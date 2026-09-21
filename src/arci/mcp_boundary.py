@@ -91,8 +91,18 @@ def _id_key(value: JsonValue) -> bytes:
     return canonical_json(value)
 
 
+def _task_file(workdir: str) -> str:
+    """The task JSON the parent wrote into the trial directory before starting us."""
+    return os.path.join(workdir, "task.json")
+
+
 def _expand(values: tuple[str, ...], workdir: str, seed: int) -> list[str]:
-    return [item.replace("{workdir}", workdir).replace("{seed}", str(seed)) for item in values]
+    return [
+        item.replace("{workdir}", workdir)
+        .replace("{seed}", str(seed))
+        .replace("{task_file}", _task_file(workdir))
+        for item in values
+    ]
 
 
 def _error_result(kind: str, text: str) -> dict[str, JsonValue]:
@@ -498,6 +508,7 @@ class _Boundary:
         env = {**os.environ, **server_spec.env}
         env["ARCI_WORKDIR"] = self.workdir
         env["ARCI_SEED"] = str(self.spec.seed)
+        env["ARCI_TASK_FILE"] = _task_file(self.workdir)
         self.server = subprocess.Popen(
             _expand(server_spec.argv, self.workdir, self.spec.seed),
             stdin=subprocess.PIPE,

@@ -258,7 +258,8 @@ class McpServerSpec(Model):
     notifications/initialized, ping, tools/list and SERIAL tools/call with `resultType`
     "complete". Anything else the boundary cannot faithfully record or replay (task results,
     sampling, elicitation, concurrent calls) is a harness fault, not a silent pass-through.
-    `argv` may use {workdir} and {seed}.
+    `argv` may use {workdir}, {seed} and {task_file}; the server also gets ARCI_WORKDIR,
+    ARCI_SEED and ARCI_TASK_FILE in its environment.
     """
 
     name: str = "env"

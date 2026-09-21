@@ -183,8 +183,9 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
      it under `/tmp` with `tempfile.mkdtemp(prefix="arci-", dir="/tmp")`), always removed;
   2. `sys.executable -P -m arci.mcp_boundary`: harness-owned. Reads its config (spec, nonce, socket
      path, workdir) as ONE JSON document on stdin. In RECORD/LIVE mode it starts the real server
-     (`mcp_server.argv`, placeholders `{workdir}` and `{seed}` expanded, `mcp_server.env` merged,
-     `ARCI_WORKDIR` and `ARCI_SEED` set), listens on the socket, accepts exactly one connection,
+     (`mcp_server.argv`, placeholders `{workdir}`, `{seed}` and `{task_file}` expanded,
+     `mcp_server.env` merged, `ARCI_WORKDIR`, `ARCI_SEED` and `ARCI_TASK_FILE` set; the task file
+     is `<trial dir>/task.json`, written by the parent before the boundary starts), listens on the socket, accepts exactly one connection,
      relays newline-delimited JSON-RPC both ways, and intercepts `tools/call`. It writes the same
      authenticated frames the v0.1 worker writes (events, latches, final result with `recording`)
      to ITS stdout. It prints a ready frame once the socket is listening; the parent starts the
