@@ -20,6 +20,27 @@ Latch = Callable[[str], None]
 JsonT = TypeVar("JsonT", bound=JsonValue)
 
 
+def format_diagnostic(value: BaseException | str) -> str:
+    """Return a deterministic, one-line, UTF-8-safe diagnostic without raising."""
+    fallback = "<unprintable diagnostic>"
+    try:
+        if isinstance(value, BaseException):
+            name = type(value).__name__
+            fallback = f"<unprintable {name}>"
+            try:
+                message = str(value)
+            except BaseException:
+                text = fallback
+            else:
+                text = f"{name}: {message}" if message else name
+        else:
+            text = value
+        text = text.encode("utf-8", errors="replace").decode("utf-8")
+        return normalise(text)
+    except BaseException:
+        return fallback
+
+
 def _arguments_sha256(arguments: dict[str, JsonValue]) -> str:
     return hash_record(arguments)
 
@@ -150,7 +171,7 @@ class ToolBox:
             self.__model_steps += 1
             self.__emit("model_step", event_payload)
         except BaseException as exc:
-            detail = normalise(f"{type(exc).__name__}: {exc}")
+            detail = format_diagnostic(exc)
             self.__mark_harness(detail)
             raise
 
@@ -226,7 +247,7 @@ class ToolBox:
         except (BudgetExceeded, ReplayMiss, ToolFault):
             raise
         except BaseException as exc:
-            detail = normalise(f"{type(exc).__name__}: {exc}")
+            detail = format_diagnostic(exc)
             self.__mark_harness(detail)
             raise
 
@@ -251,10 +272,14 @@ class ToolBox:
 
     def __execute(self, call: ToolCall) -> ToolResult:
         for perturbation in self.__perturbations:
-            injected = perturbation.before(
-                call.model_copy(deep=True),
-                random.Random(f"{self.__seed}:fault:{perturbation.name}"),
-            )
+            try:
+                injected = perturbation.before(
+                    call.model_copy(deep=True),
+                    random.Random(f"{self.__seed}:fault:{perturbation.name}"),
+                )
+            except BaseException as exc:
+                self.__mark_harness(format_diagnostic(exc))
+                raise
             if injected is not None:
                 result = _require_result(injected, "before()").model_copy(deep=True)
                 self.__validate_result(call, result)
@@ -278,7 +303,7 @@ class ToolBox:
                     tool=call.tool,
                     ok=False,
                     error_kind="error",
-                    error_detail=normalise(f"{type(exc).__name__}: {exc}"),
+                    error_detail=format_diagnostic(exc),
                 )
             else:
                 result = ToolResult(
@@ -290,14 +315,16 @@ class ToolBox:
         self.__validate_result(call, result)
 
         for perturbation in self.__perturbations:
-            rewritten = _require_result(
-                perturbation.after(
+            try:
+                rewritten_value = perturbation.after(
                     call.model_copy(deep=True),
                     result.model_copy(deep=True),
                     random.Random(f"{self.__seed}:fault:{perturbation.name}"),
-                ),
-                "after()",
-            )
+                )
+            except BaseException as exc:
+                self.__mark_harness(format_diagnostic(exc))
+                raise
+            rewritten = _require_result(rewritten_value, "after()")
             result = rewritten
             self.__validate_result(call, result)
         copied = result.model_copy(deep=True)

@@ -122,3 +122,20 @@ def test_gate_returns_error_when_adjusted_tail_is_outside_supported_range() -> N
 
     assert decision.verdict is Verdict.ERROR
     assert "statistical interval error" in decision.reasons
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"alpha": 10**400},
+        {"delta": 10**400},
+        {"n_per_arm": 10**400},
+        {"alpha": float("inf")},
+        {"delta": float("nan")},
+    ],
+)
+def test_gate_error_fallback_survives_absurd_typed_values(update: dict[str, object]) -> None:
+    decision = decide(manifest().model_copy(update=update), ())
+
+    assert decision.verdict is Verdict.ERROR
+    assert decision.validate_seal()

@@ -47,3 +47,17 @@ def test_caught_model_step_budget_is_still_a_budget_failure() -> None:
     assert trial.final_state is not None and trial.final_state["stored"] == 42
     assert trial.outcome is Outcome.FAIL
     assert trial.termination is Termination.BUDGET
+
+
+def test_large_grader_result_is_drained_while_process_runs() -> None:
+    many = tuple(f"missing_tool_{index:04d}" for index in range(2000))
+    trial = run_trial(
+        spec("good_agent", condition=COND_CLEAN),
+        lambda _event: None,
+        contract(required_tools=many),
+    )
+
+    assert trial.contract is not None
+    assert len(trial.contract.violations) == 2000
+    assert trial.outcome is Outcome.FAIL
+    assert trial.termination is Termination.COMPLETED
