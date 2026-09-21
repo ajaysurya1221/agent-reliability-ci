@@ -8,9 +8,11 @@ import os
 import queue
 import secrets
 import select
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Sequence
@@ -260,20 +262,24 @@ def _grade(
     *,
     run_oracle: bool,
     extra_pythonpath: Sequence[str],
-) -> ContractResult:
+    snapshot: str | None = None,
+    workdir: str | None = None,
+) -> tuple[ContractResult, dict[str, JsonValue] | None]:
     deadline = time.monotonic() + spec.budgets.grader_seconds
     try:
-        request = canonical_json(
-            {
-                "contract": contract.model_dump(mode="json"),
-                "events": [event.model_dump(mode="json") for event in events],
-                "task": spec.task,
-                "final_state": final_state,
-                "run_oracle": run_oracle,
-            }
-        )
+        request_data: dict[str, object] = {
+            "contract": contract.model_dump(mode="json"),
+            "events": [event.model_dump(mode="json") for event in events],
+            "task": spec.task,
+            "final_state": final_state,
+            "run_oracle": run_oracle,
+        }
+        if snapshot is not None:
+            request_data["snapshot"] = snapshot
+            request_data["workdir"] = workdir
+        request = canonical_json(request_data)
     except (TypeError, ValueError, UnicodeError):
-        return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
+        return ContractResult(success=False, grader_error=_GRADER_OUTPUT), final_state
     env = os.environ.copy()
     env["PYTHONPATH"] = _pythonpath(extra_pythonpath)
     process: subprocess.Popen[bytes] | None = None
@@ -333,20 +339,31 @@ def _grade(
             with contextlib.suppress(Exception):
                 process.wait()
             reader_stop.set()
-            return ContractResult(success=False, grader_error=_GRADER_TIMEOUT)
+            return ContractResult(success=False, grader_error=_GRADER_TIMEOUT), final_state
         _kill_group(process)
         reader_stop.set()
         reader_done.wait(timeout=max(0.0, deadline - time.monotonic()))
         if exit_code != 0:
-            return ContractResult(success=False, grader_error=_GRADER_EXIT)
+            return ContractResult(success=False, grader_error=_GRADER_EXIT), final_state
         if not reader_done.is_set() or reader_failed.is_set():
-            return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
+            return ContractResult(success=False, grader_error=_GRADER_OUTPUT), final_state
         try:
-            return ContractResult.model_validate_json(b"".join(chunks))
+            decoded = json.loads(b"".join(chunks))
+            if snapshot is None:
+                return ContractResult.model_validate(decoded), final_state
+            if not isinstance(decoded, dict):
+                raise TypeError("grader response is not an object")
+            graded_state = decoded.get("final_state")
+            if graded_state is not None and not isinstance(graded_state, dict):
+                raise TypeError("grader final state is invalid")
+            return (
+                ContractResult.model_validate(decoded.get("contract")),
+                cast(dict[str, JsonValue] | None, graded_state),
+            )
         except Exception:
-            return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
+            return ContractResult(success=False, grader_error=_GRADER_OUTPUT), final_state
     except BaseException:
-        return ContractResult(success=False, grader_error=_GRADER_EXIT)
+        return ContractResult(success=False, grader_error=_GRADER_EXIT), final_state
     finally:
         if process is not None:
             _kill_group(process)
@@ -359,7 +376,7 @@ def _grade(
                 process.wait()
 
 
-def _run_trial(
+def _run_python_trial(
     spec: TrialSpec,
     emit_event: EmitEvent,
     contract: ContractSpec,
@@ -682,7 +699,7 @@ def _run_trial(
         and worker_result is not None
         and final_state is not None
     )
-    contract_result = _grade(
+    contract_result, _graded_state = _grade(
         spec,
         contract,
         events,
@@ -738,6 +755,457 @@ def _run_trial(
     )
 
 
+def _protocol_reader(
+    process: subprocess.Popen[bytes],
+    messages: queue.Queue[tuple[str, object]],
+    stop: threading.Event,
+) -> None:
+    buffer = bytearray()
+
+    def send(kind: str, value: object) -> bool:
+        while True:
+            try:
+                messages.put((kind, value), timeout=0.05)
+                return True
+            except queue.Full:
+                if stop.is_set():
+                    return False
+
+    try:
+        assert process.stdout is not None
+        while True:
+            timeout = 0.0 if stop.is_set() else 0.05
+            ready, _, _ = select.select([process.stdout.fileno()], [], [], timeout)
+            if not ready:
+                if stop.is_set():
+                    if buffer:
+                        send("protocol_error", "partial boundary protocol line")
+                    return
+                continue
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
+                if buffer:
+                    send("protocol_error", "partial boundary protocol line")
+                return
+            buffer.extend(chunk)
+            while True:
+                newline = buffer.find(b"\n")
+                if newline < 0:
+                    if len(buffer) > _MAX_PROTOCOL_LINE:
+                        send("protocol_error", "boundary protocol line too long")
+                        return
+                    break
+                line = bytes(buffer[:newline])
+                del buffer[: newline + 1]
+                if len(line) > _MAX_PROTOCOL_LINE:
+                    send("protocol_error", "boundary protocol line too long")
+                    return
+                if not send("line", line):
+                    return
+    except BaseException:
+        send("protocol_error", "boundary protocol reader failed")
+    finally:
+        send("reader_done", None)
+
+
+def _expand_command(
+    values: Sequence[str], *, mcp_config: str, task_file: str, workdir: str, seed: int
+) -> list[str]:
+    replacements = {
+        "{mcp_config}": mcp_config,
+        "{task_file}": task_file,
+        "{workdir}": workdir,
+        "{seed}": str(seed),
+    }
+    expanded: list[str] = []
+    for value in values:
+        for marker, replacement in replacements.items():
+            value = value.replace(marker, replacement)
+        expanded.append(value)
+    return expanded
+
+
+def _run_command_trial(
+    spec: TrialSpec,
+    emit_event: EmitEvent,
+    contract: ContractSpec,
+    *,
+    extra_pythonpath: Sequence[str] = (),
+) -> TrialEnvelope:
+    """Run a command agent and its harness-owned MCP boundary."""
+    started = time.monotonic()
+    deadline = started + spec.budgets.max_seconds
+    validate_contract(contract)
+    if spec.command is None or spec.mcp_server is None:
+        raise ValueError("command trial requires command and mcp_server")
+
+    directory = tempfile.mkdtemp(prefix="arci-", dir="/tmp")
+    socket_path = str(Path(directory) / "mcp.sock")
+    task_path = str(Path(directory) / "task.json")
+    config_path = str(Path(directory) / "mcp.json")
+    events: list[Event] = []
+    worker_result: dict[str, Any] | None = None
+    parent_latches: dict[str, str] = {}
+    protocol_error: str | None = None
+    sink_error: str | None = None
+    ready_seen = False
+    result_seen = False
+    expected_seq = 0
+    tool_starts = 0
+    timed_out = False
+    boundary_exit: int | None = None
+    agent_exit: int | None = None
+    boundary: subprocess.Popen[bytes] | None = None
+    agent: subprocess.Popen[bytes] | None = None
+    nonce = secrets.token_hex(16)
+    messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=_PROTOCOL_QUEUE_SIZE)
+    reader_stop = threading.Event()
+    reader: threading.Thread | None = None
+
+    def stop_all() -> None:
+        if agent is not None:
+            _kill_group(agent)
+        if boundary is not None:
+            _kill_group(boundary)
+
+    def deliver(event: Event) -> None:
+        nonlocal sink_error
+        events.append(event)
+        if sink_error is None:
+            try:
+                emit_event(event)
+            except BaseException:
+                sink_error = "event sink failed"
+                stop_all()
+
+    def consume(message_kind: str, value: object) -> None:
+        nonlocal protocol_error, ready_seen, result_seen, worker_result
+        nonlocal expected_seq, tool_starts
+        if message_kind == "reader_done":
+            return
+        if protocol_error is not None or sink_error is not None:
+            return
+        if message_kind == "protocol_error":
+            protocol_error = cast(str, value)
+            stop_all()
+            return
+        try:
+            decoded = json.loads(cast(bytes, value).decode("utf-8", errors="replace"))
+            if not isinstance(decoded, dict):
+                raise TypeError("protocol frame is not an object")
+            canonical_json(decoded)
+            if decoded.get("nonce") != nonce:
+                raise ValueError("protocol nonce mismatch")
+            kind = decoded.get("kind")
+            if kind == "ready":
+                if ready_seen or result_seen:
+                    raise ValueError("invalid boundary ready frame")
+                ready_seen = True
+            elif kind == "event":
+                if result_seen:
+                    raise ValueError("event after boundary result")
+                event = Event.model_validate(decoded.get("event"))
+                if event.kind == "trial_end":
+                    raise ValueError("boundary emitted trial_end")
+                if event.trial_id != spec.trial_id or event.seq != expected_seq:
+                    raise ValueError("invalid event identity or sequence")
+                if not _valid_event_payload(event, tool_starts):
+                    raise ValueError("invalid event payload")
+                deliver(event)
+                expected_seq += 1
+                if event.kind == "tool_start":
+                    tool_starts += 1
+            elif kind == "result":
+                if result_seen:
+                    raise ValueError("duplicate boundary result")
+                worker_result = _validate_worker_result(decoded.get("result"))
+                result_seen = True
+            elif kind == "latch":
+                latch = decoded.get("latch")
+                detail = decoded.get("detail")
+                if result_seen or latch not in {"replay_miss", "harness_error", "budget"}:
+                    raise ValueError("invalid boundary latch")
+                if not isinstance(detail, str):
+                    raise TypeError("boundary latch detail is not a string")
+                parent_latches.setdefault(cast(str, latch), detail)
+            else:
+                raise ValueError("invalid boundary protocol frame kind")
+        except Exception:
+            protocol_error = "invalid boundary protocol"
+            stop_all()
+
+    try:
+        Path(task_path).write_bytes(canonical_json(spec.task) + b"\n")
+        mcp_config = {
+            "mcpServers": {
+                spec.mcp_server.name: {
+                    "command": sys.executable,
+                    "args": ["-P", "-m", "arci.mcp_shim", "--socket", socket_path],
+                    "env": {},
+                }
+            }
+        }
+        Path(config_path).write_bytes(canonical_json(mcp_config) + b"\n")
+
+        boundary_env = os.environ.copy()
+        boundary_env["PYTHONPATH"] = _pythonpath(extra_pythonpath)
+        boundary = subprocess.Popen(
+            [sys.executable, "-P", "-m", "arci.mcp_boundary"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=boundary_env,
+            start_new_session=True,
+        )
+        assert boundary.stdin is not None and boundary.stdout is not None
+        boundary_request = canonical_json(
+            {
+                "nonce": nonce,
+                "spec": spec.model_dump(mode="json"),
+                "socket_path": socket_path,
+                "workdir": directory,
+            }
+        )
+
+        def write_boundary_config() -> None:
+            try:
+                assert boundary is not None and boundary.stdin is not None
+                boundary.stdin.write(boundary_request)
+                boundary.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
+            finally:
+                with contextlib.suppress(Exception):
+                    assert boundary is not None and boundary.stdin is not None
+                    boundary.stdin.close()
+
+        threading.Thread(target=write_boundary_config, daemon=True).start()
+        reader = threading.Thread(
+            target=_protocol_reader, args=(boundary, messages, reader_stop), daemon=True
+        )
+        reader.start()
+
+        while not ready_seen and boundary_exit is None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = boundary.poll() is None
+                stop_all()
+                break
+            boundary_exit = boundary.poll()
+            if boundary_exit is not None:
+                break
+            try:
+                message_kind, value = messages.get(timeout=min(remaining, 0.05))
+            except queue.Empty:
+                continue
+            consume(message_kind, value)
+            if protocol_error is not None or sink_error is not None:
+                break
+
+        if ready_seen and protocol_error is None and sink_error is None:
+            command_env = {**os.environ, **spec.command.env}
+            command_env.update(
+                {
+                    "ARCI_MCP_CONFIG": config_path,
+                    "ARCI_TASK_FILE": task_path,
+                    "ARCI_WORKDIR": directory,
+                    "ARCI_SEED": str(spec.seed),
+                    "PYTHONPATH": _pythonpath(extra_pythonpath),
+                }
+            )
+            agent = subprocess.Popen(
+                _expand_command(
+                    spec.command.argv,
+                    mcp_config=config_path,
+                    task_file=task_path,
+                    workdir=directory,
+                    seed=spec.seed,
+                ),
+                cwd=directory,
+                env=command_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
+        boundary_stop_requested = False
+        while boundary_exit is None or (agent is not None and agent_exit is None):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = (boundary is not None and boundary.poll() is None) or (
+                    agent is not None and agent.poll() is None
+                )
+                stop_all()
+                break
+            if agent is not None and agent_exit is None:
+                agent_exit = agent.poll()
+                if agent_exit is not None and not boundary_stop_requested and boundary is not None:
+                    with contextlib.suppress(OSError):
+                        os.kill(boundary.pid, signal.SIGTERM)
+                    boundary_stop_requested = True
+            if boundary is not None and boundary_exit is None:
+                boundary_exit = boundary.poll()
+            if boundary_exit is not None and (agent is None or agent_exit is not None):
+                break
+            try:
+                message_kind, value = messages.get(timeout=min(remaining, 0.05))
+            except queue.Empty:
+                continue
+            consume(message_kind, value)
+
+        if boundary is not None and boundary_exit is None:
+            with contextlib.suppress(Exception):
+                boundary_exit = boundary.wait(timeout=max(0.0, deadline - time.monotonic()))
+        if agent is not None and agent_exit is None:
+            with contextlib.suppress(Exception):
+                agent_exit = agent.wait(timeout=max(0.0, deadline - time.monotonic()))
+
+        while (reader.is_alive() or not messages.empty()) and time.monotonic() < deadline:
+            try:
+                message_kind, value = messages.get(
+                    timeout=min(0.05, max(0.0, deadline - time.monotonic()))
+                )
+            except queue.Empty:
+                continue
+            consume(message_kind, value)
+    except BaseException as exc:
+        protocol_error = format_diagnostic(exc)
+    finally:
+        reader_stop.set()
+        stop_all()
+        for process in (agent, boundary):
+            if process is None:
+                continue
+            with contextlib.suppress(Exception):
+                if process.stdin is not None:
+                    process.stdin.close()
+                if process.stdout is not None:
+                    process.stdout.close()
+            with contextlib.suppress(Exception):
+                code = process.wait()
+                if process is agent:
+                    agent_exit = code
+                else:
+                    boundary_exit = code
+
+    try:
+        if not events:
+            deliver(
+                Event(
+                    trial_id=spec.trial_id,
+                    seq=0,
+                    kind="trial_start",
+                    payload={"seed": spec.seed, "arm": spec.arm, "variant": spec.variant},
+                )
+            )
+
+        worker_latches: dict[str, object] = (
+            {} if worker_result is None else cast(dict[str, object], worker_result["latches"])
+        )
+        replay_error = parent_latches.get("replay_miss") or worker_latches.get("replay")
+        harness_error = (
+            sink_error
+            or protocol_error
+            or parent_latches.get("harness_error")
+            or cast(str | None, worker_latches.get("harness"))
+        )
+        budget_error = parent_latches.get("budget") or worker_latches.get("budget")
+
+        if timed_out:
+            base_termination = Termination.TIMEOUT
+            detail = "trial exceeded max_seconds"
+        elif agent is None:
+            base_termination = Termination.HARNESS_ERROR
+            detail = "boundary exited before ready"
+        elif agent_exit is None or agent_exit != 0:
+            base_termination = Termination.CRASH
+            detail = "command exited non-zero" if agent_exit is not None else "command did not exit"
+        elif boundary_exit is None or boundary_exit != 0 or worker_result is None:
+            base_termination = Termination.HARNESS_ERROR
+            detail = "boundary exited before returning"
+        else:
+            base_termination = Termination.COMPLETED
+            detail = ""
+
+        if isinstance(replay_error, str):
+            termination = Termination.REPLAY_MISS
+            detail = "recording was not consumed exactly"
+        elif harness_error is not None:
+            termination = Termination.HARNESS_ERROR
+            detail = harness_error
+        elif isinstance(budget_error, str):
+            termination = Termination.BUDGET
+            detail = budget_error
+        else:
+            termination = base_termination
+
+        recording = tuple(
+            RecordedCall.model_validate(item)
+            for item in (() if worker_result is None else worker_result["recording"])
+        )
+        agent_claimed_success = None if agent is None or agent_exit is None else agent_exit == 0
+        replay_state = spec.replay_final_state if spec.tool_mode is ToolMode.REPLAY else None
+        run_oracle = termination is Termination.COMPLETED and agent_exit == 0
+        snapshot_ref = spec.mcp_server.snapshot if spec.tool_mode is not ToolMode.REPLAY else None
+        contract_result, final_state = _grade(
+            spec,
+            contract,
+            events,
+            replay_state,
+            run_oracle=run_oracle,
+            extra_pythonpath=extra_pythonpath,
+            snapshot=snapshot_ref,
+            workdir=directory if snapshot_ref is not None else None,
+        )
+        if contract_result.grader_error is not None and termination not in {
+            Termination.REPLAY_MISS,
+            Termination.HARNESS_ERROR,
+        }:
+            termination = Termination.GRADER_ERROR
+            detail = contract_result.grader_error
+
+        outcome, failure_fingerprint, failure_detail = _failure(
+            termination, contract_result, events, detail
+        )
+        terminal = _terminal_event(spec, len(events))
+        deliver(terminal)
+        if sink_error is not None and termination is not Termination.REPLAY_MISS:
+            termination = Termination.HARNESS_ERROR
+            outcome, failure_fingerprint, failure_detail = _failure(
+                termination, contract_result, events, sink_error
+            )
+        usage = Usage(
+            tool_calls=sum(event.kind == "tool_start" for event in events),
+            model_steps=0,
+            wall_seconds=time.monotonic() - started,
+        )
+        return TrialEnvelope.create(
+            spec_sha256=spec_sha256(spec),
+            experiment_id=spec.experiment_id,
+            trial_id=spec.trial_id,
+            pair_id=spec.pair_id,
+            arm=spec.arm,
+            variant=spec.variant,
+            task_id=spec.task_id,
+            condition_id=spec.condition.condition_id,
+            seed=spec.seed,
+            outcome=outcome,
+            termination=termination,
+            agent_claimed_success=agent_claimed_success,
+            contract=contract_result,
+            failure_fingerprint=failure_fingerprint,
+            failure_detail=failure_detail,
+            events=tuple(events),
+            incomplete_calls=_incomplete_calls(events),
+            recording=recording,
+            final_state=final_state,
+            usage=usage,
+        )
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
 def run_trial(
     spec: TrialSpec,
     emit_event: EmitEvent,
@@ -754,12 +1222,14 @@ def run_trial(
         emit_event(event)
 
     try:
-        return _run_trial(
-            spec,
-            tracked_emit,
-            contract,
-            extra_pythonpath=extra_pythonpath,
-        )
+        if spec.command is not None:
+            return _run_command_trial(
+                spec,
+                tracked_emit,
+                contract,
+                extra_pythonpath=extra_pythonpath,
+            )
+        return _run_python_trial(spec, tracked_emit, contract, extra_pythonpath=extra_pythonpath)
     except BaseException as exc:
         detail = format_diagnostic(exc) or "trial harness failed"
         try:

@@ -119,11 +119,15 @@ def main() -> int:
 
     try:
         with contextlib.redirect_stdout(sys.stderr):
+            if spec.agent is None:
+                raise ValueError("python trial has no agent")
             agent = cast(AgentFn, resolve(spec.agent))
             if spec.tool_mode is ToolMode.REPLAY:
                 tools = {}
                 perturbations = ()
             else:
+                if spec.toolset is None:
+                    raise ValueError("python trial has no toolset")
                 toolset_factory = cast(ToolSetFactory, resolve(spec.toolset))
                 toolset = toolset_factory(copy.deepcopy(spec.task), spec.seed)
                 tools = toolset.tools
