@@ -22,10 +22,12 @@ First release. One claim: a measured regression becomes an executable, reduced f
 ### How it was checked
 
 229 tests, basedpyright strict, CI on Python 3.11 and 3.14. The acceptance suite was written before
-the implementation and is hash-pinned (`FROZEN.sha256`). An adversarial reviewer attacked the code at
-four checkpoints with reproductions; 40 findings were fixed and each has a frozen regression test
-(`tests/acceptance/test_hardening*.py`). Every published calibration number was recomputed
-independently by the reviewer and matched.
+the implementation and is hash-pinned (`FROZEN.sha256`). An adversarial reviewer attacked the design and
+the code in four rounds, with reproductions: about 45 findings. They were fixed, or, where out of
+scope (a hostile in-process agent, detached descendants), documented as non-goals. The behavioural
+fixes have frozen regression tests (`tests/acceptance/test_hardening*.py` and the gate, replay and
+schema suites); documentation corrections and the protocol queue bound do not. Every published
+calibration number was recomputed independently by the reviewer and matched.
 
 ### Known limits and residual risks
 
