@@ -468,7 +468,9 @@ class _Boundary:
                 tool=call.tool,
                 ok=mcp_value.get("isError") is not True,
                 value=mcp_value,
-                error_kind="mcp_error" if mcp_value.get("isError") is True else None,
+                # The server reported a tool-level failure. "mcp_error" is reserved for
+                # JSON-RPC protocol errors.
+                error_kind="tool_error" if mcp_value.get("isError") is True else None,
             )
             rewritten = self._apply_after(call, result)
             if rewritten.value is None and rewritten.injected_by is not None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import inspect
 import json
 import os
 import sys
@@ -72,6 +73,48 @@ def _error(request_id: JsonValue, code: int, message: str) -> dict[str, JsonValu
     }
 
 
+_JSON_TYPES: dict[object, str] = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    "str": "string",
+    "int": "integer",
+    "float": "number",
+    "bool": "boolean",
+}
+
+
+def _input_schema(tool: Callable[..., JsonValue]) -> JsonValue:
+    """A JSON Schema for the tool's keyword arguments, read from its Python signature.
+
+    A model can only call a tool correctly if it is told the parameter names. Parameters
+    without a default are required; simple annotations become JSON types.
+    """
+    properties: dict[str, JsonValue] = {}
+    required: list[JsonValue] = []
+    try:
+        parameters = inspect.signature(tool).parameters.values()
+    except (TypeError, ValueError):
+        return {"type": "object"}
+    for parameter in parameters:
+        if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+            continue
+        json_type = _JSON_TYPES.get(parameter.annotation)
+        properties[parameter.name] = {"type": json_type} if json_type else {}
+        if parameter.default is parameter.empty:
+            required.append(parameter.name)
+    schema: dict[str, JsonValue] = {"type": "object", "properties": properties}
+    if required:
+        schema["required"] = required
+    return schema
+
+
+def _describe(name: str, tool: Callable[..., JsonValue]) -> str:
+    doc = inspect.getdoc(tool)
+    return doc.splitlines()[0] if doc else name
+
+
 class ToolSetServer:
     """Small synchronous server; the boundary guarantees serial tool calls."""
 
@@ -120,10 +163,10 @@ class ToolSetServer:
             tools: list[JsonValue] = [
                 {
                     "name": name,
-                    "description": name,
-                    "inputSchema": {"type": "object"},
+                    "description": _describe(name, tool),
+                    "inputSchema": _input_schema(tool),
                 }
-                for name in self._tools
+                for name, tool in self._tools.items()
             ]
             return _reply(request_id, result={"tools": tools})
         if method == "tools/call":

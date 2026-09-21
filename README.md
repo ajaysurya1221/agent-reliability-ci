@@ -12,7 +12,8 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.1.0. Python agents that use the declared tool boundary. Read
+Status: v0.2.0. Python agents that use the declared tool boundary, and any program that speaks MCP
+over stdio. Read
 [what it does not do](#limits) before you rely on it.
 
 ## Why
@@ -48,6 +49,21 @@ refactoring slip: when `reserve` times out it carries on to `confirm` and still 
 failure rate comes from the environment. Reservations already exist with configured probability
 65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`), and in those
 the missing retry never matters. That is exactly why one run hides it.
+
+## Real agents (v0.2)
+
+An agent does not have to be a Python function. A **command agent** is any program that speaks MCP
+over stdio: `arci` owns the one MCP server behind it, so every tool call is recorded, budgeted,
+fault-injected and replayable, from outside the agent's process.
+
+```text
+your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (the environment)
+                          byte relay        recorder, faults,     yours, or any python toolset via
+                                            budgets, latches      python -m arci.mcp_toolset_server
+```
+
+[docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) has the recipe and a worked example: a real tool-calling
+agent on a local Ollama model whose two arms differ by one sentence of the system prompt.
 
 ## How it works
 
@@ -174,7 +190,9 @@ unless you set `allow-inconclusive: "true"`.
   `--include` (the minimiser's output embeds none), so portable replay needs the referenced code and
   a compatible environment.
 - **A divergence is evidence, not proof of cause.** It shows where two runs part ways.
-- No importers (OTLP, Claude Code, Codex), no non-Python agents, no HTML report yet.
+- Command agents get one stdio MCP server, serial tool calls, no HTTP transport. Tool replay is not
+  agent replay: a live model rarely repeats its calls exactly.
+- No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only.
 
 ## Development
 

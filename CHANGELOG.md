@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.2.0 (2026-09-21)
+
+Command agents: test any program that speaks MCP over stdio, not only Python functions.
+
+### Added
+
+- **The out-of-process boundary.** A trial can be any subprocess (`CommandSpec`). Its tools are ONE
+  stdio MCP server owned by the harness (`McpServerSpec`). The agent's process tree holds only a
+  byte-relay shim (`arci.mcp_shim`); the recorder, fault injection, budgets and fault latches live in
+  a harness-owned boundary process (`arci.mcp_boundary`). Same frame protocol, latch precedence,
+  deadlines, process-group cleanup and sealed envelopes as v0.1.
+- Supported MCP subset (revision 2026-07-28): `initialize`, `notifications/initialized`, `ping`,
+  `tools/list`, serial `tools/call` with `resultType: "complete"`. Task results, sampling,
+  elicitation and concurrent calls are a harness ERROR, never a silent pass-through.
+- Replay for command agents: the recording includes `initialize` and `tools/list`, the server is
+  never started, JSON-RPC ids are normalised, consumption must be exact.
+- `arci.mcp_toolset_server`: serve any v0.1 python toolset as an MCP server, with a trusted
+  `snapshot` for grading.
+- `examples/ollama_mcp_agent`: a real tool-calling agent on a local model, with a one-sentence
+  prompt regression between its arms. `docs/REAL_AGENTS.md`, `docs/design/0002-...md`.
+- Schema `arci/0.2`: `ArmSpec.command`, `Manifest.mcp_server`, `McpServerSpec.snapshot`. An
+  experiment is all python agents or all command agents. v0.1 run stores must be re-run.
+
+### Trust model
+
+For command agents the record can no longer be corrupted by accident from inside the agent's
+process. This is isolation from accident, not a sandbox: the agent still holds the socket it was
+given, and whatever it does outside MCP is invisible.
+
+### Known limits
+
+- One MCP server per trial, stdio only. No HTTP transport yet.
+- Tool replay is not agent replay: a live model rarely repeats its calls, so replaying its bundle is
+  usually INVALID. Deterministic replay is demonstrated only with scripted clients.
+- The Claude Code and Codex recipes in `docs/REAL_AGENTS.md` are sketches; no paid-agent trials were
+  run for this release. The local-model results are exploratory (one machine, one small model).
+- POSIX only (unix sockets, process groups).
+
 ## v0.1.0 (2026-09-21)
 
 First release. One claim: a measured regression becomes an executable, reduced failure case.
