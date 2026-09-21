@@ -7,6 +7,7 @@ import json
 import os
 import queue
 import secrets
+import select
 import signal
 import subprocess
 import sys
@@ -21,7 +22,7 @@ from pydantic import JsonValue
 
 from arci.contracts import validate_contract
 from arci.fingerprint import fingerprint, normalise
-from arci.hashing import hash_record
+from arci.hashing import canonical_json, hash_record
 from arci.interfaces import EmitEvent
 from arci.schedule import build_schedule, spec_sha256
 from arci.schema import (
@@ -41,6 +42,7 @@ from arci.schema import (
 from arci.storage import ExperimentStore
 
 _MAX_PROTOCOL_LINE = 1024 * 1024
+_PROTOCOL_QUEUE_SIZE = 256
 _GRADER_TIMEOUT = "grader timed out"
 _GRADER_EXIT = "grader exited non-zero"
 _GRADER_OUTPUT = "grader returned invalid output"
@@ -63,12 +65,12 @@ def _kill_group(process: subprocess.Popen[bytes]) -> None:
         os.killpg(process.pid, signal.SIGKILL)
 
 
-def _terminal_event(spec: TrialSpec, seq: int, termination: Termination) -> Event:
+def _terminal_event(spec: TrialSpec, seq: int) -> Event:
     return Event(
         trial_id=spec.trial_id,
         seq=seq,
         kind="trial_end",
-        payload={"termination": termination.value},
+        payload={},
     )
 
 
@@ -136,6 +138,10 @@ def _failure(
 
 def _valid_event_payload(event: Event, tool_starts: int) -> bool:
     payload = event.payload
+    try:
+        canonical_json(event.model_dump(mode="python"))
+    except (TypeError, ValueError, UnicodeError):
+        return False
     if event.kind == "trial_start":
         return (
             isinstance(payload.get("seed"), int)
@@ -185,6 +191,7 @@ def _valid_event_payload(event: Event, tool_starts: int) -> bool:
 def _validate_worker_result(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise TypeError("worker result is not an object")
+    canonical_json(value)
     Termination(value.get("termination"))
     if not isinstance(value.get("detail"), str):
         raise TypeError("worker detail is not a string")
@@ -253,17 +260,18 @@ def _grade(
     run_oracle: bool,
     extra_pythonpath: Sequence[str],
 ) -> ContractResult:
-    request = json.dumps(
-        {
-            "contract": contract.model_dump(mode="json"),
-            "events": [event.model_dump(mode="json") for event in events],
-            "task": spec.task,
-            "final_state": final_state,
-            "run_oracle": run_oracle,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    try:
+        request = canonical_json(
+            {
+                "contract": contract.model_dump(mode="json"),
+                "events": [event.model_dump(mode="json") for event in events],
+                "task": spec.task,
+                "final_state": final_state,
+                "run_oracle": run_oracle,
+            }
+        )
+    except (TypeError, ValueError, UnicodeError):
+        return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
     env = os.environ.copy()
     env["PYTHONPATH"] = _pythonpath(extra_pythonpath)
     process: subprocess.Popen[bytes] | None = None
@@ -276,21 +284,46 @@ def _grade(
             env=env,
             start_new_session=True,
         )
+        assert process.stdin is not None and process.stdout is not None
+
+        def write_request() -> None:
+            try:
+                assert process is not None and process.stdin is not None
+                process.stdin.write(request + b"\n")
+                process.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
+            finally:
+                with contextlib.suppress(Exception):
+                    assert process is not None and process.stdin is not None
+                    process.stdin.close()
+
+        threading.Thread(target=write_request, daemon=True).start()
         try:
-            stdout, _ = process.communicate(
-                input=request + b"\n", timeout=spec.budgets.grader_seconds
-            )
+            exit_code = process.wait(timeout=spec.budgets.grader_seconds)
         except subprocess.TimeoutExpired:
             _kill_group(process)
-            process.communicate()
+            with contextlib.suppress(Exception):
+                process.wait()
             return ContractResult(success=False, grader_error=_GRADER_TIMEOUT)
-        if process.returncode != 0:
+        _kill_group(process)
+        os.set_blocking(process.stdout.fileno(), False)
+        chunks: list[bytes] = []
+        while True:
+            try:
+                chunk = os.read(process.stdout.fileno(), 65536)
+            except BlockingIOError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+        if exit_code != 0:
             return ContractResult(success=False, grader_error=_GRADER_EXIT)
         try:
-            return ContractResult.model_validate_json(stdout)
+            return ContractResult.model_validate_json(b"".join(chunks))
         except Exception:
             return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
-    except Exception:
+    except BaseException:
         return ContractResult(success=False, grader_error=_GRADER_EXIT)
     finally:
         if process is not None:
@@ -304,7 +337,7 @@ def _grade(
                 process.wait()
 
 
-def run_trial(
+def _run_trial(
     spec: TrialSpec,
     emit_event: EmitEvent,
     contract: ContractSpec,
@@ -314,6 +347,7 @@ def run_trial(
     """Run a trial in a process group and always return a sealed envelope."""
     started = time.monotonic()
     deadline = started + spec.budgets.max_seconds
+    validate_contract(contract)
     events: list[Event] = []
     worker_result: dict[str, Any] | None = None
     protocol_error: str | None = None
@@ -322,11 +356,12 @@ def run_trial(
     exit_code: int | None = None
     process: subprocess.Popen[bytes] | None = None
     nonce = secrets.token_hex(16)
-    messages: queue.Queue[tuple[str, object]] = queue.Queue()
-    reader_done = False
+    messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=_PROTOCOL_QUEUE_SIZE)
+    reader_stop = threading.Event()
     result_seen = False
     expected_seq = 0
     tool_starts = 0
+    parent_latches: dict[str, str] = {}
 
     def stop_worker() -> None:
         if process is not None:
@@ -378,59 +413,75 @@ def run_trial(
 
         def read_stdout() -> None:
             buffer = bytearray()
+
+            def send(message: str, value: object) -> bool:
+                while True:
+                    try:
+                        messages.put((message, value), timeout=0.05)
+                        return True
+                    except queue.Full:
+                        if reader_stop.is_set():
+                            return False
+
             try:
                 assert process is not None and process.stdout is not None
                 while True:
+                    if reader_stop.is_set():
+                        ready, _, _ = select.select([process.stdout.fileno()], [], [], 0.0)
+                        if not ready:
+                            if buffer:
+                                send("protocol_error", "partial worker protocol line")
+                            return
+                    else:
+                        ready, _, _ = select.select([process.stdout.fileno()], [], [], 0.05)
+                        if not ready:
+                            continue
                     chunk = os.read(process.stdout.fileno(), 65536)
                     if not chunk:
                         if buffer:
-                            messages.put(("protocol_error", "partial worker protocol line"))
+                            send("protocol_error", "partial worker protocol line")
                         return
                     buffer.extend(chunk)
                     while True:
                         newline = buffer.find(b"\n")
                         if newline < 0:
                             if len(buffer) > _MAX_PROTOCOL_LINE:
-                                messages.put(("protocol_error", "worker protocol line too long"))
+                                send("protocol_error", "worker protocol line too long")
                                 return
                             break
                         line = bytes(buffer[:newline])
                         del buffer[: newline + 1]
                         if len(line) > _MAX_PROTOCOL_LINE:
-                            messages.put(("protocol_error", "worker protocol line too long"))
+                            send("protocol_error", "worker protocol line too long")
                             return
-                        messages.put(("line", line))
+                        if not send("line", line):
+                            return
             except Exception:
-                messages.put(("protocol_error", "worker protocol reader failed"))
+                send("protocol_error", "worker protocol reader failed")
             finally:
-                messages.put(("reader_done", None))
-
-        def wait_process() -> None:
-            assert process is not None
-            messages.put(("process_exit", process.wait()))
+                send("reader_done", None)
 
         threading.Thread(target=write_stdin, daemon=True).start()
-        threading.Thread(target=read_stdout, daemon=True).start()
-        threading.Thread(target=wait_process, daemon=True).start()
+        reader = threading.Thread(target=read_stdout, daemon=True)
+        reader.start()
 
-        while not reader_done or exit_code is None:
+        while exit_code is None:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                timed_out = exit_code is None
+                timed_out = process.poll() is None
+                stop_worker()
+                break
+            polled = process.poll()
+            if polled is not None:
+                exit_code = polled
+                reader_stop.set()
                 stop_worker()
                 break
             try:
-                message, value = messages.get(timeout=remaining)
+                message, value = messages.get(timeout=min(remaining, 0.05))
             except queue.Empty:
-                timed_out = exit_code is None
-                stop_worker()
-                break
-            if message == "process_exit":
-                exit_code = cast(int, value)
-                stop_worker()
                 continue
             if message == "reader_done":
-                reader_done = True
                 continue
             if protocol_error is not None or sink_error is not None:
                 continue
@@ -442,6 +493,7 @@ def run_trial(
                 decoded = json.loads(cast(bytes, value).decode("utf-8", errors="replace"))
                 if not isinstance(decoded, dict):
                     raise TypeError("protocol frame is not an object")
+                canonical_json(decoded)
                 if decoded.get("nonce") != nonce:
                     raise ValueError("protocol nonce mismatch")
                 kind = decoded.get("kind")
@@ -464,14 +516,78 @@ def run_trial(
                         raise ValueError("duplicate worker result")
                     worker_result = _validate_worker_result(decoded.get("result"))
                     result_seen = True
+                elif kind == "latch":
+                    latch = decoded.get("latch")
+                    latch_detail = decoded.get("detail")
+                    if result_seen:
+                        raise ValueError("latch after worker result")
+                    if latch not in {"replay_miss", "harness_error", "budget"}:
+                        raise ValueError("invalid worker latch")
+                    if not isinstance(latch_detail, str):
+                        raise TypeError("worker latch detail is not a string")
+                    parent_latches.setdefault(latch, latch_detail)
                 else:
                     raise ValueError("invalid protocol frame kind")
             except Exception:
                 protocol_error = "invalid worker protocol"
                 stop_worker()
+
+        reader_stop.set()
+        while (reader.is_alive() or not messages.empty()) and time.monotonic() < deadline:
+            try:
+                message, value = messages.get(timeout=min(0.05, deadline - time.monotonic()))
+            except queue.Empty:
+                continue
+            if message == "reader_done":
+                continue
+            if protocol_error is not None or sink_error is not None:
+                continue
+            if message == "protocol_error":
+                protocol_error = cast(str, value)
+                continue
+            try:
+                decoded = json.loads(cast(bytes, value).decode("utf-8", errors="replace"))
+                if not isinstance(decoded, dict):
+                    raise TypeError("protocol frame is not an object")
+                canonical_json(decoded)
+                if decoded.get("nonce") != nonce:
+                    raise ValueError("protocol nonce mismatch")
+                kind = decoded.get("kind")
+                if kind == "event":
+                    if result_seen:
+                        raise ValueError("event after worker result")
+                    event = Event.model_validate(decoded.get("event"))
+                    if event.kind == "trial_end":
+                        raise ValueError("worker emitted trial_end")
+                    if event.trial_id != spec.trial_id or event.seq != expected_seq:
+                        raise ValueError("invalid event identity or sequence")
+                    if not _valid_event_payload(event, tool_starts):
+                        raise ValueError("invalid event payload")
+                    deliver(event)
+                    expected_seq += 1
+                    if event.kind == "tool_start":
+                        tool_starts += 1
+                elif kind == "result":
+                    if result_seen:
+                        raise ValueError("duplicate worker result")
+                    worker_result = _validate_worker_result(decoded.get("result"))
+                    result_seen = True
+                elif kind == "latch":
+                    latch = decoded.get("latch")
+                    latch_detail = decoded.get("detail")
+                    if result_seen or latch not in {"replay_miss", "harness_error", "budget"}:
+                        raise ValueError("invalid worker latch")
+                    if not isinstance(latch_detail, str):
+                        raise TypeError("worker latch detail is not a string")
+                    parent_latches.setdefault(cast(str, latch), latch_detail)
+                else:
+                    raise ValueError("invalid protocol frame kind")
+            except Exception:
+                protocol_error = "invalid worker protocol"
     except Exception as exc:
         protocol_error = normalise(f"{type(exc).__name__}: {exc}")
     finally:
+        reader_stop.set()
         if process is not None:
             _kill_group(process)
             with contextlib.suppress(Exception):
@@ -492,12 +608,14 @@ def run_trial(
             )
         )
 
-    replay_error = _replay_mismatch(spec, events, worker_result)
+    replay_error = parent_latches.get("replay_miss") or _replay_mismatch(
+        spec, events, worker_result
+    )
     worker_latches: dict[str, object] = (
         {} if worker_result is None else cast(dict[str, object], worker_result["latches"])
     )
-    worker_harness = worker_latches.get("harness")
-    worker_budget = worker_latches.get("budget")
+    worker_harness = parent_latches.get("harness_error") or worker_latches.get("harness")
+    worker_budget = parent_latches.get("budget") or worker_latches.get("budget")
 
     if timed_out:
         base_termination = Termination.TIMEOUT
@@ -560,13 +678,11 @@ def run_trial(
     outcome, failure_fingerprint, failure_detail = _failure(
         termination, contract_result, events, detail
     )
-    terminal = _terminal_event(spec, len(events), termination)
+    terminal = _terminal_event(spec, len(events))
     deliver(terminal)
     if sink_error is not None and termination is not Termination.REPLAY_MISS:
         termination = Termination.HARNESS_ERROR
         detail = sink_error
-        terminal = _terminal_event(spec, len(events) - 1, termination)
-        events[-1] = terminal
         outcome, failure_fingerprint, failure_detail = _failure(
             termination, contract_result, events, detail
         )
@@ -600,17 +716,78 @@ def run_trial(
     )
 
 
+def run_trial(
+    spec: TrialSpec,
+    emit_event: EmitEvent,
+    contract: ContractSpec,
+    *,
+    extra_pythonpath: Sequence[str] = (),
+) -> TrialEnvelope:
+    """Run one trial; any internal failure becomes a sealed harness-error envelope."""
+    started = time.monotonic()
+    delivered: list[Event] = []
+
+    def tracked_emit(event: Event) -> None:
+        delivered.append(event)
+        emit_event(event)
+
+    try:
+        return _run_trial(
+            spec,
+            tracked_emit,
+            contract,
+            extra_pythonpath=extra_pythonpath,
+        )
+    except BaseException as exc:
+        detail = normalise(f"{type(exc).__name__}: {exc}") or "trial harness failed"
+        try:
+            canonical_json(detail)
+        except (TypeError, ValueError, UnicodeError):
+            detail = f"{type(exc).__name__}: invalid error detail"
+        new_events: list[Event] = []
+        if not delivered:
+            new_events.append(
+                Event(
+                    trial_id=spec.trial_id,
+                    seq=0,
+                    kind="trial_start",
+                    payload={"seed": spec.seed, "arm": spec.arm, "variant": spec.variant},
+                )
+            )
+            delivered.extend(new_events)
+        if delivered[-1].kind != "trial_end":
+            terminal = _terminal_event(spec, len(delivered))
+            delivered.append(terminal)
+            new_events.append(terminal)
+        for event in new_events:
+            with contextlib.suppress(BaseException):
+                emit_event(event)
+        try:
+            digest = spec_sha256(spec)
+        except BaseException:
+            digest = "0" * 64
+        return TrialEnvelope.create(
+            spec_sha256=digest,
+            experiment_id=spec.experiment_id,
+            trial_id=spec.trial_id,
+            pair_id=spec.pair_id,
+            arm=spec.arm,
+            variant=spec.variant,
+            task_id=spec.task_id,
+            condition_id=spec.condition.condition_id,
+            seed=spec.seed,
+            outcome=Outcome.ERROR,
+            termination=Termination.HARNESS_ERROR,
+            contract=None,
+            failure_fingerprint=fingerprint("harness", detail),
+            failure_detail=detail,
+            events=tuple(delivered),
+            usage=Usage(wall_seconds=time.monotonic() - started),
+        )
+
+
 def _store_failure(trial: TrialEnvelope) -> TrialEnvelope:
     detail = "experiment store failed"
-    events = list(trial.events[:-1])
-    events.append(
-        Event(
-            trial_id=trial.trial_id,
-            seq=len(events),
-            kind="trial_end",
-            payload={"termination": Termination.HARNESS_ERROR.value},
-        )
-    )
     return TrialEnvelope.create(
         **{
             **trial.model_dump(exclude={"record_sha256"}),
@@ -618,7 +795,7 @@ def _store_failure(trial: TrialEnvelope) -> TrialEnvelope:
             "termination": Termination.HARNESS_ERROR,
             "failure_fingerprint": fingerprint("harness", detail),
             "failure_detail": detail,
-            "events": tuple(events),
+            "events": trial.events,
         }
     )
 
