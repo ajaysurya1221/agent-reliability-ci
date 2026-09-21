@@ -15,6 +15,9 @@ stays valid under that dependence.
 supported range 1 to 10000, no extension after the fact), the K conditions, seeds, fixture hashes.
 The margin is deliberately coarse. It is not a universal production tolerance.
 
+Supported range: `alpha` in [1e-6, 0.5], and the per-arm tail `alpha / (4K)` must be at least
+2.5e-7, that is `alpha >= K x 1e-6`. Outside it the gate returns `ERROR`; it never raises.
+
 ## Rule
 
 For each condition, with `x_A`, `x_B` = number of trials whose outcome is `PASS`:
@@ -41,7 +44,8 @@ Experiment verdict, in priority order:
    experiment can never PASS.
 2. `BLOCK` if any condition is `BLOCK`.
 3. `INCONCLUSIVE` if any condition is `INCONCLUSIVE`.
-4. `PASS` only if every condition is `PASS`.
+4. `PASS` only if every gating condition is `PASS` and no ERROR or candidate hard-invariant
+   override applies. Descriptive (ceiling) conditions never decide this.
 
 Exit codes: PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3.
 
@@ -56,8 +60,10 @@ Exit codes: PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3.
 
 - Evaluate once, at the frozen `n_per_arm`. No peeking, no outcome-dependent extension.
 - Every run is kept. A new experiment id does not reset error control and does not license
-  retrying an unchanged candidate until it passes. `Manifest.prior_runs` lists earlier experiments
-  on the same candidate and is copied into the decision and the report.
+  retrying an unchanged candidate until it passes. The manifest author supplies
+  `Manifest.prior_runs`; those ids are copied into the decision and the Markdown report (not the
+  JUnit file). v0.1 does not discover earlier runs by itself and does not enforce a cross-run error
+  budget: that discipline is the author's.
 - Unplanned slices are descriptive only. Never pool different tasks as if they were IID trials.
 - Wilson intervals appear in reports for readability. They never decide.
 - Small-N honesty: zero violations in 20 trials still allows a 13.9% one-sided 95% upper bound;

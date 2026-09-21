@@ -88,7 +88,11 @@ def evaluate_contract(
     if final_state is None:
         return ContractResult(success=False, violations=violations)
     try:
-        success = bool(resolve(spec.oracle)(task, final_state))
+        verdict = resolve(spec.oracle)(task, final_state)
+        if not isinstance(verdict, bool):
+            # A dict, a coroutine or any other truthy object must never read as success.
+            raise TypeError(f"oracle returned {type(verdict).__name__}, expected bool")
+        success = verdict
     except Exception as exc:  # a broken grader is never an agent failure
         return ContractResult(
             success=False,

@@ -121,3 +121,35 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   small tail; closed forms at x=0 and x=n). `clopper_pearson(x, n, confidence)` delegates with
   `tail = (1 - confidence) / 2`. The gate passes `tail = alpha / (4K)` directly and never recovers
   it from a rounded confidence.
+
+## Second hardening round (final review; tests/acceptance/test_hardening2.py)
+
+- `run_trial` has a last-resort guard: ANY exception escaping its own logic becomes a sealed
+  ERROR/harness_error envelope. It also validates the contract itself
+  (`arci.contracts.validate_contract`); a rejected contract is ERROR/harness_error.
+- Values crossing the boundary must be canonical JSON (finite numbers, UTF-8 encodable text; check
+  with `arci.hashing.canonical_json`). If the AGENT passes a bad value (tool arguments or
+  `note_model_step` payload) the ToolBox raises `ValueError` to the agent before emitting anything:
+  uncaught, that is FAIL/crash. If the ENVIRONMENT or an injector produces a bad value it is a
+  harness fault. The parent re-validates every frame, so nothing unsealable is ever accepted.
+- Everything the harness does around a tool call (building the call, `before`, validating the
+  hook's return type, the live call's bookkeeping, `after`, validating its return type, deep copies,
+  recording, event emission) is inside the harness-fault guard, and the guard catches
+  `BaseException` from injectors (including `SystemExit` and `KeyboardInterrupt`). A hook returning
+  the wrong type is a harness fault.
+- Latches are reported to the parent IMMEDIATELY as authenticated protocol frames
+  (`{"latch": "harness_error" | "budget" | "replay_miss", "detail": ...}`), flushed at the moment
+  they trip, and held in parent-owned state. Precedence when finalising, whatever happens later
+  (hang, hard exit, crash): replay mismatch > harness fault > grader fault > budget > timeout/crash.
+- `trial_end` is emitted by the parent with an EMPTY payload. The verdict lives only in the
+  envelope, so a sink failure while delivering `trial_end` cannot make persisted events disagree
+  with the sealed envelope: events already handed to the sink are never rewritten.
+- The grader (and the worker) are awaited on PROCESS EXIT, never on pipe EOF: read what is available
+  and return once the process has exited; at the deadline kill the group, close the pipes, reap, and
+  do not drain further. A detached descendant holding stdout must not delay either path.
+- REPLAY mode never constructs perturbations.
+- The protocol queue between the reader thread and the supervisor is bounded (backpressure on the
+  child), and the supervisor still enforces the deadline while the reader is blocked.
+- `arci.gate.decide` never raises: any exception while validating or computing (including an
+  unsupported `alpha`, `delta`, `n_per_arm` on a typed copy, or an unsupported tail for K conditions)
+  yields a sealed `ERROR` decision with a short reason.

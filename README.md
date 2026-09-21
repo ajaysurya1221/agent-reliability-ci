@@ -12,25 +12,27 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.1, a 48-hour build. Python agents that use the declared tool boundary. Read
+Status: v0.1.0. Python agents that use the declared tool boundary. Read
 [what it does not do](#limits) before you rely on it.
 
 ## Why
 
-One run of an agent tells you almost nothing. Repetition and thresholds already exist elsewhere
-(Promptfoo, LangSmith, Braintrust, Inspect AI, pytest-repeat). What is usually missing is the step
+One run of an agent tells you almost nothing. Repeated runs with CI thresholds are available in
+other tools (as of September 2026: Promptfoo, LangSmith, Braintrust, Inspect AI, pytest-repeat;
+check their current docs). What is usually missing is the step
 after the number moves: *which* run to look at, *where* it went wrong, and a reproducer small enough
 to fix against. That step is what `arci` is for.
 
-## The 60-second demo
+## The demo
 
 ```bash
 uv sync
 .venv/bin/python examples/retry_agent/hero_demo.py
 ```
 
-It runs six steps through the real CLI: about 1,250 trials, each in a fresh process with a separate
-grader process, in roughly 30 seconds on a 15-core laptop. No model calls, no network.
+It runs six steps through the real CLI and the Python API: 1,231 trials, each in a fresh process with
+a separate grader process. On the author's 15-core laptop that takes about 30 seconds; a 2-vCPU CI
+runner needs several minutes. `uv sync` needs the network once; the trials make no model calls.
 
 1. One illustrative run: agents A and B both pass.
 2. The frozen experiment (200 trials per arm, `tool_timeout` injected on the first `reserve` call)
@@ -42,9 +44,10 @@ grader process, in roughly 30 seconds on a 15-core laptop. No model calls, no ne
 6. The repaired agent C passes the exact reproducer and its own separately frozen experiment.
 
 Agent B is not rigged with dice. It is agent A with the retry around `reserve` removed, a plausible
-refactoring slip. Its failure rate comes from the environment: in 65% of seeded scenarios the
-customer already holds a reservation, so the missing retry never matters. That is exactly why one
-run hides it.
+refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
+failure rate comes from the environment. Reservations already exist with configured probability
+65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`), and in those
+the missing retry never matters. That is exactly why one run hides it.
 
 ## How it works
 
@@ -84,8 +87,9 @@ over the environment's final state, never by what the agent says about itself.
 The rule is fixed-sample and deliberately boring ([docs/STATISTICS.md](docs/STATISTICS.md)): per arm,
 an exact Clopper-Pearson interval at tail `alpha / (4K)`; bounds on the difference by Bonferroni;
 `PASS` iff the lower bound is above `-delta`, `BLOCK` iff the upper bound is below it. No peeking, no
-extending a run, no rerunning until green: earlier runs on the same candidate are listed in every
-report. Wilson intervals are shown for readability and never decide.
+extending a run, no rerunning until green. The manifest author lists earlier runs on the same
+candidate in `prior_runs` and they are printed in the decision and the Markdown report; v0.1 does
+not discover them or enforce a cross-run error budget for you. Wilson intervals are shown for readability and never decide.
 
 An agent crash, timeout, blown budget or uncaught tool fault is a `FAIL`. A broken environment,
 injector, grader or event sink is an `ERROR`, and it invalidates the experiment instead of quietly
@@ -149,7 +153,9 @@ own.
     workers: "4"
 ```
 
-The report lands in the job summary. `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it
+This assumes your agent's repository is checked out and installed, and that you pin action
+versions you have verified. The report lands in the job summary (a start-up failure shows only in
+the step's stderr). `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it
 unless you set `allow-inconclusive: "true"`.
 
 <a id="limits"></a>
@@ -164,7 +170,9 @@ unless you set `allow-inconclusive: "true"`.
 - **It replays the boundary, not the model.** Deterministic replay is guaranteed for seeded,
   fixture-backed agents. A live model will not repeat itself token for token.
 - **A bundle embeds code, and replaying it runs that code.** Hashes are integrity checks, not
-  signatures. Replay bundles only from sources you trust.
+  signatures. Replay bundles only from sources you trust. A bundle embeds only the files you
+  `--include` (the minimiser's output embeds none), so portable replay needs the referenced code and
+  a compatible environment.
 - **A divergence is evidence, not proof of cause.** It shows where two runs part ways.
 - No importers (OTLP, Claude Code, Codex), no non-Python agents, no HTML report yet.
 

@@ -103,6 +103,20 @@ def noisy_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
     )
 
 
+def dict_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+    return {"success": False}  # pyright: ignore[reportReturnType]  # truthy, and wrong
+
+
+async def async_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+    return False  # calling this yields a truthy coroutine
+
+
+def detaching_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+    """Returns promptly but leaves a detached child holding the grader's stdout open."""
+    subprocess.Popen([sys.executable, "-c", "import time; time.sleep(12)"], start_new_session=True)
+    return final_state.get("stored") == 42
+
+
 class BrokenPerturbation:
     """An injector with a bug. That is a harness fault, never an agent failure."""
 
@@ -118,6 +132,40 @@ class BrokenPerturbation:
 
 def broken_perturbation(fault: FaultSpec) -> BrokenPerturbation:
     return BrokenPerturbation()
+
+
+class BadBeforePerturbation(BrokenPerturbation):
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        return "bad"  # pyright: ignore[reportReturnType]
+
+
+class BadAfterPerturbation(BrokenPerturbation):
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        return None
+
+    def after(self, call: ToolCall, result: ToolResult, rng: random.Random) -> ToolResult:
+        return None  # pyright: ignore[reportReturnType]
+
+
+class ExitingPerturbation(BrokenPerturbation):
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        raise SystemExit("injector bailed out")
+
+
+def bad_before_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return BadBeforePerturbation()
+
+
+def bad_after_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return BadAfterPerturbation()
+
+
+def exiting_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return ExitingPerturbation()
+
+
+def exploding_factory(fault: FaultSpec) -> BrokenPerturbation:
+    raise RuntimeError("this injector cannot even be built")
 
 
 def _value(result: JsonValue) -> JsonValue:
@@ -249,4 +297,47 @@ def orphan_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
     Path(str(task["pid_file"])).write_text(str(child.pid))
     tools.call("store", value=42)
+    return {"success": True}
+
+
+def swallow_everything_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Reaches the goal state while swallowing anything at all, BaseException included."""
+    with contextlib.suppress(BaseException):
+        tools.call("fetch", key="answer")
+    tools.call("store", value=42)
+    return {"success": True}
+
+
+def swallow_then_hang_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    with contextlib.suppress(Exception):
+        tools.call("fetch", key="answer")
+    time.sleep(300)
+    return {"success": True}
+
+
+def swallow_then_exit_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    with contextlib.suppress(Exception):
+        tools.call("fetch", key="answer")
+    os._exit(7)
+
+
+def budget_then_exit_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("store", value=42)
+    for i in range(50):
+        try:
+            tools.call("log", msg=f"line {i}")
+        except BudgetExceeded:
+            os._exit(7)
+    return {"success": True}
+
+
+def nan_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("store", value=42)
+    tools.note_model_step("confidence", value=float("nan"))  # not JSON: the agent's own bug
+    return {"success": True}
+
+
+def surrogate_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("store", value=42)
+    tools.call("log", msg=chr(0xD800))  # not encodable as UTF-8
     return {"success": True}

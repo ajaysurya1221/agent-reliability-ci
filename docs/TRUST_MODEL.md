@@ -14,13 +14,21 @@ guarantees is worse than none.
 None of the following may change a verdict in the agent's favour, and none may be reported as an
 ordinary agent failure when the fault is the harness's or the grader's:
 
-- crashing, hanging, exiting non-zero (even after finishing), leaving processes behind;
+- crashing, hanging, exiting non-zero (even after finishing), leaving descendants behind in the
+  worker's process group (a descendant that starts its own session is outside the cleanup
+  guarantee);
 - swallowing any exception the tool boundary raises (`ToolFault`, `BudgetExceeded`, `ReplayMiss`,
   a broken injector);
 - claiming success it did not earn (success comes only from the independent oracle);
 - mutating values the boundary returned to it;
 - printing to stdout or writing junk bytes onto the protocol channel;
-- a broken environment factory, a broken, slow or hanging oracle, a failing event sink.
+- passing values that are not JSON (NaN, unencodable text) across the boundary;
+- a broken environment factory; a broken, slow, hanging or non-boolean oracle; a broken or
+  malformed fault injector; a failing event sink.
+
+Fault classification survives what the agent does next: a harness fault or a blown budget is
+reported to the parent the moment it happens, so hanging or exiting afterwards cannot turn it into
+an ordinary timeout or crash.
 
 ## What v0.1 does NOT guarantee
 
@@ -39,4 +47,7 @@ unobservable invariants are rejected rather than silently ignored.
 
 A replay bundle embeds code. Replaying a bundle executes that code. Hashes prove the payload matches
 what the bundle declares; they do not prove who made it. Replay bundles only from sources you trust.
+A bundle embeds only the files you explicitly include (the minimiser's output embeds none), so
+portable replay needs every referenced module, fixture and a compatible environment. Replay also
+requires the recording to be consumed exactly; anything else is INVALID.
 Payload paths are confined to the bundle's temp directory; absolute paths and `..` are rejected.
