@@ -12,10 +12,12 @@ docs/design/0002-out-of-process-boundary.md.
 
 ## Next, most valuable first
 
-1. **Sequential testing** with confidence sequences, so a real-model experiment can stop early
-   without losing error control. Real agents make N expensive; this is now the biggest cost lever.
-2. **A tighter exact test** for the non-inferiority margin. Clopper-Pearson with Bonferroni is valid
-   and easy to audit, but conservative: see the calibration table.
+1. **A tighter exact test** for the non-inferiority margin. Clopper-Pearson with Bonferroni is valid
+   and easy to audit, but conservative. Measured cost: a real 94.0% -> 77.0% drop at N=400 per arm
+   was INCONCLUSIVE by 0.008 (docs/results). An exact unconditional test of the margin would have
+   decided it. This is now the biggest lever, because real agents make every trial expensive.
+2. **Sequential testing** with confidence sequences, so an experiment can stop early without losing
+   error control.
 3. **Streamable HTTP transport** and several MCP servers per trial.
 4. **Importers**, split into analysis-only and replay-capable, built only from authentic versioned
    fixtures: OTLP GenAI spans, Claude Code `stream-json`, Codex `--json`.

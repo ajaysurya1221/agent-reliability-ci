@@ -23,6 +23,25 @@ Command agents: test any program that speaks MCP over stdio, not only Python fun
 - Schema `arci/0.2`: `ArmSpec.command`, `Manifest.mcp_server`, `McpServerSpec.snapshot`. An
   experiment is all python agents or all command agents. v0.1 run stores must be re-run.
 
+- `CommandSpec.infra_exit_codes` (default 75, EX_TEMPFAIL): an agent can say "my infrastructure
+  failed, not me". The trial is ERROR and invalidates the experiment instead of counting against the
+  agent. Added after a local model server died mid-experiment and 435 trials "crashed".
+
+### Evidence (docs/results)
+
+A real local-LLM agent, two arms differing by one sentence of the system prompt, one injected tool
+timeout. Four runs are reported, including two invalid ones that each exposed a defect (a bridge
+that advertised no tool parameters; a dead model server plus a harness shutdown race). The clean
+confirmatory run: 376/400 (94.0%) versus 308/400 (77.0%), bounds [-0.2445, -0.0921], verdict
+INCONCLUSIVE by 0.008 under the pre-registered rule. Reported as is.
+
+### Fixed during review
+
+Eleven findings from an adversarial review of the boundary (false REPRODUCED at a deadline kill,
+boundary crashes blamed on the agent, client mistakes invalidating experiments, malformed server
+results accepted, id reuse, pipe deadlocks, recordings over 1 MiB, path leaks), a shim deadlock, and
+a shutdown race that turned about 5% of trials into false ERRORs on a loaded machine.
+
 ### Trust model
 
 For command agents the record can no longer be corrupted by accident from inside the agent's
