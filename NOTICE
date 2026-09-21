@@ -1,0 +1,9 @@
+agent-reliability-ci
+Copyright 2026 Ajay Surya Senthilrajan
+
+This product includes software adapted from evalopt-graph
+(https://github.com/ajaysurya1221/evalopt-graph), Copyright (c) 2026
+Ajay Surya Senthilrajan, MIT License: the canonical JSON hashing helpers in
+src/arci/hashing.py (from src/evalopt_graph/attestation.py) and the
+self-sealing decision pattern in src/arci/schema.py (from
+src/evalopt_graph/kernel.py).
