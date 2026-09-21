@@ -229,3 +229,46 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   `id`, and enforces exact consumption (miss or leftover => `replay_miss`).
 - Determinism: for a scripted client the envelope must be identical across runs. Do not record
   timing, ids or anything derived from the trial directory.
+
+## v0.2 hardening (pre-release review; tests/acceptance/test_mcp_hardening.py)
+
+- Exit/result race (seen as 18 of 72 trials `boundary exited before returning` on a loaded
+  machine): observing that a child exited is NOT evidence that its frames have been consumed.
+  After exit, drain everything already written to the pipe (non-blocking reads until it would
+  block or EOF, and the reader thread's queue) BEFORE deciding that a result is missing. Do not wait
+  for EOF (a detached descendant may hold the pipe). Apply this to the boundary, the worker and the
+  grader paths alike. No outcome may depend on scheduling luck.
+- Classification in the command path, in both directions:
+  - the AGENT's protocol mistakes are the agent's problem: malformed JSON-RPC from the client, a
+    `tools/call` whose `arguments` is not an object, an unknown tool, reuse of an id that is still
+    outstanding. The boundary answers with a JSON-RPC error (-32600 / -32602 / -32601), forwards
+    nothing, emits no tool events, trips NO latch, and carries on. A client that disconnects early
+    is not a harness fault either;
+  - the ENVIRONMENT's mistakes are harness faults: a server response that is not valid JSON-RPC
+    2.0 (version, id type, exactly one of result/error), a `tools/call` result whose `content` is
+    not an array or whose `isError` is not a boolean, a JSON-RPC error with code -32603 (internal
+    error) or any code outside {-32600, -32601, -32602}, non-JSON on the server's stdout, a server
+    that exits early;
+  - the BOUNDARY's own abnormal exit (non-zero, or before a final frame) is a harness fault and
+    outranks the agent's crash or timeout. A deadline that passes before the boundary was ready is
+    a harness fault too.
+- The boundary allocates its OWN upstream request ids and maps them back, so client ids (string or
+  integer, reused after completion or not) never collide with each other or with injected replies.
+- Replay consumption is enforced by the PARENT: the boundary streams an authenticated progress
+  frame each time a recorded exchange is consumed, and the parent finalises `replay_miss` on EVERY
+  termination path (including deadline kills) unless the consumed count equals the recording
+  length. Unverified consumption is never REPRODUCED.
+- No synchronous write may block the loop that reads: use non-blocking I/O with bounded per-
+  destination output queues (or a writer thread per destination), keep draining every direction,
+  and keep enforcing the deadline and latches under backpressure. Two pipelined 300 KB requests with
+  700 KB responses must complete.
+- The recording is streamed to the parent as it is made, one authenticated frame per exchange
+  (chunk anything larger than the frame limit), and assembled by the parent. The final frame
+  carries no recording. There is no limit on a trial's total recording size other than memory.
+- The bridge (`arci.mcp_toolset_server`): an exception RAISED by a tool is `isError: true` with a
+  diagnostic formatted by the shared safe formatter AND scrubbed with
+  `arci.fingerprint.normalise` (no run-specific paths or numbers in recorded text). A tool that
+  RETURNS something that is not canonical JSON is a broken environment: answer with JSON-RPC error
+  -32603, which the boundary treats as a harness fault. Snapshot write failures are -32603 too.
+- The Ollama example: both URL openers reject redirects; `main` returns non-zero when the step
+  limit is exhausted without a final answer.

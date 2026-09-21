@@ -1,6 +1,10 @@
 """A scripted MCP client standing in for a real agent CLI. FROZEN.
 
-    python mcp_fixture_client.py --mcp-config FILE --variant good|fragile|liar|hang|chatty|direct
+    python mcp_fixture_client.py --mcp-config FILE --variant VARIANT
+
+Variants: good, fragile, liar, hang, chatty, direct, plus three that probe the boundary itself:
+badargs (one malformed tools/call, then behaves like good), double (two fetches, for large
+recordings) and pipeline (two large requests written back to back before reading anything).
 
 It reads a standard `{"mcpServers": {name: {command, args, env}}}` config, spawns the ONE server
 it finds there over stdio, and behaves like the matching in-process fixture agent. Exit status 0
@@ -98,8 +102,37 @@ def main() -> int:
         session.close()
         return 0
 
+    if args.variant == "badargs":
+        # A client bug: `arguments` must be an object. The boundary must answer with a JSON-RPC
+        # error and carry on; this is the agent's mistake, never a harness fault.
+        reply = session.rpc("tools/call", {"name": "fetch", "arguments": []})
+        if "error" not in reply:
+            return 7
+    if args.variant == "pipeline":
+        # Two large requests, written before reading either reply. A boundary that writes
+        # synchronously from its only reader loop deadlocks here.
+        assert session.proc.stdin is not None and session.proc.stdout is not None
+        wanted = set()
+        for n in (1, 2):
+            wanted.add(f"pipe-{n}")
+            session.send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": f"pipe-{n}",
+                    "method": "ping",
+                    "params": {"pad": "y" * 300_000},
+                }
+            )
+        while wanted:
+            line = session.proc.stdout.readline()
+            if not line:
+                return 8
+            wanted.discard(json.loads(line).get("id"))
+
     session.call("log", msg="start")
-    attempts = 3 if args.variant == "good" else 1
+    if args.variant == "double":
+        session.call("fetch", key="first")
+    attempts = 1 if args.variant in {"fragile", "hang"} else 3
     value: Any = None
     for _ in range(attempts):
         ok, payload = session.call("fetch", key="answer")

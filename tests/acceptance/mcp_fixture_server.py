@@ -26,6 +26,10 @@ def main() -> int:
     parser.add_argument("--pid-dir", default=None)
     parser.add_argument("--marker", default=None)
     parser.add_argument("--task-results", action="store_true")
+    parser.add_argument(
+        "--malformed", action="store_true", help="tools/call results have a bad shape"
+    )
+    parser.add_argument("--big", action="store_true", help="pad ping and fetch results to ~700 KB")
     args = parser.parse_args()
     if args.marker:
         Path(args.marker).write_text("server started")
@@ -61,15 +65,20 @@ def main() -> int:
                 "serverInfo": {"name": "arci-fixture", "version": "0"},
             }
         elif method == "ping":
-            result = {}
+            result = {"pad": "x" * 700_000} if args.big else {}
         elif method == "tools/list":
             result = {"tools": TOOLS}
         elif method == "tools/call" and args.task_results:
             result = {"resultType": "task", "taskId": "t-1", "status": "working"}
+        elif method == "tools/call" and args.malformed:
+            result = {"content": "not an array", "isError": "true"}
         elif method == "tools/call":
             name, arguments = params.get("name"), params.get("arguments") or {}
             if name == "fetch":
-                result = text({"key": arguments.get("key"), "value": 42})
+                payload = {"key": arguments.get("key"), "value": 42}
+                if args.big:
+                    payload["pad"] = "x" * 700_000
+                result = text(payload)
             elif name == "store":
                 state["stored"] = arguments.get("value")
                 save()
