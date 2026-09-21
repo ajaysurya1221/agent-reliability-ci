@@ -1,0 +1,57 @@
+name: agent-reliability-ci
+description: Gate a pull request on a frozen, repeated-trial experiment comparing a candidate agent with its baseline.
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  manifest:
+    description: Path to the sealed experiment manifest (JSON).
+    required: true
+  out:
+    description: Directory for the run store.
+    required: false
+    default: arci-runs
+  workers:
+    description: Parallel trials.
+    required: false
+    default: "4"
+  allow-inconclusive:
+    description: Treat INCONCLUSIVE (exit 2) as a passing check. BLOCK and ERROR always fail.
+    required: false
+    default: "false"
+
+outputs:
+  verdict:
+    description: PASS, BLOCK, INCONCLUSIVE or ERROR.
+    value: ${{ steps.gate.outputs.verdict }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install arci
+      shell: bash
+      run: python -m pip install --disable-pip-version-check --quiet "${{ github.action_path }}"
+    - name: Run the frozen experiment and gate
+      id: gate
+      shell: bash
+      env:
+        ARCI_MANIFEST: ${{ inputs.manifest }}
+        ARCI_OUT: ${{ inputs.out }}
+        ARCI_WORKERS: ${{ inputs.workers }}
+        ARCI_ALLOW_INCONCLUSIVE: ${{ inputs.allow-inconclusive }}
+      run: |
+        set +e
+        arci run "$ARCI_MANIFEST" --out "$ARCI_OUT" --workers "$ARCI_WORKERS" | tee arci-report.md
+        code=${PIPESTATUS[0]}
+        set -e
+        cat arci-report.md >> "$GITHUB_STEP_SUMMARY"
+        case "$code" in
+          0) verdict=PASS ;;
+          1) verdict=BLOCK ;;
+          2) verdict=INCONCLUSIVE ;;
+          *) verdict=ERROR ;;
+        esac
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+        if [ "$code" = "2" ] && [ "$ARCI_ALLOW_INCONCLUSIVE" = "true" ]; then exit 0; fi
+        exit "$code"
