@@ -80,6 +80,30 @@ def make_untouchable_world(task: Task, seed: int) -> World:
     return UntouchableWorld(task, seed)
 
 
+class SettyWorld(World):
+    """A broken environment: `fetch` returns something that is not JSON."""
+
+    def _fetch(self, key: str) -> JsonValue:
+        return {1, 2}  # pyright: ignore[reportReturnType]
+
+
+def make_setty_world(task: Task, seed: int) -> World:
+    return SettyWorld(task, seed)
+
+
+class PathyWorld(World):
+    """`fetch` always fails, and its message names a run-specific temporary path."""
+
+    def _fetch(self, key: str) -> JsonValue:
+        import tempfile
+
+        raise FileNotFoundError(f"{tempfile.mkdtemp(prefix='arci-pathy-')}/cache/{key}.json")
+
+
+def make_pathy_world(task: Task, seed: int) -> World:
+    return PathyWorld(task, seed)
+
+
 def make_broken_world(task: Task, seed: int) -> World:
     raise RuntimeError("environment factory exploded")
 

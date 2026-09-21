@@ -6,7 +6,8 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
 
 1. FROZEN files are listed in `FROZEN.sha256`. Never edit, move or delete them. That covers
    `src/arci/{schema,interfaces,hashing,fingerprint,schedule,contracts}.py`, everything under `tests/acceptance/`,
-   `pyproject.toml`, `uv.lock`, `justfile`, `AGENTS.md`, `docs/STATISTICS.md`, `docs/TRUST_MODEL.md`. If a frozen file
+   `pyproject.toml`, `uv.lock`, `justfile`, `AGENTS.md`, `docs/STATISTICS.md`, `docs/TRUST_MODEL.md`,
+   `docs/design/**`. If a frozen file
    looks wrong, stop and say so in your final message. Do not work around it.
 2. Edit only the files your brief says you own. Create new files only inside those paths.
 3. Do not run git commands that change state (no add, commit, checkout, stash, reset). The
@@ -169,3 +170,110 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   must not deadlock. Never wait for EOF after exit or after the deadline.
 - `decide` must survive absurd typed values (`10**400`, `inf`, `nan`) in `alpha`, `delta`,
   `n_per_arm`: the ERROR decision's own fields fall back to finite, sealable defaults.
+
+## v0.2: command agents behind the MCP boundary (docs/design/0002-out-of-process-boundary.md; tests/acceptance/test_mcp.py)
+
+- A `TrialSpec` is a python trial (`agent` + `toolset`) or a command trial (`command` +
+  `mcp_server`). `run_trial`, `make_bundle`, `replay`, `minimize_faults`, `run_experiment` accept
+  both through the SAME signatures. Python trials must keep behaving exactly as before.
+- Process layout for a command trial (both children are supervised by the parent with the existing
+  deadline, process-group kill, nonce-authenticated frame reader, latch precedence, single parent-
+  emitted empty-payload `trial_end`, and last-resort guard):
+  1. a trial directory with a SHORT path (unix socket paths are limited to about 100 bytes; create
+     it under `/tmp` with `tempfile.mkdtemp(prefix="arci-", dir="/tmp")`), always removed;
+  2. `sys.executable -P -m arci.mcp_boundary`: harness-owned. Reads its config (spec, nonce, socket
+     path, workdir) as ONE JSON document on stdin. In RECORD/LIVE mode it starts the real server
+     (`mcp_server.argv`, placeholders `{workdir}`, `{seed}` and `{task_file}` expanded,
+     `mcp_server.env` merged, `ARCI_WORKDIR`, `ARCI_SEED` and `ARCI_TASK_FILE` set; the task file
+     is `<trial dir>/task.json`, written by the parent before the boundary starts), listens on the socket, accepts exactly one connection,
+     relays newline-delimited JSON-RPC both ways, and intercepts `tools/call`. It writes the same
+     authenticated frames the v0.1 worker writes (events, latches, final result with `recording`)
+     to ITS stdout. It prints a ready frame once the socket is listening; the parent starts the
+     agent only after that.
+  3. the agent: `command.argv` with `{mcp_config}`, `{task_file}`, `{workdir}`, `{seed}` expanded,
+     `command.env` merged, plus `ARCI_MCP_CONFIG`, `ARCI_TASK_FILE`, `ARCI_WORKDIR`, `ARCI_SEED`.
+     cwd is the trial directory. `task_file` holds the task JSON. `mcp_config` is
+     `{"mcpServers": {<mcp_server.name>: {"command": sys.executable,
+     "args": ["-P", "-m", "arci.mcp_shim", "--socket", <path>], "env": {}}}}`.
+     Its stdout/stderr are captured and discarded (bounded), never parsed.
+  4. `arci.mcp_shim`: relays bytes stdin->socket and socket->stdout, exits when either side closes.
+     No logic, no imports beyond the stdlib.
+- Expanded paths never enter sealed records: events carry tool name, arguments, result; never the
+  workdir, socket path, pids or JSON-RPC ids. `spec_sha256` is over the UNEXPANDED spec.
+- Tool events: only `tools/call` produces `tool_start`/`tool_finish`. `tool_start` payload as
+  before (`tool`, `call_id` c-0000.., `occurrence`, `arguments`). `tool_finish.value` is the MCP
+  result object verbatim (for a JSON-RPC error: `{"error": <error object>}`); `ok` is
+  `not isError` and no JSON-RPC error; `error_kind` is `"mcp_error"` for a
+  JSON-RPC error, the perturbation's kind for an injected one, else null.
+- Supported subset and fault mapping are in the design note. A `resultType` other than
+  `"complete"` (or absent), a server-initiated request (sampling, elicitation), or a second
+  `tools/call` while one is in flight latches `harness_error` with a fixed detail string. A server
+  that cannot be started, or exits before the agent is done with it, is `harness_error`.
+- Perturbations reuse `arci.perturb` through `ToolCall`/`ToolResult`; `before()` short-circuits into
+  an `isError: true` result whose single text content is `"arci injected <error_kind>"`; `after()`
+  may rewrite `value` (for `empty_result`: `content` becomes `[]`).
+- Budget: the call that would exceed `max_tool_calls` gets an `isError: true` result
+  `"arci: tool budget exceeded"`, is NOT forwarded, emits no tool events, and trips the `budget`
+  latch. `usage.tool_calls` counts forwarded and injected calls.
+- Outcome for command trials: agent exit 0 => `agent_claimed_success` True, termination
+  `completed` (then graded); non-zero exit => FAIL/crash; deadline => FAIL/timeout; latches keep
+  their precedence. `final_state` comes from `mcp_server.snapshot(task, workdir)`, executed inside
+  the existing grader subprocess BEFORE the oracle, with the same deadline; a raising, hanging or
+  non-dict snapshot is a grader fault. The trial directory must still exist while grading.
+- Recording for replay: every server response the agent received, in order. `tools/call` exchanges
+  as `RecordedCall` (tool, arguments_sha256, occurrence, result with `value` = the MCP result).
+  Non-tool exchanges (`initialize`, `tools/list`, `ping`) are recorded too, as `RecordedCall` with
+  `tool` = `"rpc:<method>"`, `arguments_sha256` over the canonical params, their own occurrence
+  counters, and `value` = the JSON-RPC `result`. REPLAY mode never starts the server, serves all of
+  these from the recording by (tool, arguments_sha256, occurrence), rewrites only the JSON-RPC
+  `id`, and enforces exact consumption (miss or leftover => `replay_miss`).
+- Determinism: for a scripted client the envelope must be identical across runs. Do not record
+  timing, ids or anything derived from the trial directory.
+
+## v0.2 hardening (pre-release review; tests/acceptance/test_mcp_hardening.py)
+
+- Exit/result race (seen as 18 of 72 trials `boundary exited before returning` on a loaded
+  machine): observing that a child exited is NOT evidence that its frames have been consumed.
+  After exit, drain everything already written to the pipe (non-blocking reads until it would
+  block or EOF, and the reader thread's queue) BEFORE deciding that a result is missing. Do not wait
+  for EOF (a detached descendant may hold the pipe). Apply this to the boundary, the worker and the
+  grader paths alike. No outcome may depend on scheduling luck.
+- Classification in the command path, in both directions:
+  - the AGENT's protocol mistakes are the agent's problem: malformed JSON-RPC from the client, a
+    `tools/call` whose `arguments` is not an object, an unknown tool, reuse of an id that is still
+    outstanding. The boundary answers with a JSON-RPC error (-32600 / -32602 / -32601), forwards
+    nothing, emits no tool events, trips NO latch, and carries on. A client that disconnects early
+    is not a harness fault either;
+  - the ENVIRONMENT's mistakes are harness faults: a server response that is not valid JSON-RPC
+    2.0 (version, id type, exactly one of result/error), a `tools/call` result whose `content` is
+    not an array or whose `isError` is not a boolean, a JSON-RPC error with code -32603 (internal
+    error) or any code outside {-32600, -32601, -32602}, non-JSON on the server's stdout, a server
+    that exits early;
+  - the BOUNDARY's own abnormal exit (non-zero, or before a final frame) is a harness fault and
+    outranks the agent's crash or timeout. A deadline that passes before the boundary was ready is
+    a harness fault too.
+- The boundary allocates its OWN upstream request ids and maps them back, so client ids (string or
+  integer, reused after completion or not) never collide with each other or with injected replies.
+- Replay consumption is enforced by the PARENT: the boundary streams an authenticated progress
+  frame each time a recorded exchange is consumed, and the parent finalises `replay_miss` on EVERY
+  termination path (including deadline kills) unless the consumed count equals the recording
+  length. Unverified consumption is never REPRODUCED.
+- No synchronous write may block the loop that reads: use non-blocking I/O with bounded per-
+  destination output queues (or a writer thread per destination), keep draining every direction,
+  and keep enforcing the deadline and latches under backpressure. Two pipelined 300 KB requests with
+  700 KB responses must complete.
+- The recording is streamed to the parent as it is made, one authenticated frame per exchange
+  (chunk anything larger than the frame limit), and assembled by the parent. The final frame
+  carries no recording. There is no limit on a trial's total recording size other than memory.
+- The bridge (`arci.mcp_toolset_server`): an exception RAISED by a tool is `isError: true` with a
+  diagnostic formatted by the shared safe formatter AND scrubbed with
+  `arci.fingerprint.normalise` (no run-specific paths or numbers in recorded text). A tool that
+  RETURNS something that is not canonical JSON is a broken environment: answer with JSON-RPC error
+  -32603, which the boundary treats as a harness fault. Snapshot write failures are -32603 too.
+- The Ollama example: both URL openers reject redirects; `main` returns non-zero when the step
+  limit is exhausted without a final answer.
+- Infrastructure failures: if a command agent exits with a status listed in
+  `command.infra_exit_codes` (default `(75,)`, EX_TEMPFAIL) the trial is ERROR/harness_error with
+  failure_detail `"agent reported an infrastructure failure (exit <code>)"`, ranked like any other
+  harness fault. Any other non-zero exit stays FAIL/crash. The Ollama example returns 75 when the
+  model backend is unreachable, times out, or the model is missing, and 1 for its own bugs.
