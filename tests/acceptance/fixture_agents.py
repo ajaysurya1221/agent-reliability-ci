@@ -40,10 +40,15 @@ class World:
         self.log.append(msg)
         return None
 
-    def _block(self, pid_file: str) -> JsonValue:
-        """Never returns: spawns a descendant, publishes its pid, then sleeps."""
+    def _block(self, pid_file: str, ack_file: str, acked_file: str) -> JsonValue:
+        """Never returns. Spawns a descendant and publishes its pid, then waits for the
+        parent harness to acknowledge that it has SEEN this call's tool_start, records
+        that acknowledgment, and sleeps until killed."""
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
         Path(pid_file).write_text(str(child.pid))
+        while not Path(ack_file).exists():
+            time.sleep(0.02)
+        Path(acked_file).write_text("acknowledged while alive")
         time.sleep(300)
         return None
 
@@ -138,7 +143,12 @@ def chatty_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task
 
 
 def block_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
-    tools.call("block", pid_file=task["pid_file"])
+    tools.call(
+        "block",
+        pid_file=task["pid_file"],
+        ack_file=task["ack_file"],
+        acked_file=task["acked_file"],
+    )
     return {"success": True}
 
 

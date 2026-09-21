@@ -104,39 +104,48 @@ def test_uncaught_tool_fault_is_an_agent_failure_not_a_harness_error() -> None:
     assert env.outcome is Outcome.FAIL and env.termination is Termination.CRASH
 
 
+def _terminated(pid: int) -> bool:
+    """Gone, or a zombie awaiting reaping. Either way it is no longer running."""
+    stat = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    return stat == "" or stat.startswith("Z")
+
+
 def test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree(
     tmp_path: Path,
 ) -> None:
     from arci.runner import run_trial
 
-    pid_file = tmp_path / "descendant.pid"
-    stamps: list[tuple[str, float]] = []
+    pid_file, ack_file, acked_file = (tmp_path / n for n in ("pid", "ack", "acked"))
+
+    def acknowledge(event: Event) -> None:
+        # Runs in the parent. The blocked tool proceeds only once this file exists, so
+        # `acked_file` can only appear if the event was delivered while the worker lived.
+        if event.kind == "tool_start":
+            ack_file.write_text("seen")
+
     blocked = spec(
-        "block_agent", condition=COND_CLEAN, max_seconds=4.0, task={"pid_file": str(pid_file)}
+        "block_agent",
+        condition=COND_CLEAN,
+        max_seconds=10.0,
+        task={"pid_file": str(pid_file), "ack_file": str(ack_file), "acked_file": str(acked_file)},
     )
-    env = run_trial(blocked, lambda e: stamps.append((e.kind, time.monotonic())), contract())
-    returned = time.monotonic()
+    env = run_trial(blocked, acknowledge, contract())
 
     assert env.outcome is Outcome.FAIL and env.termination is Termination.TIMEOUT
     assert env.validate_seal()
+    assert acked_file.exists(), "tool_start was not delivered before the worker was killed"
     assert [c.tool for c in env.incomplete_calls] == ["block"]
     kinds = _kinds(env.events)
     assert "tool_start" in kinds and "tool_finish" not in kinds
     assert kinds.count("trial_end") == 1 and kinds[-1] == "trial_end"
-    # The callback ran while the worker was still alive, not from a buffer at the end.
-    started = next(at for kind, at in stamps if kind == "tool_start")
-    assert started < returned - 1.5
 
     descendant = int(pid_file.read_text())
-    deadline = time.monotonic() + 5
-    alive = True
-    while alive and time.monotonic() < deadline:
-        try:
-            os.kill(descendant, 0)
-            time.sleep(0.1)
-        except ProcessLookupError:
-            alive = False
-    assert not alive, "descendant process survived the timeout"
+    deadline = time.monotonic() + 10
+    while not _terminated(descendant) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert _terminated(descendant), "descendant process survived the timeout"
 
 
 def test_hard_exit_still_yields_a_terminal_envelope() -> None:

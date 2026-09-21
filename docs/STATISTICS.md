@@ -34,7 +34,7 @@ For each condition, with `x_A`, `x_B` = number of trials whose outcome is `PASS`
 
 Experiment verdict, in priority order:
 
-1. `ERROR` if any trial has outcome `ERROR`; if the trial set is not exactly the schedule
+1. `ERROR` if the manifest's own seal is invalid; if any trial has outcome `ERROR`; if the trial set is not exactly the schedule
    `arci.schedule.build_schedule(manifest)` (missing, duplicated or unknown trial ids; a trial whose
    experiment id, task id, arm, pair id, condition id, seed or `spec_sha256` differs from its
    scheduled spec); if any trial's seal is invalid; or if there is no gating condition. An invalid
@@ -73,9 +73,10 @@ must not exceed `alpha`. We publish measured numbers. We promise none in advance
 
 Reference points (exact enumeration, alpha 0.05, delta 0.10, K=1), as (PASS, BLOCK, INCONCLUSIVE):
 0.95 vs 0.95 at N=200: (0.889, 0.000, 0.111). 0.95 vs 0.65 at N=200: (0.000, 0.985, 0.015).
-0.95 vs 0.75 at N=200: (0.000, 0.365, 0.635). 0.95 vs 0.85 at N=200: (0.001, 0.001, 0.999).
-0.80 vs 0.80 at N=200: (0.218, 0.000, 0.782). Anything at N=20: INCONCLUSIVE more than 99% of the
-time. The rule is conservative by design: mid-range success rates need larger N to reach PASS.
+0.95 vs 0.75 at N=200: (0.000, 0.365, 0.635). 0.95 vs 0.85 at N=200: (0.001, 0.000, 0.999).
+0.80 vs 0.80 at N=200: (0.218, 0.000, 0.782). At p_A=0.95, p_B=0.65 and N=20,
+P(INCONCLUSIVE) = 0.992: small runs of realistic agents almost never decide. (A total collapse
+still does: 1.0 vs 0.0 at N=20 is BLOCK with probability 1.) The rule is conservative by design: mid-range success rates need larger N to reach PASS.
 
 ## Not in v0.1
 

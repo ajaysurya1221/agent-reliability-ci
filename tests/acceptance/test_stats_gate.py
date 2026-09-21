@@ -199,6 +199,18 @@ def test_prior_runs_are_carried_into_the_decision() -> None:
     assert d.prior_runs == ("exp-earlier-1", "exp-earlier-2")
 
 
+def test_forged_manifest_is_an_error_not_a_friendlier_verdict() -> None:
+    from arci.gate import decide
+
+    m = manifest()
+    trials = synthetic_trials(
+        m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=130
+    )
+    assert decide(m, trials).verdict is Verdict.BLOCK
+    forged = m.model_copy(update={"delta": 0.9})  # specs and trial seals are untouched
+    assert decide(forged, trials).verdict is Verdict.ERROR
+
+
 def test_tampered_decision_fails_validation() -> None:
     from arci.gate import decide
 

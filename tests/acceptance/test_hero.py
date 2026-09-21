@@ -100,4 +100,5 @@ def test_selfcheck_calibration_is_exact_and_honest() -> None:
     assert oc(0.80, 0.80, 200)["PASS"] == pytest.approx(0.2184, abs=2e-3)
     assert oc(0.95, 0.85, 200)["PASS"] <= 0.05  # false PASS at the margin boundary
     assert oc(0.95, 0.95, 200)["BLOCK"] <= 0.05  # false BLOCK under no change
-    assert oc(0.95, 0.65, 20)["INCONCLUSIVE"] >= 0.99  # N=20 is exploratory, and we say so
+    assert oc(0.95, 0.65, 20)["INCONCLUSIVE"] == pytest.approx(0.992345533306, abs=1e-6)
+    assert oc(1.0, 0.0, 20)["BLOCK"] == pytest.approx(1.0)  # a total collapse still decides
