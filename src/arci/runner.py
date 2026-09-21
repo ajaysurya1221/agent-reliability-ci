@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 import os
@@ -15,7 +16,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
@@ -49,6 +50,33 @@ _PROTOCOL_QUEUE_SIZE = 256
 _GRADER_TIMEOUT = "grader timed out"
 _GRADER_EXIT = "grader exited non-zero"
 _GRADER_OUTPUT = "grader returned invalid output"
+
+
+def _decode_recording_chunks(chunks: dict[int, str], count: int) -> RecordedCall:
+    if count < 1 or set(chunks) != set(range(count)):
+        raise ValueError("incomplete streamed recording")
+    encoded = "".join(chunks[position] for position in range(count))
+    return RecordedCall.model_validate_json(base64.b64decode(encoded, validate=True))
+
+
+def _replay_consumption_error(spec: TrialSpec, consumed: int) -> str | None:
+    if spec.tool_mode is ToolMode.REPLAY and consumed != len(spec.recording):
+        return "recording was not consumed exactly"
+    return None
+
+
+def _drain_after_exit(
+    reader: threading.Thread,
+    messages: queue.Queue[tuple[str, object]],
+    consume: Callable[[str, object], None],
+) -> None:
+    while reader.is_alive() or not messages.empty():
+        try:
+            kind, value = messages.get(timeout=0.05)
+        except queue.Empty:
+            continue
+        consume(kind, value)
+    reader.join()
 
 
 def _pythonpath(extra: Sequence[str]) -> str:
@@ -191,7 +219,7 @@ def _valid_event_payload(event: Event, tool_starts: int) -> bool:
     return False
 
 
-def _validate_worker_result(value: object) -> dict[str, Any]:
+def _validate_worker_result(value: object, *, recording_in_result: bool = True) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise TypeError("worker result is not an object")
     canonical_json(value)
@@ -202,10 +230,13 @@ def _validate_worker_result(value: object) -> dict[str, Any]:
         raise TypeError("worker agent result is invalid")
     if value.get("final_state") is not None and not isinstance(value.get("final_state"), dict):
         raise TypeError("worker final state is invalid")
-    recording = value.get("recording")
-    if not isinstance(recording, list):
-        raise TypeError("worker recording is invalid")
-    tuple(RecordedCall.model_validate(item) for item in recording)
+    if recording_in_result:
+        recording = value.get("recording")
+        if not isinstance(recording, list):
+            raise TypeError("worker recording is invalid")
+        tuple(RecordedCall.model_validate(item) for item in recording)
+    elif "recording" in value:
+        raise TypeError("boundary result must not contain a recording")
     latches = value.get("latches")
     if not isinstance(latches, dict):
         raise TypeError("worker latches are invalid")
@@ -342,7 +373,7 @@ def _grade(
             return ContractResult(success=False, grader_error=_GRADER_TIMEOUT), final_state
         _kill_group(process)
         reader_stop.set()
-        reader_done.wait(timeout=max(0.0, deadline - time.monotonic()))
+        reader_done.wait()
         if exit_code != 0:
             return ContractResult(success=False, grader_error=_GRADER_EXIT), final_state
         if not reader_done.is_set() or reader_failed.is_set():
@@ -397,6 +428,7 @@ def _run_python_trial(
     nonce = secrets.token_hex(16)
     messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=_PROTOCOL_QUEUE_SIZE)
     reader_stop = threading.Event()
+    reader_abandon = threading.Event()
     result_seen = False
     expected_seq = 0
     tool_starts = 0
@@ -459,7 +491,10 @@ def _run_python_trial(
                         messages.put((message, value), timeout=0.05)
                         return True
                     except queue.Full:
-                        if reader_stop.is_set():
+                        # `reader_stop` only asks for a drain; the parent keeps consuming
+                        # while it drains. Frames may be dropped only once the parent has
+                        # abandoned the queue for good.
+                        if reader_abandon.is_set():
                             return False
 
             try:
@@ -508,6 +543,7 @@ def _run_python_trial(
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 timed_out = process.poll() is None
+                reader_abandon.set()
                 stop_worker()
                 break
             polled = process.poll()
@@ -572,9 +608,9 @@ def _run_python_trial(
                 stop_worker()
 
         reader_stop.set()
-        while (reader.is_alive() or not messages.empty()) and time.monotonic() < deadline:
+        while not timed_out and (reader.is_alive() or not messages.empty()):
             try:
-                message, value = messages.get(timeout=min(0.05, deadline - time.monotonic()))
+                message, value = messages.get(timeout=0.05)
             except queue.Empty:
                 continue
             if message == "reader_done":
@@ -627,6 +663,7 @@ def _run_python_trial(
         protocol_error = format_diagnostic(exc)
     finally:
         reader_stop.set()
+        reader_abandon.set()
         if process is not None:
             _kill_group(process)
             with contextlib.suppress(Exception):
@@ -755,10 +792,41 @@ def _run_python_trial(
     )
 
 
+def _boundary_exit_clean(exit_code: int | None, stop_signal: int | None) -> bool:
+    """Is the boundary's exit status one the parent asked for, or a clean zero?
+
+    A non-zero status that is exactly the stop signal the PARENT sent is the parent's own
+    doing, not a boundary fault: the signal can land while the boundary is already
+    finalising, after it has written and flushed its final frame.
+    """
+    if exit_code == 0:
+        return True
+    return stop_signal is not None and exit_code == -stop_signal
+
+
+def _boundary_exit_abnormal(
+    *,
+    alive_at_deadline: bool,
+    exit_code: int | None,
+    stop_signal: int | None,
+    has_result: bool,
+) -> bool:
+    """Did the boundary die without delivering its result, on its own initiative?
+
+    A boundary that was still running when the deadline passed belongs to the timeout
+    path. Otherwise the authenticated final frame, drained from the pipe, is the evidence:
+    the exit status alone never decides.
+    """
+    if alive_at_deadline or exit_code is None:
+        return False
+    return not _boundary_exit_clean(exit_code, stop_signal) or not has_result
+
+
 def _protocol_reader(
     process: subprocess.Popen[bytes],
     messages: queue.Queue[tuple[str, object]],
     stop: threading.Event,
+    abandon: threading.Event,
 ) -> None:
     buffer = bytearray()
 
@@ -768,7 +836,10 @@ def _protocol_reader(
                 messages.put((kind, value), timeout=0.05)
                 return True
             except queue.Full:
-                if stop.is_set():
+                # `stop` only means "drain and finish"; the parent keeps consuming while
+                # draining, so keep pushing instead of dropping frames that are already
+                # parsed. Only `abandon` (the parent will never read again) may drop them.
+                if abandon.is_set():
                     return False
 
     try:
@@ -853,14 +924,21 @@ def _run_command_trial(
     expected_seq = 0
     tool_starts = 0
     timed_out = False
+    boundary_alive_at_deadline = False
     boundary_exit: int | None = None
+    boundary_stop_signal: int | None = None
     agent_exit: int | None = None
     boundary: subprocess.Popen[bytes] | None = None
     agent: subprocess.Popen[bytes] | None = None
     nonce = secrets.token_hex(16)
     messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=_PROTOCOL_QUEUE_SIZE)
     reader_stop = threading.Event()
+    reader_abandon = threading.Event()
     reader: threading.Thread | None = None
+    streamed_recording: list[RecordedCall] = []
+    record_chunks: dict[int, str] = {}
+    record_chunk_count: int | None = None
+    replay_consumed = 0
 
     def stop_all() -> None:
         if agent is not None:
@@ -880,7 +958,7 @@ def _run_command_trial(
 
     def consume(message_kind: str, value: object) -> None:
         nonlocal protocol_error, ready_seen, result_seen, worker_result
-        nonlocal expected_seq, tool_starts
+        nonlocal expected_seq, tool_starts, record_chunk_count, replay_consumed
         if message_kind == "reader_done":
             return
         if protocol_error is not None or sink_error is not None:
@@ -918,8 +996,49 @@ def _run_command_trial(
             elif kind == "result":
                 if result_seen:
                     raise ValueError("duplicate boundary result")
-                worker_result = _validate_worker_result(decoded.get("result"))
+                if record_chunks:
+                    raise ValueError("incomplete streamed recording")
+                worker_result = _validate_worker_result(
+                    decoded.get("result"), recording_in_result=False
+                )
                 result_seen = True
+            elif kind == "recording":
+                if result_seen or spec.tool_mode is ToolMode.REPLAY:
+                    raise ValueError("invalid boundary recording frame")
+                index = decoded.get("index")
+                chunk = decoded.get("chunk")
+                chunks = decoded.get("chunks")
+                data = decoded.get("data")
+                if (
+                    type(index) is not int
+                    or type(chunk) is not int
+                    or type(chunks) is not int
+                    or not isinstance(data, str)
+                    or index != len(streamed_recording)
+                    or chunk < 0
+                    or chunks < 1
+                    or chunk >= chunks
+                    or chunk in record_chunks
+                    or (record_chunk_count is not None and chunks != record_chunk_count)
+                ):
+                    raise ValueError("invalid boundary recording chunk")
+                record_chunk_count = chunks
+                record_chunks[chunk] = data
+                if len(record_chunks) == chunks:
+                    streamed_recording.append(_decode_recording_chunks(record_chunks, chunks))
+                    record_chunks.clear()
+                    record_chunk_count = None
+            elif kind == "replay_progress":
+                consumed = decoded.get("consumed")
+                if (
+                    result_seen
+                    or spec.tool_mode is not ToolMode.REPLAY
+                    or type(consumed) is not int
+                    or consumed != replay_consumed + 1
+                    or consumed > len(spec.recording)
+                ):
+                    raise ValueError("invalid replay progress frame")
+                replay_consumed = consumed
             elif kind == "latch":
                 latch = decoded.get("latch")
                 detail = decoded.get("detail")
@@ -981,14 +1100,17 @@ def _run_command_trial(
 
         threading.Thread(target=write_boundary_config, daemon=True).start()
         reader = threading.Thread(
-            target=_protocol_reader, args=(boundary, messages, reader_stop), daemon=True
+            target=_protocol_reader,
+            args=(boundary, messages, reader_stop, reader_abandon),
+            daemon=True,
         )
         reader.start()
 
         while not ready_seen and boundary_exit is None:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                timed_out = boundary.poll() is None
+                boundary_alive_at_deadline = boundary.poll() is None
+                timed_out = boundary_alive_at_deadline
                 stop_all()
                 break
             boundary_exit = boundary.poll()
@@ -1029,23 +1151,39 @@ def _run_command_trial(
                 start_new_session=True,
             )
 
-        boundary_stop_requested = False
+        boundary_stop_at: float | None = None
         while boundary_exit is None or (agent is not None and agent_exit is None):
-            remaining = deadline - time.monotonic()
+            now = time.monotonic()
+            remaining = deadline - now
             if remaining <= 0:
-                timed_out = (boundary is not None and boundary.poll() is None) or (
+                boundary_alive_at_deadline = boundary is not None and boundary.poll() is None
+                timed_out = boundary_alive_at_deadline or (
                     agent is not None and agent.poll() is None
                 )
                 stop_all()
                 break
-            if agent is not None and agent_exit is None:
-                agent_exit = agent.poll()
-                if agent_exit is not None and not boundary_stop_requested and boundary is not None:
-                    with contextlib.suppress(OSError):
-                        os.kill(boundary.pid, signal.SIGTERM)
-                    boundary_stop_requested = True
+            # Reap the boundary before deciding to signal it: an exit we can already see
+            # is never a boundary that still needs stopping.
             if boundary is not None and boundary_exit is None:
                 boundary_exit = boundary.poll()
+            if agent is not None and agent_exit is None:
+                agent_exit = agent.poll()
+                if agent_exit is not None and boundary_stop_at is None:
+                    # The boundary normally stops by itself as soon as the agent's shim
+                    # closes the socket, and it writes its final frame on the way out.
+                    # Give it a deadline-derived window to do that before asking it to
+                    # stop; only a boundary still held open past the window is signalled.
+                    boundary_stop_at = now + remaining / 2.0
+            if (
+                boundary is not None
+                and boundary_exit is None
+                and boundary_stop_signal is None
+                and boundary_stop_at is not None
+                and now >= boundary_stop_at
+            ):
+                with contextlib.suppress(OSError):
+                    os.kill(boundary.pid, signal.SIGTERM)
+                boundary_stop_signal = signal.SIGTERM
             if boundary_exit is not None and (agent is None or agent_exit is not None):
                 break
             try:
@@ -1061,18 +1199,16 @@ def _run_command_trial(
             with contextlib.suppress(Exception):
                 agent_exit = agent.wait(timeout=max(0.0, deadline - time.monotonic()))
 
-        while (reader.is_alive() or not messages.empty()) and time.monotonic() < deadline:
-            try:
-                message_kind, value = messages.get(
-                    timeout=min(0.05, max(0.0, deadline - time.monotonic()))
-                )
-            except queue.Empty:
-                continue
-            consume(message_kind, value)
+        reader_stop.set()
+        if timed_out:
+            reader_abandon.set()
+        else:
+            _drain_after_exit(reader, messages, consume)
     except BaseException as exc:
         protocol_error = format_diagnostic(exc)
     finally:
         reader_stop.set()
+        reader_abandon.set()
         stop_all()
         for process in (agent, boundary):
             if process is None:
@@ -1103,7 +1239,10 @@ def _run_command_trial(
         worker_latches: dict[str, object] = (
             {} if worker_result is None else cast(dict[str, object], worker_result["latches"])
         )
-        replay_error = parent_latches.get("replay_miss") or worker_latches.get("replay")
+        parent_replay_error = _replay_consumption_error(spec, replay_consumed)
+        replay_error = (
+            parent_replay_error or parent_latches.get("replay_miss") or worker_latches.get("replay")
+        )
         harness_error = (
             sink_error
             or protocol_error
@@ -1112,16 +1251,29 @@ def _run_command_trial(
         )
         budget_error = parent_latches.get("budget") or worker_latches.get("budget")
 
-        if timed_out:
+        boundary_exit_clean = _boundary_exit_clean(boundary_exit, boundary_stop_signal)
+        boundary_abnormal = _boundary_exit_abnormal(
+            alive_at_deadline=boundary_alive_at_deadline,
+            exit_code=boundary_exit,
+            stop_signal=boundary_stop_signal,
+            has_result=worker_result is not None,
+        )
+        if not ready_seen:
+            base_termination = Termination.HARNESS_ERROR
+            detail = "boundary exited before ready"
+        elif boundary_abnormal:
+            base_termination = Termination.HARNESS_ERROR
+            detail = "boundary exited before returning"
+        elif timed_out:
             base_termination = Termination.TIMEOUT
             detail = "trial exceeded max_seconds"
         elif agent is None:
             base_termination = Termination.HARNESS_ERROR
-            detail = "boundary exited before ready"
+            detail = "command was not started"
         elif agent_exit is None or agent_exit != 0:
             base_termination = Termination.CRASH
             detail = "command exited non-zero" if agent_exit is not None else "command did not exit"
-        elif boundary_exit is None or boundary_exit != 0 or worker_result is None:
+        elif boundary_exit is None or not boundary_exit_clean or worker_result is None:
             base_termination = Termination.HARNESS_ERROR
             detail = "boundary exited before returning"
         else:
@@ -1140,9 +1292,10 @@ def _run_command_trial(
         else:
             termination = base_termination
 
-        recording = tuple(
-            RecordedCall.model_validate(item)
-            for item in (() if worker_result is None else worker_result["recording"])
+        recording = (
+            tuple(spec.recording)
+            if spec.tool_mode is ToolMode.REPLAY
+            else tuple(streamed_recording)
         )
         agent_claimed_success = None if agent is None or agent_exit is None else agent_exit == 0
         replay_state = spec.replay_final_state if spec.tool_mode is ToolMode.REPLAY else None

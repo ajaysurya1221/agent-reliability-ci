@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
 from contextlib import suppress
@@ -25,6 +26,24 @@ JsonPrimitive: TypeAlias = bool | int | float | str | None
 JsonValue: TypeAlias = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 ChatFunction = Callable[[str, JsonObject], JsonObject]
+
+
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        del fp, newurl
+        raise urllib.error.HTTPError(req.full_url, code, msg, headers, None)
+
+
+def _loopback_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _RejectRedirects())
 
 
 def _object(value: object, label: str) -> JsonObject:
@@ -58,7 +77,7 @@ def ollama_chat(url: str, payload: JsonObject) -> JsonObject:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    opener = _loopback_opener()
     with opener.open(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
         value: Any = json.loads(response.read())
     return _object(value, "Ollama response")
@@ -291,13 +310,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         task_value: Any = json.loads(Path(cast(str, args.task_file)).read_text(encoding="utf-8"))
         task = _object(task_value, "task")
         session = McpSession(cast(str, args.mcp_config))
-        run_agent(
+        result = run_agent(
             task,
             session,
             prompt_variant=cast(str, args.prompt_variant),
             model=cast(str, args.model),
             max_steps=cast(int, args.max_steps),
         )
+        if result is None:
+            return 1
     except Exception as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
         return 1

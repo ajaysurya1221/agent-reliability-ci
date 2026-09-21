@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
@@ -26,6 +27,24 @@ from arci.schema import (
 )
 
 OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
+
+
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        del fp, newurl
+        raise urllib.error.HTTPError(req.full_url, code, msg, headers, None)
+
+
+def _loopback_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _RejectRedirects())
 
 
 def _agent_command(variant: str, model: str) -> CommandSpec:
@@ -112,7 +131,7 @@ def build_manifest(
 def check_ollama(model: str) -> None:
     request = urllib.request.Request(OLLAMA_TAGS_URL, method="GET")
     try:
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        opener = _loopback_opener()
         with opener.open(request, timeout=5.0) as response:
             value: Any = json.loads(response.read())
     except Exception as exc:
