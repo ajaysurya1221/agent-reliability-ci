@@ -17,9 +17,20 @@ your agent (any argv) --stdio--> arci.mcp_shim --unix socket--> arci.mcp_boundar
 
    ```python
    McpServerSpec(
-       argv=(sys.executable, "-P", "-m", "arci.mcp_toolset_server",
-             "--toolset", "my_pkg.env:make_world", "--workdir", "{workdir}", "--seed", "{seed}",
-             "--task-file", "{task_file}"),
+       argv=(
+           sys.executable,
+           "-P",
+           "-m",
+           "arci.mcp_toolset_server",
+           "--toolset",
+           "my_pkg.env:make_world",
+           "--workdir",
+           "{workdir}",
+           "--seed",
+           "{seed}",
+           "--task-file",
+           "{task_file}",
+       ),
        snapshot="arci.mcp_toolset_server:snapshot",
    )
    ```
@@ -31,8 +42,18 @@ your agent (any argv) --stdio--> arci.mcp_shim --unix socket--> arci.mcp_boundar
    expanded at launch. Exit status 0 means "I claim success".
 
    ```python
-   CommandSpec(argv=(sys.executable, "-P", "-m", "my_pkg.agent", "--mcp-config", "{mcp_config}",
-                     "--task-file", "{task_file}"))
+   CommandSpec(
+       argv=(
+           sys.executable,
+           "-P",
+           "-m",
+           "my_pkg.agent",
+           "--mcp-config",
+           "{mcp_config}",
+           "--task-file",
+           "{task_file}",
+       )
+   )
    ```
 
    Commands run in the temporary trial directory: use an importable module or an absolute script
@@ -65,8 +86,16 @@ made), so check its flags against your CLI's current documentation before relyin
 
 ```python
 # Claude Code, non-interactive, using only the harness's MCP server
-CommandSpec(argv=("claude", "-p", "Read {task_file} and complete the task using the MCP tools.",
-                  "--mcp-config", "{mcp_config}", "--strict-mcp-config"))
+CommandSpec(
+    argv=(
+        "claude",
+        "-p",
+        "Read {task_file} and complete the task using the MCP tools.",
+        "--mcp-config",
+        "{mcp_config}",
+        "--strict-mcp-config",
+    )
+)
 ```
 
 An agent that cannot take the path as an argument can read it from the environment instead:

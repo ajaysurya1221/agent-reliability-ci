@@ -249,6 +249,10 @@ class CommandSpec(Model):
 
     argv: tuple[str, ...] = Field(min_length=1)
     env: dict[str, str] = Field(default_factory=dict)
+    # Exit statuses by which the agent says "my INFRASTRUCTURE failed, not me" (model backend
+    # unreachable, quota exhausted, credentials missing). Such a trial is ERROR/harness_error and
+    # invalidates the experiment instead of being counted as an agent failure. 75 is EX_TEMPFAIL.
+    infra_exit_codes: tuple[int, ...] = (75,)
 
 
 class McpServerSpec(Model):

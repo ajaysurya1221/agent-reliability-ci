@@ -78,6 +78,10 @@ def main() -> int:
         (Path(args.pid_dir) / "client.pid").write_text(str(os.getpid()))
     if args.variant == "liar":
         return 0
+    if args.variant == "infra":
+        return 75  # EX_TEMPFAIL: "my model backend is unreachable", not an agent failure
+    if args.variant == "boom":
+        return 1  # an ordinary crash
     session = Session(args.mcp_config)
     session.rpc(
         "initialize",

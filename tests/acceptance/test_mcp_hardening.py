@@ -102,3 +102,12 @@ def test_pipelined_large_messages_do_not_deadlock_the_boundary() -> None:
     env = _run("pipeline", condition=COND_CLEAN, server_args=("--big",), max_seconds=40.0)
     assert env.outcome is Outcome.PASS, env.failure_detail
     assert env.usage.wall_seconds < 30
+
+
+def test_an_infrastructure_exit_code_invalidates_the_trial_instead_of_blaming_the_agent() -> None:
+    """Found the hard way: a local model server died mid-experiment and 435 trials "crashed"."""
+    infra = _run("infra", condition=COND_CLEAN)
+    assert infra.outcome is Outcome.ERROR and infra.termination is Termination.HARNESS_ERROR
+    assert infra.failure_detail is not None and "infrastructure" in infra.failure_detail
+    crashed = _run("boom", condition=COND_CLEAN)
+    assert crashed.outcome is Outcome.FAIL and crashed.termination is Termination.CRASH

@@ -272,3 +272,8 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   -32603, which the boundary treats as a harness fault. Snapshot write failures are -32603 too.
 - The Ollama example: both URL openers reject redirects; `main` returns non-zero when the step
   limit is exhausted without a final answer.
+- Infrastructure failures: if a command agent exits with a status listed in
+  `command.infra_exit_codes` (default `(75,)`, EX_TEMPFAIL) the trial is ERROR/harness_error with
+  failure_detail `"agent reported an infrastructure failure (exit <code>)"`, ranked like any other
+  harness fault. Any other non-zero exit stays FAIL/crash. The Ollama example returns 75 when the
+  model backend is unreachable, times out, or the model is missing, and 1 for its own bugs.
