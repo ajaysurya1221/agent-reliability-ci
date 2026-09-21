@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from arci.interfaces import BudgetExceeded, ToolBoxProtocol, ToolFault
+from arci.interfaces import BudgetExceeded, ReplayMiss, ToolBoxProtocol, ToolFault
 from arci.schema import Bucket, FaultSpec, ToolCall, ToolResult
 
 Task = dict[str, JsonValue]
@@ -162,6 +162,42 @@ def bad_after_perturbation(fault: FaultSpec) -> BrokenPerturbation:
 
 def exiting_perturbation(fault: FaultSpec) -> BrokenPerturbation:
     return ExitingPerturbation()
+
+
+class ControlRaisingPerturbation(BrokenPerturbation):
+    """A plausible authoring mistake: raising a boundary exception instead of returning a result."""
+
+    def __init__(self, kind: str) -> None:
+        self.kind = kind
+
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        if self.kind == "tool_fault":
+            raise ToolFault("timeout", "raised by the injector itself")
+        if self.kind == "budget":
+            raise BudgetExceeded("raised by the injector itself")
+        raise ReplayMiss("raised by the injector itself")
+
+
+def control_raising_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return ControlRaisingPerturbation(str(fault.params.get("raises")))
+
+
+class UnprintableError(Exception):
+    def __str__(self) -> str:
+        raise RuntimeError("even the message is broken")
+
+
+class UnprintablePerturbation(BrokenPerturbation):
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        raise UnprintableError()
+
+
+def unprintable_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return UnprintablePerturbation()
+
+
+def surrogate_factory(fault: FaultSpec) -> BrokenPerturbation:
+    raise RuntimeError("bad text " + chr(0xD800))
 
 
 def exploding_factory(fault: FaultSpec) -> BrokenPerturbation:

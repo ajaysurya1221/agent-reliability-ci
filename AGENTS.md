@@ -153,3 +153,19 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
 - `arci.gate.decide` never raises: any exception while validating or computing (including an
   unsupported `alpha`, `delta`, `n_per_arm` on a typed copy, or an unsupported tail for K conditions)
   yields a sealed `ERROR` decision with a short reason.
+
+## Third hardening round (release re-check; tests/acceptance/test_hardening3.py)
+
+- An injector (or its factory) raising ANYTHING is a harness fault, including the boundary's own
+  exception types (`ToolFault`, `BudgetExceeded`, `ReplayMiss`). Latch `harness_error` around each
+  `before`/`after`/factory invocation for every `BaseException` BEFORE anything propagates to the
+  agent. Injected faults reach the agent only through a returned `ToolResult`.
+- Diagnostics are formatted by ONE safe helper used by worker, toolbox and runner: it never raises
+  (an exception whose `__str__` raises gets a fixed fallback such as `"<unprintable ExcType>"`),
+  it returns one line, and it replaces anything not UTF-8 encodable, so a latch frame or an
+  envelope can always be sent and sealed.
+- Child stdout (worker AND grader) is drained concurrently while the supervisor watches process
+  exit and the deadline. Never wait for exit before reading: a response larger than the pipe buffer
+  must not deadlock. Never wait for EOF after exit or after the deadline.
+- `decide` must survive absurd typed values (`10**400`, `inf`, `nan`) in `alpha`, `delta`,
+  `n_per_arm`: the ERROR decision's own fields fall back to finite, sealable defaults.
