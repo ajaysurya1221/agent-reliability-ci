@@ -16,7 +16,32 @@ from arci.schema import (
     ToolMode,
     ToolResult,
 )
-from arci.toolbox import ToolBox
+from arci.toolbox import ToolBox, format_diagnostic
+
+
+class _RaisingPerturbation:
+    name = "broken"
+    bucket = Bucket.FALSIFY
+
+    def __init__(self, hook: str, error: BaseException) -> None:
+        self.hook = hook
+        self.error = error
+
+    def before(self, call: object, rng: object) -> None:
+        del call, rng
+        if self.hook == "before":
+            raise self.error
+
+    def after(self, call: object, result: ToolResult, rng: object) -> ToolResult:
+        del call, rng
+        if self.hook == "after":
+            raise self.error
+        return result
+
+
+class _UnprintableError(Exception):
+    def __str__(self) -> str:
+        raise RuntimeError("broken string")
 
 
 def test_injected_fault_is_recorded_and_counts_toward_budget() -> None:
@@ -111,3 +136,28 @@ def test_budget_and_returned_values_are_latched_and_isolated() -> None:
     with pytest.raises(BudgetExceeded):
         box.call("fetch")
     assert budget == ["tool call budget exhausted"]
+
+
+@pytest.mark.parametrize("hook", ["before", "after"])
+@pytest.mark.parametrize("error", [ToolFault("error"), BudgetExceeded(), ReplayMiss()])
+def test_injector_boundary_exceptions_latch_as_harness_fault(
+    hook: str, error: BaseException
+) -> None:
+    harness: list[str] = []
+    box = ToolBox(
+        {"fetch": lambda: 42},
+        Budgets(),
+        lambda _kind, _payload: None,
+        perturbations=(_RaisingPerturbation(hook, error),),
+        latch_harness=harness.append,
+    )
+
+    with pytest.raises(type(error)):
+        box.call("fetch")
+    assert box.harness_fault
+    assert len(harness) == 1
+
+
+def test_diagnostic_formatter_handles_unprintable_and_non_utf8_text() -> None:
+    assert format_diagnostic(_UnprintableError()) == "<unprintable _UnprintableError>"
+    assert format_diagnostic("first\nsecond " + chr(0xD800)) == "first"

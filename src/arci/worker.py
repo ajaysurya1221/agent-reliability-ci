@@ -13,12 +13,11 @@ from typing import Any, cast
 from pydantic import JsonValue, TypeAdapter
 
 from arci.contracts import resolve
-from arci.fingerprint import normalise
 from arci.hashing import canonical_json
 from arci.interfaces import AgentFn, BudgetExceeded, ReplayMiss, ToolFault, ToolSet, ToolSetFactory
 from arci.perturb import build
 from arci.schema import Event, Termination, ToolMode, TrialSpec
-from arci.toolbox import ToolBox
+from arci.toolbox import ToolBox, format_diagnostic
 
 _AGENT_RESULT = TypeAdapter(dict[str, JsonValue])
 _FINAL_STATE = TypeAdapter(dict[str, JsonValue])
@@ -34,17 +33,17 @@ class _Latches:
 
     def set_replay(self, detail: str) -> None:
         if self.replay is None:
-            self.replay = normalise(detail)
+            self.replay = format_diagnostic(detail)
             _write_latch(self._nonce, "replay_miss", self.replay)
 
     def set_harness(self, detail: str) -> None:
         if self.harness is None:
-            self.harness = normalise(detail)
+            self.harness = format_diagnostic(detail)
             _write_latch(self._nonce, "harness_error", self.harness)
 
     def set_budget(self, detail: str) -> None:
         if self.budget is None:
-            self.budget = normalise(detail)
+            self.budget = format_diagnostic(detail)
             _write_latch(self._nonce, "budget", self.budget)
 
 
@@ -88,7 +87,7 @@ class _Emitter:
 
 
 def _detail(exc: BaseException) -> str:
-    return normalise(f"{type(exc).__name__}: {exc}")
+    return format_diagnostic(exc)
 
 
 def _read_request() -> tuple[str, TrialSpec]:
@@ -152,11 +151,13 @@ def main() -> int:
         except ReplayMiss as exc:
             termination = Termination.REPLAY_MISS
             detail = _detail(exc)
-            latches.set_replay(detail)
+            if not toolbox.harness_fault:
+                latches.set_replay(detail)
         except BudgetExceeded as exc:
             termination = Termination.BUDGET
             detail = _detail(exc)
-            latches.set_budget(detail)
+            if not toolbox.harness_fault:
+                latches.set_budget(detail)
         except ToolFault as exc:
             termination = Termination.CRASH
             detail = _detail(exc)

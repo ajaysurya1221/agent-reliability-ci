@@ -103,11 +103,20 @@ def _experiment_verdict(conditions: Sequence[ConditionDecision], has_error: bool
 
 
 def _safe_float(value: object) -> float:
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        converted = float(value)
-        if math.isfinite(converted):
-            return converted
+    try:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            converted = float(value)
+            if math.isfinite(converted):
+                return converted
+    except BaseException:
+        pass
     return 0.0
+
+
+def _safe_int(value: object) -> int:
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10_000:
+        return value
+    return 0
 
 
 def _safe_text(value: object) -> str:
@@ -115,7 +124,7 @@ def _safe_text(value: object) -> str:
         return ""
     try:
         value.encode("utf-8")
-    except UnicodeError:
+    except BaseException:
         return ""
     return value
 
@@ -137,8 +146,7 @@ def _error_decision(
         trials_sha256 = hash_record({"trials": []})
     alpha = _safe_float(getattr(manifest, "alpha", 0.0))
     delta = _safe_float(getattr(manifest, "delta", 0.0))
-    n_value = getattr(manifest, "n_per_arm", 0)
-    n_per_arm = n_value if isinstance(n_value, int) and not isinstance(n_value, bool) else 0
+    n_per_arm = _safe_int(getattr(manifest, "n_per_arm", 0))
     return GateDecision.create(
         experiment_id=_safe_text(getattr(manifest, "experiment_id", "")),
         manifest_sha256=_safe_text(getattr(manifest, "record_sha256", "")),

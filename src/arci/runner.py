@@ -21,7 +21,7 @@ from typing import Any, cast
 from pydantic import JsonValue
 
 from arci.contracts import validate_contract
-from arci.fingerprint import fingerprint, normalise
+from arci.fingerprint import fingerprint
 from arci.hashing import canonical_json, hash_record
 from arci.interfaces import EmitEvent
 from arci.schedule import build_schedule, spec_sha256
@@ -40,6 +40,7 @@ from arci.schema import (
     Usage,
 )
 from arci.storage import ExperimentStore
+from arci.toolbox import format_diagnostic
 
 _MAX_PROTOCOL_LINE = 1024 * 1024
 _PROTOCOL_QUEUE_SIZE = 256
@@ -100,7 +101,7 @@ def _first_failed_tool(events: Sequence[Event]) -> str:
 def _failure(
     termination: Termination, contract: ContractResult | None, events: Sequence[Event], detail: str
 ) -> tuple[Outcome, str | None, str | None]:
-    clean_detail = normalise(detail) if detail else ""
+    clean_detail = format_diagnostic(detail) if detail else ""
     if termination is Termination.REPLAY_MISS:
         message = clean_detail or "recording was not consumed exactly"
         return Outcome.ERROR, fingerprint("replay_miss", message), message
@@ -120,7 +121,7 @@ def _failure(
         message = clean_detail or "worker exited before returning"
         return Outcome.FAIL, fingerprint("crash", message), message
     if contract is not None and contract.grader_error is not None:
-        message = normalise(contract.grader_error)
+        message = format_diagnostic(contract.grader_error)
         return Outcome.ERROR, fingerprint("grader", message), message
     if contract is not None:
         hard = next((v for v in contract.violations if v.severity == "hard"), None)
@@ -260,6 +261,7 @@ def _grade(
     run_oracle: bool,
     extra_pythonpath: Sequence[str],
 ) -> ContractResult:
+    deadline = time.monotonic() + spec.budgets.grader_seconds
     try:
         request = canonical_json(
             {
@@ -285,6 +287,29 @@ def _grade(
             start_new_session=True,
         )
         assert process.stdin is not None and process.stdout is not None
+        chunks: list[bytes] = []
+        reader_stop = threading.Event()
+        reader_done = threading.Event()
+        reader_failed = threading.Event()
+
+        def read_response() -> None:
+            try:
+                assert process is not None and process.stdout is not None
+                while True:
+                    timeout = 0.0 if reader_stop.is_set() else 0.05
+                    ready, _, _ = select.select([process.stdout.fileno()], [], [], timeout)
+                    if not ready:
+                        if reader_stop.is_set():
+                            return
+                        continue
+                    chunk = os.read(process.stdout.fileno(), 65536)
+                    if not chunk:
+                        return
+                    chunks.append(chunk)
+            except BaseException:
+                reader_failed.set()
+            finally:
+                reader_done.set()
 
         def write_request() -> None:
             try:
@@ -298,27 +323,24 @@ def _grade(
                     assert process is not None and process.stdin is not None
                     process.stdin.close()
 
+        reader = threading.Thread(target=read_response, daemon=True)
+        reader.start()
         threading.Thread(target=write_request, daemon=True).start()
         try:
-            exit_code = process.wait(timeout=spec.budgets.grader_seconds)
+            exit_code = process.wait(timeout=max(0.0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             _kill_group(process)
             with contextlib.suppress(Exception):
                 process.wait()
+            reader_stop.set()
             return ContractResult(success=False, grader_error=_GRADER_TIMEOUT)
         _kill_group(process)
-        os.set_blocking(process.stdout.fileno(), False)
-        chunks: list[bytes] = []
-        while True:
-            try:
-                chunk = os.read(process.stdout.fileno(), 65536)
-            except BlockingIOError:
-                break
-            if not chunk:
-                break
-            chunks.append(chunk)
+        reader_stop.set()
+        reader_done.wait(timeout=max(0.0, deadline - time.monotonic()))
         if exit_code != 0:
             return ContractResult(success=False, grader_error=_GRADER_EXIT)
+        if not reader_done.is_set() or reader_failed.is_set():
+            return ContractResult(success=False, grader_error=_GRADER_OUTPUT)
         try:
             return ContractResult.model_validate_json(b"".join(chunks))
         except Exception:
@@ -585,7 +607,7 @@ def _run_trial(
             except Exception:
                 protocol_error = "invalid worker protocol"
     except Exception as exc:
-        protocol_error = normalise(f"{type(exc).__name__}: {exc}")
+        protocol_error = format_diagnostic(exc)
     finally:
         reader_stop.set()
         if process is not None:
@@ -739,7 +761,7 @@ def run_trial(
             extra_pythonpath=extra_pythonpath,
         )
     except BaseException as exc:
-        detail = normalise(f"{type(exc).__name__}: {exc}") or "trial harness failed"
+        detail = format_diagnostic(exc) or "trial harness failed"
         try:
             canonical_json(detail)
         except (TypeError, ValueError, UnicodeError):
