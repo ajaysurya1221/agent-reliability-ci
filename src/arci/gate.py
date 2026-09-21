@@ -18,7 +18,7 @@ from arci.schema import (
     TrialSpec,
     Verdict,
 )
-from arci.stats import clopper_pearson, difference_bounds, per_arm_confidence, wilson
+from arci.stats import clopper_pearson_tail, difference_bounds, per_arm_confidence, wilson
 
 
 def classify(delta_low: float, delta_high: float, delta: float) -> Verdict:
@@ -43,25 +43,34 @@ def _matches_spec(trial: TrialEnvelope, spec: TrialSpec) -> bool:
     )
 
 
-def _arm_stats(trials: Sequence[TrialEnvelope], confidence: float) -> ArmStats:
+def _arm_stats(trials: Sequence[TrialEnvelope], tail: float) -> tuple[ArmStats, bool]:
     n = len(trials)
     successes = sum(trial.outcome is Outcome.PASS for trial in trials)
     errors = sum(trial.outcome is Outcome.ERROR for trial in trials)
+    interval_error = False
     if n == 0 or n > 10_000:
         cp_low, cp_high = 0.0, 1.0
         wilson_low, wilson_high = 0.0, 1.0
     else:
-        cp_low, cp_high = clopper_pearson(successes, n, confidence)
-        wilson_low, wilson_high = wilson(successes, n)
-    return ArmStats(
-        n=n,
-        successes=successes,
-        errors=errors,
-        rate=successes / n if n else 0.0,
-        cp_low=cp_low,
-        cp_high=cp_high,
-        wilson_low=wilson_low,
-        wilson_high=wilson_high,
+        try:
+            cp_low, cp_high = clopper_pearson_tail(successes, n, tail)
+            wilson_low, wilson_high = wilson(successes, n)
+        except Exception:
+            cp_low, cp_high = 0.0, 1.0
+            wilson_low, wilson_high = 0.0, 1.0
+            interval_error = True
+    return (
+        ArmStats(
+            n=n,
+            successes=successes,
+            errors=errors,
+            rate=successes / n if n else 0.0,
+            cp_low=cp_low,
+            cp_high=cp_high,
+            wilson_low=wilson_low,
+            wilson_high=wilson_high,
+        ),
+        interval_error,
     )
 
 
@@ -98,7 +107,9 @@ def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
         not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
         for condition in manifest.conditions
     )
-    confidence = per_arm_confidence(manifest.alpha, max(gating_count, 1))
+    adjusted_conditions = max(gating_count, 1)
+    confidence = per_arm_confidence(manifest.alpha, adjusted_conditions)
+    tail = manifest.alpha / (4.0 * adjusted_conditions)
 
     global_reasons: list[str] = []
     try:
@@ -162,8 +173,10 @@ def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
         ]
         baseline_trials = [trial for trial in condition_trials if trial.arm == "baseline"]
         candidate_trials = [trial for trial in condition_trials if trial.arm == "candidate"]
-        baseline = _arm_stats(baseline_trials, confidence)
-        candidate = _arm_stats(candidate_trials, confidence)
+        baseline, baseline_interval_error = _arm_stats(baseline_trials, tail)
+        candidate, candidate_interval_error = _arm_stats(candidate_trials, tail)
+        if baseline_interval_error or candidate_interval_error:
+            global_reasons.append("statistical interval error")
         delta_low, delta_high = difference_bounds(
             baseline=(baseline.cp_low, baseline.cp_high),
             candidate=(candidate.cp_low, candidate.cp_high),

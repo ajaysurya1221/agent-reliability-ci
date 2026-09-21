@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from arci.gate import classify
-from arci.stats import clopper_pearson, difference_bounds, per_arm_confidence
+from arci.stats import clopper_pearson_tail, difference_bounds
 
 _OUTCOMES = ("PASS", "BLOCK", "INCONCLUSIVE")
 _SAMPLE_SIZES = (20, 50, 100, 200, 400)
@@ -42,8 +42,8 @@ def _validate_probability(value: float, name: str) -> None:
 
 
 @cache
-def _intervals(n: int, confidence: float) -> tuple[tuple[float, float], ...]:
-    return tuple(clopper_pearson(successes, n, confidence) for successes in range(n + 1))
+def _intervals(n: int, tail: float) -> tuple[tuple[float, float], ...]:
+    return tuple(clopper_pearson_tail(successes, n, tail) for successes in range(n + 1))
 
 
 def _binomial_pmf(p: float, n: int) -> tuple[float, ...]:
@@ -80,8 +80,7 @@ def operating_characteristics(
         raise ValueError("n must be between 1 and 10000")
     if not 0.0 < delta < 1.0:
         raise ValueError("delta must be strictly between 0 and 1")
-    confidence = per_arm_confidence(alpha, k)
-    intervals = _intervals(n, confidence)
+    intervals = _intervals(n, alpha / (4.0 * k))
     pmf_a = _binomial_pmf(p_a, n)
     pmf_b = _binomial_pmf(p_b, n)
     masses: dict[str, list[float]] = {outcome: [] for outcome in _OUTCOMES}
@@ -117,7 +116,7 @@ def correlated_boundary(
         raise ValueError("rho must be between 0 and 1")
     if reps < 1:
         raise ValueError("reps must be at least 1")
-    intervals = _intervals(n, per_arm_confidence(0.05, 1))
+    intervals = _intervals(n, 0.05 / 4.0)
     rng = random.Random(seed)
     counts = {outcome: 0 for outcome in _OUTCOMES}
     for _ in range(reps):

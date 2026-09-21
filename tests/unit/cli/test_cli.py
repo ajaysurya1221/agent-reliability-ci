@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import arci.cli as cli_module
 from arci.cli import main
 
 
@@ -39,3 +40,20 @@ def test_malformed_replay_is_invalid(tmp_path: Path, capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
     assert captured.out.startswith("INVALID:")
     assert "Traceback" not in captured.err
+
+
+@pytest.mark.parametrize(("flag", "expected"), [((), False), (("--all-steps",), True)])
+def test_diff_all_steps_flag_is_dispatched(
+    monkeypatch: pytest.MonkeyPatch, flag: tuple[str, ...], expected: bool
+) -> None:
+    observed: list[bool] = []
+
+    def fake_diff(run_dir: str, trial_a: str, trial_b: str, all_steps: bool) -> int:
+        assert (run_dir, trial_a, trial_b) == ("run", "left", "right")
+        observed.append(all_steps)
+        return 0
+
+    monkeypatch.setattr(cli_module, "_cmd_diff", fake_diff)
+
+    assert main(["diff", "run", "left", "right", *flag]) == 0
+    assert observed == [expected]

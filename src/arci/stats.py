@@ -7,59 +7,103 @@ from statistics import NormalDist
 
 _MAX_N = 10_000
 _BISECTION_STEPS = 60
+_MIN_TAIL = 2.5e-7
 
 
-def _validate(successes: int, n: int, confidence: float) -> None:
+def _validate_counts(successes: int, n: int) -> None:
     if n < 1 or n > _MAX_N:
         raise ValueError("n must be between 1 and 10000")
     if successes < 0 or successes > n:
         raise ValueError("successes must be between 0 and n")
+
+
+def _validate(successes: int, n: int, confidence: float) -> None:
+    _validate_counts(successes, n)
     if not 0.0 < confidence < 1.0:
         raise ValueError("confidence must be strictly between 0 and 1")
 
 
-def _binomial_cdf(x: int, n: int, p: float) -> float:
-    """Return P(X <= x) by log-summing the exact binomial terms."""
-    if x < 0:
-        return 0.0
-    if x >= n:
-        return 1.0
-    if p <= 0.0:
-        return 1.0
-    if p >= 1.0:
-        return 0.0
-
+def _log_binomial_sum(start: int, stop: int, n: int, p: float) -> float:
+    """Log-sum binomial probabilities for ``start <= X < stop``."""
     log_p = math.log(p)
     log_q = math.log1p(-p)
     log_n_factorial = math.lgamma(n + 1)
     logs = [
         log_n_factorial - math.lgamma(k + 1) - math.lgamma(n - k + 1) + k * log_p + (n - k) * log_q
-        for k in range(x + 1)
+        for k in range(start, stop)
     ]
     largest = max(logs)
-    return math.exp(largest) * math.fsum(math.exp(value - largest) for value in logs)
+    return largest + math.log(math.fsum(math.exp(value - largest) for value in logs))
 
 
-def _cdf_root(x: int, n: int, target: float) -> float:
-    """Solve binomial_cdf(x, n, p) == target for p."""
+def _tail_is_greater(x: int, n: int, p: float, target: float, *, upper: bool) -> bool:
+    """Compare one binomial tail with ``target`` without subtracting a CDF.
+
+    The smaller-probability side is log-summed. When that is the complement of
+    the requested tail, the comparison is reversed against ``1 - target`` in
+    log space, so no rounded probability is subtracted from one.
+    """
+    if p <= 0.0:
+        return not upper
+    if p >= 1.0:
+        return upper
+
+    # floor(np + p) is a binomial median. It identifies which side has at most
+    # half the mass, including the only ambiguous point around the mean.
+    median = math.floor(n * p + p)
+    log_target = math.log(target)
+    log_complement_target = math.log1p(-target)
+    if upper:
+        if x > median:
+            return _log_binomial_sum(x, n + 1, n, p) > log_target
+        return _log_binomial_sum(0, x, n, p) < log_complement_target
+    if x < median:
+        return _log_binomial_sum(0, x + 1, n, p) > log_target
+    return _log_binomial_sum(x + 1, n + 1, n, p) < log_complement_target
+
+
+def _tail_root(x: int, n: int, target: float, *, upper: bool) -> float:
+    """Solve a binomial upper or lower tail equation by bisection."""
     low = 0.0
     high = 1.0
     for _ in range(_BISECTION_STEPS):
         midpoint = (low + high) / 2.0
-        if _binomial_cdf(x, n, midpoint) > target:
+        greater = _tail_is_greater(x, n, midpoint, target, upper=upper)
+        if upper:
+            if greater:
+                high = midpoint
+            else:
+                low = midpoint
+        elif greater:
             low = midpoint
         else:
             high = midpoint
     return (low + high) / 2.0
 
 
+def clopper_pearson_tail(successes: int, n: int, tail: float) -> tuple[float, float]:
+    """Return an exact interval by directly inverting each tail probability."""
+    _validate_counts(successes, n)
+    if not _MIN_TAIL <= tail < 0.5:
+        raise ValueError("tail must be between 2.5e-7 (inclusive) and 0.5 (exclusive)")
+
+    if successes == 0:
+        low = 0.0
+        high = 1.0 - tail ** (1.0 / n)
+    elif successes == n:
+        low = tail ** (1.0 / n)
+        high = 1.0
+    else:
+        low = _tail_root(successes, n, tail, upper=True)
+        high = _tail_root(successes, n, tail, upper=False)
+    return low, high
+
+
 def clopper_pearson(successes: int, n: int, confidence: float) -> tuple[float, float]:
     """Return the equal-tailed exact binomial confidence interval."""
     _validate(successes, n, confidence)
     tail = (1.0 - confidence) / 2.0
-    low = 0.0 if successes == 0 else _cdf_root(successes - 1, n, 1.0 - tail)
-    high = 1.0 if successes == n else _cdf_root(successes, n, tail)
-    return low, high
+    return clopper_pearson_tail(successes, n, tail)
 
 
 def wilson(successes: int, n: int, confidence: float = 0.95) -> tuple[float, float]:

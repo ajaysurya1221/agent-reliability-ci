@@ -8,7 +8,7 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import NoReturn, cast
+from typing import Literal, NoReturn, Protocol, cast
 
 from arci.gate import decide
 from arci.replay import make_bundle, replay
@@ -29,6 +29,16 @@ from arci.storage import load_run
 
 class CliError(ValueError):
     """A concise error safe to show to a command-line user."""
+
+
+class _FirstDivergence(Protocol):
+    def __call__(
+        self,
+        a: TrialEnvelope,
+        b: TrialEnvelope,
+        *,
+        mode: Literal["boundary", "all"] = "boundary",
+    ) -> Divergence: ...
 
 
 class _Parser(argparse.ArgumentParser):
@@ -155,14 +165,18 @@ def _cmd_replay(bundle_path: str) -> int:
     }[result.status]
 
 
-def _cmd_diff(run_dir: str, trial_a: str, trial_b: str) -> int:
+def _cmd_diff(run_dir: str, trial_a: str, trial_b: str, all_steps: bool) -> int:
     first_divergence = cast(
-        Callable[[TrialEnvelope, TrialEnvelope], Divergence],
+        _FirstDivergence,
         vars(importlib.import_module("arci.diff"))["first_divergence"],
     )
 
     _manifest, trials = load_run(run_dir)
-    divergence = first_divergence(_find_trial(trials, trial_a), _find_trial(trials, trial_b))
+    mode: Literal["boundary", "all"] = "all" if all_steps else "boundary"
+    divergence = first_divergence(
+        _find_trial(trials, trial_a), _find_trial(trials, trial_b), mode=mode
+    )
+    print(f"mode: {mode}")
     print(f"common_prefix: {divergence.common_prefix}")
     print(f"left: {divergence.left}")
     print(f"right: {divergence.right}")
@@ -224,6 +238,7 @@ def _parser() -> _Parser:
     diff.add_argument("run_dir", metavar="RUN_DIR")
     diff.add_argument("trial_a", metavar="TRIAL_A")
     diff.add_argument("trial_b", metavar="TRIAL_B")
+    diff.add_argument("--all-steps", action="store_true")
 
     minimize = commands.add_parser("minimize", help="minimize a failing trial's faults")
     minimize.add_argument("run_dir", metavar="RUN_DIR")
@@ -263,6 +278,7 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["run_dir"]),
             cast(str, values["trial_a"]),
             cast(str, values["trial_b"]),
+            cast(bool, values["all_steps"]),
         )
     if command == "minimize":
         return _cmd_minimize(
