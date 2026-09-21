@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+from typing import Literal
 
 from pydantic import JsonValue
 
 from arci.hashing import canonical_json
 from arci.schema import Divergence, Event, TrialEnvelope
+
+DiffMode = Literal["boundary", "all"]
+_BOUNDARY_KINDS = frozenset({"tool_start", "tool_finish", "agent_result", "trial_end"})
 
 
 def _json(value: object) -> str:
@@ -52,62 +56,104 @@ def step_signature(event: Event) -> str:
     return event.kind
 
 
-def first_divergence(a: TrialEnvelope, b: TrialEnvelope) -> Divergence:
-    """Locate the first unequal semantic step in two trial traces."""
-    left_signatures = tuple(step_signature(event) for event in a.events)
-    right_signatures = tuple(step_signature(event) for event in b.events)
-    common = 0
-    while (
-        common < len(left_signatures)
-        and common < len(right_signatures)
-        and left_signatures[common] == right_signatures[common]
-    ):
-        common += 1
+def _indexed_signatures(trial: TrialEnvelope, mode: DiffMode) -> tuple[tuple[int, str], ...]:
+    return tuple(
+        (index, step_signature(event))
+        for index, event in enumerate(trial.events)
+        if mode == "all" or event.kind in _BOUNDARY_KINDS
+    )
 
-    left = left_signatures[common] if common < len(left_signatures) else None
-    right = right_signatures[common] if common < len(right_signatures) else None
+
+def _alignment(
+    a: TrialEnvelope, b: TrialEnvelope, mode: DiffMode
+) -> tuple[Divergence, int | None, int | None]:
+    if mode not in {"boundary", "all"}:
+        raise ValueError(f"unknown diff mode: {mode}")
+
+    left_steps = _indexed_signatures(a, mode)
+    right_steps = _indexed_signatures(b, mode)
+    aligned = 0
+    while (
+        aligned < len(left_steps)
+        and aligned < len(right_steps)
+        and left_steps[aligned][1] == right_steps[aligned][1]
+    ):
+        aligned += 1
+
+    left_entry = left_steps[aligned] if aligned < len(left_steps) else None
+    right_entry = right_steps[aligned] if aligned < len(right_steps) else None
+    left_index = left_entry[0] if left_entry is not None else None
+    right_index = right_entry[0] if right_entry is not None else None
+    left = left_entry[1] if left_entry is not None else None
+    right = right_entry[1] if right_entry is not None else None
+    common_prefix = left_index if left_index is not None else len(a.events)
     if left is None and right is None:
-        return Divergence(common_prefix=common, left=None, right=None)
+        return (
+            Divergence(common_prefix=len(a.events), left=None, right=None),
+            None,
+            None,
+        )
 
     after_injection: str | None = None
-    for position in range(common + 1):
-        for events in (a.events, b.events):
-            if position >= len(events):
-                continue
-            event = events[position]
+    limits = (
+        (a.events, left_index if left_index is not None else len(a.events) - 1),
+        (b.events, right_index if right_index is not None else len(b.events) - 1),
+    )
+    for events, limit in limits:
+        for event in events[: limit + 1]:
             injected_by = event.payload.get("injected_by")
             if event.kind == "tool_finish" and isinstance(injected_by, str) and injected_by:
                 after_injection = injected_by
 
-    return Divergence(
-        common_prefix=common,
-        left=left,
-        right=right,
-        after_injection=after_injection,
+    return (
+        Divergence(
+            common_prefix=common_prefix,
+            left=left,
+            right=right,
+            after_injection=after_injection,
+        ),
+        left_index,
+        right_index,
     )
 
 
-def render_divergence(a: TrialEnvelope, b: TrialEnvelope, d: Divergence) -> str:
+def first_divergence(
+    a: TrialEnvelope, b: TrialEnvelope, *, mode: DiffMode = "boundary"
+) -> Divergence:
+    """Locate the first unequal boundary or full-trace step in two trials."""
+    divergence, _left_index, _right_index = _alignment(a, b, mode)
+    return divergence
+
+
+def render_divergence(
+    a: TrialEnvelope,
+    b: TrialEnvelope,
+    d: Divergence,
+    *,
+    mode: DiffMode = "boundary",
+) -> str:
     """Render a compact explanation around a trace divergence."""
+    _computed, left_index, right_index = _alignment(a, b, mode)
+    mode_line = f"Mode: {mode}."
     if d.left is None and d.right is None:
-        return f"No divergence: {d.common_prefix} normalized steps are identical."
+        return f"{mode_line}\nNo divergence: {d.common_prefix} normalized steps are identical."
 
     injection = (
         f" after injection {_json(d.after_injection)}" if d.after_injection is not None else ""
     )
-    lines = [f"First divergence at step {d.common_prefix}{injection}.", "Context:"]
-    start = max(0, d.common_prefix - 2)
-    for index in range(start, d.common_prefix):
-        lines.append(f"  {index}: both  {step_signature(a.events[index])}")
+    lines = [mode_line, f"First divergence at step {d.common_prefix}{injection}.", "Context:"]
 
-    def signature_at(trial: TrialEnvelope, index: int) -> str:
-        return step_signature(trial.events[index]) if index < len(trial.events) else "<end>"
+    def append_context(side: str, trial: TrialEnvelope, index: int | None) -> None:
+        if index is None:
+            lines.append(f"  {side}: <end>")
+            return
+        start = max(0, index - 2)
+        stop = min(len(trial.events), index + 2)
+        for position in range(start, stop):
+            event = trial.events[position]
+            marker = "annotation" if event.kind == "model_step" else "event"
+            lines.append(f"  {side} {position} [{marker}]: {step_signature(event)}")
 
-    for index in range(d.common_prefix, d.common_prefix + 2):
-        left = signature_at(a, index)
-        right = signature_at(b, index)
-        if index > d.common_prefix and left == "<end>" and right == "<end>":
-            break
-        lines.append(f"  {index}: left  {left}")
-        lines.append(f"  {index}: right {right}")
+    append_context("left", a, left_index)
+    append_context("right", b, right_index)
     return "\n".join(lines)

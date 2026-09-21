@@ -66,11 +66,11 @@ def agent_b(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
     del rng
     reserved = _reservation_state(task, tools)
     if not reserved:
-        tools.note_model_step("reserve_once")
+        tools.note_model_step("reserve_attempt", attempt=1)
         try:
             reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
         except ToolFault:
-            tools.note_model_step("reserve_fault_skip_to_confirm")
+            tools.note_model_step("reserve_failed_continue")
 
     confirmed = False
     for attempt in range(3):
