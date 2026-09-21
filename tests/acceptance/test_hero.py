@@ -33,9 +33,8 @@ def test_frozen_experiment_blocks_the_regression_and_passes_the_repair(
 def test_one_illustrative_run_hides_the_regression() -> None:
     """pass@1 on a clean run cannot tell A from B. That is the point of the tool."""
     from arci.runner import run_trial
-    from examples.retry_agent.experiment import build_manifest, clean_manifest
-
     from arci.schedule import build_schedule
+    from examples.retry_agent.experiment import build_manifest, clean_manifest
 
     m = clean_manifest(candidate="agent_b")
     first_pair = build_schedule(m)[:2]
@@ -47,9 +46,8 @@ def test_one_illustrative_run_hides_the_regression() -> None:
 def test_repaired_candidate_passes_the_reproducer() -> None:
     from arci.replay import make_bundle, replay
     from arci.runner import run_trial
-    from examples.retry_agent.experiment import build_manifest
-
     from arci.schedule import build_schedule
+    from examples.retry_agent.experiment import build_manifest
 
     m = build_manifest(n_per_arm=200, candidate="agent_b")
     candidate_specs = [s for s in build_schedule(m) if s.arm == "candidate"]
