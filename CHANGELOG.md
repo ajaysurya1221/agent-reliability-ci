@@ -34,7 +34,7 @@ given, and whatever it does outside MCP is invisible.
 - One MCP server per trial, stdio only. No HTTP transport yet.
 - Tool replay is not agent replay: a live model rarely repeats its calls, so replaying its bundle is
   usually INVALID. Deterministic replay is demonstrated only with scripted clients.
-- The Claude Code and Codex recipes in `docs/REAL_AGENTS.md` are sketches; no paid-agent trials were
+- The Claude Code recipe in `docs/REAL_AGENTS.md` is an untested sketch; no paid-agent trials were
   run for this release. The local-model results are exploratory (one machine, one small model).
 - POSIX only (unix sockets, process groups).
 

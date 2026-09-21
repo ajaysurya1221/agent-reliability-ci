@@ -74,7 +74,8 @@ manifest (sealed, frozen before the run)
   K fault conditions, alpha, delta, n_per_arm, seeds
         |
         v
-runner: one fresh child process per trial, killed as a process group at the deadline
+runner: per trial, a Python worker OR a command agent + MCP boundary + server; a separate
+  grader process; everything killed as process groups at the deadline
   ToolBox = the tool boundary: budgets, seeded fault injection, record / replay
   every event streams to ONE parent writer -> events.jsonl, trials.jsonl (sealed envelopes)
         |
@@ -87,7 +88,7 @@ gate: pure function (manifest, trials) -> sealed decision, exit code 0 / 1 / 2 /
         +--> replay     REPRODUCED / NOT_REPRODUCED / INVALID
 ```
 
-An agent is a plain function, `agent(task, tools, rng) -> dict`. It calls `tools.call("name", ...)`
+A Python agent is a plain function, `agent(task, tools, rng) -> dict`. It calls `tools.call("name", ...)`
 and may annotate its reasoning with `tools.note_model_step(...)`. Success is decided by an oracle
 over the environment's final state, never by what the agent says about itself.
 
@@ -177,9 +178,9 @@ unless you set `allow-inconclusive: "true"`.
 <a id="limits"></a>
 ## What it does not do
 
-- **It is not a sandbox and not a security boundary.** The agent is assumed to be your own buggy
-  code, not an adversary. It shares a process with the tool boundary; a hostile agent could forge its
-  own result. See [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md). Out-of-process isolation (an MCP proxy
+- **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
+  boundary. Command agents use a separate harness-owned MCP boundary. Both assume buggy, non-hostile
+  agent code; a hostile agent could still forge or bypass its record. See [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md). Out-of-process isolation (an MCP proxy
   and a tool gateway) is the first item on the roadmap.
 - **It only sees the tool boundary.** Files, network and subprocesses the agent touches directly are
   invisible.

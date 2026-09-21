@@ -1,8 +1,9 @@
 # Testing a real agent (v0.2)
 
-A **command agent** is any program. `arci` runs it once per trial, gives it an MCP config file, and
-owns the one MCP server behind that config. Everything the agent does through MCP is recorded,
-budgeted, fault-injected and replayable. Everything else it does is invisible (see the trust model).
+A **command agent** is a subprocess configured to use one harness-owned stdio MCP server. `arci`
+runs it once per trial and gives it an MCP config file. The boundary records the supported
+request/response exchanges; only `tools/call` is budgeted and fault-injected. Everything the agent
+does outside MCP is invisible (see the trust model).
 
 ```text
 your agent (any argv) --stdio--> arci.mcp_shim --unix socket--> arci.mcp_boundary --stdio--> MCP server
@@ -30,9 +31,12 @@ your agent (any argv) --stdio--> arci.mcp_shim --unix socket--> arci.mcp_boundar
    expanded at launch. Exit status 0 means "I claim success".
 
    ```python
-   CommandSpec(argv=(sys.executable, "my_agent.py", "--mcp-config", "{mcp_config}",
+   CommandSpec(argv=(sys.executable, "-P", "-m", "my_pkg.agent", "--mcp-config", "{mcp_config}",
                      "--task-file", "{task_file}"))
    ```
+
+   Commands run in the temporary trial directory: use an importable module or an absolute script
+   path, never a relative one.
 
 3. **A manifest** with `mcp_server`, two `ArmSpec(command=...)` arms, fault conditions that name MCP
    tool names, and the usual contract, alpha, delta and `n_per_arm`.
@@ -55,9 +59,9 @@ model, N=30.
 
 ## Other agent CLIs
 
-Any CLI that accepts a standard `{"mcpServers": {...}}` config file can be a command agent. Two
-sketches follow. They were NOT run for this release (no paid-agent trials were made), so check the
-flags against your CLI's current documentation before relying on them:
+Any CLI that accepts a standard `{"mcpServers": {...}}` config file can be a command agent. One
+untested Claude Code sketch follows. It was NOT run for this release (no paid-agent trials were
+made), so check its flags against your CLI's current documentation before relying on it:
 
 ```python
 # Claude Code, non-interactive, using only the harness's MCP server
