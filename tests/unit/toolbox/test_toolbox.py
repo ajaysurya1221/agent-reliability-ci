@@ -89,3 +89,25 @@ def test_empty_result_rewrites_only_the_selected_occurrence() -> None:
     )
     assert box.call("fetch") is None
     assert box.call("fetch") == 42
+
+
+def test_budget_and_returned_values_are_latched_and_isolated() -> None:
+    budget: list[str] = []
+    emitted: list[dict[str, JsonValue]] = []
+    original: dict[str, JsonValue] = {"nested": {"value": 42}}
+    box = ToolBox(
+        {"fetch": lambda: original},
+        Budgets(max_tool_calls=1),
+        lambda kind, payload: emitted.append(payload) if kind == "tool_finish" else None,
+        latch_budget=budget.append,
+    )
+
+    returned = box.call("fetch")
+    assert isinstance(returned, dict)
+    returned["nested"] = None
+    assert box.recording[0].result.value == {"nested": {"value": 42}}
+    assert emitted[0]["value"] == {"nested": {"value": 42}}
+
+    with pytest.raises(BudgetExceeded):
+        box.call("fetch")
+    assert budget == ["tool call budget exhausted"]

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import base64
-import importlib
-import sys
 import tempfile
 from pathlib import Path, PurePosixPath
 
@@ -86,13 +84,13 @@ def replay(bundle: ReplayBundle) -> ReplayResult:
         if set(bundle.files) != set(bundle.fixtures):
             return ReplayResult(status=ReplayStatus.INVALID, detail="fixture inventory mismatch")
 
+        relative_paths = {name: _relative_path(name) for name in {*bundle.files, *bundle.fixtures}}
         decoded: dict[str, bytes] = {}
         for name, payload in bundle.files.items():
-            relative = _relative_path(name)
             data = base64.b64decode(payload, validate=True)
             if hash_bytes(data) != bundle.fixtures[name]:
                 return ReplayResult(status=ReplayStatus.INVALID, detail="fixture hash mismatch")
-            decoded[relative.as_posix()] = data
+            decoded[relative_paths[name].as_posix()] = data
 
         with tempfile.TemporaryDirectory(prefix="arci-replay-") as directory:
             root = Path(directory)
@@ -100,32 +98,12 @@ def replay(bundle: ReplayBundle) -> ReplayResult:
                 destination = root / Path(*PurePosixPath(name).parts)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(data)
-            oracle_module = bundle.manifest.contract.oracle.partition(":")[0]
-            parts = oracle_module.split(".")
-            embedded_modules = {
-                ".".join(parts[:index])
-                for index in range(1, len(parts) + 1)
-                if "/".join(parts[:index]) + "/__init__.py" in decoded
-                or "/".join(parts[:index]) + ".py" in decoded
-            }
-            saved_modules = {
-                name: sys.modules.pop(name) for name in embedded_modules if name in sys.modules
-            }
-            sys.path.insert(0, directory)
-            importlib.invalidate_caches()
-            try:
-                observed = run_trial(
-                    bundle.spec,
-                    lambda _event: None,
-                    bundle.manifest.contract,
-                    extra_pythonpath=(directory,),
-                )
-            finally:
-                sys.path.remove(directory)
-                for name in embedded_modules:
-                    sys.modules.pop(name, None)
-                sys.modules.update(saved_modules)
-                importlib.invalidate_caches()
+            observed = run_trial(
+                bundle.spec,
+                lambda _event: None,
+                bundle.manifest.contract,
+                extra_pythonpath=(directory,),
+            )
 
         if observed.termination is Termination.REPLAY_MISS:
             return ReplayResult(
