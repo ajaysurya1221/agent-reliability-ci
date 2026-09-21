@@ -9,11 +9,16 @@ from arci.schedule import build_schedule
 from arci.schema import Outcome
 from arci.storage import load_run
 from examples.retry_agent.experiment import build_manifest, clean_manifest
+from examples.retry_agent.world import (
+    FLAKY_CONFIRM_SHARE,
+    PREEXISTING_RESERVATION_SHARE,
+    scenario_for_seed,
+)
 
 
 @pytest.mark.parametrize(
     ("candidate", "expected"),
-    [("agent_a", 189), ("agent_b", 135), ("agent_c", 190)],
+    [("agent_a", 192), ("agent_b", 132), ("agent_c", 192)],
 )
 def test_fixed_200_seed_success_counts(tmp_path: Path, candidate: str, expected: int) -> None:
     manifest = build_manifest(candidate=candidate)
@@ -37,3 +42,16 @@ def test_clean_manifest_passes_both_arms(candidate: str) -> None:
         for spec in build_schedule(manifest)
     ]
     assert outcomes == [Outcome.PASS, Outcome.PASS]
+
+
+def test_fixed_seed_scenario_mix_is_environment_driven() -> None:
+    scenarios = [scenario_for_seed(seed) for seed in range(12_000, 12_200)]
+
+    assert PREEXISTING_RESERVATION_SHARE == 0.65
+    assert FLAKY_CONFIRM_SHARE == 0.04
+    assert sum(scenario.has_reservation for scenario in scenarios) == 135
+    assert sum(scenario.flaky_confirm for scenario in scenarios) == 8
+    assert (
+        sum(scenario.has_reservation and not scenario.flaky_confirm for scenario in scenarios)
+        == 132
+    )

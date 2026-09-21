@@ -72,3 +72,36 @@ def test_first_divergence_when_left_trial_is_a_strict_prefix() -> None:
     assert divergence.left is None
     assert divergence.right == 'model_step summary="retry" payload={"attempt":1}'
     assert divergence.after_injection is None
+
+
+def test_tool_finish_value_only_change_is_a_visible_divergence() -> None:
+    trial_spec = spec("fragile_agent")
+    common = {
+        "tool": "fetch",
+        "call_id": "c-0001",
+        "ok": True,
+        "error_kind": None,
+        "injected_by": None,
+    }
+    left_event = Event(
+        trial_id="left",
+        seq=2,
+        kind="tool_finish",
+        payload={**common, "value": {"answer": 42}},
+    )
+    right_event = Event(
+        trial_id="right",
+        seq=9,
+        kind="tool_finish",
+        payload={**common, "call_id": "c-9999", "value": None},
+    )
+
+    divergence = first_divergence(
+        _envelope(trial_spec, (left_event,)),
+        _envelope(trial_spec, (right_event,)),
+    )
+
+    assert divergence.common_prefix == 0
+    assert divergence.left is not None and "value#" in divergence.left
+    assert divergence.right is not None and "value#" in divergence.right
+    assert divergence.left != divergence.right

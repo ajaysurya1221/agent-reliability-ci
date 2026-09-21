@@ -1,9 +1,9 @@
-"""Baseline, regression and repaired inventory agents."""
+"""Baseline, retry regression and repaired inventory agents."""
 
 from __future__ import annotations
 
-import contextlib
 import random
+from collections.abc import Callable
 
 from pydantic import JsonValue
 
@@ -20,61 +20,112 @@ def _reserve_arguments(task: Task) -> dict[str, JsonValue]:
     }
 
 
+def _succeeded(value: JsonValue, key: str) -> bool:
+    return isinstance(value, dict) and value.get(key) is True
+
+
+def _reservation_state(task: Task, tools: ToolBoxProtocol) -> bool:
+    tools.note_model_step("inspect_reservation")
+    state = tools.call("get_reservation", order_id=task["order_id"])
+    needs_reservation = not _succeeded(state, "reserved")
+    tools.note_model_step("reservation_decision", needs_reservation=needs_reservation)
+    return not needs_reservation
+
+
 def agent_a(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
-    """Baseline: bounded retry, followed by a stochastic simulated-policy choice."""
-    tools.call("get_stock", sku=task["sku"])
-    reserved = False
-    for attempt in range(3):
-        tools.note_model_step("reserve", attempt=attempt)
-        try:
-            result = tools.call("reserve", **_reserve_arguments(task))
-            reserved = isinstance(result, dict) and result.get("reserved") is True
-            if reserved:
-                break
-        except ToolFault:
-            continue
-    if reserved and rng.random() < 0.96:
-        tools.call("confirm", order_id=task["order_id"], sku=task["sku"])
-    else:
-        tools.call("get_stock", sku=task["sku"])
+    """Baseline: inspect state and retry transient reserve and confirm faults."""
+    del rng
+    reserved = _reservation_state(task, tools)
+    if not reserved:
+        for attempt in range(3):
+            tools.note_model_step("reserve_attempt", attempt=attempt + 1)
+            try:
+                reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
+            except ToolFault:
+                continue
+            break
+
+    confirmed = False
+    if reserved:
+        for attempt in range(3):
+            tools.note_model_step("confirm_attempt", attempt=attempt + 1)
+            try:
+                confirmed = _succeeded(
+                    tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+                    "confirmed",
+                )
+            except ToolFault:
+                continue
+            break
+    tools.note_model_step("completion_decision", confirmed=confirmed)
     return {"success": True}
 
 
 def agent_b(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
-    """Regression: the main reservation gives up after its first fault."""
-    tools.call("get_stock", sku=task["sku"])
-    # The simulated policy often emits an idempotent exploratory reservation first.
-    # Under the injected fault this accidentally shields the later, fragile action.
-    if rng.random() < 0.66:
-        with contextlib.suppress(ToolFault):
-            tools.call("reserve", **_reserve_arguments(task))
-    tools.note_model_step("reserve_once")
-    try:
-        result = tools.call("reserve", **_reserve_arguments(task))
-    except ToolFault:
-        return {"success": True}
-    if isinstance(result, dict) and result.get("reserved") is True:
-        tools.call("confirm", order_id=task["order_id"], sku=task["sku"])
+    """Regression: a reserve timeout is treated as final before confirming."""
+    del rng
+    reserved = _reservation_state(task, tools)
+    if not reserved:
+        tools.note_model_step("reserve_once")
+        try:
+            reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
+        except ToolFault:
+            tools.note_model_step("reserve_fault_skip_to_confirm")
+
+    confirmed = False
+    for attempt in range(3):
+        tools.note_model_step("confirm_attempt", attempt=attempt + 1)
+        try:
+            confirmed = _succeeded(
+                tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+                "confirmed",
+            )
+        except ToolFault:
+            continue
+        break
+    tools.note_model_step("completion_decision", confirmed=confirmed, reserved=reserved)
     return {"success": True}
 
 
-def agent_c(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
-    """Repair: an explicit recovery state machine, distinct from the baseline loop."""
-    should_finish = rng.random() < 0.97
-    tools.call("get_stock", sku=task["sku"])
-    attempts_left = 3
-    reservation: JsonValue = None
-    while reservation is None and attempts_left:
-        tools.note_model_step("reservation_state", remaining=attempts_left)
-        attempts_left -= 1
+def _with_retry(
+    tools: ToolBoxProtocol,
+    operation: str,
+    call: Callable[[], JsonValue],
+    *,
+    attempts: int = 3,
+) -> JsonValue:
+    for attempt in range(attempts):
+        tools.note_model_step(f"{operation}_attempt", attempt=attempt + 1)
         try:
-            candidate = tools.call("reserve", **_reserve_arguments(task))
+            return call()
         except ToolFault:
             continue
-        if isinstance(candidate, dict) and candidate.get("reserved") is True:
-            reservation = candidate
-    if reservation is not None and should_finish:
-        tools.call("confirm", order_id=task["order_id"], sku=task["sku"])
-    elif reservation is not None:
-        tools.call("get_stock", sku=task["sku"])
+    return None
+
+
+def agent_c(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Repair: share one bounded retry helper across both transient operations."""
+    del rng
+    reserved = _reservation_state(task, tools)
+    if not reserved:
+        reserved = _succeeded(
+            _with_retry(
+                tools,
+                "reserve",
+                lambda: tools.call("reserve", **_reserve_arguments(task)),
+            ),
+            "reserved",
+        )
+
+    confirmed = False
+    if reserved:
+        confirmed = _succeeded(
+            _with_retry(
+                tools,
+                "confirm",
+                lambda: tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+            ),
+            "confirmed",
+        )
+    tools.note_model_step("completion_decision", confirmed=confirmed)
     return {"success": True}

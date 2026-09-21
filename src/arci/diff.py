@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from pydantic import JsonValue
 
 from arci.hashing import canonical_json
@@ -17,6 +19,10 @@ def _payload_without_ids(event: Event, *excluded: str) -> dict[str, JsonValue]:
     return {key: value for key, value in event.payload.items() if key not in ignored}
 
 
+def _value_digest(value: object) -> str:
+    return hashlib.sha256(canonical_json(value)).hexdigest()[:8]
+
+
 def step_signature(event: Event) -> str:
     """Return a stable signature containing only the event's semantic content."""
     if event.kind == "tool_start":
@@ -30,6 +36,7 @@ def step_signature(event: Event) -> str:
                 "tool_finish",
                 f"tool={_json(event.payload.get('tool'))}",
                 f"ok={_json(event.payload.get('ok'))}",
+                f"value#{_value_digest(event.payload.get('value'))}",
                 f"error_kind={_json(event.payload.get('error_kind'))}",
                 f"injected_by={_json(event.payload.get('injected_by'))}",
             )

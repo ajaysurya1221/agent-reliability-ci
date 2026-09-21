@@ -17,3 +17,8 @@ def test_correlated_boundary_is_seeded() -> None:
     second = correlated_boundary(0.8, 0.7, 12, 0.5, reps=200, seed=9)
     assert first == second
     assert sum(first.values()) == pytest.approx(1.0)
+
+
+def test_operating_characteristics_keep_the_published_tail_calibration() -> None:
+    result = operating_characteristics(0.95, 0.65, 20)
+    assert result["INCONCLUSIVE"] == pytest.approx(0.992345533306, abs=1e-9)
