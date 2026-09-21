@@ -7,12 +7,12 @@ Every model is immutable and rejects unknown fields. Sealed records carry a
 
 from __future__ import annotations
 
-from enum import StrEnum
-from typing import Annotated, Any, Literal, Self
+from enum import Enum, StrEnum
+from typing import Annotated, Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from arci.hashing import seal_digest
+from arci.hashing import hash_record
 
 SCHEMA_VERSION = "arci/0.1"
 N_PER_ARM_MIN = 1
@@ -25,6 +25,55 @@ AgentRef = Annotated[str, Field(pattern=r"^[A-Za-z_][\w.]*:[A-Za-z_]\w*$")]  # "
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    # Declared metadata fields of THIS model that never enter a digest (timing,
+    # timestamps). Exclusion is by declared field, never by key name, so arbitrary
+    # JSON carried in tasks, arguments, tool values or final state is always sealed.
+    VOLATILE: ClassVar[frozenset[str]] = frozenset()
+
+
+def digest_payload(value: Any, *, top: bool = True) -> Any:
+    """Canonical content of a record for hashing.
+
+    Models contribute their declared fields minus their own VOLATILE set; only the
+    top-level record omits its own `record_sha256` (nested seals stay in, so a
+    corrupted nested seal changes the outer digest). Plain JSON is kept verbatim.
+    """
+    if isinstance(value, BaseModel):
+        skip = set(getattr(type(value), "VOLATILE", frozenset[str]()))
+        if top:
+            skip.add("record_sha256")
+        return {
+            name: digest_payload(getattr(value, name), top=False)
+            for name in type(value).model_fields
+            if name not in skip
+        }
+    if isinstance(value, (tuple, list)):
+        return [digest_payload(v, top=False) for v in value]  # pyright: ignore[reportUnknownVariableType]
+    if isinstance(value, Enum):
+        return value.value
+    return value
+
+
+def content_sha256(value: BaseModel) -> str:
+    """Digest of a model's non-volatile content, including any seal it carries."""
+    return hash_record(digest_payload(value, top=False))
+
+
+def _nested_sealed(value: Any) -> list[Sealed]:
+    found: list[Sealed] = []
+    if isinstance(value, BaseModel):
+        for name in type(value).model_fields:
+            child = getattr(value, name)
+            if isinstance(child, Sealed):
+                found.append(child)
+            found.extend(_nested_sealed(child))
+    elif isinstance(value, (tuple, list)):
+        for item in value:  # pyright: ignore[reportUnknownVariableType]
+            if isinstance(item, Sealed):
+                found.append(item)
+            found.extend(_nested_sealed(item))
+    return found
+
 
 class Sealed(Model):
     """A record whose `record_sha256` covers all of its non-volatile content."""
@@ -34,11 +83,13 @@ class Sealed(Model):
     @classmethod
     def create(cls, **data: Any) -> Self:
         draft = cls(**data)
-        digest = seal_digest(draft.model_dump(mode="json"))
-        return draft.model_copy(update={"record_sha256": digest})
+        return draft.model_copy(update={"record_sha256": hash_record(digest_payload(draft))})
 
     def validate_seal(self) -> bool:
-        return self.record_sha256 == seal_digest(self.model_dump(mode="json"))
+        """True iff this record AND every sealed record nested inside it are intact."""
+        if self.record_sha256 != hash_record(digest_payload(self)):
+            return False
+        return all(inner.validate_seal() for inner in _nested_sealed(self))
 
 
 # --- enums -------------------------------------------------------------------
@@ -59,7 +110,7 @@ class Termination(StrEnum):
     BUDGET = "budget"  # BudgetExceeded: FAIL
     HARNESS_ERROR = "harness_error"  # ERROR
     GRADER_ERROR = "grader_error"  # ERROR
-    REPLAY_MISS = "replay_miss"  # ERROR; the replay is INVALID
+    REPLAY_MISS = "replay_miss"  # ERROR; miss or unconsumed recording; the replay is INVALID
 
 
 class Verdict(StrEnum):
@@ -117,6 +168,8 @@ class ToolResult(Model):
     injected_by: str | None = None  # perturbation name, if this result was injected
     duration_ms: float = 0.0
 
+    VOLATILE: ClassVar[frozenset[str]] = frozenset({"duration_ms"})
+
 
 class RecordedCall(Model):
     """One recorded tool exchange. Replay matches on (tool, arguments_sha256, occurrence)."""
@@ -138,6 +191,8 @@ class Event(Model):
     kind: EventKind
     payload: dict[str, JsonValue] = Field(default_factory=dict)
     at_ms: float = 0.0
+
+    VOLATILE: ClassVar[frozenset[str]] = frozenset({"at_ms"})
 
 
 # --- experiment definition ---------------------------------------------------
@@ -166,6 +221,8 @@ class Usage(Model):
     tool_calls: int = 0
     model_steps: int = 0
     wall_seconds: float = 0.0
+
+    VOLATILE: ClassVar[frozenset[str]] = frozenset({"wall_seconds"})
 
 
 class ContractSpec(Model):
@@ -208,6 +265,8 @@ class Manifest(Sealed):
     # Every earlier experiment on the same candidate_id. Reported, never hidden.
     prior_runs: tuple[str, ...] = ()
 
+    VOLATILE: ClassVar[frozenset[str]] = frozenset({"created_at"})
+
 
 class TrialSpec(Model):
     experiment_id: str
@@ -224,6 +283,11 @@ class TrialSpec(Model):
     budgets: Budgets = Field(default_factory=Budgets)
     tool_mode: ToolMode = ToolMode.RECORD
     recording: tuple[RecordedCall, ...] = ()  # required when tool_mode is REPLAY
+    # REPLAY only: recorded results do not mutate the environment, so the source
+    # trial's final state is graded instead, and ONLY if the agent consumed the
+    # recording exactly (every recorded call, in order, no misses). Anything else is
+    # a replay mismatch: outcome ERROR, termination "replay_miss".
+    replay_final_state: dict[str, JsonValue] | None = None
 
 
 # --- results -----------------------------------------------------------------
@@ -283,6 +347,8 @@ class ConditionDecision(Model):
     delta_low: float  # bounds on p_candidate - p_baseline
     delta_high: float
     candidate_hard_violations: int
+    # False when the condition contains a CEILING fault: reported, never gated on rates.
+    is_gating: bool = True
     verdict: Verdict
     reasons: tuple[str, ...]
 
@@ -314,7 +380,11 @@ class ReplayBundle(Sealed):
     expected_outcome: Outcome
     expected_fingerprint: str
     source_trial_sha256: str
-    fixtures: dict[str, str] = Field(default_factory=dict)  # relative path -> sha256
+    # Embedded payload: relative POSIX path -> base64 file content. Replay verifies
+    # `fixtures` hashes, materialises these into a temp dir and puts that dir FIRST on
+    # the child's import path, so the bundle runs without the original checkout.
+    files: dict[str, str] = Field(default_factory=dict)
+    fixtures: dict[str, str] = Field(default_factory=dict)  # relative path -> sha256 of content
     lock_sha256: str | None = None
     replay_command: str = "arci replay bundle.json"
     minimality: Literal["original", "reduced", "1-minimal"] = "original"

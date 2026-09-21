@@ -5,13 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import JsonValue
 
 from arci.interfaces import ContractRejected
 from arci.schema import Event
 from tests.acceptance.helpers import contract
 
 pytestmark = pytest.mark.acceptance
-TASK = {"goal": "store 42"}
+TASK: dict[str, JsonValue] = {"goal": "store 42"}
 
 
 def _calls(*tools: str) -> list[Event]:

@@ -59,3 +59,29 @@ def test_fingerprint_scrubs_run_noise_unless_strict() -> None:
     assert a == b
     assert fingerprint("crash", "x 1", strict=True) != fingerprint("crash", "x 2", strict=True)
     assert fingerprint("oracle", "same") != fingerprint("crash", "same")
+
+
+def test_reserved_looking_keys_inside_user_json_are_sealed() -> None:
+    data = manifest().model_dump(exclude={"record_sha256"})
+    m = Manifest.create(**{**data, "task": {"goal": "x", "created_at": "a", "duration_ms": 1}})
+    forged = m.model_copy(update={"task": {"goal": "x", "created_at": "b", "duration_ms": 1}})
+    assert m.validate_seal() and not forged.validate_seal()
+
+
+def test_a_corrupted_nested_seal_invalidates_the_outer_record() -> None:
+    from arci.schema import Outcome, ReplayBundle
+    from tests.acceptance.helpers import spec
+
+    m = manifest()
+    bundle = ReplayBundle.create(
+        manifest=m,
+        spec=spec("fragile_agent"),
+        expected_outcome=Outcome.FAIL,
+        expected_fingerprint="f" * 64,
+        source_trial_sha256="0" * 64,
+    )
+    assert bundle.validate_seal()
+    bad_inner = m.model_copy(update={"record_sha256": "0" * 64})
+    assert not bundle.model_copy(update={"manifest": bad_inner}).validate_seal()
+    swapped = m.model_copy(update={"n_per_arm": 3})  # inner content changed, inner seal stale
+    assert not bundle.model_copy(update={"manifest": swapped}).validate_seal()

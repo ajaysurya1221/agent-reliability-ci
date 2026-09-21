@@ -3,22 +3,39 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
 
+from arci.hashing import hash_bytes
 from arci.schema import (
     Event,
     Outcome,
+    ReplayBundle,
     ReplayStatus,
     Termination,
     ToolMode,
     TrialEnvelope,
 )
-from tests.acceptance.helpers import COND_CLEAN, COND_TIMEOUT, contract, manifest, spec
+from tests.acceptance.helpers import (
+    COND_CLEAN,
+    MOD,
+    contract,
+    manifest,
+    spec,
+)
 
 pytestmark = pytest.mark.acceptance
+REPO = Path(__file__).resolve().parents[2]
+PAYLOAD = (
+    "tests/__init__.py",
+    "tests/acceptance/__init__.py",
+    "tests/acceptance/fixture_agents.py",
+)
 
 
 def _run(agent: str, **kw: object) -> tuple[TrialEnvelope, list[Event]]:
@@ -34,6 +51,18 @@ def _kinds(events: tuple[Event, ...] | list[Event]) -> list[str]:
     return [e.kind for e in events]
 
 
+def _steps(env: TrialEnvelope) -> list[tuple[str, object]]:
+    return [(e.kind, e.payload) for e in env.events]
+
+
+def _rebundle(bundle: ReplayBundle, **spec_update: object) -> ReplayBundle:
+    data = bundle.model_dump(exclude={"record_sha256"})
+    return ReplayBundle.create(**{**data, "spec": bundle.spec.model_copy(update=spec_update)})
+
+
+# --- recorder and outcome taxonomy -------------------------------------------
+
+
 def test_robust_agent_passes_under_injected_timeout() -> None:
     env, seen = _run("good_agent")
     assert env.outcome is Outcome.PASS and env.termination is Termination.COMPLETED
@@ -45,8 +74,9 @@ def test_robust_agent_passes_under_injected_timeout() -> None:
     ]
     assert len(injected) == 1 and injected[0].payload.get("ok") is False
     assert _kinds(env.events)[0] == "trial_start" and _kinds(env.events)[-1] == "trial_end"
+    assert _kinds(env.events).count("trial_end") == 1
     assert [e.seq for e in env.events] == list(range(len(env.events)))
-    assert _kinds(seen) == _kinds(env.events)  # parent saw every event
+    assert _kinds(seen) == _kinds(env.events)  # the parent saw every event
     assert env.usage.tool_calls == 4  # log, fetch(injected), fetch, store
     assert env.final_state == {"stored": 42, "log": ["start"]}
 
@@ -74,19 +104,45 @@ def test_uncaught_tool_fault_is_an_agent_failure_not_a_harness_error() -> None:
     assert env.outcome is Outcome.FAIL and env.termination is Termination.CRASH
 
 
-def test_timeout_kills_the_worker_and_keeps_the_partial_trace() -> None:
-    started = time.monotonic()
-    env, seen = _run("hang_agent", condition=COND_CLEAN, max_seconds=1.0)
-    assert time.monotonic() - started < 15
+def test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree(
+    tmp_path: Path,
+) -> None:
+    from arci.runner import run_trial
+
+    pid_file = tmp_path / "descendant.pid"
+    stamps: list[tuple[str, float]] = []
+    blocked = spec(
+        "block_agent", condition=COND_CLEAN, max_seconds=4.0, task={"pid_file": str(pid_file)}
+    )
+    env = run_trial(blocked, lambda e: stamps.append((e.kind, time.monotonic())), contract())
+    returned = time.monotonic()
+
     assert env.outcome is Outcome.FAIL and env.termination is Termination.TIMEOUT
-    assert "tool_finish" in _kinds(env.events) and "tool_finish" in _kinds(seen)
     assert env.validate_seal()
+    assert [c.tool for c in env.incomplete_calls] == ["block"]
+    kinds = _kinds(env.events)
+    assert "tool_start" in kinds and "tool_finish" not in kinds
+    assert kinds.count("trial_end") == 1 and kinds[-1] == "trial_end"
+    # The callback ran while the worker was still alive, not from a buffer at the end.
+    started = next(at for kind, at in stamps if kind == "tool_start")
+    assert started < returned - 1.5
+
+    descendant = int(pid_file.read_text())
+    deadline = time.monotonic() + 5
+    alive = True
+    while alive and time.monotonic() < deadline:
+        try:
+            os.kill(descendant, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            alive = False
+    assert not alive, "descendant process survived the timeout"
 
 
 def test_hard_exit_still_yields_a_terminal_envelope() -> None:
     env, _ = _run("exit_agent", condition=COND_CLEAN)
     assert env.outcome is Outcome.FAIL and env.termination is Termination.CRASH
-    assert "tool_finish" in _kinds(env.events)
+    assert "tool_finish" in _kinds(env.events) and _kinds(env.events)[-1] == "trial_end"
 
 
 def test_budget_exhaustion_is_a_failure() -> None:
@@ -95,9 +151,16 @@ def test_budget_exhaustion_is_a_failure() -> None:
     assert env.usage.tool_calls == 5
 
 
-def test_grader_error_is_error_not_fail() -> None:
-    env, _ = _run("good_agent", oracle="raising_oracle")
+@pytest.mark.parametrize("oracle", ["raising_oracle", "no_such_function"])
+def test_grader_faults_are_errors_not_failures(oracle: str) -> None:
+    env, _ = _run("good_agent", oracle=oracle)
     assert env.outcome is Outcome.ERROR and env.termination is Termination.GRADER_ERROR
+
+
+def test_a_broken_environment_is_a_harness_error() -> None:
+    env, _ = _run("good_agent", toolset="make_broken_world")
+    assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR
+    assert env.validate_seal()
 
 
 def test_same_spec_gives_the_same_sealed_record() -> None:
@@ -106,23 +169,7 @@ def test_same_spec_gives_the_same_sealed_record() -> None:
     assert a.record_sha256 == b.record_sha256
 
 
-def test_schedule_is_deterministic_paired_and_complete() -> None:
-    from arci.runner import build_schedule
-
-    m = manifest(n_per_arm=5, conditions=(COND_CLEAN, COND_TIMEOUT))
-    schedule = build_schedule(m)
-    assert schedule == build_schedule(m)
-    assert len(schedule) == 2 * 2 * 5
-    assert len({s.trial_id for s in schedule}) == len(schedule)
-    by_pair: dict[str, list[int]] = {}
-    for s in schedule:
-        by_pair.setdefault(s.pair_id, []).append(s.seed)
-    assert all(len(v) == 2 and v[0] == v[1] for v in by_pair.values())  # arms share the seed
-    assert len({v[0] for v in by_pair.values()}) == len(by_pair)  # pairs do not
-
-
 def test_experiment_writes_one_store_and_gates_end_to_end(tmp_path: Path) -> None:
-    from arci.gate import decide
     from arci.runner import run_experiment
 
     m = manifest(n_per_arm=6)
@@ -134,9 +181,57 @@ def test_experiment_writes_one_store_and_gates_end_to_end(tmp_path: Path) -> Non
     assert len(lines) == 12
     assert all(TrialEnvelope.model_validate_json(x).validate_seal() for x in lines)
     assert (run_dir / "events.jsonl").read_text().count("\n") >= 12 * 4
+    with pytest.raises(FileExistsError):
+        run_experiment(m, tmp_path, max_workers=1)  # a run directory is never reused
+
+    from arci.gate import decide
+
     d = decide(m, trials)
     base, cand = d.conditions[0].baseline, d.conditions[0].candidate
     assert (base.successes, cand.successes) == (6, 0)
+
+
+# --- replay ------------------------------------------------------------------
+
+
+def test_replay_reproduces_a_passing_trial_without_touching_live_tools() -> None:
+    from arci.runner import run_trial
+
+    live, _ = _run("good_agent")
+    sink: list[Event] = []
+    replayed = run_trial(
+        spec("good_agent", toolset="make_untouchable_world").model_copy(
+            update={
+                "tool_mode": ToolMode.REPLAY,
+                "recording": live.recording,
+                "replay_final_state": live.final_state,
+            }
+        ),
+        sink.append,
+        contract(),
+    )
+    assert replayed.outcome is Outcome.PASS
+    assert replayed.final_state == live.final_state
+    assert _steps(replayed) == _steps(live)
+
+
+def test_unconsumed_recording_is_a_replay_mismatch() -> None:
+    from arci.runner import run_trial
+
+    live, _ = _run("good_agent")
+    sink: list[Event] = []
+    env = run_trial(
+        spec("good_agent", toolset="make_untouchable_world").model_copy(
+            update={
+                "tool_mode": ToolMode.REPLAY,
+                "recording": (*live.recording, live.recording[-1]),
+                "replay_final_state": live.final_state,
+            }
+        ),
+        sink.append,
+        contract(),
+    )
+    assert env.outcome is Outcome.ERROR and env.termination is Termination.REPLAY_MISS
 
 
 def test_failing_trial_replays_offline_from_its_bundle() -> None:
@@ -146,21 +241,29 @@ def test_failing_trial_replays_offline_from_its_bundle() -> None:
     bundle = make_bundle(manifest(), env, spec("fragile_agent"))
     assert bundle.validate_seal() and bundle.spec.tool_mode is ToolMode.REPLAY
     assert bundle.expected_fingerprint == env.failure_fingerprint
-    result = replay(bundle)
-    assert result.status is ReplayStatus.REPRODUCED
+    assert bundle.spec.replay_final_state == env.final_state
+    assert replay(bundle).status is ReplayStatus.REPRODUCED
+    passing, _ = _run("good_agent")
+    with pytest.raises(ValueError):
+        make_bundle(manifest(), passing, spec("good_agent"))
 
 
-def test_replay_miss_is_invalid_never_reproduced() -> None:
+@pytest.mark.parametrize("mutation", ["dropped", "tool", "arguments", "occurrence"])
+def test_replay_miss_is_invalid_even_when_the_agent_swallows_it(mutation: str) -> None:
     from arci.replay import make_bundle, replay
 
-    from arci.schema import ReplayBundle
-
-    env, _ = _run("fragile_agent")
-    bundle = make_bundle(manifest(), env, spec("fragile_agent"))
-    clipped = bundle.spec.model_copy(update={"recording": bundle.spec.recording[:1]})
-    data = bundle.model_dump(exclude={"record_sha256"})
-    broken = ReplayBundle.create(**{**data, "spec": clipped})
-    assert replay(broken).status is ReplayStatus.INVALID
+    env, _ = _run("catchall_agent")
+    assert env.outcome is Outcome.FAIL
+    bundle = make_bundle(manifest(candidate="catchall_agent"), env, spec("catchall_agent"))
+    assert replay(bundle).status is ReplayStatus.REPRODUCED
+    first, *rest = bundle.spec.recording
+    broken = {
+        "dropped": (),
+        "tool": (first.model_copy(update={"tool": "fetch_v2"}), *rest),
+        "arguments": (first.model_copy(update={"arguments_sha256": "0" * 64}), *rest),
+        "occurrence": (first.model_copy(update={"occurrence": 5}), *rest),
+    }[mutation]
+    assert replay(_rebundle(bundle, recording=broken)).status is ReplayStatus.INVALID
 
 
 def test_tampered_bundle_is_invalid() -> None:
@@ -175,20 +278,58 @@ def test_tampered_bundle_is_invalid() -> None:
 def test_repaired_agent_does_not_reproduce_the_failure() -> None:
     from arci.replay import make_bundle, replay
 
-    from arci.schema import ReplayBundle
-
     env, _ = _run("fragile_agent")
     bundle = make_bundle(manifest(), env, spec("fragile_agent"))
-    # The repaired agent retries, so it needs a second fetch the recording lacks;
-    # run it live against the same seeded condition instead of the recording.
-    repaired = bundle.spec.model_copy(
-        update={
-            "agent": "tests.acceptance.fixture_agents:good_agent",
-            "tool_mode": ToolMode.RECORD,
-            "recording": (),
-        }
+    # The repaired agent retries, so it needs calls the recording lacks: run it live
+    # against the same seeded condition instead.
+    live = _rebundle(
+        bundle,
+        agent=f"{MOD}:good_agent",
+        tool_mode=ToolMode.RECORD,
+        recording=(),
+        replay_final_state=None,
     )
-    data = bundle.model_dump(exclude={"record_sha256"})
-    result = replay(ReplayBundle.create(**{**data, "spec": repaired}))
+    result = replay(live)
     assert result.status is ReplayStatus.NOT_REPRODUCED
     assert result.observed_outcome is Outcome.PASS
+
+
+def test_bundle_is_portable_and_runs_without_the_checkout(tmp_path: Path) -> None:
+    from arci.replay import make_bundle
+
+    env, _ = _run("fragile_agent")
+    bundle = make_bundle(manifest(), env, spec("fragile_agent"), root=REPO, include=PAYLOAD)
+    assert set(bundle.files) == set(PAYLOAD)
+    assert bundle.fixtures == {p: hash_bytes((REPO / p).read_bytes()) for p in PAYLOAD}
+    (tmp_path / "bundle.json").write_text(bundle.model_dump_json())
+    code = (
+        "from arci.replay import replay\n"
+        "from arci.schema import ReplayBundle\n"
+        "b = ReplayBundle.model_validate_json(open('bundle.json').read())\n"
+        "print(replay(b).status.value)\n"
+    )
+    clean_env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    done = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        env=clean_env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert done.stdout.strip().splitlines()[-1:] == ["REPRODUCED"], done.stderr[-2000:]
+
+
+def test_bundle_payload_is_verified_before_execution() -> None:
+    import base64
+
+    from arci.replay import make_bundle, replay
+
+    env, _ = _run("fragile_agent")
+    bundle = make_bundle(manifest(), env, spec("fragile_agent"), root=REPO, include=PAYLOAD)
+    evil = base64.b64encode(b"raise SystemExit('payload swapped')\n").decode()
+    data = bundle.model_dump(exclude={"record_sha256"})
+    swapped = ReplayBundle.create(**{**data, "files": {**bundle.files, PAYLOAD[2]: evil}})
+    assert swapped.validate_seal()  # well sealed, but the content no longer matches `fixtures`
+    assert replay(swapped).status is ReplayStatus.INVALID

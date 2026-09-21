@@ -19,18 +19,25 @@ The margin is deliberately coarse. It is not a universal production tolerance.
 
 For each condition, with `x_A`, `x_B` = number of trials whose outcome is `PASS`:
 
+0. A condition containing any `ceiling` fault is descriptive only: it is reported with
+   `is_gating = false`, excluded from K and from the statistical verdict below. ERROR and
+   hard-invariant overrides still apply to it. K counts gating conditions only, and an experiment
+   with no gating condition is `ERROR`.
 1. Per-arm confidence `c = 1 - alpha / (2K)`.
 2. Two-sided Clopper-Pearson interval at confidence `c` for each arm: `[L_A, U_A]`, `[L_B, U_B]`.
 3. Bounds on `D = p_B - p_A`: `[L, U] = [L_B - U_A, U_B - L_A]`. By Bonferroni these cover D with
    probability at least `1 - alpha/K`, and all K conditions simultaneously with at least `1 - alpha`.
-4. Condition verdict: `PASS` iff `L > -delta`. `BLOCK` iff `U < -delta`. Otherwise `INCONCLUSIVE`.
+4. Condition verdict (`arci.gate.classify(L, U, delta)`): `PASS` iff `L > -delta`. `BLOCK` iff
+   `U < -delta`. Otherwise `INCONCLUSIVE`. Both inequalities are strict.
 5. Any candidate trial with a hard invariant violation makes that condition `BLOCK`, whatever the
    rates say.
 
 Experiment verdict, in priority order:
 
-1. `ERROR` if any trial has outcome `ERROR`, if any scheduled trial is missing, if any trial id is
-   duplicated or unknown, or if an arm's trial count differs from `n_per_arm`. An invalid
+1. `ERROR` if any trial has outcome `ERROR`; if the trial set is not exactly the schedule
+   `arci.schedule.build_schedule(manifest)` (missing, duplicated or unknown trial ids; a trial whose
+   experiment id, task id, arm, pair id, condition id, seed or `spec_sha256` differs from its
+   scheduled spec); if any trial's seal is invalid; or if there is no gating condition. An invalid
    experiment can never PASS.
 2. `BLOCK` if any condition is `BLOCK`.
 3. `INCONCLUSIVE` if any condition is `INCONCLUSIVE`.
@@ -63,6 +70,12 @@ simulation for positively correlated arms), the probability of PASS, BLOCK and I
 grid of `(p_A, p_B, N)`, including the boundary `p_B = p_A - delta`. At the boundary, P(PASS) is the
 false-PASS rate and must not exceed `alpha`; for `p_B >= p_A`, P(BLOCK) is the false-BLOCK rate and
 must not exceed `alpha`. We publish measured numbers. We promise none in advance.
+
+Reference points (exact enumeration, alpha 0.05, delta 0.10, K=1), as (PASS, BLOCK, INCONCLUSIVE):
+0.95 vs 0.95 at N=200: (0.889, 0.000, 0.111). 0.95 vs 0.65 at N=200: (0.000, 0.985, 0.015).
+0.95 vs 0.75 at N=200: (0.000, 0.365, 0.635). 0.95 vs 0.85 at N=200: (0.001, 0.001, 0.999).
+0.80 vs 0.80 at N=200: (0.218, 0.000, 0.782). Anything at N=20: INCONCLUSIVE more than 99% of the
+time. The rule is conservative by design: mid-range success rates need larger N to reach PASS.
 
 ## Not in v0.1
 

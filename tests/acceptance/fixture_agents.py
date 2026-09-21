@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import random
+import subprocess
+import sys
 import time
 from collections.abc import Callable, Mapping
+from pathlib import Path
 
 from pydantic import JsonValue
 
@@ -22,6 +26,7 @@ class World:
             "fetch": self._fetch,
             "store": self._store,
             "log": self._log,
+            "block": self._block,
         }
 
     def _fetch(self, key: str) -> JsonValue:
@@ -35,12 +40,41 @@ class World:
         self.log.append(msg)
         return None
 
+    def _block(self, pid_file: str) -> JsonValue:
+        """Never returns: spawns a descendant, publishes its pid, then sleeps."""
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
+        Path(pid_file).write_text(str(child.pid))
+        time.sleep(300)
+        return None
+
     def snapshot(self) -> dict[str, JsonValue]:
         return {"stored": self.stored, "log": list(self.log)}
 
 
 def make_world(task: Task, seed: int) -> World:
     return World(task, seed)
+
+
+class UntouchableWorld(World):
+    """Any live tool execution is a test failure; its own state is never the goal state."""
+
+    def __init__(self, task: Task, seed: int) -> None:
+        super().__init__(task, seed)
+        self.tools = {name: self._forbidden for name in ("fetch", "store", "log", "block")}
+
+    def _forbidden(self, **_: JsonValue) -> JsonValue:
+        raise AssertionError("live tool executed during replay")
+
+    def snapshot(self) -> dict[str, JsonValue]:
+        return {"stored": "UNTOUCHED", "log": []}
+
+
+def make_untouchable_world(task: Task, seed: int) -> World:
+    return UntouchableWorld(task, seed)
+
+
+def make_broken_world(task: Task, seed: int) -> World:
+    raise RuntimeError("environment factory exploded")
 
 
 def oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
@@ -92,12 +126,6 @@ def liar_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
     return {"success": True}
 
 
-def hang_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
-    tools.call("fetch", key="answer")
-    time.sleep(120)
-    return {"success": True}
-
-
 def exit_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
     tools.call("fetch", key="answer")
     os._exit(7)
@@ -107,3 +135,20 @@ def chatty_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task
     for i in range(50):
         tools.call("log", msg=f"line {i}")
     return {"success": False}
+
+
+def block_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("block", pid_file=task["pid_file"])
+    return {"success": True}
+
+
+def catchall_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Swallows every exception, including ones it has no business swallowing."""
+    value: JsonValue = None
+    try:
+        value = _value(tools.call("fetch", key="answer"))
+    except Exception:
+        value = None
+    with contextlib.suppress(Exception):
+        tools.call("store", value=value)
+    return {"success": True}

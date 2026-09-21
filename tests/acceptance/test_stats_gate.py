@@ -5,7 +5,14 @@ from __future__ import annotations
 import pytest
 
 from arci.schema import EXIT_CODES, Verdict
-from tests.acceptance.helpers import COND_CLEAN, COND_TIMEOUT, manifest, synthetic_trials
+from tests.acceptance.helpers import (
+    COND_CEILING,
+    COND_CLEAN,
+    COND_TIMEOUT,
+    manifest,
+    reseal,
+    synthetic_trials,
+)
 
 pytestmark = pytest.mark.acceptance
 
@@ -31,8 +38,8 @@ def test_clopper_pearson_matches_exact_reference(
     from arci.stats import clopper_pearson
 
     got_low, got_high = clopper_pearson(x, n, conf)
-    assert got_low == pytest.approx(low, abs=1e-9)
-    assert got_high == pytest.approx(high, abs=1e-9)
+    assert got_low == pytest.approx(low, rel=0, abs=1e-9)
+    assert got_high == pytest.approx(high, rel=0, abs=1e-9)
 
 
 def test_wilson_is_display_only_but_correct() -> None:
@@ -204,3 +211,142 @@ def test_tampered_decision_fails_validation() -> None:
     )
     forged = d.model_copy(update={"verdict": Verdict.PASS, "exit_code": 0})
     assert not forged.validate_seal()
+
+
+def test_gate_uses_clopper_pearson_not_wilson() -> None:
+    """170/200 in both arms: CP lower bound -0.1177 (INCONCLUSIVE); Wilson would say PASS."""
+    from arci.gate import decide
+
+    m = manifest()
+    d = decide(
+        m,
+        synthetic_trials(
+            m, condition_id="fetch_timeout", baseline_successes=170, candidate_successes=170
+        ),
+    )
+    assert d.verdict is Verdict.INCONCLUSIVE and d.exit_code == 2
+    assert d.conditions[0].delta_low == pytest.approx(-0.117665507158, rel=0, abs=1e-8)
+
+
+def test_boundaries_are_strict() -> None:
+    from arci.gate import classify
+
+    assert classify(-0.10, 0.05, 0.10) is Verdict.INCONCLUSIVE  # L == -delta is not a PASS
+    assert classify(-0.30, -0.10, 0.10) is Verdict.INCONCLUSIVE  # U == -delta is not a BLOCK
+    assert classify(-0.0999, 0.05, 0.10) is Verdict.PASS
+    assert classify(-0.30, -0.1001, 0.10) is Verdict.BLOCK
+
+
+def test_non_default_alpha_widens_the_intervals() -> None:
+    from arci.gate import decide
+
+    m = manifest(alpha=0.01)
+    same = synthetic_trials(
+        m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=190
+    )
+    d = decide(m, same)
+    assert d.per_arm_confidence == pytest.approx(0.995)
+    assert d.conditions[0].delta_low == pytest.approx(-0.092432736643, rel=0, abs=1e-8)
+    assert d.verdict is Verdict.PASS
+    weaker = synthetic_trials(
+        m, condition_id="fetch_timeout", baseline_successes=176, candidate_successes=176
+    )
+    assert decide(m, weaker).verdict is Verdict.INCONCLUSIVE
+
+
+def test_error_outranks_block() -> None:
+    from arci.gate import decide
+
+    m = manifest(conditions=(COND_CLEAN, COND_TIMEOUT))
+    trials = [
+        *synthetic_trials(
+            m,
+            condition_id="clean",
+            baseline_successes=195,
+            candidate_successes=195,
+            candidate_errors=1,
+        ),
+        *synthetic_trials(
+            m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=130
+        ),
+    ]
+    assert decide(m, trials).verdict is Verdict.ERROR
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "unknown_id",
+        "foreign_experiment",
+        "foreign_task",
+        "wrong_spec_hash",
+        "wrong_seed",
+        "broken_seal",
+        "replaced_duplicate",
+    ],
+)
+def test_trials_must_match_the_schedule_exactly(mutation: str) -> None:
+    from arci.gate import decide
+
+    m = manifest()
+    trials = synthetic_trials(
+        m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=190
+    )
+    assert decide(m, trials).verdict is Verdict.PASS
+    victim = trials[-1]
+    impostor = {
+        "unknown_id": lambda: reseal(victim, trial_id="fetch_timeout:99999:candidate"),
+        "foreign_experiment": lambda: reseal(victim, experiment_id="someone-elses-run"),
+        "foreign_task": lambda: reseal(victim, task_id="another-task"),
+        "wrong_spec_hash": lambda: reseal(victim, spec_sha256="1" * 64),
+        "wrong_seed": lambda: reseal(victim, seed=victim.seed + 1),
+        "broken_seal": lambda: victim.model_copy(update={"outcome": "PASS", "seed": 123}),
+        "replaced_duplicate": lambda: trials[0],  # count unchanged, one id twice, one missing
+    }[mutation]()
+    assert decide(m, [*trials[:-1], impostor]).verdict is Verdict.ERROR
+
+
+def test_ceiling_conditions_are_reported_but_never_gate_on_rates() -> None:
+    from arci.gate import decide
+
+    m = manifest(conditions=(COND_TIMEOUT, COND_CEILING))
+    trials = [
+        *synthetic_trials(
+            m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=190
+        ),
+        *synthetic_trials(
+            m, condition_id="dead_backend", baseline_successes=100, candidate_successes=40
+        ),
+    ]
+    d = decide(m, trials)
+    assert d.k_conditions == 1 and d.per_arm_confidence == pytest.approx(0.975)
+    gating = {c.condition_id: c.is_gating for c in d.conditions}
+    assert gating == {"fetch_timeout": True, "dead_backend": False}
+    assert d.verdict is Verdict.PASS
+
+
+def test_ceiling_conditions_still_block_on_hard_violations_and_need_a_gating_peer() -> None:
+    from arci.gate import decide
+
+    m = manifest(conditions=(COND_TIMEOUT, COND_CEILING))
+    trials = [
+        *synthetic_trials(
+            m, condition_id="fetch_timeout", baseline_successes=190, candidate_successes=190
+        ),
+        *synthetic_trials(
+            m,
+            condition_id="dead_backend",
+            baseline_successes=100,
+            candidate_successes=100,
+            candidate_hard_violations=1,
+        ),
+    ]
+    assert decide(m, trials).verdict is Verdict.BLOCK
+    only_ceiling = manifest(conditions=(COND_CEILING,))
+    lonely = synthetic_trials(
+        only_ceiling,
+        condition_id="dead_backend",
+        baseline_successes=100,
+        candidate_successes=100,
+    )
+    assert decide(only_ceiling, lonely).verdict is Verdict.ERROR
