@@ -6,7 +6,7 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
 
 1. FROZEN files are listed in `FROZEN.sha256`. Never edit, move or delete them. That covers
    `src/arci/{schema,interfaces,hashing,fingerprint,schedule,contracts}.py`, everything under `tests/acceptance/`,
-   `pyproject.toml`, `uv.lock`, `justfile`, `AGENTS.md`, `docs/STATISTICS.md`. If a frozen file
+   `pyproject.toml`, `uv.lock`, `justfile`, `AGENTS.md`, `docs/STATISTICS.md`, `docs/TRUST_MODEL.md`. If a frozen file
    looks wrong, stop and say so in your final message. Do not work around it.
 2. Edit only the files your brief says you own. Create new files only inside those paths.
 3. Do not run git commands that change state (no add, commit, checkout, stash, reset). The
@@ -74,3 +74,50 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   fixture environment" (used to show a repaired agent no longer fails). `REPRODUCED` iff outcome
   and fingerprint both equal the bundle's expectations.
 - The gate counts a success as `outcome is PASS`. See `docs/STATISTICS.md` for the rule.
+
+## Hardening semantics (checkpoint 2; see docs/TRUST_MODEL.md and tests/acceptance/test_hardening.py)
+
+- `run_trial` NEVER raises and ALWAYS returns one sealed envelope, whatever the child writes.
+- Latches, all checked in finalisation on EVERY termination path, in this precedence:
+  replay mismatch (miss or leftover recording) > harness fault > grader fault > budget > the rest.
+  The agent must not be able to clear them by catching exceptions: a caught `BudgetExceeded` still
+  ends as FAIL/budget, a caught injector exception still ends as ERROR/harness_error, a caught
+  `ReplayMiss` still ends as ERROR/replay_miss. Keep latch state out of the agent's easy reach
+  (closure or name-mangled), and send a per-trial random nonce with every protocol line so stray
+  writes to fd 1 are recognised as junk rather than accepted as results.
+- An exception raised by a perturbation's `before`/`after`, or by boundary validation, is a harness
+  fault (ERROR/harness_error), never a `ToolFault`.
+- `FaultSpec.name` may be a registered name or a `"module:function"` factory reference
+  (`(FaultSpec) -> Perturbation`), resolved in the child.
+- Protocol robustness: the parent reads BYTES, splits on newlines with a bounded line length,
+  decodes each line separately (`errors="replace"`), and validates every frame: nonce, kind,
+  event-specific payload shape, trial id, contiguous `seq`. Valid events received before a bad frame
+  are kept. Any invalid frame makes the trial ERROR/harness_error. The reader thread always signals
+  completion, even on exceptions.
+- The child's final result frame is buffered by the parent and accepted only if the process then
+  exits with status 0 before the deadline. Non-zero exit after completion => FAIL/crash. Still
+  running at the deadline => FAIL/timeout. The parent emits exactly ONE `trial_end`, itself, after
+  termination is settled; the child never emits `trial_end`. Persisted events always equal the
+  envelope's events.
+- The deadline (`budgets.max_seconds`) is monotonic, starts before the spec is written to the
+  child's stdin (write it from a thread), and runs through process exit. No fixed waits.
+- Cleanup is unconditional (try/finally): kill the whole process group after EVERY trial, including
+  successful ones, close pipes, reap the child.
+- An exception from `emit_event` is a harness fault: stop the worker, return ERROR/harness_error.
+  `run_experiment` must surface store write failures the same way.
+- Values crossing the boundary are deep-copied both ways: what the agent receives, what is
+  recorded and what is emitted are three independent copies. Same for replayed results.
+- Grading never runs in the caller's process: `python -P -m arci.grade` (a new module you own)
+  reads one JSON request on stdin (contract, events, task, final_state), writes one JSON
+  `ContractResult`, and is killed at `budgets.grader_seconds`. Timeout, non-zero exit or unparsable
+  output => `grader_error` with a fixed deterministic message. The parent never imports oracle,
+  agent or toolset modules and never mutates its own `sys.path` / `sys.modules`.
+- Children are started with `sys.executable -P` (no implicit cwd on the import path) and a
+  `PYTHONPATH` that is: bundle payload dir first (replay only), then the parent's `sys.path`.
+- Bundle payload keys must be relative POSIX paths with no `..` segment and no leading `/`;
+  otherwise `replay` returns INVALID before writing anything. The temp dir is always removed.
+- `arci.stats.clopper_pearson_tail(successes, n, tail)` inverts each side at `tail` directly and is
+  accurate to 1e-9 absolute for tail >= 2.5e-7 and n <= 10000 (use log-space survival sums for the
+  small tail; closed forms at x=0 and x=n). `clopper_pearson(x, n, confidence)` delegates with
+  `tail = (1 - confidence) / 2`. The gate passes `tail = alpha / (4K)` directly and never recovers
+  it from a rounded confidence.

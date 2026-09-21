@@ -215,6 +215,8 @@ class Budgets(Model):
     max_tool_calls: int = Field(default=30, ge=0, le=1000)
     max_model_steps: int = Field(default=50, ge=1, le=1000)
     max_seconds: float = Field(default=30.0, gt=0, le=3600)
+    # Wall-clock limit for grading one trial. A grader that exceeds it is a grader fault.
+    grader_seconds: float = Field(default=20.0, gt=0, le=3600)
 
 
 class Usage(Model):
@@ -256,7 +258,8 @@ class Manifest(Sealed):
     baseline: ArmSpec
     candidate: ArmSpec
     conditions: tuple[Condition, ...] = Field(min_length=1)
-    alpha: float = Field(default=0.05, gt=0, lt=1)
+    # Supported range. Outside it the exact interval inversion is not validated.
+    alpha: float = Field(default=0.05, ge=1e-6, le=0.5)
     delta: float = Field(default=0.10, gt=0, lt=1)
     n_per_arm: int = Field(default=200, ge=N_PER_ARM_MIN, le=N_PER_ARM_MAX)
     base_seed: int = 0

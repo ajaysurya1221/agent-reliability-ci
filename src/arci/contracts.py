@@ -16,6 +16,7 @@ from typing import Any, cast
 import yaml
 from pydantic import JsonValue
 
+from arci.fingerprint import normalise
 from arci.interfaces import ContractRejected
 from arci.schema import ContractResult, ContractSpec, Event, Violation
 
@@ -92,6 +93,7 @@ def evaluate_contract(
         return ContractResult(
             success=False,
             violations=violations,
-            grader_error=f"{type(exc).__name__}: {exc}".splitlines()[0],
+            # One line, run-specific noise scrubbed, so the sealed record stays deterministic.
+            grader_error=normalise(f"{type(exc).__name__}: {exc}"),
         )
     return ContractResult(success=success, violations=violations)

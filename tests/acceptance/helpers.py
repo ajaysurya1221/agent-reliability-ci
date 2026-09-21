@@ -77,6 +77,7 @@ def spec(
     max_tool_calls: int = 20,
     toolset: str = "make_world",
     task: dict[str, JsonValue] | None = None,
+    grader_seconds: float = 20.0,
 ) -> TrialSpec:
     return TrialSpec(
         experiment_id="exp-acceptance",
@@ -90,7 +91,9 @@ def spec(
         task={"goal": "store 42"} if task is None else task,
         condition=condition,
         seed=seed,
-        budgets=Budgets(max_tool_calls=max_tool_calls, max_seconds=max_seconds),
+        budgets=Budgets(
+            max_tool_calls=max_tool_calls, max_seconds=max_seconds, grader_seconds=grader_seconds
+        ),
     )
 
 

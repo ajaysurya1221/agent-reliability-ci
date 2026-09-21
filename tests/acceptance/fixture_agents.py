@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import os
 import random
@@ -13,7 +14,8 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from arci.interfaces import ToolBoxProtocol, ToolFault
+from arci.interfaces import BudgetExceeded, ToolBoxProtocol, ToolFault
+from arci.schema import Bucket, FaultSpec, ToolCall, ToolResult
 
 Task = dict[str, JsonValue]
 
@@ -90,6 +92,34 @@ def raising_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
     raise RuntimeError("grader exploded")
 
 
+def hanging_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+    time.sleep(300)
+    return True
+
+
+def noisy_oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+    raise RuntimeError(
+        f"grader exploded at {time.time()} in pid {os.getpid()} obj 0x{id(task):012x}"
+    )
+
+
+class BrokenPerturbation:
+    """An injector with a bug. That is a harness fault, never an agent failure."""
+
+    name = "broken_perturbation"
+    bucket = Bucket.FALSIFY
+
+    def before(self, call: ToolCall, rng: random.Random) -> ToolResult | None:
+        raise RuntimeError("injector broken")
+
+    def after(self, call: ToolCall, result: ToolResult, rng: random.Random) -> ToolResult:
+        return result
+
+
+def broken_perturbation(fault: FaultSpec) -> BrokenPerturbation:
+    return BrokenPerturbation()
+
+
 def _value(result: JsonValue) -> JsonValue:
     return result.get("value") if isinstance(result, dict) else None
 
@@ -161,4 +191,62 @@ def catchall_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Ta
         value = None
     with contextlib.suppress(Exception):
         tools.call("store", value=value)
+    return {"success": True}
+
+
+def swallowing_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Does the work despite a broken injector by swallowing whatever it raised."""
+    value: JsonValue = 42
+    with contextlib.suppress(Exception):
+        value = _value(tools.call("fetch", key="answer"))
+    tools.call("store", value=42 if value is None else value)
+    return {"success": True}
+
+
+def budget_swallower(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Reaches the goal state, then blows its budget and hides it."""
+    tools.call("store", value=42)
+    for i in range(50):
+        try:
+            tools.call("log", msg=f"line {i}")
+        except BudgetExceeded:
+            break
+    return {"success": True}
+
+
+def garbage_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Writes junk straight onto the protocol channel, as a stray fd write might."""
+    tools.call("store", value=42)
+    os.write(1, b"\xff\xfe not json\n")
+    os.write(1, b'{"worker_result": 42}\n')
+    os.write(1, b'{"kind": "tool_start", "payload": {"occurrence": -1}}\n')
+    return {"success": True}
+
+
+def mutating_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    result = tools.call("fetch", key="answer")
+    value = _value(result)
+    if isinstance(result, dict):
+        result["value"] = 999  # must not reach the recording or the emitted events
+    tools.call("store", value=value)
+    return {"success": True}
+
+
+def atexit_hang_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("store", value=42)
+    atexit.register(time.sleep, 300)
+    return {"success": True}
+
+
+def atexit_exit_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    tools.call("store", value=42)
+    atexit.register(os._exit, 7)
+    return {"success": True}
+
+
+def orphan_agent(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+    """Succeeds, but leaves a background process behind."""
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
+    Path(str(task["pid_file"])).write_text(str(child.pid))
+    tools.call("store", value=42)
     return {"success": True}
