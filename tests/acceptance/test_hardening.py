@@ -199,7 +199,7 @@ def test_embedded_code_wins_over_the_checkout_on_the_import_path() -> None:
     original = (REPO / "tests/acceptance/fixture_agents.py").read_text()
     assert replay(_embedded_variant(original)).status is ReplayStatus.REPRODUCED
     repaired = (
-        original + "\\n\\nfragile_agent = good_agent  # the embedded copy is the repaired one\\n"
+        original + "\n\nfragile_agent = good_agent  # the embedded copy is the repaired one\n"
     )
     result = replay(_embedded_variant(repaired))
     assert result.status is ReplayStatus.NOT_REPRODUCED
@@ -211,7 +211,7 @@ def test_replay_leaves_the_callers_import_state_alone() -> None:
 
     before_path, before_modules = list(sys.path), set(sys.modules)
     original = (REPO / "tests/acceptance/fixture_agents.py").read_text()
-    marker = original + "\\n\\nimport json as zz_bundle_only_marker  # noqa: F401\\n"
+    marker = original + "\n\nimport json as zz_bundle_only_marker  # noqa: F401\n"
     assert replay(_embedded_variant(marker)).status is ReplayStatus.REPRODUCED
     assert sys.path == before_path
     leaked = {m for m in set(sys.modules) - before_modules if not m.startswith(("arci", "_"))}
@@ -223,7 +223,7 @@ def test_bundle_paths_cannot_escape_the_payload_directory() -> None:
 
     bundle = _embedded_variant((REPO / "tests/acceptance/fixture_agents.py").read_text())
     data = bundle.model_dump(exclude={"record_sha256"})
-    raw = b"print('escaped')\\n"
+    raw = b"print('escaped')\n"
     for evil in ("../escape.py", "/tmp/arci-escape.py", "a/../../escape.py"):
         forged = ReplayBundle.create(
             **{
