@@ -14,6 +14,7 @@ from pydantic import JsonValue, TypeAdapter
 
 from arci.contracts import resolve
 from arci.fingerprint import normalise
+from arci.hashing import canonical_json
 from arci.interfaces import AgentFn, BudgetExceeded, ReplayMiss, ToolFault, ToolSet, ToolSetFactory
 from arci.perturb import build
 from arci.schema import Event, Termination, ToolMode, TrialSpec
@@ -25,7 +26,8 @@ _PROTOCOL = sys.stdout.buffer
 
 
 class _Latches:
-    def __init__(self) -> None:
+    def __init__(self, nonce: str) -> None:
+        self._nonce = nonce
         self.replay: str | None = None
         self.harness: str | None = None
         self.budget: str | None = None
@@ -33,21 +35,35 @@ class _Latches:
     def set_replay(self, detail: str) -> None:
         if self.replay is None:
             self.replay = normalise(detail)
+            _write_latch(self._nonce, "replay_miss", self.replay)
 
     def set_harness(self, detail: str) -> None:
         if self.harness is None:
             self.harness = normalise(detail)
+            _write_latch(self._nonce, "harness_error", self.harness)
 
     def set_budget(self, detail: str) -> None:
         if self.budget is None:
             self.budget = normalise(detail)
+            _write_latch(self._nonce, "budget", self.budget)
 
 
 def _write_frame(nonce: str, kind: str, payload_name: str, payload: object) -> None:
     frame = {"nonce": nonce, "kind": kind, payload_name: payload}
-    data = json.dumps(frame, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n"
+    data = canonical_json(frame) + b"\n"
     _PROTOCOL.write(data)
     _PROTOCOL.flush()
+
+
+def _write_latch(nonce: str, latch: str, detail: str) -> None:
+    frame = {"nonce": nonce, "kind": "latch", "latch": latch, "detail": detail}
+    data = canonical_json(frame) + b"\n"
+    _PROTOCOL.write(data)
+    _PROTOCOL.flush()
+
+
+def _validate_json(value: object) -> None:
+    canonical_json(value)
 
 
 class _Emitter:
@@ -58,11 +74,13 @@ class _Emitter:
         self._started = time.monotonic()
 
     def __call__(self, kind: str, payload: dict[str, JsonValue]) -> None:
+        copied = copy.deepcopy(payload)
+        _validate_json(copied)
         event = Event(
             trial_id=self._trial_id,
             seq=self._seq,
             kind=cast(Any, kind),
-            payload=copy.deepcopy(payload),
+            payload=copied,
             at_ms=(time.monotonic() - self._started) * 1000.0,
         )
         self._seq += 1
@@ -91,7 +109,7 @@ def main() -> int:
         return 2
 
     emit = _Emitter(spec.trial_id, nonce)
-    latches = _Latches()
+    latches = _Latches(nonce)
     emit("trial_start", {"seed": spec.seed, "arm": spec.arm, "variant": spec.variant})
     termination = Termination.COMPLETED
     detail = ""
@@ -102,12 +120,17 @@ def main() -> int:
 
     try:
         with contextlib.redirect_stdout(sys.stderr):
-            toolset_factory = cast(ToolSetFactory, resolve(spec.toolset))
             agent = cast(AgentFn, resolve(spec.agent))
-            toolset = toolset_factory(copy.deepcopy(spec.task), spec.seed)
-            perturbations = tuple(build(fault) for fault in spec.condition.faults)
+            if spec.tool_mode is ToolMode.REPLAY:
+                tools = {}
+                perturbations = ()
+            else:
+                toolset_factory = cast(ToolSetFactory, resolve(spec.toolset))
+                toolset = toolset_factory(copy.deepcopy(spec.task), spec.seed)
+                tools = toolset.tools
+                perturbations = tuple(build(fault) for fault in spec.condition.faults)
         toolbox = ToolBox(
-            toolset.tools,
+            tools,
             spec.budgets,
             emit,
             mode=spec.tool_mode,
@@ -124,6 +147,7 @@ def main() -> int:
                     copy.deepcopy(spec.task), toolbox, random.Random(f"{spec.seed}:agent")
                 )
             agent_result = _AGENT_RESULT.validate_python(returned)
+            _validate_json(agent_result)
             emit("agent_result", {"result": copy.deepcopy(agent_result)})
         except ReplayMiss as exc:
             termination = Termination.REPLAY_MISS
@@ -151,9 +175,11 @@ def main() -> int:
             if spec.tool_mode is ToolMode.REPLAY:
                 final_state = copy.deepcopy(spec.replay_final_state)
             else:
+                assert toolset is not None
                 with contextlib.redirect_stdout(sys.stderr):
                     snapshot = toolset.snapshot()
                 final_state = _FINAL_STATE.validate_python(snapshot)
+                _validate_json(final_state)
     except BaseException as exc:
         latches.set_harness(_detail(exc))
 

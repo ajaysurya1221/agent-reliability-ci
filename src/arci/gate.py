@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 from arci.hashing import hash_record
@@ -101,8 +102,66 @@ def _experiment_verdict(conditions: Sequence[ConditionDecision], has_error: bool
     return Verdict.PASS
 
 
-def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
+def _safe_float(value: object) -> float:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        converted = float(value)
+        if math.isfinite(converted):
+            return converted
+    return 0.0
+
+
+def _safe_text(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    try:
+        value.encode("utf-8")
+    except UnicodeError:
+        return ""
+    return value
+
+
+def _error_decision(
+    manifest: Manifest, trials: Sequence[TrialEnvelope], reason: str
+) -> GateDecision:
+    try:
+        gating_count = sum(
+            not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
+            for condition in manifest.conditions
+        )
+    except BaseException:
+        gating_count = 0
+    try:
+        trial_hashes = sorted(_safe_text(trial.record_sha256) for trial in trials)
+        trials_sha256 = hash_record({"trials": trial_hashes})
+    except BaseException:
+        trials_sha256 = hash_record({"trials": []})
+    alpha = _safe_float(getattr(manifest, "alpha", 0.0))
+    delta = _safe_float(getattr(manifest, "delta", 0.0))
+    n_value = getattr(manifest, "n_per_arm", 0)
+    n_per_arm = n_value if isinstance(n_value, int) and not isinstance(n_value, bool) else 0
+    return GateDecision.create(
+        experiment_id=_safe_text(getattr(manifest, "experiment_id", "")),
+        manifest_sha256=_safe_text(getattr(manifest, "record_sha256", "")),
+        trials_sha256=trials_sha256,
+        alpha=alpha,
+        delta=delta,
+        k_conditions=gating_count,
+        per_arm_confidence=0.0,
+        n_per_arm=n_per_arm,
+        conditions=(),
+        verdict=Verdict.ERROR,
+        exit_code=EXIT_CODES[Verdict.ERROR],
+        reasons=(reason,),
+        prior_runs=(),
+    )
+
+
+def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
     """Apply the frozen gate rule without executing or mutating anything."""
+    try:
+        Manifest.model_validate(manifest.model_dump(mode="python"))
+    except Exception:
+        return _error_decision(manifest, trials, "manifest values invalid")
     gating_count = sum(
         not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
         for condition in manifest.conditions
@@ -110,6 +169,8 @@ def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
     adjusted_conditions = max(gating_count, 1)
     confidence = per_arm_confidence(manifest.alpha, adjusted_conditions)
     tail = manifest.alpha / (4.0 * adjusted_conditions)
+    if tail < 2.5e-7:
+        return _error_decision(manifest, trials, "statistical interval error")
 
     global_reasons: list[str] = []
     try:
@@ -239,6 +300,14 @@ def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
         reasons=tuple(global_reasons),
         prior_runs=manifest.prior_runs,
     )
+
+
+def decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
+    """Apply the frozen gate rule; malformed typed inputs become sealed ERRORs."""
+    try:
+        return _decide(manifest, trials)
+    except BaseException:
+        return _error_decision(manifest, trials, "gate computation failed")
 
 
 def replay_decision(
