@@ -29,8 +29,8 @@ uv sync
 .venv/bin/python examples/retry_agent/hero_demo.py
 ```
 
-It runs six steps through the real CLI, about 1,300 trials in under two minutes on a laptop, with no
-model calls and no network:
+It runs six steps through the real CLI: about 1,250 trials, each in a fresh process with a separate
+grader process, in roughly 30 seconds on a 15-core laptop. No model calls, no network.
 
 1. One illustrative run: agents A and B both pass.
 2. The frozen experiment (200 trials per arm, `tool_timeout` injected on the first `reserve` call)
