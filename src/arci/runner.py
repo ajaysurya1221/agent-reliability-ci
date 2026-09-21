@@ -1270,6 +1270,11 @@ def _run_command_trial(
         elif agent is None:
             base_termination = Termination.HARNESS_ERROR
             detail = "command was not started"
+        elif agent_exit is not None and agent_exit in spec.command.infra_exit_codes:
+            # The agent says its infrastructure failed (model backend down, quota, credentials).
+            # That invalidates the trial; it must never be scored as an agent failure.
+            base_termination = Termination.HARNESS_ERROR
+            detail = f"agent reported an infrastructure failure (exit {agent_exit})"
         elif agent_exit is None or agent_exit != 0:
             base_termination = Termination.CRASH
             detail = "command exited non-zero" if agent_exit is not None else "command did not exit"

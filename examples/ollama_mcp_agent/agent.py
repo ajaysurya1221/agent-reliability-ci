@@ -89,6 +89,9 @@ class McpClient(Protocol):
     def call_tool(self, name: str, arguments: JsonObject) -> tuple[str, bool]: ...
 
 
+EX_TEMPFAIL = 75
+
+
 class McpRpcError(RuntimeError):
     """An MCP JSON-RPC error that should be shown to the model as a tool error."""
 
@@ -319,6 +322,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if result is None:
             return 1
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        # The model backend is unreachable or timed out: infrastructure, not the agent.
+        # arci maps this exit status (EX_TEMPFAIL) to an ERROR trial, not a failed one.
+        print(f"infrastructure error: {_one_line(exc)}", file=sys.stderr)
+        return EX_TEMPFAIL
     except Exception as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
         return 1
