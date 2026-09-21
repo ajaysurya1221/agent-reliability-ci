@@ -30,6 +30,14 @@ Fault classification survives what the agent does next: a harness fault or a blo
 reported to the parent the moment it happens, so hanging or exiting afterwards cannot turn it into
 an ordinary timeout or crash.
 
+## Command agents (v0.2)
+
+For a command agent the environment, the recorder, fault injection, budgets and the fault latches
+live in a harness-owned boundary process. The agent's process tree contains only a byte-relay shim.
+A buggy agent can no longer corrupt the record by accident, whatever it does in its own process.
+This is isolation from accident, not a sandbox: the agent can still reach the unix socket it was
+given, and anything it does outside MCP (files, network) is invisible.
+
 ## What v0.1 does NOT guarantee
 
 The agent, the tool boundary and the environment run in the same child process. A deliberately

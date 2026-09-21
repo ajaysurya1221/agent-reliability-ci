@@ -10,11 +10,11 @@ from __future__ import annotations
 from enum import Enum, StrEnum
 from typing import Annotated, Any, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from arci.hashing import hash_record
 
-SCHEMA_VERSION = "arci/0.1"
+SCHEMA_VERSION = "arci/0.2"
 N_PER_ARM_MIN = 1
 N_PER_ARM_MAX = 10_000
 
@@ -239,21 +239,63 @@ class ContractSpec(Model):
     unobservable: tuple[str, ...] = ()
 
 
+class CommandSpec(Model):
+    """An agent that is any subprocess. Its tools must go through the MCP boundary.
+
+    `argv` may use the placeholders {mcp_config}, {task_file}, {workdir} and {seed}; they are
+    expanded only at launch and never stored expanded, so sealed records stay path-free.
+    Exit status 0 means the agent claims success. Anything else is a crash.
+    """
+
+    argv: tuple[str, ...] = Field(min_length=1)
+    env: dict[str, str] = Field(default_factory=dict)
+
+
+class McpServerSpec(Model):
+    """The environment, as ONE stdio MCP server owned by the harness, never by the agent.
+
+    Supported subset (protocol revision 2026-07-28, stdio transport): initialize,
+    notifications/initialized, ping, tools/list and SERIAL tools/call with `resultType`
+    "complete". Anything else the boundary cannot faithfully record or replay (task results,
+    sampling, elicitation, concurrent calls) is a harness fault, not a silent pass-through.
+    `argv` may use {workdir} and {seed}.
+    """
+
+    name: str = "env"
+    argv: tuple[str, ...] = Field(min_length=1)
+    env: dict[str, str] = Field(default_factory=dict)
+    # (task, workdir) -> dict. Trusted code run in the grader process after the agent exits;
+    # its result is the final state handed to the oracle.
+    snapshot: AgentRef
+
+
 class ArmSpec(Model):
     label: str
-    agent: AgentRef  # (task, tools, rng) -> dict
+    agent: AgentRef | None = None  # python agent: (task, tools, rng) -> dict
+    command: CommandSpec | None = None  # command agent
     candidate_id: str = ""  # stable identity of the code under test (e.g. git sha)
+
+    @model_validator(mode="after")
+    def _exactly_one_kind(self) -> ArmSpec:
+        if (self.agent is None) == (self.command is None):
+            raise ValueError(
+                "an arm is either a python `agent` or a `command`, not both or neither"
+            )
+        return self
 
 
 class Manifest(Sealed):
     """Frozen before execution. Changing anything means a new experiment."""
 
-    schema_version: Literal["arci/0.1"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
     experiment_id: str
     created_at: str = ""
     task_id: str
     task: dict[str, JsonValue] = Field(default_factory=dict)
-    toolset: AgentRef  # (task, seed) -> object with .tools and .snapshot()
+    # Python agents need `toolset`: (task, seed) -> object with .tools and .snapshot().
+    # Command agents need `mcp_server`. Both arms of one experiment are the same kind.
+    toolset: AgentRef | None = None
+    mcp_server: McpServerSpec | None = None
     contract: ContractSpec
     baseline: ArmSpec
     candidate: ArmSpec
@@ -270,6 +312,17 @@ class Manifest(Sealed):
 
     VOLATILE: ClassVar[frozenset[str]] = frozenset({"created_at"})
 
+    @model_validator(mode="after")
+    def _one_kind_of_experiment(self) -> Manifest:
+        python_arms = self.baseline.agent is not None, self.candidate.agent is not None
+        if python_arms[0] != python_arms[1]:
+            raise ValueError("baseline and candidate must both be python agents or both commands")
+        if python_arms[0] and (self.toolset is None or self.mcp_server is not None):
+            raise ValueError("python agents need `toolset` and no `mcp_server`")
+        if not python_arms[0] and (self.mcp_server is None or self.toolset is not None):
+            raise ValueError("command agents need `mcp_server` and no `toolset`")
+        return self
+
 
 class TrialSpec(Model):
     experiment_id: str
@@ -277,8 +330,10 @@ class TrialSpec(Model):
     pair_id: str  # baseline and candidate trials sharing a scenario seed
     arm: Literal["baseline", "candidate"]
     variant: str
-    agent: AgentRef
-    toolset: AgentRef
+    agent: AgentRef | None = None
+    command: CommandSpec | None = None
+    toolset: AgentRef | None = None
+    mcp_server: McpServerSpec | None = None
     task_id: str
     task: dict[str, JsonValue] = Field(default_factory=dict)
     condition: Condition
@@ -309,7 +364,7 @@ class ContractResult(Model):
 
 
 class TrialEnvelope(Sealed):
-    schema_version: Literal["arci/0.1"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
     spec_sha256: Sha256
     experiment_id: str
     trial_id: str
@@ -357,7 +412,7 @@ class ConditionDecision(Model):
 
 
 class GateDecision(Sealed):
-    schema_version: Literal["arci/0.1"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
     experiment_id: str
     manifest_sha256: str
     trials_sha256: str  # hash_record of the sorted trial record_sha256 list
@@ -377,7 +432,7 @@ class GateDecision(Sealed):
 class ReplayBundle(Sealed):
     """Portable, self-contained reproducer for one failing trial."""
 
-    schema_version: Literal["arci/0.1"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
     manifest: Manifest
     spec: TrialSpec  # tool_mode REPLAY, recording filled in
     expected_outcome: Outcome
