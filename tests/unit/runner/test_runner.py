@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import contextlib
+import os
+import queue
 import random
+import signal
+import threading
+import time
 
 from pydantic import JsonValue
 
+import arci.runner as runner_module
 from arci.interfaces import BudgetExceeded, ToolBoxProtocol
 from arci.runner import run_trial
 from arci.schema import Budgets, Outcome, Termination
@@ -61,3 +67,103 @@ def test_large_grader_result_is_drained_while_process_runs() -> None:
     assert len(trial.contract.violations) == 2000
     assert trial.outcome is Outcome.FAIL
     assert trial.termination is Termination.COMPLETED
+
+
+def test_protocol_reader_drains_frames_already_in_the_pipe_after_exit() -> None:
+    read_fd, write_fd = os.pipe()
+    stdout = os.fdopen(read_fd, "rb", buffering=0)
+
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stdout = stdout
+
+    messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+    stop = threading.Event()
+    abandon = threading.Event()
+    os.write(write_fd, b"first\nsecond\n")
+    os.close(write_fd)
+    reader = threading.Thread(
+        target=vars(runner_module)["_protocol_reader"],
+        args=(FakeProcess(), messages, stop, abandon),
+    )
+    reader.start()
+    stop.set()
+    seen: list[tuple[str, object]] = []
+
+    def consume(kind: str, value: object) -> None:
+        seen.append((kind, value))
+
+    drain = vars(runner_module)["_drain_after_exit"]
+    drain(reader, messages, consume)
+    stdout.close()
+
+    assert [value for kind, value in seen if kind == "line"] == [b"first", b"second"]
+    assert seen[-1] == ("reader_done", None)
+
+
+def test_protocol_reader_keeps_frames_when_the_queue_backs_up_during_a_drain() -> None:
+    read_fd, write_fd = os.pipe()
+    stdout = os.fdopen(read_fd, "rb", buffering=0)
+
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stdout = stdout
+
+    # A one-slot queue plus a consumer that starts late: the reader must block rather than
+    # drop the frames it has already parsed, or a final result frame can vanish.
+    messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+    stop = threading.Event()
+    abandon = threading.Event()
+    lines = [f"line-{index}".encode() for index in range(64)]
+    os.write(write_fd, b"".join(line + b"\n" for line in lines))
+    os.close(write_fd)
+    reader = threading.Thread(
+        target=vars(runner_module)["_protocol_reader"],
+        args=(FakeProcess(), messages, stop, abandon),
+    )
+    reader.start()
+    stop.set()
+    time.sleep(0.3)
+    seen: list[tuple[str, object]] = []
+
+    def consume(kind: str, value: object) -> None:
+        seen.append((kind, value))
+
+    drain = vars(runner_module)["_drain_after_exit"]
+    drain(reader, messages, consume)
+    stdout.close()
+
+    assert [value for kind, value in seen if kind == "line"] == lines
+
+
+def test_boundary_exit_is_abnormal_only_when_it_was_not_the_parents_own_stop() -> None:
+    abnormal = vars(runner_module)["_boundary_exit_abnormal"]
+
+    # Clean exit with the final frame in hand.
+    assert not abnormal(alive_at_deadline=False, exit_code=0, stop_signal=None, has_result=True)
+    # Killed by the stop signal the parent itself sent, AFTER the final frame was written
+    # and drained: the parent's own doing, not an abnormal boundary exit.
+    assert not abnormal(
+        alive_at_deadline=False,
+        exit_code=-signal.SIGTERM,
+        stop_signal=int(signal.SIGTERM),
+        has_result=True,
+    )
+    # Same status, but the parent never asked it to stop: a real fault.
+    assert abnormal(
+        alive_at_deadline=False, exit_code=-signal.SIGTERM, stop_signal=None, has_result=True
+    )
+    # Stopped by the parent but no final frame ever arrived: still a fault.
+    assert abnormal(
+        alive_at_deadline=False,
+        exit_code=-signal.SIGTERM,
+        stop_signal=int(signal.SIGTERM),
+        has_result=False,
+    )
+    # Some other non-zero status is a fault even when a stop was requested.
+    assert abnormal(
+        alive_at_deadline=False, exit_code=3, stop_signal=int(signal.SIGTERM), has_result=True
+    )
+    # Still running when the deadline passed: the timeout path owns this, not the fault path.
+    assert not abnormal(alive_at_deadline=True, exit_code=-9, stop_signal=None, has_result=False)
+    assert not abnormal(alive_at_deadline=False, exit_code=None, stop_signal=None, has_result=False)

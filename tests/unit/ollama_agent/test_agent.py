@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import io
 import json
+import urllib.error
+import urllib.request
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from pydantic import JsonValue
 
+import examples.ollama_mcp_agent.agent as agent_module
+import examples.ollama_mcp_agent.experiment as experiment_module
 from examples.ollama_mcp_agent.agent import JsonObject, run_agent, validate_ollama_url
 
 
@@ -167,3 +172,53 @@ def test_loopback_only_guard(url: str) -> None:
 
 def test_literal_loopback_url_is_allowed() -> None:
     validate_ollama_url("http://127.0.0.1:11434/api/chat")
+
+
+@pytest.mark.parametrize("module", [agent_module, experiment_module])
+def test_ollama_openers_reject_redirects(module: object) -> None:
+    handler_type = vars(module)["_RejectRedirects"]
+    handler = handler_type()
+    request = urllib.request.Request("http://127.0.0.1:11434/")
+    with pytest.raises(urllib.error.HTTPError):
+        handler.redirect_request(request, None, 302, "redirect", {}, "http://example.com/")
+
+
+def test_main_returns_nonzero_when_the_step_limit_is_exhausted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task_file = tmp_path / "task.json"
+    task_file.write_text("{}", encoding="utf-8")
+
+    class Session(FakeSession):
+        def close(self) -> None:
+            return None
+
+    def make_session(_path: str | Path) -> Session:
+        return Session()
+
+    def exhaust_steps(
+        task: JsonObject,
+        session: object,
+        *,
+        prompt_variant: str,
+        model: str,
+        max_steps: int,
+    ) -> None:
+        del task, session, prompt_variant, model, max_steps
+
+    monkeypatch.setattr(agent_module, "McpSession", make_session)
+    monkeypatch.setattr(agent_module, "run_agent", exhaust_steps)
+
+    code = agent_module.main(
+        [
+            "--mcp-config",
+            "unused.json",
+            "--task-file",
+            str(task_file),
+            "--prompt-variant",
+            "a",
+            "--max-steps",
+            "1",
+        ]
+    )
+    assert code == 1

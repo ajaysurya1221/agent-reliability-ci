@@ -6,11 +6,12 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import pytest
 from pydantic import JsonValue
 
-from arci.mcp_toolset_server import snapshot
+from arci.mcp_toolset_server import ToolSetServer, snapshot
 
 
 class FixtureToolSet:
@@ -21,6 +22,9 @@ class FixtureToolSet:
             "store": self.store,
             "boom": self.boom,
             "hidden": self.hidden,
+            "setty": self.setty,
+            "nan": self.nan,
+            "pathy": self.pathy,
         }
 
     def store(self, value: JsonValue) -> JsonValue:
@@ -35,6 +39,15 @@ class FixtureToolSet:
 
     def hidden(self) -> JsonValue:
         raise AssertionError("hidden tool was called")
+
+    def setty(self) -> JsonValue:
+        return {1, 2}  # pyright: ignore[reportReturnType]
+
+    def nan(self) -> JsonValue:
+        return float("nan")
+
+    def pathy(self) -> JsonValue:
+        raise FileNotFoundError("/tmp/arci-pathy-12345/cache/item.json")
 
     def snapshot(self) -> dict[str, JsonValue]:
         print("snapshot noise")
@@ -128,3 +141,59 @@ def test_snapshot_is_written_at_startup(tmp_path: Path) -> None:
     )
     assert process.stdout == ""
     assert snapshot({}, str(tmp_path)) == {"calls": 0, "value": None}
+
+
+def test_non_json_tool_returns_are_internal_environment_errors(tmp_path: Path) -> None:
+    server = ToolSetServer(FixtureToolSet(), tmp_path, None)
+    for name in ("setty", "nan"):
+        response = server.handle(
+            {
+                "jsonrpc": "2.0",
+                "id": name,
+                "method": "tools/call",
+                "params": {"name": name, "arguments": {}},
+            }
+        )
+        assert response is not None
+        assert response["error"] == {
+            "code": -32603,
+            "message": "tool returned invalid JSON",
+        }
+
+
+def test_snapshot_write_failure_is_an_internal_environment_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server = ToolSetServer(FixtureToolSet(), tmp_path, None)
+
+    def fail_snapshot() -> None:
+        raise OSError("disk failed")
+
+    monkeypatch.setattr(server, "save_snapshot", fail_snapshot)
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": "store",
+            "method": "tools/call",
+            "params": {"name": "store", "arguments": {"value": 3}},
+        }
+    )
+    assert response is not None
+    assert response["error"] == {"code": -32603, "message": "snapshot failed"}
+
+
+def test_tool_exception_diagnostic_scrubs_run_specific_paths(tmp_path: Path) -> None:
+    server = ToolSetServer(FixtureToolSet(), tmp_path, None)
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": "path",
+            "method": "tools/call",
+            "params": {"name": "pathy", "arguments": {}},
+        }
+    )
+    assert response is not None
+    data = cast(dict[str, Any], response)
+    text = data["result"]["content"][0]["text"]
+    assert "arci-pathy" not in str(text)
+    assert "<path>" in str(text)

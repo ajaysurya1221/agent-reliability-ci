@@ -15,6 +15,7 @@ from typing import Any, NoReturn, cast
 
 from arci.interfaces import ToolSet, ToolSetFactory
 from arci.schema import JsonValue
+from arci.toolbox import format_diagnostic
 
 PROTOCOL_VERSION = "2026-07-28"
 
@@ -24,9 +25,9 @@ def _one_line(exc: BaseException) -> str:
     try:
         detail = str(exc).replace("\r", " ").replace("\n", " ").strip()
     except BaseException:
-        detail = ""
+        return format_diagnostic(exc)
     name = type(exc).__name__
-    return f"{name}: {detail}" if detail else name
+    return format_diagnostic(f"{name}: {detail}" if detail else name)
 
 
 def _resolve_factory(reference: str) -> ToolSetFactory:
@@ -177,18 +178,23 @@ class ToolSetServer:
         name = params.get("name")
         raw_arguments = params.get("arguments")
         arguments = raw_arguments if isinstance(raw_arguments, dict) else {}
+        if not isinstance(name, str) or name not in self._tools:
+            return _error(request_id, -32602, f"unknown tool {name}")
         try:
-            if not isinstance(name, str) or name not in self._tools:
-                return _error(request_id, -32602, f"unknown tool {name}")
+            with redirect_stdout(sys.stderr):
+                value = self._tools[name](**arguments)
+        except BaseException as exc:
+            result = _result(_one_line(exc), is_error=True)
+        else:
             try:
-                with redirect_stdout(sys.stderr):
-                    value = self._tools[name](**arguments)
                 result = _result(value)
-            except Exception as exc:
-                result = _result(_one_line(exc), is_error=True)
-            return _reply(request_id, result=result)
-        finally:
+            except (TypeError, ValueError, UnicodeError):
+                return _error(request_id, -32603, "tool returned invalid JSON")
+        try:
             self.save_snapshot()
+        except BaseException:
+            return _error(request_id, -32603, "snapshot failed")
+        return _reply(request_id, result=result)
 
 
 def snapshot(task: dict[str, JsonValue], workdir: str) -> dict[str, JsonValue]:
