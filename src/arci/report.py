@@ -83,14 +83,14 @@ def _failure_clusters(trials: Sequence[TrialEnvelope]) -> list[tuple[str, int, s
 
 
 def _decision_usage(trials: Sequence[TrialEnvelope]) -> tuple[int, int, int]:
-    attempts = 0
+    recorded_decisions = 0
     input_tokens = 0
     output_tokens = 0
     for trial in trials:
         for recorded in trial.recording:
             if recorded.tool != DECISION_TOOL:
                 continue
-            attempts += 1
+            recorded_decisions += 1
             value = recorded.result.value
             if not isinstance(value, dict):
                 continue
@@ -106,7 +106,7 @@ def _decision_usage(trials: Sequence[TrialEnvelope]) -> tuple[int, int, int]:
                 input_tokens += raw_input
             if isinstance(raw_output, int) and not isinstance(raw_output, bool):
                 output_tokens += raw_output
-    return attempts, input_tokens, output_tokens
+    return recorded_decisions, input_tokens, output_tokens
 
 
 def render_markdown(
@@ -150,18 +150,19 @@ def render_markdown(
             )
             lines.append(f"| {look.look} | {look.pairs} | **{look.verdict.value}** | {bounds} |")
 
-    decision_attempts, input_tokens, output_tokens = _decision_usage(trials)
-    if decision_attempts:
+    recorded_decisions, input_tokens, output_tokens = _decision_usage(trials)
+    if recorded_decisions:
         estimated_cost = input_tokens * USD_PER_MTOK_INPUT / 1_000_000
         lines.extend(
             [
                 "",
                 "## Decisions",
                 "",
-                "| Attempts | Input tokens | Output tokens | Estimated cost at list price |",
+                "| Recorded decisions | Input tokens | Output tokens "
+                "| Estimated cost at list price |",
                 "|---:|---:|---:|---:|",
                 (
-                    f"| {decision_attempts} | {input_tokens} | {output_tokens} | "
+                    f"| {recorded_decisions} | {input_tokens} | {output_tokens} | "
                     f"USD {estimated_cost:.7f} |"
                 ),
                 "",

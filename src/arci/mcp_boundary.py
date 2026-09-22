@@ -373,7 +373,11 @@ def _probabilities(value: object, expected: set[str]) -> dict[str, float] | None
         return None
     probabilities: dict[str, float] = {}
     for key, raw in value.items():
-        if not isinstance(key, str) or not _finite_number(raw) or cast(float, raw) < 0.0:
+        if (
+            not isinstance(key, str)
+            or not _finite_number(raw)
+            or not 0.0 <= float(cast(int | float, raw)) <= 1.0
+        ):
             return None
         probabilities[key] = float(cast(int | float, raw))
     if not math.isclose(sum(probabilities.values()), 1.0, abs_tol=1e-3):
@@ -517,6 +521,14 @@ def _retry_wait_fits(wait_seconds: float, elapsed: float, request_seconds: float
     return wait_seconds + 1.0 <= request_seconds - elapsed
 
 
+def _deadline_remaining(deadline: float, *, clock: Callable[[], float] = time.monotonic) -> float:
+    """Return time left on one upstream deadline, or the fixed timeout diagnostic."""
+    remaining = deadline - clock()
+    if remaining <= 0.0:
+        raise _DecisionTransportError("decision upstream timed out")
+    return remaining
+
+
 def _package_version() -> str:
     try:
         return importlib.metadata.version("agent-reliability-ci")
@@ -541,7 +553,9 @@ def _request_upstream_once(
     body: dict[str, JsonValue] | None,
     spec: DecisionSpec,
     api_key: str,
-    timeout: float,
+    deadline: float,
+    *,
+    clock: Callable[[], float] = time.monotonic,
 ) -> _UpstreamResult:
     parts = urlsplit(spec.base_url)
     if parts.hostname is None:
@@ -549,7 +563,11 @@ def _request_upstream_once(
     connection_type = (
         http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
     )
-    connection = connection_type(parts.hostname, parts.port, timeout=max(timeout, 0.001))
+    connection = connection_type(
+        parts.hostname,
+        parts.port,
+        timeout=max(_deadline_remaining(deadline, clock=clock), 0.001),
+    )
     raw = None if body is None else canonical_json(body)
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -559,14 +577,31 @@ def _request_upstream_once(
     }
     if raw is not None:
         headers["Content-Type"] = "application/json"
+    expired = threading.Event()
+
+    def expire_connection() -> None:
+        expired.set()
+        sock = connection.sock
+        if sock is not None:
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
+            with contextlib.suppress(OSError):
+                sock.close()
+
+    timer = threading.Timer(_deadline_remaining(deadline, clock=clock), expire_connection)
+    timer.daemon = True
+    timer.start()
     try:
         try:
+            connection.timeout = max(_deadline_remaining(deadline, clock=clock), 0.001)
             connection.request(
                 method,
                 _join_upstream_path(spec.base_url, endpoint),
                 body=raw,
                 headers=headers,
             )
+            if connection.sock is not None:
+                connection.sock.settimeout(max(_deadline_remaining(deadline, clock=clock), 0.001))
             response = connection.getresponse()
             response_headers = dict(response.getheaders())
             lowered_response_headers = {
@@ -575,11 +610,26 @@ def _request_upstream_once(
             encoding = lowered_response_headers.get("content-encoding", "identity")
             if encoding.lower() != "identity":
                 raise _DecisionTransportError(f"decision upstream sent Content-Encoding {encoding}")
-            payload = response.read()
+            payload = bytearray()
+            while True:
+                remaining = _deadline_remaining(deadline, clock=clock)
+                if connection.sock is not None:
+                    connection.sock.settimeout(max(remaining, 0.001))
+                chunk = response.read1(64 * 1024)
+                if not chunk:
+                    break
+                payload.extend(chunk)
+            _deadline_remaining(deadline, clock=clock)
         except ssl.SSLError as exc:
             raise _DecisionTransportError(_tls_diagnostic(exc)) from None
+        except TimeoutError:
+            raise _DecisionTransportError("decision upstream timed out") from None
+        except OSError:
+            if expired.is_set():
+                raise _DecisionTransportError("decision upstream timed out") from None
+            raise
         try:
-            value = json.loads(payload.decode("utf-8"))
+            value = json.loads(bytes(payload).decode("utf-8"))
             canonical_json(value)
         except (json.JSONDecodeError, UnicodeError, TypeError, ValueError):
             raise _DecisionTransportError("decision upstream returned non-JSON") from None
@@ -589,6 +639,7 @@ def _request_upstream_once(
             cast(JsonValue, value),
         )
     finally:
+        timer.cancel()
         connection.close()
 
 
@@ -607,7 +658,8 @@ def request_decision_upstream(
     if not key:
         raise RuntimeError("TYPESAFE_API_KEY is not set for the decision upstream")
     started = clock()
-    first = _request_upstream_once(method, endpoint, body, spec, key, spec.request_seconds)
+    deadline = started + spec.request_seconds
+    first = _request_upstream_once(method, endpoint, body, spec, key, deadline, clock=clock)
     if first.status not in {429, 529}:
         return first
     delay = _retry_delay(first.headers)
@@ -615,10 +667,12 @@ def request_decision_upstream(
     if not _retry_wait_fits(delay, elapsed, spec.request_seconds):
         return first
     sleep(delay)
-    remaining = spec.request_seconds - (clock() - started)
+    remaining = _deadline_remaining(deadline, clock=clock)
     if remaining < 1.0:
         return first
-    second = _request_upstream_once(method, endpoint, body, spec, key, remaining)
+    second = _request_upstream_once(method, endpoint, body, spec, key, deadline, clock=clock)
+    if second.status != 200:
+        raise _DecisionTransportError("decision upstream failed after retry")
     return _UpstreamResult(
         second.status,
         second.headers,

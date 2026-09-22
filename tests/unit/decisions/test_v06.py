@@ -38,6 +38,7 @@ from tests.acceptance.helpers import COND_CLEAN, synthetic_trials
 
 allowed_headers = vars(boundary_module)["_allowed_headers"]
 attach_upstream = vars(boundary_module)["_attach_upstream"]
+deadline_remaining = vars(boundary_module)["_deadline_remaining"]
 join_upstream_path = vars(boundary_module)["_join_upstream_path"]
 probabilities = vars(boundary_module)["_probabilities"]
 raw_upstream_snapshot = vars(boundary_module)["_raw_upstream_snapshot"]
@@ -46,6 +47,7 @@ retry_wait_fits = vars(boundary_module)["_retry_wait_fits"]
 TokenBucket = vars(runner_module)["_TokenBucket"]
 UpstreamResult = boundary_module.UpstreamResult
 cmd_preflight = vars(cli_module)["_cmd_preflight"]
+scrub_preflight_value = vars(cli_module)["_scrub_preflight_value"]
 request_upstream = boundary_module.request_decision_upstream
 upstream_diagnostic = boundary_module.upstream_diagnostic
 
@@ -57,6 +59,7 @@ def test_prefix_tolerance_headers_and_retry_parsing() -> None:
     assert join_upstream_path("https://api.example", "/v1/models") == "/v1/models"
     assert probabilities({"a": 0.5004, "b": 0.5}, {"a", "b"}) is not None
     assert probabilities({"a": 0.502, "b": 0.5}, {"a", "b"}) is None
+    assert probabilities({"a": 1.0005, "b": 0.0}, {"a", "b"}) is None
     assert allowed_headers(
         {
             "Retry-After": "3",
@@ -107,7 +110,7 @@ def test_raw_snapshot_is_independent_and_null_is_explicit() -> None:
     assert cast(dict[str, JsonValue], attached.value)["upstream"] is None
 
 
-def test_retry_does_not_resend_when_sleep_overshoots_the_margin(
+def test_retry_sleep_and_deadline_use_one_monotonic_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = 0.0
@@ -126,10 +129,12 @@ def test_retry_does_not_resend_when_sleep_overshoots_the_margin(
         body: dict[str, JsonValue] | None,
         spec: DecisionSpec,
         api_key: str,
-        timeout: float,
+        deadline: float,
+        *,
+        clock: Any,
     ) -> UpstreamResult:
         nonlocal sends
-        del method, endpoint, body, spec, api_key, timeout
+        del method, endpoint, body, spec, api_key, deadline, clock
         sends += 1
         return UpstreamResult(429, {"retry-after-ms": "200"}, {"detail": "busy"})
 
@@ -140,12 +145,53 @@ def test_retry_does_not_resend_when_sleep_overshoots_the_margin(
         request_seconds=2.0,
     )
 
-    result = request_upstream(
-        "POST", "/v1/systemone", {}, spec, api_key="secret", clock=clock, sleep=sleep
+    assert deadline_remaining(2.0, clock=clock) == 2.0
+    with pytest.raises(RuntimeError, match="decision upstream timed out"):
+        request_upstream(
+            "POST", "/v1/systemone", {}, spec, api_key="secret", clock=clock, sleep=sleep
+        )
+
+    assert sends == 1
+
+
+def test_a_non_200_resend_is_a_transport_fault(monkeypatch: pytest.MonkeyPatch) -> None:
+    results = [
+        UpstreamResult(529, {"retry-after-ms": "0"}, {"detail": "busy"}),
+        UpstreamResult(422, {}, {"detail": "bad request"}),
+    ]
+
+    def send_once(
+        method: str,
+        endpoint: str,
+        body: dict[str, JsonValue] | None,
+        spec: DecisionSpec,
+        api_key: str,
+        deadline: float,
+        *,
+        clock: Any,
+    ) -> UpstreamResult:
+        del method, endpoint, body, spec, api_key, deadline, clock
+        return results.pop(0)
+
+    monkeypatch.setattr(boundary_module, "_request_upstream_once", send_once)
+    spec = DecisionSpec(
+        upstream="http",
+        base_url="http://127.0.0.1:8080/typesafe",
+        request_seconds=2.0,
     )
 
-    assert result.status == 429 and result.attempts == 1
-    assert sends == 1
+    with pytest.raises(RuntimeError, match="decision upstream failed after retry"):
+        request_upstream(
+            "POST",
+            "/v1/systemone",
+            {},
+            spec,
+            api_key="secret",
+            clock=lambda: 0.0,
+            sleep=lambda _seconds: None,
+        )
+
+    assert results == []
 
 
 def test_upstream_diagnostics_are_redacted_safe_and_bounded(
@@ -207,6 +253,27 @@ def _decision_record(input_tokens: int, output_tokens: int) -> RecordedCall:
     )
 
 
+def _before_injected_decision_record() -> RecordedCall:
+    return RecordedCall(
+        tool=DECISION_TOOL,
+        arguments_sha256=hash_record({"attempt": 2}),
+        occurrence=1,
+        result=ToolResult(
+            call_id="c-0001",
+            tool=DECISION_TOOL,
+            ok=False,
+            value={
+                "status": 529,
+                "headers": {},
+                "body": {"detail": "arci injected unavailable"},
+                "upstream": None,
+            },
+            error_kind="http_529",
+            injected_by="decision_unavailable",
+        ),
+    )
+
+
 def test_report_decision_section_counts_records_not_upstream_attempts() -> None:
     manifest = decision_manifest(
         conditions=(COND_CLEAN,),
@@ -224,13 +291,22 @@ def test_report_decision_section_counts_records_not_upstream_attempts() -> None:
         candidate_successes=1,
     )
     trials = [
-        trial.model_copy(update={"recording": (_decision_record(275, 20),)}) for trial in trials
+        trial.model_copy(
+            update={
+                "recording": (
+                    _decision_record(275, 20),
+                    _before_injected_decision_record(),
+                )
+            }
+        )
+        for trial in trials
     ]
 
     report = render_markdown(manifest, decide(manifest, trials), trials)
 
     assert "## Decisions" in report
-    assert "| 2 | 550 | 40 | USD 0.0000231 |" in report
+    assert "Recorded decisions" in report
+    assert "| 4 | 550 | 40 | USD 0.0000231 |" in report
     assert "2026-09-22" in report and "not billed spend" in report
 
 
@@ -399,3 +475,48 @@ def test_preflight_never_prints_a_key_from_an_upstream_exception(
     assert cmd_preflight(str(path), upstream=broken) == 3
     output = capsys.readouterr().out
     assert "real-secret" not in output and "<redacted>" in output
+
+
+def test_preflight_scrubs_provider_strings_from_prints_and_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    key = "real-secret"
+    spec = DecisionSpec(
+        upstream="http",
+        base_url=f"http://127.0.0.1:8080/{key}",
+        model=f"provider-{key}",
+    )
+    path = tmp_path / "manifest.json"
+    path.write_text(decision_manifest(n_per_arm=1, spec=spec).model_dump_json(), encoding="utf-8")
+    monkeypatch.setenv("TYPESAFE_API_KEY", key)
+
+    def echoed(
+        method: str,
+        endpoint: str,
+        body: dict[str, JsonValue] | None,
+        spec: DecisionSpec,
+        *,
+        api_key: str | None = None,
+    ) -> UpstreamResult:
+        del method, endpoint, api_key
+        if body is None:
+            return UpstreamResult(
+                200,
+                {"x-typesafe-request-id": key},
+                {"models": [{"name": spec.model, "description": key, "release_date": key}]},
+            )
+        return UpstreamResult(
+            200,
+            {"x-typesafe-request-id": key},
+            _smoke_answer(body, spec.model),
+        )
+
+    assert cmd_preflight(str(path), upstream=echoed, clock=lambda: 1.0) == 0
+    output = capsys.readouterr().out
+    assert key not in output
+    assert "<redacted>" in output
+    receipt = json.loads(output.splitlines()[-1])
+    assert key not in json.dumps(receipt)
+    assert scrub_preflight_value({key: [key, {"nested": key}]}, key) == {
+        "<redacted>": ["<redacted>", {"nested": "<redacted>"}]
+    }
