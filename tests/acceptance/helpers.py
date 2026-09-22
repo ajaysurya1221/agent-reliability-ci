@@ -146,6 +146,55 @@ def synthetic_trials(
     return out
 
 
+def synthetic_trials_by_pair(
+    m: Manifest,
+    *,
+    condition_id: str,
+    baseline_fail: frozenset[int],
+    candidate_fail: frozenset[int],
+    n: int | None = None,
+) -> list[TrialEnvelope]:
+    """Envelopes for pairs 0..n-1 where the named pair indices FAIL and all others PASS."""
+    count = m.n_per_arm if n is None else n
+    out: list[TrialEnvelope] = []
+    for s in build_schedule(m):
+        i = int(s.pair_id.rsplit(":", 1)[1])
+        if s.condition.condition_id != condition_id or i >= count:
+            continue
+        failed = i in (candidate_fail if s.arm == "candidate" else baseline_fail)
+        out.append(
+            TrialEnvelope.create(
+                spec_sha256=spec_sha256(s),
+                experiment_id=s.experiment_id,
+                trial_id=s.trial_id,
+                pair_id=s.pair_id,
+                arm=s.arm,
+                variant=s.variant,
+                task_id=s.task_id,
+                condition_id=condition_id,
+                seed=s.seed,
+                outcome=Outcome.FAIL if failed else Outcome.PASS,
+                termination=Termination.COMPLETED,
+                contract=ContractResult(success=not failed),
+                failure_fingerprint="f" * 64 if failed else None,
+            )
+        )
+    return out
+
+
+def cumulative_fail_sets(looks: tuple[int, ...], successes: tuple[int, ...]) -> frozenset[int]:
+    """Pair indices to fail so that the cumulative success count at each look is as given."""
+    failed: set[int] = set()
+    start = 0
+    for end, ok in zip(looks, successes, strict=True):
+        already = sum(1 for i in failed if i < end)
+        need = (end - ok) - already
+        assert 0 <= need <= end - start, (end, ok, need)
+        failed.update(range(start, start + need))
+        start = end
+    return frozenset(failed)
+
+
 def reseal(trial: TrialEnvelope, **update: object) -> TrialEnvelope:
     """A validly sealed copy with some fields changed (a well-formed impostor)."""
     return TrialEnvelope.create(**{**trial.model_dump(exclude={"record_sha256"}), **update})

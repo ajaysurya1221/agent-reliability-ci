@@ -11,7 +11,14 @@ import pytest
 from pydantic import ValidationError
 
 from arci.schema import Manifest, TrialEnvelope, Verdict
-from tests.acceptance.helpers import COND_CLEAN, COND_TIMEOUT, manifest, synthetic_trials
+from tests.acceptance.helpers import (
+    COND_CLEAN,
+    COND_TIMEOUT,
+    cumulative_fail_sets,
+    manifest,
+    synthetic_trials,
+    synthetic_trials_by_pair,
+)
 
 pytestmark = pytest.mark.acceptance
 LOOKS = (50, 100, 200)
@@ -22,10 +29,6 @@ def _seq(**kw: object) -> Manifest:
     return Manifest.create(**{**data, "looks": LOOKS})
 
 
-def _through(trials: list[TrialEnvelope], pairs: int) -> list[TrialEnvelope]:
-    return [t for t in trials if int(t.pair_id.rsplit(":", 1)[1]) < pairs]
-
-
 def _counts(m: Manifest, *, baseline: int, candidate: int, n: int) -> list[TrialEnvelope]:
     """Trials for pairs 0..n-1 of the ONE condition, with the given cumulative successes."""
     return synthetic_trials(
@@ -33,6 +36,19 @@ def _counts(m: Manifest, *, baseline: int, candidate: int, n: int) -> list[Trial
         condition_id="fetch_timeout",
         baseline_successes=baseline,
         candidate_successes=candidate,
+        n=n,
+    )
+
+
+def _cumulative(
+    m: Manifest, *, baseline: tuple[int, ...], candidate: tuple[int, ...], n: int
+) -> list[TrialEnvelope]:
+    """Trials for pairs 0..n-1 whose cumulative successes at each of LOOKS are as given."""
+    return synthetic_trials_by_pair(
+        m,
+        condition_id="fetch_timeout",
+        baseline_fail=cumulative_fail_sets(LOOKS, baseline),
+        candidate_fail=cumulative_fail_sets(LOOKS, candidate),
         n=n,
     )
 
@@ -93,16 +109,7 @@ def test_inconclusive_looks_continue_and_the_final_look_decides() -> None:
 
     m = _seq()
     # Look 1: 48/50 vs 47/50 INCONCLUSIVE; look 2: 96/100 vs 95/100 INCONCLUSIVE; look 3 PASS.
-    full = _counts(m, baseline=192, candidate=191, n=200)
-    trials = (
-        _through(_counts(m, baseline=48, candidate=47, n=50), 50)
-        + [
-            t
-            for t in _through(_counts(m, baseline=96, candidate=95, n=100), 100)
-            if int(t.pair_id.rsplit(":", 1)[1]) >= 50
-        ]
-        + [t for t in full if int(t.pair_id.rsplit(":", 1)[1]) >= 100]
-    )
+    trials = _cumulative(m, baseline=(48, 96, 192), candidate=(47, 95, 191), n=200)
     d = decide(m, trials)
     assert [h.verdict for h in d.history] == [
         Verdict.INCONCLUSIVE,
@@ -126,8 +133,11 @@ def test_the_final_look_without_a_decision_is_inconclusive() -> None:
     from arci.gate import decide
 
     m = _seq()
-    d = decide(m, _counts(m, baseline=190, candidate=182, n=200))
+    # 48/50 vs 44/50, 95/100 vs 90/100, 190/200 vs 182/200: INCONCLUSIVE at every look.
+    trials = _cumulative(m, baseline=(48, 95, 190), candidate=(44, 90, 182), n=200)
+    d = decide(m, trials)
     assert d.verdict is Verdict.INCONCLUSIVE and d.stopped_at_look == 3 and len(d.history) == 3
+    assert d.history[2].conditions[0].delta_high == pytest.approx(0.060598722790, rel=0, abs=1e-8)
 
 
 def test_the_plan_is_bound_into_trial_identity() -> None:
