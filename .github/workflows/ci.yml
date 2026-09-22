@@ -43,6 +43,16 @@ jobs:
         run: |
           uv lock --check
           uv sync --frozen
+      - name: Set up Node
+        if: matrix.python-version == '3.14'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: examples/jev_triage_agent/package-lock.json
+      - name: Install the JavaScript SDK example
+        if: matrix.python-version == '3.14'
+        run: npm ci --prefix examples/jev_triage_agent
       - name: Frozen files unchanged
         run: shasum -a 256 -c FROZEN.sha256
       - name: Check formatting
