@@ -33,7 +33,8 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
       minimiser 1-minimal; wired into CI (test_hero_decisions.py 5/5)
 
 ## 3. Verify and review
-- [~] Full suite, ruff, basedpyright strict, frozen hashes unchanged (final gate running)
+- [x] Full suite (406 tests), ruff, basedpyright strict, frozen hashes unchanged; hosted CI green on
+      Python 3.11 and 3.14 (first run caught a 3.11 json.dumps recursion limit in two probes; fixed)
 - [x] Astra adversarial review of the full diff with reproductions: CHANGES_REQUIRED, 5 blocking
       (lost worker faults, non-total validation, cross-transport order, pipelining, key leaks) + Expect stall
 - [x] Frozen regression tests for every finding (`test_decisions_hardening.py`, 9 tests); Sol fixed them (WP-J1b)
@@ -44,10 +45,10 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
 ## 4. Docs and release
 - [x] `docs/DECISIONS.md` user guide ("Testing agents that use Jev"), TRUST_MODEL addendum,
       REAL_AGENTS pointer, README section + status, CHANGELOG 0.5.0, ROADMAP update
-- [ ] Tag `v0.5.0`, push (repo stays private; no PyPI)
-- [ ] Update project memory; remove this file or move it into the changelog
+- [x] Tag `v0.5.0` (8a54c0b), pushed; repo stays private; no PyPI
+- [x] Update project memory. This file stays as the release log for v0.5; delete it when the next cycle starts
 
 ## Cut first if behind
-- [ ] Descriptive "Decisions" table in `arci report` (confidence bins with exact intervals)
+- [-] Descriptive "Decisions" table in `arci report`: cut on Astra's advice (repeated decisions inside trials are not independent draws)
 - [-] Ollama-backed System One emulator (use `system-one-adapter`; roadmap note only)
 - [-] Python in-process agents (run them as command agents through the toolset bridge)
