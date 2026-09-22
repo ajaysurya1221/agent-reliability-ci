@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.4.0 (2026-09-22)
+
+One thing: pre-registered looks, so an experiment can stop early without losing error control.
+
+- `Manifest.looks = (N_1, ..., N_L)`: cumulative pairs per condition, last equal to `n_per_arm`.
+  Equal Bonferroni spending, `alpha / L` per look, with either interval method. The run stops at
+  the first look that is PASS or BLOCK; the final look is INCONCLUSIVE otherwise. No `looks` is
+  the fixed design, unchanged.
+- The gate replays every look and treats the first decisive one as a mandatory stop: a store that
+  continued past it, stopped without a decision, or is not a whole-pair prefix at a declared look
+  is ERROR. The plan is bound into every trial's identity; the look history is sealed into the
+  decision.
+- `bench/selfcheck.py --looks 50,100,200`: exact enumeration over sequential paths (a
+  (x_A, x_B) state table, at most (N+1)^2 states), with the same false-PASS / false-BLOCK <= alpha
+  sweep. Measured, K=1: a 0.95 -> 0.65 regression costs 302 expected trials with Clopper-Pearson
+  (P(BLOCK) .985 -> .943) and 159 with Newcombe, against 400 for the fixed design; two equal 0.95
+  agents cost 350 and 239. The Markdown report shows the look history and the stopping look.
+
 ## v0.3.0 (2026-09-22)
 
 One thing: a tighter interval for the margin, opt-in.
