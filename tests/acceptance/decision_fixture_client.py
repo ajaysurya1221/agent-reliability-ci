@@ -27,6 +27,7 @@ Variants
   pipeline    two requests on one connection; expects exactly one response, then gated
   expect      sends `Expect: 100-continue`; stores "expect-rejected" after the 417
   fireandforget  acts over MCP, then sends a request and exits without reading the answer
+  keys        logs the sorted top-level keys of the response it received, then acts like gated
 """
 
 from __future__ import annotations
@@ -410,6 +411,16 @@ def main() -> int:
         return 0
 
     questions = SDK_SHAPES if variant == "sdkshapes" else None
+    if variant == "keys":
+        status, payload = endpoint.ask(task)
+        if status == 200 and isinstance(payload, dict):
+            session.call("log", msg="keys=" + ",".join(sorted(payload)))
+            action = gated_action(payload["answers"]) or "escalate"
+            session.call("store", value=action)
+        else:
+            session.call("store", value="escalate")
+        session.close()
+        return 0
 
     status, payload = endpoint.ask(task, questions=questions)
     if status != 200:

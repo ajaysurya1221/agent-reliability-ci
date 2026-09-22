@@ -96,7 +96,7 @@ def test_decision_spec_validation() -> None:
         {"upstream": "fixture"},  # fixture required
         {"upstream": "http", "fixture": "a.b:c"},  # fixture forbidden
         {"upstream": "http", "base_url": "http://api.typesafe.ai"},  # plaintext off loopback
-        {"upstream": "http", "base_url": "https://api.typesafe.ai/v1"},  # path
+        {"upstream": "http", "base_url": "https://api.typesafe.ai/v1/"},  # trailing slash
         {"upstream": "http", "base_url": "https://user:pw@api.typesafe.ai"},  # credentials
         {"upstream": "http", "base_url": "https://api.typesafe.ai?x=1"},  # query
         {"upstream": "http", "model": "jev latest"},

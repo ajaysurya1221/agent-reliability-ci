@@ -304,15 +304,26 @@ class DecisionSpec(Model):
 
     upstream: Literal["fixture", "http"]
     fixture: AgentRef | None = None
+    # An https origin, optionally with a path prefix (Vercel AI Gateway serves the TypeSafe API
+    # at `https://ai-gateway.vercel.sh/typesafe`), or a loopback http origin for tests. The
+    # boundary calls `{base_url}/v1/systemone` and `{base_url}/v1/models`.
     base_url: str = "https://api.typesafe.ai"
     # Pinned model id. Forwarded requests carry it; a response reporting another model is a
-    # harness fault. Aliases such as `jev-latest` move under you; pin the version you tuned for.
+    # harness fault. Aliases such as `jev-latest` move under you; pin the version you tuned for
+    # (`typesafe-ai/jev` through the gateway).
     model: str = "jev-1.13.0"
     max_decisions: int = Field(default=50, ge=0, le=1000)
-    # Upstream or fixture time limit per attempt. Exceeding it is a harness fault, not a timeout.
+    # Upstream or fixture time limit per attempt, including the one bounded wait the boundary
+    # grants an upstream 429/529. Keep it below the SDKs' per-attempt timeout (10 s): a client
+    # that gives up first retries into a boundary still busy with its earlier request.
+    # Exceeding it is a harness fault, not an agent timeout.
     request_seconds: float = Field(default=5.0, gt=0, le=3600)
     # Largest request body the boundary accepts; a larger one is answered 413, agent's problem.
     max_body_bytes: int = Field(default=262_144, ge=1, le=1_048_576)
+    # `http` upstream only: the parent paces trial starts so that admitted attempts stay under
+    # this rate across all workers (the vendor limit is 1,200/min and "adjusting dynamically").
+    # 0 disables pacing. Ignored for the fixture upstream.
+    max_requests_per_minute: int = Field(default=600, ge=0, le=100_000)
 
     @model_validator(mode="after")
     def _upstream_is_consistent(self) -> DecisionSpec:
@@ -324,15 +335,17 @@ class DecisionSpec(Model):
         loopback = parts.scheme == "http" and parts.hostname in {"127.0.0.1", "localhost"}
         if not (parts.scheme == "https" or loopback):
             raise ValueError("base_url must be an https origin or a loopback http origin")
-        if (
-            not parts.hostname
-            or "@" in parts.netloc
-            or parts.path not in {"", "/"}
-            or parts.query
-            or parts.fragment
+        if not parts.hostname or "@" in parts.netloc or parts.query or parts.fragment:
+            raise ValueError("base_url must not carry credentials, a query or a fragment")
+        path = parts.path
+        if path and (
+            not path.startswith("/")
+            or path.endswith("/")
+            or any(segment in {"", ".", ".."} for segment in path[1:].split("/"))
+            or any(ch.isspace() for ch in path)
         ):
             raise ValueError(
-                "base_url must be a bare origin: no credentials, path, query, fragment"
+                "base_url path prefix must be /segments with no trailing slash, '.' or '..'"
             )
         return self
 

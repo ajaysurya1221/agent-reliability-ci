@@ -231,6 +231,19 @@ def decisions(
     return DecisionSpec(upstream=upstream, fixture=fixture_ref, model=PINNED_MODEL, **kw)  # pyright: ignore[reportArgumentType]
 
 
+GATEWAY_MODEL = "typesafe-ai/jev"
+
+
+def gateway_decisions(port: int, **kw: object) -> DecisionSpec:
+    """An `http` upstream shaped like Vercel AI Gateway: path prefix and its own model id."""
+    return DecisionSpec(
+        upstream="http",
+        base_url=f"http://127.0.0.1:{port}/typesafe",
+        model=GATEWAY_MODEL,
+        **kw,  # pyright: ignore[reportArgumentType]
+    )
+
+
 def decision_contract() -> ContractSpec:
     return ContractSpec(oracle=f"{ME}:oracle")
 

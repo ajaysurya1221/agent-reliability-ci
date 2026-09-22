@@ -428,3 +428,83 @@ TypeSafe's Jev API). The boundary process serves that endpoint on loopback for c
   boundary's real key before framing (`format_diagnostic`, then replace the key by `<redacted>`).
 - `decision_low_confidence` wording: mixing never reverses probability order and `choice` is
   preserved; a cap of 0 or floating-point rounding can create ties. Recompute nothing else.
+
+## v0.6: ready for Jev day one (tests/acceptance/test_decisions_v06.py, test_decisions_node.py)
+
+Read `docs/design/jev-research-2026-09-22.md` (vendor facts) and `docs/design/0004-day-one.md`
+first. Everything below is derived from the vendor docs and the two official SDKs; nothing was run
+against Jev. Reviewed by the senior consultant (gpt-6-astra, xhigh) on 2026-09-22.
+
+- Base URL with a prefix. `DecisionSpec.base_url` may carry a path prefix (Vercel AI Gateway:
+  `https://ai-gateway.vercel.sh/typesafe`, model `typesafe-ai/jev`). The upstream client requests
+  `{base_url}/v1/systemone` and `{base_url}/v1/models` (`base_url.rstrip("/") + endpoint`);
+  nothing else about the URL changes. Loopback http origins may carry a prefix too (tests).
+- Tolerant response validation. Unknown keys stay ignored at the top level (`provider_metadata`),
+  inside `usage`, inside every answer and inside model cards. Probability sums are accepted within
+  `abs_tol=1e-3` of 1 (the service rounds). Set equalities stay: answers vs questions,
+  probabilities vs criteria, legend vs levels. `model` must still equal the pin; `usage` must
+  still carry integer `input_tokens` and `output_tokens`.
+- Headers. Recorded response headers are the allowlist `retry-after`, `retry-after-ms`,
+  `x-typesafe-request-id` (lower-case names, CR/LF rejected). The agent's own request headers
+  are not forwarded: the boundary makes its own upstream request with `Authorization`,
+  `Content-Type: application/json`, `Accept: application/json`, `Accept-Encoding: identity`,
+  `User-Agent: arci/<version>`.
+- Upstream transport faults are ONE deterministic harness message each, no traceback, under 300
+  characters: a non-identity `Content-Encoding` -> "decision upstream sent Content-Encoding <x>";
+  an unparsable body -> "decision upstream returned non-JSON"; any `ssl.SSLError` ->
+  "TLS failed: <short reason>" (for example `TLS failed: certificate verify failed`,
+  `TLS failed: wrong version number`); connection refused / DNS / timeout keep their existing
+  one-liners. Diagnostics are still scrubbed of the real key.
+- One bounded wait (http upstream only). On upstream 429 or 529 the boundary waits once for
+  `retry-after-ms`, else `retry-after` (seconds or HTTP-date), else 500 ms, only if that wait plus
+  1 s of margin fits in the time left of `request_seconds` (otherwise no wait: harness fault at
+  once), then repeats the identical upstream request ONCE. Success -> the ordinary result; a second
+  429/529 or anything else -> the existing harness fault. Throughout: ONE admitted attempt, ONE
+  `tool_start`, ONE recorded result, ONE occurrence. The wait is NOT hidden: the raw snapshot
+  (below) records `attempts` (1 or 2) and `first_status` (the 429/529 waited on, else null).
+  No other status is ever retried. `request_seconds` defaults to 5 s so that the wait plus the
+  retry stay inside the SDKs' 10 s per-attempt timeout; document that users must keep it there.
+- Pacing. `DecisionSpec.max_requests_per_minute` (default 600, 0 = off) is enforced by
+  `run_experiment` in the parent, only when `decisions.upstream == "http"`: a token bucket shared by
+  the worker threads (capacity one, refill `rate / 60` per second) is acquired before each trial
+  STARTS, so starts are spaced at most `rate / 60` per second. One trial = one paced slot; an agent
+  that decides k times per trial must set the rate k times lower (documented). The wait happens
+  before `run_trial` starts its clock, so `max_seconds` and the sequential-looks staging (whole
+  looks, stop before the next look) are untouched. `run_trial` alone (bundles, replay, minimiser,
+  preflight) is never paced. The default `max_workers` stays 4.
+- Raw upstream snapshot. `ToolResult.value` for a decision is `{status, headers, body, upstream}`
+  where `upstream` is `{status, headers, body, attempts, first_status}`: the validated answer
+  BEFORE after-perturbations (equal to the served triple when nothing was injected), taken as an
+  independent deep copy before `_apply_after`, attached after the served value is validated and
+  reconstructed. `upstream` is `null` when no upstream ran (a before-injected result such as
+  `decision_unavailable`, a budget or replay reply). HTTP replies and REPLAY serve only `status`,
+  `headers`, `body`, never `upstream`. Seals, events and diff digests cover the whole value.
+- Minimality. `minimize_faults` reports `minimality="reduced"` (never `"1-minimal"`) whenever
+  `spec.decisions.upstream == "http"` (live answers are sampled) and whenever any single-removal
+  candidate ended in ERROR or a replay INVALID: such a result says nothing about that fault. The
+  fixture upstream with clean single-removal PASSes keeps the existing rule.
+- Tokens and cost. `render_markdown` gains a `## Decisions` section when any trial recorded a
+  decision: attempts (each admitted decision once), input tokens and output tokens summed from
+  `value.body.usage` (missing fields count 0), and "estimated cost at list price" in USD as
+  `input_tokens * USD_PER_MTOK_INPUT / 1e6`, constant `USD_PER_MTOK_INPUT = 0.042`, printed with
+  7 decimals and the date the price was read ("2026-09-22"), plus one line saying fixtures and
+  replays cost nothing and this is an estimate, not billed spend.
+- `arci preflight MANIFEST`. Loads and seal-checks the manifest. Exit 3 with one plain line when
+  `decisions` is missing or `upstream != "http"` ("nothing to preflight: no http upstream"), when
+  `TYPESAFE_API_KEY` is absent (never print it), when `GET {base_url}/v1/models` fails (TLS,
+  connection, auth, non-JSON, invalid shape) or when the smoke request fails validation. Exit 2
+  when the models list lacks the pinned id, printing the ids the account has (never guessing a
+  successor). Exit 0 after one smoke `POST` with three tiny questions (one noul, one choice with
+  two options, one score with two levels) on state "preflight", validated like any response and
+  requiring the pinned model; print the model reported, the request id, the token usage and the
+  latency in ms, then one credential-free JSON receipt line `{"preflight": {...}}` with the
+  manifest sha256, endpoint, model, usage, request id and latency. The smoke request reuses the
+  boundary's upstream client code in the CLI process, creates no run store and no records, and
+  is never paced or perturbed.
+- Node example. `examples/jev_triage_agent/agent.mjs` mirrors `agent.py` with `@typesafe-ai/sdk`
+  pinned to `0.6.0` in `examples/jev_triage_agent/package.json` (an explicit exception to the
+  no-new-dependencies rule: example and test only, never runtime). `new TypeSafeClient()` from the
+  environment; same questions, gating and MCP actions through the shim; same flags as the Python
+  agent. `experiment.build_manifest(..., runtime="node")` and `clean_manifest(..., runtime="node")`
+  select it (`node <abs path>/agent.mjs ...`). The acceptance test skips when `node` is absent;
+  CI installs the package with `npm ci` on the Python 3.14 job, so there the test must run.
