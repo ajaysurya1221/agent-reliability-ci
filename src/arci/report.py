@@ -96,6 +96,26 @@ def render_markdown(
         ),
     ]
 
+    if len(decision.looks) > 1:
+        lines.extend(
+            [
+                "",
+                "## Looks",
+                "",
+                f"Stopped at look {decision.stopped_at_look} of {len(decision.looks)}.",
+                "",
+                "| Look | Cumulative pairs | Verdict | Bounds by condition |",
+                "|---:|---:|---|---|",
+            ]
+        )
+        for look in decision.history:
+            bounds = "<br>".join(
+                f"`{_cell(condition.condition_id)}`: "
+                f"{_interval(condition.delta_low, condition.delta_high)}"
+                for condition in look.conditions
+            )
+            lines.append(f"| {look.look} | {look.pairs} | **{look.verdict.value}** | {bounds} |")
+
     for condition in decision.conditions:
         baseline = _arm_summary(condition.baseline)
         candidate = _arm_summary(condition.candidate)

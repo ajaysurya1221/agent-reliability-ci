@@ -6,7 +6,10 @@ import argparse
 import json
 import math
 import random
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import TypedDict
 
@@ -34,6 +37,10 @@ class Row(TypedDict):
     PASS: float
     BLOCK: float
     INCONCLUSIVE: float
+
+
+class SequentialRow(Row):
+    expected_trials: float
 
 
 def _validate_probability(value: float, name: str) -> None:
@@ -116,6 +123,81 @@ def operating_characteristics(
         raise ArithmeticError("enumerated probabilities do not sum to one")
     result["INCONCLUSIVE"] += 1.0 - total
     return result
+
+
+def sequential_characteristics(
+    p_a: float,
+    p_b: float,
+    looks: tuple[int, ...],
+    *,
+    alpha: float = 0.05,
+    delta: float = 0.10,
+    k: int = 1,
+    method: str = "clopper_pearson",
+    rho: float = 0.0,
+) -> dict[str, float]:
+    """Exactly enumerate paired paths, absorbing decisive mass at each look."""
+    _validate_probability(p_a, "p_a")
+    _validate_probability(p_b, "p_b")
+    if (
+        not looks
+        or looks[0] < 1
+        or looks[-1] > 10_000
+        or any(right <= left for left, right in pairwise(looks))
+    ):
+        raise ValueError("looks must be strictly increasing and between 1 and 10000")
+    if not 0.0 <= rho <= 1.0:
+        raise ValueError("rho must be between 0 and 1")
+    if method not in {"clopper_pearson", "newcombe"}:
+        raise ValueError(f"unknown interval method {method!r}")
+    independent = (
+        (1.0 - p_a) * (1.0 - p_b),
+        (1.0 - p_a) * p_b,
+        p_a * (1.0 - p_b),
+        p_a * p_b,
+    )
+    if rho > 0.0:
+        shared = (
+            1.0 - max(p_a, p_b),
+            max(p_b - p_a, 0.0),
+            max(p_a - p_b, 0.0),
+            min(p_a, p_b),
+        )
+        joint = tuple((1.0 - rho) * independent[i] + rho * shared[i] for i in range(4))
+    else:
+        joint = independent
+    transitions = tuple(
+        (add_a, add_b, probability)
+        for (add_a, add_b), probability in zip(((0, 0), (0, 1), (1, 0), (1, 1)), joint, strict=True)
+        if probability
+    )
+    states: dict[tuple[int, int], float] = {(0, 0): 1.0}
+    absorbed = {outcome: 0.0 for outcome in _OUTCOMES}
+    expected_trials = 0.0
+    look_set = set(looks)
+    tables = {look: _verdict_table(method, look, alpha / len(looks), delta, k) for look in looks}
+    for pair in range(1, looks[-1] + 1):
+        advanced: defaultdict[tuple[int, int], float] = defaultdict(float)
+        for (successes_a, successes_b), mass in states.items():
+            for add_a, add_b, probability in transitions:
+                advanced[successes_a + add_a, successes_b + add_b] += mass * probability
+        if pair not in look_set:
+            states = dict(advanced)
+            continue
+        table = tables[pair]
+        width = pair + 1
+        survivors: dict[tuple[int, int], float] = {}
+        for counts, mass in advanced.items():
+            verdict = table[counts[0] * width + counts[1]]
+            if verdict == "INCONCLUSIVE" and pair != looks[-1]:
+                survivors[counts] = mass
+            else:
+                absorbed[verdict] += mass
+                expected_trials += 2.0 * pair * mass
+        states = survivors
+    total = math.fsum(absorbed.values())
+    absorbed["INCONCLUSIVE"] += 1.0 - total
+    return {**absorbed, "expected_trials": expected_trials}
 
 
 def correlated_boundary(
@@ -201,6 +283,44 @@ def boundary_calibration(
     }
 
 
+def sequential_boundary_calibration(
+    method: str, looks: tuple[int, ...], *, alpha: float = 0.05, delta: float = 0.10
+) -> dict[str, float]:
+    """Worst sequential directional errors on the fixed-design boundary grid."""
+    points: list[tuple[str, tuple[int, ...], float, float, float, float]] = []
+    for index in range(50):
+        p_a = round(0.5 + index * 0.01, 6)
+        for base in (p_a - delta, p_a):
+            for offset in (-0.01, -0.001, 0.0, 0.001, 0.01):
+                p_b = round(base + offset, 6)
+                if not 0.0 < p_b < 1.0:
+                    continue
+                points.append((method, looks, p_a, p_b, alpha, delta))
+    with ProcessPoolExecutor(max_workers=8) as executor:
+        results = executor.map(_sequential_sweep_point, points, chunksize=4)
+        evaluated = list(results)
+    pass_points = [row for row in evaluated if row[1] - row[0] <= -delta + 1e-12]
+    block_points = [row for row in evaluated if row[1] - row[0] >= -delta - 1e-12]
+    worst_pass = max(pass_points, key=lambda row: row[2])
+    worst_block = max(block_points, key=lambda row: row[3])
+    return {
+        "false_pass": worst_pass[2],
+        "false_pass_at_p_a": worst_pass[0],
+        "false_pass_at_p_b": worst_pass[1],
+        "false_block": worst_block[3],
+        "false_block_at_p_a": worst_block[0],
+        "false_block_at_p_b": worst_block[1],
+    }
+
+
+def _sequential_sweep_point(
+    point: tuple[str, tuple[int, ...], float, float, float, float],
+) -> tuple[float, float, float, float]:
+    method, looks, p_a, p_b, alpha, delta = point
+    result = sequential_characteristics(p_a, p_b, looks, method=method, alpha=alpha, delta=delta)
+    return p_a, p_b, result["PASS"], result["BLOCK"]
+
+
 def _row(p_a: float, p_b: float, n: int, values: dict[str, float]) -> Row:
     return {
         "p_a": p_a,
@@ -210,6 +330,10 @@ def _row(p_a: float, p_b: float, n: int, values: dict[str, float]) -> Row:
         "BLOCK": values["BLOCK"],
         "INCONCLUSIVE": values["INCONCLUSIVE"],
     }
+
+
+def _sequential_row(p_a: float, p_b: float, n: int, values: dict[str, float]) -> SequentialRow:
+    return {**_row(p_a, p_b, n, values), "expected_trials": values["expected_trials"]}
 
 
 def _print_table(title: str, rows: list[Row]) -> None:
@@ -223,6 +347,18 @@ def _print_table(title: str, rows: list[Row]) -> None:
         )
 
 
+def _print_sequential_table(title: str, rows: list[SequentialRow]) -> None:
+    print(f"## {title}")
+    print("| p_A | p_B | final N | PASS | BLOCK | INCONCLUSIVE | expected trials |")
+    print("|---:|---:|---:|---:|---:|---:|---:|")
+    for row in rows:
+        print(
+            f"| {row['p_a']:.2f} | {row['p_b']:.2f} | {row['n']} | "
+            f"{row['PASS']:.6f} | {row['BLOCK']:.6f} | {row['INCONCLUSIVE']:.6f} | "
+            f"{row['expected_trials']:.1f} |"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path, metavar="PATH")
@@ -230,8 +366,64 @@ def main() -> int:
         "--method", choices=("clopper_pearson", "newcombe"), default="clopper_pearson"
     )
     parser.add_argument("--no-sweep", action="store_true", help="skip the boundary sweep")
+    parser.add_argument("--looks", metavar="N,N,...", help="group-sequential cumulative looks")
     args = parser.parse_args()
     method = str(args.method)
+
+    if args.looks:
+        try:
+            looks = tuple(int(value) for value in str(args.looks).split(","))
+        except ValueError:
+            parser.error("--looks must be comma-separated integers")
+        rows: list[SequentialRow] = []
+        correlated: list[SequentialRow] = []
+        for p_a, p_b in _SCENARIOS:
+            values = sequential_characteristics(p_a, p_b, looks, method=method)
+            rows.append(_sequential_row(p_a, p_b, looks[-1], values))
+            paired = sequential_characteristics(p_a, p_b, looks, method=method, rho=0.5)
+            correlated.append(_sequential_row(p_a, p_b, looks[-1], paired))
+        print(f"Interval method: {method}; looks: {','.join(map(str, looks))}")
+        _print_sequential_table("Exact independent group-sequential calibration", rows)
+        print()
+        _print_sequential_table(
+            "Exact correlated group-sequential calibration (rho=0.5)", correlated
+        )
+        calibration: dict[str, bool] = {}
+        sequential_sweep: dict[str, float] = {}
+        if not args.no_sweep:
+            sequential_sweep = sequential_boundary_calibration(method, looks)
+            ok = (
+                sequential_sweep["false_pass"] <= 0.05 + 1e-12
+                and sequential_sweep["false_block"] <= 0.05 + 1e-12
+            )
+            calibration["sequential_sweep_le_alpha"] = ok
+            print()
+            print(
+                f"Sequential boundary sweep: max false-PASS "
+                f"{sequential_sweep['false_pass']:.4f} at "
+                f"({sequential_sweep['false_pass_at_p_a']:.3f}, "
+                f"{sequential_sweep['false_pass_at_p_b']:.3f}); max false-BLOCK "
+                f"{sequential_sweep['false_block']:.4f} at "
+                f"({sequential_sweep['false_block_at_p_a']:.3f}, "
+                f"{sequential_sweep['false_block_at_p_b']:.3f}) "
+                f"{'PASS' if ok else 'FAIL'}"
+            )
+        if args.json is not None:
+            args.json.write_text(
+                json.dumps(
+                    {
+                        "method": method,
+                        "looks": looks,
+                        "exact": rows,
+                        "correlated": correlated,
+                        "sweep": sequential_sweep,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+        return 0 if all(calibration.values()) else 1
 
     print(f"Interval method: {method}")
     exact_rows = [

@@ -4,7 +4,7 @@ import pytest
 
 import arci.gate as gate_module
 from arci.gate import decide
-from arci.schema import Verdict
+from arci.schema import Manifest, Verdict
 from tests.acceptance.helpers import COND_CLEAN, COND_TIMEOUT, manifest, synthetic_trials
 
 
@@ -139,3 +139,30 @@ def test_gate_error_fallback_survives_absurd_typed_values(update: dict[str, obje
 
     assert decision.verdict is Verdict.ERROR
     assert decision.validate_seal()
+
+
+def test_sequential_store_must_end_at_the_decisive_look() -> None:
+    data = manifest().model_dump(exclude={"record_sha256"})
+    experiment = Manifest.create(**{**data, "looks": (50, 100, 200)})
+    first = synthetic_trials(
+        experiment,
+        condition_id="fetch_timeout",
+        baseline_successes=48,
+        candidate_successes=20,
+        n=50,
+    )
+    full = synthetic_trials(
+        experiment,
+        condition_id="fetch_timeout",
+        baseline_successes=190,
+        candidate_successes=190,
+    )
+    padded = [
+        *first,
+        *(trial for trial in full if int(trial.pair_id.rsplit(":", 1)[1]) >= 50),
+    ]
+
+    decision = decide(experiment, padded)
+
+    assert decision.verdict is Verdict.ERROR
+    assert decision.reasons == ("trial set does not match the stopping look",)
