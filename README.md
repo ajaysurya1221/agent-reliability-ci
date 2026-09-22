@@ -85,9 +85,10 @@ agent on a local Ollama model whose two arms differ by one sentence of the syste
 
 ## Agents that use a decision model (v0.5)
 
-ARCI can also put `POST /v1/systemone` behind the command-agent boundary. Official TypeSafe SDK
-clients work unchanged: the harness supplies `TYPESAFE_BASE_URL` and a per-trial token, while the
-real key remains in the harness. Decisions are recorded, budgeted, perturbed and replayed under the
+ARCI can also put `POST /v1/systemone` behind the command-agent boundary. The harness supplies
+`TYPESAFE_BASE_URL` and a per-trial token, while the real key remains in the harness. The Python
+`typesafe-sdk` works unchanged for the request shapes the acceptance tests cover; the JavaScript
+SDK reads the same variables but has no test in this repository. Decisions are recorded, budgeted, perturbed and replayed under the
 reserved tool name `decision:systemone`.
 
 See [Testing agents that use Jev](docs/DECISIONS.md) and the offline

@@ -5,9 +5,10 @@ acts through MCP. Agent A applies the TypeSafe confidence-gating pattern: every 
 needs confidence 0.6, a refund needs 0.85, and uncertainty or provider failure escalates to a
 human. B is the regression: it silently returns in those cases. C restores escalation.
 
-The agent uses only the Python standard library. An agent using the official `typesafe-sdk` or
-`@typesafe-ai/sdk` works unchanged because ARCI supplies the same `TYPESAFE_BASE_URL` and
-`TYPESAFE_API_KEY` variables.
+The agent uses only the Python standard library. ARCI supplies the same `TYPESAFE_BASE_URL` and
+`TYPESAFE_API_KEY` variables the official SDKs read: the Python `typesafe-sdk` is exercised
+unchanged by the acceptance tests for the request shapes they cover; the JavaScript SDK has no
+test in this repository.
 
 ## Run
 
@@ -25,7 +26,8 @@ Measured on 2026-09-22 (15-core laptop, about 20 s for all six steps, N=50 per a
 - A versus A: 50/50 vs 50/50, bounds [-0.084, 0.084], PASS (exit 0)
 - reduced failure and replay: the minimiser keeps `decision_low_confidence` and removes the benign
   `empty_result` (1-minimal, 2 trials); the reduced bundle replays REPRODUCED with no provider running
-- A versus C: 50/50 vs 50/50, PASS (exit 0); C also passes B's exact reproducer live
+- A versus C: 50/50 vs 50/50, PASS (exit 0); C also passes B's exact reproducer against the seeded
+  fixture in RECORD mode, which does not exercise Jev
 
 The six steps show the clean run hiding the regression, the frozen experiment blocking B, an
 aligned trace diff, fault minimisation, offline replay, and C passing the same fault.

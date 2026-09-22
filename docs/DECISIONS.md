@@ -9,12 +9,15 @@ minimisation and bundle machinery.
 
 For each trial ARCI sets `TYPESAFE_BASE_URL` to its loopback listener and `TYPESAFE_API_KEY` to a
 random per-trial token. These values are set after `CommandSpec.env`, so the agent cannot override
-them there. The real upstream key stays in the harness environment and never enters the agent,
-events, recordings or bundles.
+them there. The real upstream key stays in the harness and the boundary; the MCP server child does
+not inherit it and boundary diagnostics are scrubbed of it. Everything else you put in
+`CommandSpec.env` or `McpServerSpec.env` is sealed into manifests and bundles verbatim, so keep API
+keys out of both.
 
-The Python `typesafe-sdk` and JavaScript `@typesafe-ai/sdk` honour these variables, so existing
-agents using those SDKs need no code change. Other HTTP clients must read `TYPESAFE_BASE_URL`, send
-`Authorization: Bearer $TYPESAFE_API_KEY`, and call `POST /v1/systemone`.
+The Python `typesafe-sdk` honours these variables and needs no code change for the request shapes
+covered by the acceptance tests (structured instructions and criteria included). The JavaScript
+`@typesafe-ai/sdk` reads the same variables but is not tested here. Other HTTP clients must read
+`TYPESAFE_BASE_URL`, send `Authorization: Bearer $TYPESAFE_API_KEY`, and call `POST /v1/systemone`.
 
 ## `DecisionSpec`
 
@@ -51,8 +54,9 @@ t = 1 - confidence_max/c
 p'_i = (1 - t)*p_i + t/n
 ```
 
-and reports confidence `confidence_max`. The probabilities still sum to one and their ranking and
-winner do not change. Noul and score answers are unchanged. This is normally a `falsify` fault
+and reports confidence `confidence_max`. The probabilities still sum to one; mixing never reverses
+their order and the `choice` field is preserved, though a cap of 0 or floating-point rounding can
+create ties. Noul and score answers are unchanged. This is normally a `falsify` fault
 when escalation is an accepted fallback; otherwise it should be `ceiling`.
 
 `decision_unavailable` is a before-perturbation. From `at_occurrence` (default 0) onward, it skips
@@ -70,8 +74,9 @@ to MCP calls.
   bodies, and broken fixtures are harness faults (`ERROR`), not agent failures.
 - Local 401, 404, 411, 413 and 422 rejections are deterministic client errors. They are not
   recorded or budgeted and set no harness latch.
-- Concurrent decisions, or overlap between a decision and an MCP tool call, are unsupported and
-  produce a harness fault.
+- Concurrent decisions, or any overlap between a decision and a pending MCP exchange, are
+  unsupported and produce a harness fault. One request per connection: pipelined bytes are
+  ignored and `Expect: 100-continue` is answered 417.
 
 Replay never calls the fixture or real endpoint. It serves recorded decisions by tool name,
 canonical-argument hash and occurrence, rewrites only transport identifiers, and requires exact

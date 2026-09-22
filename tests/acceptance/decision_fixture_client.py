@@ -20,6 +20,13 @@ Variants
   badreq      sends an empty question map first (expects 422), then gated
   late        acts over MCP first, closes the MCP session, and only then asks a question
   leak        logs the endpoint and token it was given (for the key-isolation test), then gated
+  weird       sends a question whose type is not a string (expects 422), then gated
+  deep        sends a 5000-level nested state (expects 422), then gated
+  sdkshapes   asks with the structured criteria shapes the official SDK may send, then gated
+  pingrace    leaves an MCP ping in flight while asking (unsupported: a harness fault)
+  pipeline    two requests on one connection; expects exactly one response, then gated
+  expect      sends `Expect: 100-continue`; stores "expect-rejected" after the 417
+  fireandforget  acts over MCP, then sends a request and exits without reading the answer
 """
 
 from __future__ import annotations
@@ -133,6 +140,95 @@ def gated_action(answers: dict[str, Any]) -> str | None:
     ):
         return None
     return action
+
+
+# The shapes the official SDK is allowed to send: structured instructions, criteria whose values
+# are objects, arrays or null, and partial noul criteria.
+SDK_SHAPES: dict[str, Any] = {
+    "department": {
+        "type": "choice",
+        "instructions": {"task": "route the ticket", "fields": ["ticket"]},
+        "criteria": {
+            "billing": None,
+            "technical": ["bugs", "outages", "integrations"],
+            "sales": {"about": "pricing, plans, account questions"},
+        },
+    },
+    "refund_requested": {
+        "type": "noul",
+        "instructions": "The customer explicitly asks for a refund",
+        "criteria": {"true": "asks for money back"},
+    },
+    "policy_supports": {"type": "noul", "instructions": ["policy", "covers this situation"]},
+    "frustration": {
+        "type": "score",
+        "criteria": ["Calm", {"level": "Frustrated but civil"}, ["Very", "angry"]],
+    },
+}
+
+
+def _raw(endpoint: Endpoint) -> tuple[socket.socket, str]:
+    parsed = urllib.parse.urlsplit(endpoint.base)
+    assert parsed.hostname is not None and parsed.port is not None
+    return socket.create_connection((parsed.hostname, parsed.port), timeout=15), parsed.netloc
+
+
+def _post_bytes(
+    endpoint: Endpoint, netloc: str, task: dict[str, Any], expect: bool = False
+) -> tuple[bytes, bytes]:
+    body = json.dumps(
+        {"state": {"ticket": task}, "model": "jev-latest", "questions": QUESTIONS}
+    ).encode("utf-8")
+    head = (
+        f"POST /v1/systemone HTTP/1.1\r\nHost: {netloc}\r\n"
+        f"Authorization: Bearer {endpoint.key}\r\nContent-Type: application/json\r\n"
+        f"Content-Length: {len(body)}\r\n" + ("Expect: 100-continue\r\n" if expect else "") + "\r\n"
+    ).encode("ascii")
+    return head, body
+
+
+def _read_all(sock: socket.socket) -> bytes:
+    chunks: list[bytes] = []
+    with contextlib.suppress(OSError):
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _pipelined(endpoint: Endpoint, task: dict[str, Any]) -> int:
+    """Two complete requests on one connection; return how many responses came back."""
+    sock, netloc = _raw(endpoint)
+    head, body = _post_bytes(endpoint, netloc, task)
+    sock.sendall(head + body + head + body)
+    raw = _read_all(sock)
+    sock.close()
+    return raw.count(b"HTTP/1.1 ")
+
+
+def _expect_continue(endpoint: Endpoint, task: dict[str, Any]) -> int:
+    """Send only the head with Expect: 100-continue and wait for the boundary's answer."""
+    sock, netloc = _raw(endpoint)
+    head, _ = _post_bytes(endpoint, netloc, task, expect=True)
+    sock.sendall(head)
+    sock.settimeout(5)
+    raw = b""
+    with contextlib.suppress(OSError):
+        raw = sock.recv(65536)
+    sock.close()
+    if not raw.startswith(b"HTTP/1.1 "):
+        return 0
+    return int(raw.split(b" ", 2)[1])
+
+
+def _fire_and_forget(endpoint: Endpoint, task: dict[str, Any]) -> None:
+    """Send a complete request and exit without reading the answer."""
+    sock, netloc = _raw(endpoint)
+    head, body = _post_bytes(endpoint, netloc, task)
+    sock.sendall(head + body)
+    sock.close()
 
 
 def sdk_agent(session: Session, task: dict[str, Any]) -> int:
@@ -254,8 +350,60 @@ def main() -> int:
         endpoint.ask(task)
     if variant == "sdk":
         return sdk_agent(session, task)
+    if variant == "weird":
+        # A question whose `type` is not a string. The boundary must answer 422, not fall over.
+        status, _ = endpoint.request(
+            "POST",
+            "/v1/systemone",
+            {"state": {"ticket": task}, "model": "jev-latest", "questions": {"q": {"type": []}}},
+        )
+        if status != 422:
+            session.call("store", value=f"status-{status}")
+            session.close()
+            return 0
+    if variant == "deep":
+        nested: Any = "x"
+        for _ in range(5000):
+            nested = [nested]
+        status, _ = endpoint.request(
+            "POST",
+            "/v1/systemone",
+            {"state": nested, "model": "jev-latest", "questions": QUESTIONS},
+        )
+        if status != 422:
+            session.call("store", value=f"status-{status}")
+            session.close()
+            return 0
+    if variant == "pingrace":
+        # An MCP exchange left in flight while a decision is made: unsupported, so the trial
+        # must end as a harness fault whatever the server answers later.
+        session.send({"jsonrpc": "2.0", "id": "race", "method": "ping", "params": {}})
+        endpoint.ask(task)
+        assert session.proc.stdout is not None
+        while True:
+            line = session.proc.stdout.readline()
+            if not line or json.loads(line).get("id") == "race":
+                break
+    if variant == "pipeline":
+        responses = _pipelined(endpoint, task)
+        if responses != 1:
+            session.call("store", value=f"pipelined-{responses}")
+            session.close()
+            return 0
+    if variant == "expect":
+        status = _expect_continue(endpoint, task)
+        session.call("store", value="expect-rejected" if status == 417 else f"status-{status}")
+        session.close()
+        return 0
+    if variant == "fireandforget":
+        session.call("store", value="escalate")
+        session.close()
+        _fire_and_forget(endpoint, task)
+        return 0
 
-    status, payload = endpoint.ask(task)
+    questions = SDK_SHAPES if variant == "sdkshapes" else None
+
+    status, payload = endpoint.ask(task, questions=questions)
     if status != 200:
         if variant == "gated":
             session.call("store", value="escalate")

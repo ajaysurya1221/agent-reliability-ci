@@ -400,3 +400,31 @@ TypeSafe's Jev API). The boundary process serves that endpoint on loopback for c
   `tool_finish` signature is unchanged (status is inside `value#digest`; add `status=` too).
 - Events, seals, fingerprints, minimiser, bundles, the gate: unchanged. `first_failed_tool` in an
   oracle fingerprint may therefore read `decision:systemone:http_529`.
+
+### v0.5 hardening (release review; tests/acceptance/test_decisions_hardening.py)
+
+- Request validation is TOTAL: any exception while parsing or validating a client request
+  (TypeError, ValueError, RecursionError, UnicodeError, ...) is a local 422, never a harness
+  fault. Nesting deeper than 64 levels anywhere in the body is a 422 (check iteratively; do not
+  recurse into it). Accept every shape the official SDK may send: `instructions` is str, object,
+  array or null; choice `criteria` values are str, object, array or null; score `criteria` items
+  are str, object or array; noul `criteria` is an object with optional `true` / `false`, each
+  str, object, array or null. `type` must be exactly one of the three strings.
+- One request per connection: read the request line, headers and `Content-Length` body, answer
+  once, close. Bytes after the body are ignored, never parsed. An `Expect` header is a local 417
+  (not recorded, not budgeted, no latch).
+- Serial across transports means ANY pending MCP exchange (a forwarded `initialize`, `ping`,
+  `tools/list` or `tools/call` still awaiting the server) blocks decisions, and an in-flight
+  decision blocks every MCP request: either overlap is the "concurrent" harness fault. Recording
+  order therefore equals request order, which is what replay matches.
+- The worker deadline is enforced by the loop from dispatch time: a result that arrives after
+  `request_seconds` is a harness fault even if the worker succeeded; the agent gets a 500. Before
+  finalising for ANY reason (agent exit, parent stop, MCP EOF with decisions off, deadline), the
+  loop drains the worker queue once and latches any queued fault; a worker still running at that
+  point is a harness fault only if its deadline has passed, otherwise the call stays incomplete.
+- The MCP server child is started WITHOUT `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL` in its
+  environment (they belong to the boundary and the agent respectively). Every diagnostic that
+  leaves the boundary (latch details, fixture and upstream error text) is scrubbed of the
+  boundary's real key before framing (`format_diagnostic`, then replace the key by `<redacted>`).
+- `decision_low_confidence` wording: mixing never reverses probability order and `choice` is
+  preserved; a cap of 0 or floating-point rounding can create ties. Recompute nothing else.

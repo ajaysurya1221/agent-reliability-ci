@@ -8,8 +8,10 @@ The oracle accepts the ground-truth action, or an escalation: escalating is alwa
 from __future__ import annotations
 
 import math
+import os
 import random
 import sys
+import time
 from pathlib import Path
 from typing import Literal, cast
 
@@ -181,6 +183,19 @@ def infinite_fixture(
     answers = dict(cast(dict[str, JsonValue], body["answers"]))
     answers["refund_requested"] = {"type": "noul", "noul": math.inf}
     return {**body, "answers": answers}
+
+
+def slow_fixture(request: dict[str, JsonValue], seed: int, occurrence: int) -> dict[str, JsonValue]:
+    time.sleep(0.5)
+    return fixture(request, seed, occurrence)
+
+
+def leaky_fixture(
+    request: dict[str, JsonValue], seed: int, occurrence: int
+) -> dict[str, JsonValue]:
+    """A careless fixture whose error message carries whatever key the boundary holds."""
+    del request, seed, occurrence
+    raise RuntimeError(f"upstream refused key {os.environ.get('TYPESAFE_API_KEY', '')}")
 
 
 def oracle(task: dict[str, JsonValue], final_state: dict[str, JsonValue]) -> bool:

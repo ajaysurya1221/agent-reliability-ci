@@ -5,8 +5,10 @@
 Command agents can now test the decision logic around TypeSafe's Jev/System One API.
 
 - `Manifest.decisions: DecisionSpec` adds a harness-owned loopback `POST /v1/systemone` boundary.
-  Existing `typesafe-sdk` and `@typesafe-ai/sdk` agents are redirected through
-  `TYPESAFE_BASE_URL` and a per-trial token; the real upstream key stays in the harness.
+  Agents are redirected through `TYPESAFE_BASE_URL` and a per-trial token; the real upstream key
+  stays in the harness (the MCP server child does not inherit it, diagnostics are scrubbed). The
+  Python `typesafe-sdk` is exercised unchanged by the acceptance tests; the JavaScript SDK reads the
+  same variables but is untested here.
 - Admitted decisions use the existing `ToolCall`, `ToolResult` and `RecordedCall` records under
   `decision:systemone`, so budgets, events, diff, minimisation, bundles and exact replay apply.
 - `decision_low_confidence` mixes choice probabilities toward uniform without changing the winner;
