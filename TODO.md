@@ -33,15 +33,16 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
       minimiser 1-minimal; wired into CI (test_hero_decisions.py 5/5)
 
 ## 3. Verify and review
-- [ ] Full suite, ruff, basedpyright strict, frozen hashes unchanged
+- [~] Full suite, ruff, basedpyright strict, frozen hashes unchanged (final gate running)
 - [x] Astra adversarial review of the full diff with reproductions: CHANGES_REQUIRED, 5 blocking
       (lost worker faults, non-total validation, cross-transport order, pipelining, key leaks) + Expect stall
 - [x] Frozen regression tests for every finding (`test_decisions_hardening.py`, 9 tests); Sol fixed them (WP-J1b)
-- [~] Astra re-check of the fixes; full suite on the merged branch
-- [ ] Specialist escalation only for failures Sol cannot reproduce in its sandbox
+- [x] Astra re-check: findings 1-4, 6, 8-11 FIXED; 5 closed by rejecting harness-owned env vars in
+      manifests; its one new blocker (weakened score-legend validation) fixed with a unit test
+- [-] Specialist escalation: not needed this release
 
 ## 4. Docs and release
-- [ ] `docs/DECISIONS.md` user guide ("Testing agents that use Jev"), TRUST_MODEL addendum,
+- [x] `docs/DECISIONS.md` user guide ("Testing agents that use Jev"), TRUST_MODEL addendum,
       REAL_AGENTS pointer, README section + status, CHANGELOG 0.5.0, ROADMAP update
 - [ ] Tag `v0.5.0`, push (repo stays private; no PyPI)
 - [ ] Update project memory; remove this file or move it into the changelog
