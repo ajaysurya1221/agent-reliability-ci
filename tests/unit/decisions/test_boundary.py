@@ -23,8 +23,15 @@ from tests.acceptance.decision_fixtures import (
 )
 
 Boundary = vars(boundary_module)["_Boundary"]
+DecisionCompletion = vars(boundary_module)["_DecisionCompletion"]
 DecisionWork = vars(boundary_module)["_DecisionWork"]
+HttpRequestError = vars(boundary_module)["_HttpRequestError"]
 UpstreamResult = vars(boundary_module)["_UpstreamResult"]
+deadline_expired = vars(boundary_module)["_decision_deadline_expired"]
+parse_http_request = vars(boundary_module)["_parse_http_request"]
+scrub_diagnostic = vars(boundary_module)["_scrub_diagnostic"]
+server_environment = vars(boundary_module)["_server_environment"]
+transports_conflict = vars(boundary_module)["_transports_conflict"]
 
 
 def _request() -> dict[str, JsonValue]:
@@ -149,3 +156,119 @@ def test_matched_low_confidence_fault_marks_an_upstream_422(
     assert replies[0][0] == 422
     assert instance.recording[0].result.error_kind == "http_422"
     assert instance.recording[0].result.injected_by == "decision_low_confidence"
+
+
+def test_deadline_uses_worker_completion_time_and_rejects_an_overdue_result(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, _protocol, replies = _instance(monkeypatch, tmp_path, condition=COND_LOW_CONFIDENCE)
+    request = _request()
+    call = ToolCall(call_id="c-0000", tool=DECISION_TOOL, arguments=request, occurrence=0)
+    started = 10.0
+    results: queue.Queue[Any] = queue.Queue(maxsize=1)
+    results.put_nowait(
+        DecisionCompletion(
+            started + instance.spec.decisions.request_seconds + 0.001,
+            UpstreamResult(200, {}, {}),
+        )
+    )
+    instance.decision_work = DecisionWork(call, request, results, started)
+
+    instance._poll_decision_work()
+
+    assert deadline_expired(started, 0.05, started + 0.05)
+    assert instance.latches.harness == "decision upstream timed out"
+    assert instance.decision_work.timed_out is True
+    assert replies == [(500, {"detail": "arci: decision upstream failed"}, {})]
+
+
+def test_a_queued_worker_fault_is_latched_by_the_final_poll(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, _protocol, replies = _instance(monkeypatch, tmp_path, condition=COND_LOW_CONFIDENCE)
+    request = _request()
+    call = ToolCall(call_id="c-0000", tool=DECISION_TOOL, arguments=request, occurrence=0)
+    started = time.monotonic()
+    results: queue.Queue[Any] = queue.Queue(maxsize=1)
+    results.put_nowait(
+        DecisionCompletion(started + 0.001, UpstreamResult(500, {}, None, "fixture failed"))
+    )
+    instance.decision_work = DecisionWork(call, request, results, started)
+
+    instance._poll_decision_work()
+
+    assert instance.latches.harness == "fixture failed"
+    assert instance.decision_work is None
+    assert replies == [(500, {"detail": "arci: decision upstream failed"}, {})]
+
+
+def test_deep_raw_json_is_a_local_422_even_when_the_decoder_recurses(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, _protocol, replies = _instance(monkeypatch, tmp_path, condition=COND_LOW_CONFIDENCE)
+    nested: object = "leaf"
+    for _ in range(5000):
+        nested = [nested]
+    raw = json.dumps({"state": nested, "model": "jev-latest", "questions": QUESTIONS}).encode()
+
+    instance._handle_http_request(
+        "POST",
+        "/v1/systemone",
+        {"authorization": "Bearer proxy-token"},
+        raw,
+    )
+
+    assert replies[0][0] == 422
+    assert instance.tool_calls == 0
+    assert instance.latches.harness is None
+
+
+def test_http_parser_uses_only_the_first_request_and_rejects_expect() -> None:
+    body = b'{"request":1}'
+    head = (
+        b"POST /v1/systemone HTTP/1.1\r\n"
+        b"Host: localhost\r\n" + f"Content-Length: {len(body)}\r\n\r\n".encode()
+    )
+
+    parsed = parse_http_request(head + body + head + body, 1024)
+
+    assert parsed is not None
+    assert parsed.body == body
+    with pytest.raises(HttpRequestError) as error:
+        parse_http_request(head.replace(b"\r\n\r\n", b"\r\nExpect: 100-continue\r\n\r\n"), 1024)
+    assert error.value.status == 417
+
+
+def test_serial_rule_covers_every_cross_transport_overlap() -> None:
+    assert transports_conflict(pending_mcp=True, active_decision=True)
+    assert not transports_conflict(pending_mcp=False, active_decision=True)
+    assert not transports_conflict(pending_mcp=True, active_decision=False)
+
+
+def test_real_key_is_removed_from_server_environment_and_diagnostics() -> None:
+    inherited = {
+        "KEEP": "yes",
+        "TYPESAFE_API_KEY": "real-secret",
+        "TYPESAFE_BASE_URL": "https://real.invalid",
+    }
+    configured = {
+        "TYPESAFE_API_KEY": "configured-secret",
+        "TYPESAFE_BASE_URL": "https://configured.invalid",
+    }
+
+    env = server_environment(inherited, configured, "/tmp/trial", 7)
+
+    assert "TYPESAFE_API_KEY" not in env and "TYPESAFE_BASE_URL" not in env
+    assert env["KEEP"] == "yes"
+    assert env["ARCI_SEED"] == "7"
+
+
+def test_real_key_is_scrubbed_after_safe_diagnostic_formatting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TYPESAFE_API_KEY", "real-secret")
+
+    detail = scrub_diagnostic(RuntimeError("upstream refused real-secret"))
+
+    assert "real-secret" not in detail
+    assert "<redacted>" in detail

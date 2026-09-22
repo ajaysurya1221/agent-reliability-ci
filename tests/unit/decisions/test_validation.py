@@ -9,10 +9,12 @@ import pytest
 from pydantic import JsonValue
 
 import arci.mcp_boundary as boundary_module
+from tests.acceptance.decision_fixture_client import SDK_SHAPES
 
 request_error = vars(boundary_module)["_decision_request_error"]
 validate_response = vars(boundary_module)["_validate_decision_response"]
 allowed_headers = vars(boundary_module)["_allowed_headers"]
+depth_exceeded = vars(boundary_module)["_json_depth_exceeded"]
 
 MODEL = "jev-1.13.0"
 
@@ -82,10 +84,6 @@ def test_request_validation_accepts_extra_keys_and_all_question_types() -> None:
             {"questions": {"q": {"type": "score", "criteria": ["one"]}}},
             ["body", "questions", "q", "criteria"],
         ),
-        (
-            {"questions": {"q": {"type": "noul", "criteria": {"true": "yes"}}}},
-            ["body", "questions", "q", "criteria"],
-        ),
     ],
 )
 def test_request_validation_returns_a_stable_422_location(update: object, loc: list[str]) -> None:
@@ -96,6 +94,61 @@ def test_request_validation_returns_a_stable_422_location(update: object, loc: l
     error = request_error(value)
     assert error is not None
     assert cast(dict[str, Any], cast(list[Any], error["detail"])[0])["loc"] == loc
+
+
+@pytest.mark.parametrize("kind", [[], {}])
+def test_request_validation_is_total_for_non_string_question_types(kind: object) -> None:
+    value = {**_request(), "questions": {"q": {"type": kind}}}
+
+    error = request_error(value)
+
+    assert error is not None
+    assert cast(dict[str, Any], cast(list[Any], error["detail"])[0])["loc"] == [
+        "body",
+        "questions",
+        "q",
+        "type",
+    ]
+
+
+def test_request_validation_enforces_the_depth_limit_iteratively() -> None:
+    at_limit: object = "leaf"
+    for _ in range(64):
+        at_limit = [at_limit]
+    too_deep: object = [at_limit]
+
+    assert depth_exceeded(at_limit) is False
+    assert depth_exceeded(too_deep) is True
+
+    request = _request()
+    request["state"] = cast(JsonValue, too_deep)
+    assert request_error(request) is not None
+
+
+def test_request_and_response_validation_accept_official_sdk_shapes() -> None:
+    request = _request()
+    request["questions"] = cast(JsonValue, copy.deepcopy(SDK_SHAPES))
+    response = _response()
+    answers = cast(dict[str, Any], response["answers"])
+    answers.clear()
+    answers["department"] = {
+        "type": "choice",
+        "choice": "billing",
+        "probabilities": {"billing": 0.7, "technical": 0.2, "sales": 0.1},
+        "confidence": 0.55,
+    }
+    answers["refund_requested"] = {"type": "noul", "noul": 0.8}
+    answers["policy_supports"] = {"type": "noul", "noul": 0.9}
+    answers["frustration"] = {
+        "type": "score",
+        "score": 1.0,
+        "legend": {"0": "Calm", "1": {"level": "civil"}, "2": ["Very", "angry"]},
+        "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2},
+        "confidence": 0.4,
+    }
+
+    assert request_error(request) is None
+    assert validate_response(response, request, MODEL) == response
 
 
 def test_response_validation_accepts_tied_winners_and_returns_an_independent_copy() -> None:

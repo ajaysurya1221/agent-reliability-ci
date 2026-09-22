@@ -48,6 +48,7 @@ _MAX_LINE = 1024 * 1024
 _RECORD_CHUNK = 512 * 1024
 _MAX_QUEUED_BYTES = 16 * 1024 * 1024
 _MAX_HTTP_HEAD = 64 * 1024
+_MAX_JSON_DEPTH = 64
 _DECISION_CONCURRENCY = "concurrent decision requests are unsupported"
 _HTTP_REASONS = {
     200: "OK",
@@ -56,11 +57,21 @@ _HTTP_REASONS = {
     404: "Not Found",
     411: "Length Required",
     413: "Content Too Large",
+    417: "Expectation Failed",
     422: "Unprocessable Entity",
     500: "Internal Server Error",
     529: "Site is overloaded",
 }
 _PROTOCOL = sys.stdout.buffer
+
+
+def _scrub_diagnostic(detail: str | BaseException) -> str:
+    """Format a boundary diagnostic and remove the real upstream credential."""
+    clean = format_diagnostic(detail)
+    api_key = os.environ.get("TYPESAFE_API_KEY")
+    if api_key:
+        clean = clean.replace(api_key, "<redacted>")
+    return clean
 
 
 def _frame(nonce: str, kind: str, **payload: object) -> None:
@@ -91,9 +102,9 @@ class _Latches:
         self.harness: str | None = None
         self.budget: str | None = None
 
-    def _set(self, attribute: str, wire_name: str, detail: str) -> None:
+    def _set(self, attribute: str, wire_name: str, detail: str | BaseException) -> None:
         if getattr(self, attribute) is None:
-            clean = format_diagnostic(detail)
+            clean = _scrub_diagnostic(detail)
             setattr(self, attribute, clean)
             _frame(self.nonce, "latch", latch=wire_name, detail=clean)
 
@@ -101,7 +112,7 @@ class _Latches:
         self._set("replay", "replay_miss", detail)
 
     def set_harness(self, detail: str | BaseException) -> None:
-        self._set("harness", "harness_error", format_diagnostic(detail))
+        self._set("harness", "harness_error", detail)
 
     def set_budget(self, detail: str) -> None:
         self._set("budget", "budget", detail)
@@ -143,6 +154,7 @@ class _DecisionConnection:
     sock: socket.socket
     received: bytearray
     output: bytearray
+    request_parsed: bool = False
     request_complete: bool = False
 
 
@@ -154,21 +166,64 @@ class _UpstreamResult:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class _DecisionCompletion:
+    finished_at: float
+    result: _UpstreamResult
+
+
 @dataclass
 class _DecisionWork:
     call: ToolCall
     request: dict[str, JsonValue]
-    results: queue.Queue[_UpstreamResult]
+    results: queue.Queue[_DecisionCompletion]
     started: float
     timed_out: bool = False
+
+
+@dataclass(frozen=True)
+class _HttpRequest:
+    method: str
+    path: str
+    headers: dict[str, str]
+    body: bytes
+
+
+class _HttpRequestError(Exception):
+    def __init__(self, status: int, body: JsonValue) -> None:
+        super().__init__(status)
+        self.status = status
+        self.body = body
 
 
 def _detail(loc: list[str], msg: str, kind: str = "value_error") -> dict[str, JsonValue]:
     return cast(dict[str, JsonValue], {"detail": [{"loc": loc, "msg": msg, "type": kind}]})
 
 
-def _decision_request_error(value: object) -> dict[str, JsonValue] | None:
-    """Return a deterministic TypeSafe-style 422 body, or ``None`` when valid."""
+def _json_depth_exceeded(value: object, limit: int = _MAX_JSON_DEPTH) -> bool:
+    """Check JSON container depth iteratively; repeated containers are non-JSON cycles."""
+    stack: list[tuple[object, int]] = [(value, 1)]
+    seen: set[int] = set()
+    while stack:
+        current, depth = stack.pop()
+        if not isinstance(current, dict | list):
+            continue
+        if depth > limit or id(current) in seen:
+            return True
+        seen.add(id(current))
+        if isinstance(current, dict):
+            children = cast(dict[object, object], current).values()
+        else:
+            children = cast(list[object], current)
+        stack.extend((child, depth + 1) for child in children)
+    return False
+
+
+def _structured_description(value: object, *, null: bool) -> bool:
+    return isinstance(value, str | dict | list) or (null and value is None)
+
+
+def _validate_decision_request(value: object) -> dict[str, JsonValue] | None:
     if not isinstance(value, dict):
         return _detail(["body"], "Input should be an object", "object_type")
     state = value.get("state")
@@ -185,22 +240,27 @@ def _decision_request_error(value: object) -> dict[str, JsonValue] | None:
             return _detail(loc, "Question should be an object", "object_type")
         question = cast(dict[str, object], raw_question)
         kind = question.get("type")
-        if kind not in {"noul", "choice", "score"}:
+        if not isinstance(kind, str) or kind not in {"noul", "choice", "score"}:
             return _detail([*loc, "type"], "Input should be 'noul', 'choice' or 'score'")
+        if not _structured_description(question.get("instructions"), null=True):
+            return _detail(
+                [*loc, "instructions"], "Instructions should be a string, object, array or null"
+            )
         criteria = question.get("criteria")
         if kind == "noul":
             if criteria is not None and (
                 not isinstance(criteria, dict)
-                or set(criteria) != {"true", "false"}
-                or not all(isinstance(item, str) for item in criteria.values())
+                or not set(criteria).issubset({"true", "false"})
+                or not all(_structured_description(item, null=True) for item in criteria.values())
             ):
-                return _detail([*loc, "criteria"], "Noul criteria should define true and false")
+                return _detail([*loc, "criteria"], "Noul criteria has an invalid shape")
         elif kind == "choice":
             if (
                 not isinstance(criteria, dict)
                 or not 1 <= len(criteria) <= 255
                 or not all(
-                    isinstance(key, str) and isinstance(item, str) for key, item in criteria.items()
+                    isinstance(key, str) and _structured_description(item, null=True)
+                    for key, item in criteria.items()
                 )
             ):
                 return _detail(
@@ -209,10 +269,78 @@ def _decision_request_error(value: object) -> dict[str, JsonValue] | None:
         elif (
             not isinstance(criteria, list)
             or not 2 <= len(criteria) <= 10
-            or not all(isinstance(item, str) for item in criteria)
+            or not all(_structured_description(item, null=False) for item in criteria)
         ):
             return _detail([*loc, "criteria"], "Score criteria should contain 2 to 10 levels")
     return None
+
+
+def _decision_request_error(value: object) -> dict[str, JsonValue] | None:
+    """Return a deterministic TypeSafe-style 422 body; validation is total."""
+    try:
+        if _json_depth_exceeded(value):
+            return _detail(["body"], f"JSON nesting may not exceed {_MAX_JSON_DEPTH} levels")
+        canonical_json(value)
+        return _validate_decision_request(value)
+    except BaseException:
+        return _detail(["body"], "Input should be valid JSON")
+
+
+def _decision_deadline_expired(started: float, request_seconds: float, at: float) -> bool:
+    return at - started >= request_seconds
+
+
+def _transports_conflict(*, pending_mcp: bool, active_decision: bool) -> bool:
+    return pending_mcp and active_decision
+
+
+def _parse_http_request(received: bytes, max_body_bytes: int) -> _HttpRequest | None:
+    """Parse the first HTTP request only; trailing pipelined bytes are ignored."""
+    head_end = received.find(b"\r\n\r\n")
+    if head_end < 0:
+        if len(received) > _MAX_HTTP_HEAD:
+            raise _HttpRequestError(413, {"detail": "request too large"})
+        return None
+    if head_end > _MAX_HTTP_HEAD:
+        raise _HttpRequestError(413, {"detail": "request too large"})
+    try:
+        lines = received[:head_end].decode("iso-8859-1").split("\r\n")
+        request_line = lines[0].split(" ")
+        if len(request_line) != 3 or request_line[2] != "HTTP/1.1":
+            raise ValueError("invalid request line")
+        method, path, _version = request_line
+        headers: dict[str, str] = {}
+        for line in lines[1:]:
+            name, separator, header_value = line.partition(":")
+            if not separator or not name:
+                raise ValueError("invalid header")
+            headers[name.strip().lower()] = header_value.strip()
+    except (UnicodeError, ValueError) as exc:
+        raise _HttpRequestError(422, _detail(["request"], "Invalid HTTP request")) from exc
+    if "expect" in headers:
+        raise _HttpRequestError(417, {"detail": "expectation failed"})
+    if "chunked" in headers.get("transfer-encoding", "").lower():
+        raise _HttpRequestError(411, {"detail": "content-length required"})
+    raw_length = headers.get("content-length")
+    if method == "POST" and raw_length is None:
+        raise _HttpRequestError(411, {"detail": "content-length required"})
+    try:
+        content_length = 0 if raw_length is None else int(raw_length)
+    except ValueError as exc:
+        raise _HttpRequestError(411, {"detail": "content-length required"}) from exc
+    if content_length < 0:
+        raise _HttpRequestError(411, {"detail": "content-length required"})
+    if content_length > max_body_bytes:
+        raise _HttpRequestError(413, {"detail": "request too large"})
+    body_start = head_end + 4
+    if len(received) - body_start < content_length:
+        return None
+    return _HttpRequest(
+        method=method,
+        path=path,
+        headers=headers,
+        body=received[body_start : body_start + content_length],
+    )
 
 
 def _finite_number(value: object) -> bool:
@@ -285,12 +413,7 @@ def _validate_decision_response(
         else:
             legend = answer.get("legend")
             score = answer.get("score")
-            if (
-                not isinstance(legend, dict)
-                or set(legend) != expected
-                or not all(isinstance(item, str) for item in legend.values())
-                or not _finite_number(score)
-            ):
+            if not isinstance(legend, dict) or set(legend) != expected or not _finite_number(score):
                 raise ValueError("decision response has an invalid score")
     copied = cast(dict[str, JsonValue], copy.deepcopy(value))
     canonical_json(copied)
@@ -349,6 +472,18 @@ def _expand(values: tuple[str, ...], workdir: str, seed: int) -> list[str]:
         .replace("{task_file}", _task_file(workdir))
         for item in values
     ]
+
+
+def _server_environment(
+    inherited: dict[str, str], configured: dict[str, str], workdir: str, seed: int
+) -> dict[str, str]:
+    env = {**inherited, **configured}
+    env.pop("TYPESAFE_API_KEY", None)
+    env.pop("TYPESAFE_BASE_URL", None)
+    env["ARCI_WORKDIR"] = workdir
+    env["ARCI_SEED"] = str(seed)
+    env["ARCI_TASK_FILE"] = _task_file(workdir)
+    return env
 
 
 def _error_result(kind: str, text: str) -> dict[str, JsonValue]:
@@ -642,7 +777,7 @@ class _Boundary:
         spec = self.spec.decisions
         if spec is None:
             raise ValueError("decision request without decision configuration")
-        results: queue.Queue[_UpstreamResult] = queue.Queue(maxsize=1)
+        results: queue.Queue[_DecisionCompletion] = queue.Queue(maxsize=1)
         pinned = copy.deepcopy(request)
         pinned["model"] = spec.model
 
@@ -659,9 +794,9 @@ class _Boundary:
                 else:
                     result = self._http_upstream("POST", "/v1/systemone", pinned, spec)
             except BaseException as exc:
-                result = _UpstreamResult(500, {}, None, format_diagnostic(exc))
+                result = _UpstreamResult(500, {}, None, _scrub_diagnostic(exc))
             with contextlib.suppress(queue.Full):
-                results.put_nowait(result)
+                results.put_nowait(_DecisionCompletion(time.monotonic(), result))
 
         self.decision_work = _DecisionWork(call, copy.deepcopy(request), results, time.monotonic())
         threading.Thread(target=invoke, daemon=True).start()
@@ -676,7 +811,7 @@ class _Boundary:
             arguments={},
             occurrence=occurrence,
         )
-        results: queue.Queue[_UpstreamResult] = queue.Queue(maxsize=1)
+        results: queue.Queue[_DecisionCompletion] = queue.Queue(maxsize=1)
 
         def invoke() -> None:
             try:
@@ -697,9 +832,9 @@ class _Boundary:
                 else:
                     result = self._http_upstream("GET", "/v1/models", None, spec)
             except BaseException as exc:
-                result = _UpstreamResult(500, {}, None, format_diagnostic(exc))
+                result = _UpstreamResult(500, {}, None, _scrub_diagnostic(exc))
             with contextlib.suppress(queue.Full):
-                results.put_nowait(result)
+                results.put_nowait(_DecisionCompletion(time.monotonic(), result))
 
         self.decision_work = _DecisionWork(call, {}, results, time.monotonic())
         threading.Thread(target=invoke, daemon=True).start()
@@ -852,24 +987,25 @@ class _Boundary:
         if work.timed_out:
             return
         try:
-            result = work.results.get_nowait()
+            completion = work.results.get_nowait()
         except queue.Empty:
-            result = None
-        if result is not None:
+            completion = None
+        observed_at = time.monotonic()
+        expired_at = observed_at if completion is None else completion.finished_at
+        if _decision_deadline_expired(work.started, spec.request_seconds, expired_at):
+            self.latches.set_harness("decision upstream timed out")
+            # Retain the work so no retry can start a second uncancellable worker.
+            work.timed_out = True
+            self._queue_http(500, {"detail": "arci: decision upstream failed"})
+            return
+        if completion is not None:
             try:
-                self._finish_decision_work(result)
+                self._finish_decision_work(completion.result)
             except BaseException as exc:
                 self.latches.set_harness(exc)
                 self.decision_work = None
                 self._queue_http(500, {"detail": "arci: decision upstream failed"})
             return
-        if time.monotonic() - work.started >= spec.request_seconds:
-            self.latches.set_harness("decision upstream timed out")
-            # Keep the timed-out work installed until shutdown.  The daemon
-            # call cannot be cancelled safely, and retaining it prevents an
-            # SDK retry from starting a second upstream worker concurrently.
-            work.timed_out = True
-            self._queue_http(500, {"detail": "arci: decision upstream failed"})
 
     def _close_rejected_decision(self, connection: socket.socket) -> None:
         self.rejected_decisions.pop(connection, None)
@@ -907,7 +1043,10 @@ class _Boundary:
         if (
             self.decision_connection is not None
             or self.decision_work is not None
-            or self.tools_inflight
+            or _transports_conflict(
+                pending_mcp=bool(self.pending) or self.tools_inflight,
+                active_decision=True,
+            )
         ):
             self._reject_concurrent_decision(connection)
             return
@@ -916,6 +1055,8 @@ class _Boundary:
         self.selector.register(connection, selectors.EVENT_READ, "decision")
 
     def _local_http_error(self, status: int, body: JsonValue) -> None:
+        if self.decision_connection is not None:
+            self.decision_connection.request_parsed = True
         self._queue_http(status, body)
 
     def _admit_decision(self, request: dict[str, JsonValue]) -> None:
@@ -997,71 +1138,33 @@ class _Boundary:
             return
         try:
             value = json.loads(raw_body.decode("utf-8"))
-            canonical_json(value)
-        except (json.JSONDecodeError, UnicodeError, TypeError, ValueError):
+            error = _decision_request_error(value)
+            if error is not None:
+                self._local_http_error(422, error)
+                return
+            request = cast(dict[str, JsonValue], copy.deepcopy(value))
+        except BaseException:
             self._local_http_error(422, _detail(["body"], "Input should be valid JSON"))
             return
-        error = _decision_request_error(value)
-        if error is not None:
-            self._local_http_error(422, error)
-            return
-        self._admit_decision(cast(dict[str, JsonValue], copy.deepcopy(value)))
+        self._admit_decision(request)
 
     def _consume_http(self, chunk: bytes) -> None:
         connection = self.decision_connection
         spec = self.spec.decisions
         if connection is None or spec is None:
             return
+        if connection.request_parsed:
+            return
         connection.received.extend(chunk)
-        head_end = connection.received.find(b"\r\n\r\n")
-        if head_end < 0:
-            if len(connection.received) > _MAX_HTTP_HEAD:
-                self._local_http_error(413, {"detail": "request too large"})
-            return
-        if head_end > _MAX_HTTP_HEAD:
-            self._local_http_error(413, {"detail": "request too large"})
-            return
         try:
-            lines = bytes(connection.received[:head_end]).decode("iso-8859-1").split("\r\n")
-            request_line = lines[0].split(" ")
-            if len(request_line) != 3 or request_line[2] != "HTTP/1.1":
-                raise ValueError("invalid request line")
-            method, path, _version = request_line
-            headers: dict[str, str] = {}
-            for line in lines[1:]:
-                name, separator, value = line.partition(":")
-                if not separator or not name:
-                    raise ValueError("invalid header")
-                headers[name.strip().lower()] = value.strip()
-        except (UnicodeError, ValueError):
-            self._local_http_error(422, _detail(["request"], "Invalid HTTP request"))
+            request = _parse_http_request(bytes(connection.received), spec.max_body_bytes)
+        except _HttpRequestError as exc:
+            self._local_http_error(exc.status, exc.body)
             return
-        if "chunked" in headers.get("transfer-encoding", "").lower():
-            self._local_http_error(411, {"detail": "content-length required"})
+        if request is None:
             return
-        raw_length = headers.get("content-length")
-        if method == "POST" and raw_length is None:
-            self._local_http_error(411, {"detail": "content-length required"})
-            return
-        try:
-            content_length = 0 if raw_length is None else int(raw_length)
-        except ValueError:
-            self._local_http_error(411, {"detail": "content-length required"})
-            return
-        if content_length < 0:
-            self._local_http_error(411, {"detail": "content-length required"})
-            return
-        if content_length > spec.max_body_bytes:
-            self._local_http_error(413, {"detail": "request too large"})
-            return
-        body_start = head_end + 4
-        if len(connection.received) - body_start < content_length:
-            return
-        body = bytes(connection.received[body_start : body_start + content_length])
-        if len(connection.received) != body_start + content_length:
-            self._local_http_error(422, _detail(["request"], "Only one request is allowed"))
-            return
-        self._handle_http_request(method, path, headers, body)
+        connection.request_parsed = True
+        self._handle_http_request(request.method, request.path, request.headers, request.body)
 
     def _read_decision(self) -> None:
         connection = self.decision_connection
@@ -1269,6 +1372,24 @@ class _Boundary:
         client_key = _id_key(rpc_id)
         if client_key in self.client_pending:
             self._client_error(rpc_id, -32600, "request id is already outstanding")
+            return
+        if _transports_conflict(
+            pending_mcp=True,
+            active_decision=(
+                self.decision_connection is not None or self.decision_work is not None
+            ),
+        ):
+            self.latches.set_harness(_DECISION_CONCURRENCY)
+            if method == "tools/call":
+                self._write_client(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": rpc_id,
+                        "result": _error_result("error", f"arci: {_DECISION_CONCURRENCY}"),
+                    }
+                )
+            else:
+                self._client_error(rpc_id, -32600, _DECISION_CONCURRENCY)
             return
         if method == "tools/call":
             self._tool_request(message, rpc_id)
@@ -1488,10 +1609,7 @@ class _Boundary:
         server_spec = self.spec.mcp_server
         if server_spec is None:
             raise ValueError("command trial has no MCP server")
-        env = {**os.environ, **server_spec.env}
-        env["ARCI_WORKDIR"] = self.workdir
-        env["ARCI_SEED"] = str(self.spec.seed)
-        env["ARCI_TASK_FILE"] = _task_file(self.workdir)
+        env = _server_environment(dict(os.environ), server_spec.env, self.workdir, self.spec.seed)
         self.server = subprocess.Popen(
             _expand(server_spec.argv, self.workdir, self.spec.seed),
             stdin=subprocess.PIPE,
@@ -1633,6 +1751,10 @@ class _Boundary:
         except BaseException as exc:
             self.latches.set_harness(exc)
         finally:
+            try:
+                self._poll_decision_work()
+            except BaseException as exc:
+                self.latches.set_harness(exc)
             self._cleanup()
 
     def _cleanup(self) -> None:
