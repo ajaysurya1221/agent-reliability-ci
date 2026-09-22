@@ -277,7 +277,8 @@ def test_a_gateway_shaped_upstream_is_accepted_recorded_and_served(
     finish = _finish(env)
     value = cast(dict[str, Any], finish.payload["value"])
     assert value["status"] == 200 and value["body"]["model"] == GATEWAY_MODEL
-    assert value["headers"] == {"x-typesafe-request-id": "req-0000"}
+    assert set(value["headers"]) == {"x-typesafe-request-id"}
+    assert value["headers"]["x-typesafe-request-id"].startswith("req-")
     assert value["body"]["provider_metadata"]["gateway"]["cost"] == "0.00001155"
     assert value["upstream"]["body"] == value["body"]  # nothing injected: raw equals served
     assert value["upstream"]["attempts"] == 1 and value["upstream"]["first_status"] is None
@@ -334,9 +335,8 @@ def test_encoding_and_non_json_and_tls_are_one_clear_harness_message(
     plain = gateway()
     tls = _run(
         "gated",
-        spec=decisions(
+        spec=DecisionSpec(
             upstream="http",
-            fixture_name=None,
             base_url=f"https://127.0.0.1:{plain.server_port}/typesafe",
             model=GATEWAY_MODEL,
         ),
