@@ -62,6 +62,48 @@ Experiment verdict, in priority order:
 
 Exit codes: PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3.
 
+## Sequential looks (v0.4)
+
+The manifest may freeze `looks = (N_1, ..., N_L)`: strictly increasing cumulative pairs per
+condition, with `N_L = n_per_arm`. No `looks` means one look at `n_per_arm`, which is the rule
+above unchanged. With L looks the per-look alpha is `alpha / L`, equal spending, nothing recycled:
+Clopper-Pearson uses the per-arm tail `alpha / (4KL)`; Newcombe uses Wilson confidence
+`1 - alpha / (KL)`. A plan with `alpha / (4KL) < 2.5e-7` is rejected.
+
+At each completed look every condition is recomputed from all its trials through that look (pairs
+`0 .. N_j - 1`, both arms, including ceiling conditions, which stay descriptive). The look's
+verdict is the experiment verdict above applied to those condition verdicts. The run STOPS at the
+first look whose verdict is BLOCK or PASS; otherwise it continues, and at the final look the
+verdict is INCONCLUSIVE without relaxing any boundary. ERROR and hard-invariant overrides keep
+their priority at every look.
+
+What the gate requires of a store: for the deciding look j, exactly the trials of pairs
+`0 .. N_j - 1` in every declared condition, matching the schedule, validly sealed, and nothing
+beyond. Every earlier look, recomputed, must be INCONCLUSIVE. A store that continued past a
+decisive look (padding an early BLOCK into a later PASS), stopped where no look was decisive, or is
+missing or duplicating any trial of a reached look is ERROR. The decision records the full look
+history (each look's trial digest, bounds and verdict) and the stopping look, sealed.
+
+The plan (`looks`) is bound into every trial's identity, like `alpha`, `delta` and
+`interval_method`. Looks are whole pairs: both arms of a pair share a seed and both finish before
+the look is evaluated. The schedule is always the full `n_per_arm` schedule; a look takes each
+condition's first `N_j` pairs of it, so the seeds of later conditions never change.
+
+Cost and benefit, by exact enumeration over sequential paths (K=1, alpha 0.05, delta 0.10, looks
+50/100/200, independent arms), against the fixed N=200 design's 400 trials:
+
+| true rates | method | expected trials | P(BLOCK) or P(PASS) fixed → sequential |
+|---|---|---:|---|
+| 0.95 → 0.65 | Clopper-Pearson | 302 | BLOCK .985 → .943 |
+| 0.95 → 0.95 | Clopper-Pearson | 350 | PASS .889 → .735 |
+| 0.95 → 0.65 | Newcombe | 159 | BLOCK .9998 → .9989 |
+| 0.95 → 0.95 | Newcombe | 239 | PASS .989 → .969 |
+
+Bonferroni across looks is the price of simplicity: it buys early stopping with some power. Worst
+directional errors over the boundary sweep with three looks: Clopper-Pearson false-PASS 0.0017,
+false-BLOCK 0.0002; Newcombe 0.0237 and 0.0224. `bench/selfcheck.py --looks 50,100,200` recomputes
+these and fails if any exceeds alpha.
+
 ## What the verdicts mean
 
 - `PASS`: the candidate is non-inferior to the baseline within `delta`. It says nothing about

@@ -55,6 +55,7 @@ def build_schedule(manifest: Manifest) -> tuple[TrialSpec, ...]:
                         alpha=manifest.alpha,
                         delta=manifest.delta,
                         interval_method=manifest.interval_method,
+                        looks=manifest.looks,
                     )
                 )
     return tuple(out)

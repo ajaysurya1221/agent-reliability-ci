@@ -277,3 +277,41 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
   failure_detail `"agent reported an infrastructure failure (exit <code>)"`, ranked like any other
   harness fault. Any other non-zero exit stays FAIL/crash. The Ollama example returns 75 when the
   model backend is unreachable, times out, or the model is missing, and 1 for its own bugs.
+
+## v0.4: group-sequential looks (docs/STATISTICS.md "Sequential looks"; tests/acceptance/test_sequential.py)
+
+- `Manifest.looks` (validated in the frozen schema) is the plan; `looks == ()` means `(n_per_arm,)`
+  and MUST reproduce today's fixed-design results exactly (same bounds, same verdict, same
+  `per_arm_confidence`), with `history` of length 1 and `stopped_at_look == 1`.
+- `decide` (pure, never raises): L = number of looks; K = gating conditions; per-look tail
+  `alpha/(4KL)` (Clopper-Pearson) or Wilson confidence `1 - alpha/(KL)` (Newcombe). For j = 1..L:
+  take, per declared condition, the trials whose pair index is `< N_j`; compute every condition
+  exactly as today (ArmStats, bounds, hard violations, ceiling => descriptive) and the experiment
+  verdict for that look; record a `LookDecision` (its `trials_sha256` is over the trials through
+  that look). Stop at the first look whose verdict is PASS or BLOCK; that is `stopped_at_look` and
+  the decision's `conditions`/`verdict`. If none is decisive, the last look decides
+  (INCONCLUSIVE). THEN validate the store against the stopping look: the trial set must be exactly
+  the schedule's trials with pair index `< N_stop` for every condition (both arms, all conditions
+  including ceiling ones), all seals valid, identities matching, no extra trials; otherwise the
+  decision is ERROR with reason `"trial set does not match the stopping look"`. A store whose
+  trials end at some `N_j` where looks 1..j were all INCONCLUSIVE and j < L is ERROR (`"stopped
+  without a decision"`); a store that is not a whole-pair prefix at a declared look is ERROR. Any
+  trial ERROR, seal failure or manifest problem is ERROR as before (`stopped_at_look = 0`).
+- `run_experiment`: build the FULL schedule once (never rebuild with a smaller n_per_arm). Run it
+  in stages: stage j = the trials of every condition with pair index in `[N_{j-1}, N_j)`, submitted
+  to the executor together; wait for all of them; write them to the store; call `decide` on the
+  trials so far; stop if the verdict is PASS or BLOCK (or ERROR). Return the trials run. The
+  runner must import `arci.gate` lazily inside the function.
+- `bench/selfcheck.py`: `sequential_characteristics(p_a, p_b, looks, *, alpha=0.05, delta=0.10,
+  k=1, method="clopper_pearson", rho=0.0) -> dict` with keys `PASS`, `BLOCK`, `INCONCLUSIVE`,
+  `expected_trials` (both arms, i.e. 2 x expected pairs) by EXACT enumeration over sequential
+  paths: keep a dict of surviving probability mass keyed by cumulative `(x_a, x_b)`; advance one
+  pair at a time through the four paired outcomes (independent arms when rho == 0; the bench's
+  shared-uniform mixture with weight rho otherwise); at each registered look absorb the mass of
+  states whose verdict (from the per-look `_verdict_table` at that N) is PASS or BLOCK. At most
+  (N+1)^2 states. `looks=(n,)` must equal `operating_characteristics` to 1e-9. Add `--looks
+  50,100,200` to the CLI: prints the table for both scenarios sets, and a boundary sweep as for the
+  fixed design (worst false-PASS on/below the boundary and false-BLOCK on/above, <= alpha or exit
+  non-zero). Keep the whole bench under two minutes.
+- Report/CLI: the Markdown report gains a "Looks" table (look, pairs, verdict, bounds per
+  condition) when there is more than one look, and states the stopping look.
