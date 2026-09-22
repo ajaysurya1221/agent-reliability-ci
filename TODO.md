@@ -15,13 +15,14 @@ Plan: `~/.claude/plans/you-are-in-plan-bubbly-moore.md` (approved 2026-09-22). T
 - [x] `FROZEN.sha256`, worktrees wp-k1 / wp-k2 with `.venv`; design record `docs/design/0004-day-one.md`
 
 ## 2. Build (Sol, two parallel work packages)
-- [~] WP-K1 boundary/runner/cli/report/minimize: A1 A2 A3 B4 B5 B6 C9
+- [x] WP-K1 boundary/runner/cli/report/minimize: A1 A2 A3 B4 B5 B6 C9 (v0.6 acceptance 13/13, all
+      decision and MCP socket suites green in the worktree; three test-side fixes on the way)
 - [x] WP-K2 example/docs: C8 Node agent + package.json + CI step, B7 runbook + results template,
       README, CHANGELOG 0.6.0, ROADMAP, D10 calibration option (Node test 2/2 with the unmodified JS SDK)
 
 ## 3. Verify and review
-- [ ] Full suite, ruff, basedpyright strict, frozen hashes; hero demos; Node test locally
-- [ ] Astra adversarial release review; findings become frozen regression tests; Sol fixes
+- [~] Full suite, ruff, basedpyright strict, frozen hashes; hero demos; Node test locally (running)
+- [~] Astra adversarial release review (running); findings become frozen regression tests; Sol fixes
 
 ## 4. Release
 - [ ] Merge to main, CI green on 3.11 and 3.14, tag `v0.6.0`, memory, close this list
