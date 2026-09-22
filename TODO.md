@@ -24,17 +24,17 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
 - [x] `AGENTS.md` v0.5 section for the coder; regenerate `FROZEN.sha256`
 
 ## 2. Build (Sol implements offline; Claude verifies outside the sandbox)
-- [~] WP-J1: loopback HTTP listener in the boundary process; record/replay/budget for decisions;
-      fixture and http upstreams; env injection in the runner
-- [~] WP-J2: decision perturbations; diff signatures for decisions; report additions
-- [~] WP-J3 (folded into WP-J2): `examples/jev_triage_agent` (A gated, B regression, C fix; fixture answers from
+- [x] WP-J1: loopback HTTP listener in the boundary process; record/replay/budget for decisions;
+      fixture and http upstreams; env injection in the runner (26/26 decision acceptance tests)
+- [x] WP-J2 (in J1): decision perturbations; diff signatures for decisions
+- [x] WP-J3 (WP-J2 job): `examples/jev_triage_agent` (A gated, B regression, C fix; fixture answers from
       hidden ground truth; MCP tools `issue_refund` / `escalate` / `reply`; independent oracle)
-- [ ] Hero demo 2 script: A vs B exit 1, A vs A exit 0, A vs C exit 0, replay REPRODUCED,
-      minimiser 1-minimal; wired into CI
+- [x] Hero demo 2 script: A vs B exit 1, A vs A exit 0, A vs C exit 0, replay REPRODUCED,
+      minimiser 1-minimal; wired into CI (test_hero_decisions.py 5/5)
 
 ## 3. Verify and review
 - [ ] Full suite, ruff, basedpyright strict, frozen hashes unchanged
-- [ ] Astra adversarial review of the full diff with reproductions; fix or list every finding
+- [~] Astra adversarial review of the full diff with reproductions; fix or list every finding
 - [ ] Specialist escalation only for failures Sol cannot reproduce in its sandbox
 
 ## 4. Docs and release

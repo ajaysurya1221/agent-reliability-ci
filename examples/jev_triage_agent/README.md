@@ -17,13 +17,15 @@ From the repository root:
 .venv/bin/python examples/jev_triage_agent/hero_demo.py --n 50
 ```
 
-Expected measured results (filled after the boundary implementation is integrated):
+Measured on 2026-09-22 (15-core laptop, about 20 s for all six steps, N=50 per arm):
 
-- clean pair: `<measured>`
-- A versus B under `decision_low_confidence`: `<measured>`
-- A versus A: `<measured>`
-- reduced failure and replay: `<measured>`
-- A versus C: `<measured>`
+- clean pair: A and B both PASS
+- A versus B under `decision_low_confidence`: 50/50 vs 0/50, bounds on the difference
+  [-1.000, -0.832], BLOCK (exit 1)
+- A versus A: 50/50 vs 50/50, bounds [-0.084, 0.084], PASS (exit 0)
+- reduced failure and replay: the minimiser keeps `decision_low_confidence` and removes the benign
+  `empty_result` (1-minimal, 2 trials); the reduced bundle replays REPRODUCED with no provider running
+- A versus C: 50/50 vs 50/50, PASS (exit 0); C also passes B's exact reproducer live
 
 The six steps show the clean run hiding the regression, the frozen experiment blocking B, an
 aligned trace diff, fault minimisation, offline replay, and C passing the same fault.

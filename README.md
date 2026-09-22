@@ -62,8 +62,11 @@ the missing retry never matters. That is exactly why one run hides it.
 
 This six-step offline demo tests a support-triage agent that asks a Jev-shaped System One endpoint
 and then acts through MCP. A escalates when confidence is low, B silently abandons the ticket, and C
-restores escalation. The fixture needs no API key; measured results remain `<measured>` until the
-v0.5 boundary run is completed.
+restores escalation. The fixture needs no API key. Measured on a 15-core laptop, about 20 s: A vs B
+50/50 vs 0/50, bounds on the difference [-1.000, -0.832], BLOCK; A vs A 50/50 vs 50/50, bounds
+[-0.084, 0.084], PASS; the minimiser keeps only `decision_low_confidence` (1-minimal, 2 trials);
+the reduced failure replays REPRODUCED with no decision provider running; C passes B's reproducer
+live and A vs C is PASS.
 
 ## Real agents (v0.2)
 
