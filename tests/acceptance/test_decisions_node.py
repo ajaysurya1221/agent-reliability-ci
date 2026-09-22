@@ -38,7 +38,9 @@ def test_the_node_agent_tells_a_from_b_through_the_same_boundary(tmp_path: Path)
     from examples.jev_triage_agent.experiment import build_manifest
 
     for candidate, expected in (("b", Verdict.BLOCK), ("a", Verdict.PASS)):
-        m = build_manifest(n_per_arm=8, candidate=candidate, runtime="node")
+        m = build_manifest(
+            n_per_arm=50, candidate=candidate, runtime="node"
+        )  # A vs A needs 50 to PASS
         assert m.validate_seal()
         trials = run_experiment(m, tmp_path / candidate, max_workers=4)
         d = decide(m, trials)
