@@ -29,8 +29,9 @@ Plan: `~/.claude/plans/you-are-in-plan-bubbly-moore.md` (approved 2026-09-22). T
       with a frozen regression case; final gate green (430 tests, ruff, strict types)
 
 ## 4. Release
-- [~] Merged to main (5157a49); first CI run hit a timing flake in the v0.1 retry example on the 3.11
-      runner (one trial over its 5 s budget); budget raised to 15 s; CI re-running; then tag `v0.6.0`
+- [x] Merged to main; a timing flake in the v0.1 retry example on the loaded 3.11 runner was fixed
+      by raising its per-trial budget to 15 s; CI green on 3.11 and 3.14; tagged `v0.6.0` (a221ad2);
+      memory updated. Repo stays private; nothing on PyPI. Delete this file when the next cycle starts.
 
 ## Cut order if behind
 D10, then C8's CI step (keep the local test), then B6's worker cap. Never cut A1, A3, B4, B5.
