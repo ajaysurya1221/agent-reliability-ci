@@ -412,6 +412,24 @@ class Manifest(Sealed):
     def _decisions_are_consistent(self) -> Manifest:
         if self.decisions is not None and self.mcp_server is None:
             raise ValueError("`decisions` needs command agents (an `mcp_server`)")
+        if self.decisions is not None:
+            # The harness owns these variables: it injects the loopback endpoint and a per-trial
+            # token into the agent and strips both from the MCP server. A manifest that carries
+            # them would seal a key into every record and bundle made from it.
+            owned = {"TYPESAFE_API_KEY", "TYPESAFE_BASE_URL"}
+            configured = [
+                env
+                for env in (
+                    self.baseline.command.env if self.baseline.command else {},
+                    self.candidate.command.env if self.candidate.command else {},
+                    self.mcp_server.env if self.mcp_server else {},
+                )
+                if owned & set(env)
+            ]
+            if configured:
+                raise ValueError(
+                    "TYPESAFE_API_KEY / TYPESAFE_BASE_URL are harness-owned; remove them from env"
+                )
         for condition in self.conditions:
             for fault in condition.faults:
                 allowed = DECISION_PERTURBATIONS.get(fault.name)

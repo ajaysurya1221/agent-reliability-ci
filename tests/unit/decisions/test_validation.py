@@ -221,3 +221,14 @@ def test_only_retry_after_is_forwarded() -> None:
     ) == {"retry-after": "3"}
     with pytest.raises(ValueError, match="invalid header"):
         allowed_headers({"Retry-After": "3\r\nX-Leak: secret"})
+
+
+@pytest.mark.parametrize("bad", [None, 17, True])
+def test_response_validation_rejects_non_descriptive_score_legends(bad: object) -> None:
+    response = copy.deepcopy(_response())
+    answer = cast(dict[str, Any], cast(dict[str, Any], response["answers"])["urgency"])
+    legend = dict(cast(dict[str, Any], answer["legend"]))
+    legend[next(iter(legend))] = bad
+    answer["legend"] = legend
+    with pytest.raises(ValueError):
+        validate_response(response, _request(), MODEL)

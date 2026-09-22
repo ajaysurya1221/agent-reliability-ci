@@ -125,6 +125,14 @@ def test_manifest_rules_for_decisions() -> None:
                 "conditions": (Condition(condition_id="c", faults=(low,)),),
             }
         )
+    harness_owned = decision_manifest().model_dump(exclude={"record_sha256"})
+    harness_owned["mcp_server"]["env"] = {"TYPESAFE_API_KEY": "sk-leak"}
+    with pytest.raises(ValidationError):  # would seal a key into every record and bundle
+        Manifest.create(**harness_owned)
+    harness_owned = decision_manifest().model_dump(exclude={"record_sha256"})
+    harness_owned["candidate"]["command"]["env"] = {"TYPESAFE_BASE_URL": "http://example.invalid"}
+    with pytest.raises(ValidationError):
+        Manifest.create(**harness_owned)
     for fault in (
         low.model_copy(update={"tool": "fetch"}),  # wrong target
         low.model_copy(update={"tool": None}),  # no wildcard

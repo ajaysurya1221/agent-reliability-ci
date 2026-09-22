@@ -415,6 +415,9 @@ def _validate_decision_response(
             score = answer.get("score")
             if not isinstance(legend, dict) or set(legend) != expected or not _finite_number(score):
                 raise ValueError("decision response has an invalid score")
+            # Legend values are level descriptions: text or structure, never null, numbers or bools.
+            if any(not isinstance(v, str | dict | list) for v in legend.values()):
+                raise ValueError("decision response has an invalid score legend")
     copied = cast(dict[str, JsonValue], copy.deepcopy(value))
     canonical_json(copied)
     return copied
