@@ -118,6 +118,23 @@ def wilson(successes: int, n: int, confidence: float = 0.95) -> tuple[float, flo
     return centre - radius, centre + radius
 
 
+def newcombe(
+    successes_a: int, n_a: int, successes_b: int, n_b: int, confidence: float
+) -> tuple[float, float]:
+    """Newcombe's hybrid score interval (method 10) for p_b - p_a, no continuity correction.
+
+    Wilson intervals per arm at `confidence`, combined through their asymmetric distances from
+    the observed rates. Approximate; calibration is checked by enumeration in bench/selfcheck.py.
+    """
+    low_a, high_a = wilson(successes_a, n_a, confidence)
+    low_b, high_b = wilson(successes_b, n_b, confidence)
+    rate_a, rate_b = successes_a / n_a, successes_b / n_b
+    difference = rate_b - rate_a
+    lower = difference - math.sqrt((rate_b - low_b) ** 2 + (high_a - rate_a) ** 2)
+    upper = difference + math.sqrt((high_b - rate_b) ** 2 + (rate_a - low_a) ** 2)
+    return max(-1.0, lower), min(1.0, upper)
+
+
 def per_arm_confidence(alpha: float, k: int) -> float:
     """Return the Bonferroni-adjusted confidence for one arm."""
     if not 0.0 < alpha < 1.0:

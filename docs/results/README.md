@@ -34,5 +34,10 @@ Run 4 lists runs 1 to 3 in its sealed manifest's `prior_runs`, as the discipline
   answers is the cost of the v0.1 gate's conservatism (per-arm Clopper-Pearson plus Bonferroni), and
   it is why a tighter exact test for the margin is now first on the roadmap: with real agents,
   every trial costs model time.
+- Re-analysed under `interval_method: newcombe` (added in v0.3 because of this run, validated by
+  exact enumeration, see docs/STATISTICS.md), the same 376/400 vs 308/400 gives bounds
+  [-0.2178, -0.1225]: BLOCK. This is a re-analysis for illustration. The sealed verdict of run 4
+  remains INCONCLUSIVE, because its manifest froze the Clopper-Pearson rule before the run; choosing
+  the method after seeing the data is exactly what the discipline forbids.
 - Twice the experiment was wrong rather than the agent (a bridge bug, a dead model server). Both
   times the clusters and traces said so quickly, and both times the tool now says so by itself.

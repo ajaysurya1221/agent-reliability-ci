@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.0 (2026-09-22)
+
+One thing: a tighter interval for the margin, opt-in.
+
+- `Manifest.interval_method`: `clopper_pearson` (default, unchanged) or `newcombe` (Newcombe's
+  hybrid score interval, method 10, no continuity correction, Wilson per arm at `1 - alpha/K`).
+  Frozen with the manifest; printed in every decision and report.
+- Calibration by exact enumeration in `bench/selfcheck.py --method newcombe`: a sweep of the
+  boundary and the no-change line for p in [0.5, 0.99], N in {20, 50, 100, 200, 400}. Worst
+  directional error 0.031 (alpha 0.05). The bench exits non-zero if any sweep fails. Head-to-head
+  table in `docs/STATISTICS.md`.
+- Why: the clean v0.2 confirmatory run (376/400 vs 308/400) was INCONCLUSIVE by 0.008 under the
+  default rule; Clopper-Pearson with Bonferroni was spending about a tenth of its allowed alpha.
+  Re-analysed under `newcombe` it blocks. Its sealed verdict stays INCONCLUSIVE.
+
 ## v0.2.0 (2026-09-21)
 
 Command agents: test any program that speaks MCP over stdio, not only Python functions.
