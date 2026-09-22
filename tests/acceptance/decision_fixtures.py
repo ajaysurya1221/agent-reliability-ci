@@ -96,7 +96,7 @@ def fixture(request: dict[str, JsonValue], seed: int, occurrence: int) -> dict[s
         if kind == "choice":
             options = sorted(cast(dict[str, JsonValue], question["criteria"]))
             correct = cast(str, truth[name])
-            top = round(0.9 + noise, 4)
+            top = round(0.95 + noise, 4)
             rest = round((1.0 - top) / (len(options) - 1), 6)
             probabilities = {o: (top if o == correct else rest) for o in options}
             total = sum(probabilities.values())
