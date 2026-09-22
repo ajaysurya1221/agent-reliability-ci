@@ -71,7 +71,7 @@ def _finish(env: TrialEnvelope) -> Event:
 
 class _Gateway(ThreadingHTTPServer):
     """Modes: ok, 429-once, 529-once, 429-always, slow-retry, 529-then-422, prob-over-1, drip,
-    gzip, text, nopin, echo-key, nopin-echo."""
+    drip-chunked, gzip, text, nopin, echo-key, nopin-echo."""
 
     def __init__(self, mode: str) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
@@ -180,6 +180,22 @@ class _Handler(BaseHTTPRequestHandler):
                 self.wfile.write(raw[index : index + 8])
                 self.wfile.flush()
                 time.sleep(0.05)
+        elif mode == "drip-chunked":
+            # Chunked encoding whose chunk-size line itself trickles: the reader blocks inside
+            # chunk parsing, where a per-read socket timeout alone does not bound the total time.
+            raw = json.dumps(self._answer(body)).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            size_line = f"{len(raw):x};ext=" + "x" * 400 + "\r\n"
+            for ch in size_line:  # one byte of the chunk-size line every 20 ms
+                self.wfile.write(ch.encode("ascii"))
+                self.wfile.flush()
+                time.sleep(0.02)
+            self.wfile.write(raw + b"\r\n0\r\n\r\n")
+            self.wfile.flush()
         elif mode == "gzip":
             raw = gzip.compress(json.dumps(self._answer(body)).encode("utf-8"))
             self._send(200, raw, {"Content-Type": "application/json", "Content-Encoding": "gzip"})
@@ -412,11 +428,25 @@ def test_every_probability_must_lie_in_the_unit_interval(gateway: Any, real_key:
 
 
 def test_a_dripping_upstream_is_bounded_by_request_seconds(gateway: Any, real_key: None) -> None:
-    server = gateway("drip")
-    before = time.monotonic()
-    env = _run("gated", spec=gateway_decisions(server.server_port, request_seconds=1.0))
-    assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR
-    assert time.monotonic() - before < 12.0
+    for mode in ("drip", "drip-chunked"):
+        server = gateway(mode)
+        before = time.monotonic()
+        env = _run("gated", spec=gateway_decisions(server.server_port, request_seconds=1.0))
+        assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR, mode
+        assert time.monotonic() - before < 12.0, mode
+
+
+def test_preflight_is_bounded_by_the_same_deadline(gateway: Any, tmp_path: Path) -> None:
+    for mode in ("drip", "drip-chunked"):
+        server = gateway(mode)
+        before = time.monotonic()
+        done = _preflight(
+            tmp_path,
+            decision_manifest(spec=gateway_decisions(server.server_port, request_seconds=1.0)),
+            "real-secret",
+        )
+        assert done.returncode == 3, (mode, done.stdout + done.stderr)
+        assert time.monotonic() - before < 8.0, mode  # the chunk-size line alone trickles for 8 s
 
 
 # --- B6: tokens and cost -------------------------------------------------------------------------

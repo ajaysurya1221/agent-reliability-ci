@@ -578,10 +578,13 @@ def _request_upstream_once(
     if raw is not None:
         headers["Content-Type"] = "application/json"
     expired = threading.Event()
+    # `getresponse()` detaches the socket from the connection on `Connection: close` replies;
+    # keep our own reference so the deadline can still interrupt a trickling body.
+    sockets: list[socket.socket] = []
 
     def expire_connection() -> None:
         expired.set()
-        sock = connection.sock
+        sock = connection.sock or (sockets[0] if sockets else None)
         if sock is not None:
             with contextlib.suppress(OSError):
                 sock.shutdown(socket.SHUT_RDWR)
@@ -601,6 +604,7 @@ def _request_upstream_once(
                 headers=headers,
             )
             if connection.sock is not None:
+                sockets.append(connection.sock)
                 connection.sock.settimeout(max(_deadline_remaining(deadline, clock=clock), 0.001))
             response = connection.getresponse()
             response_headers = dict(response.getheaders())
@@ -613,8 +617,9 @@ def _request_upstream_once(
             payload = bytearray()
             while True:
                 remaining = _deadline_remaining(deadline, clock=clock)
-                if connection.sock is not None:
-                    connection.sock.settimeout(max(remaining, 0.001))
+                for sock in sockets:
+                    with contextlib.suppress(OSError):
+                        sock.settimeout(max(remaining, 0.001))
                 chunk = response.read1(64 * 1024)
                 if not chunk:
                     break
