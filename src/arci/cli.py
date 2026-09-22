@@ -129,6 +129,24 @@ def _preflight_exception(prefix: str, exc: BaseException) -> int:
     return _preflight_failure(f"{prefix}: {upstream_diagnostic(exc)}")
 
 
+def _scrub_preflight_value(value: JsonValue, api_key: str) -> JsonValue:
+    """Recursively remove the upstream credential from serialised preflight values."""
+    if isinstance(value, str):
+        return value.replace(api_key, "<redacted>")
+    if isinstance(value, list):
+        return [_scrub_preflight_value(item, api_key) for item in value]
+    if isinstance(value, dict):
+        return {
+            key.replace(api_key, "<redacted>"): _scrub_preflight_value(item, api_key)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _scrub_preflight_text(value: object, api_key: str) -> str:
+    return str(value).replace(api_key, "<redacted>")
+
+
 def _cmd_preflight(
     manifest_path: str,
     *,
@@ -155,7 +173,8 @@ def _cmd_preflight(
         cast(str, model["name"]) for model in cast(list[dict[str, JsonValue]], models["models"])
     )
     if spec.model not in available:
-        _print(f"pinned model unavailable; account models: {', '.join(available) or 'none'}")
+        listed = ", ".join(_scrub_preflight_text(model, api_key) for model in available) or "none"
+        _print(f"pinned model unavailable; account models: {listed}")
         return 2
     smoke = cast(
         dict[str, JsonValue],
@@ -184,24 +203,28 @@ def _cmd_preflight(
     usage = cast(dict[str, JsonValue], body["usage"])
     request_id = result.headers.get("x-typesafe-request-id", "")
     endpoint = f"{spec.base_url.rstrip('/')}/v1/systemone"
-    _print(f"model: {body['model']}")
-    _print(f"request id: {request_id or 'none'}")
+    _print(f"model: {_scrub_preflight_text(body['model'], api_key)}")
+    _print(f"request id: {_scrub_preflight_text(request_id or 'none', api_key)}")
     _print(f"usage: input_tokens={usage['input_tokens']} output_tokens={usage['output_tokens']}")
     _print(f"latency: {latency_ms:.1f} ms")
-    receipt = {
-        "preflight": {
-            "manifest_sha256": manifest.record_sha256,
-            "endpoint": endpoint,
-            "model": body["model"],
-            "usage": {
-                "input_tokens": usage["input_tokens"],
-                "output_tokens": usage["output_tokens"],
-            },
-            "request_id": request_id,
-            "latency_ms": round(latency_ms, 1),
-        }
-    }
-    _print(json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+    receipt = cast(
+        JsonValue,
+        {
+            "preflight": {
+                "manifest_sha256": manifest.record_sha256,
+                "endpoint": endpoint,
+                "model": body["model"],
+                "usage": {
+                    "input_tokens": usage["input_tokens"],
+                    "output_tokens": usage["output_tokens"],
+                },
+                "request_id": request_id,
+                "latency_ms": round(latency_ms, 1),
+            }
+        },
+    )
+    scrubbed_receipt = _scrub_preflight_value(receipt, api_key)
+    _print(json.dumps(scrubbed_receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
     return 0
 
 
