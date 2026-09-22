@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 import contextlib
 import copy
+import email.utils
 import http.client
 import importlib
+import importlib.metadata
 import json
 import math
 import os
@@ -15,12 +17,15 @@ import random
 import selectors
 import signal
 import socket
+import ssl
 import subprocess
 import sys
 import threading
 import time
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC
 from typing import cast
 from urllib.parse import urlsplit
 
@@ -65,13 +70,24 @@ _HTTP_REASONS = {
 _PROTOCOL = sys.stdout.buffer
 
 
+class _DecisionTransportError(RuntimeError):
+    """An already-normalised, deterministic upstream transport diagnostic."""
+
+
 def _scrub_diagnostic(detail: str | BaseException) -> str:
     """Format a boundary diagnostic and remove the real upstream credential."""
-    clean = format_diagnostic(detail)
+    clean = format_diagnostic(
+        str(detail) if isinstance(detail, _DecisionTransportError) else detail
+    )
     api_key = os.environ.get("TYPESAFE_API_KEY")
     if api_key:
         clean = clean.replace(api_key, "<redacted>")
     return clean
+
+
+def upstream_diagnostic(detail: str | BaseException) -> str:
+    """Return a key-free upstream diagnostic within the v0.6 wire limit."""
+    return _scrub_diagnostic(detail)[:299]
 
 
 def _frame(nonce: str, kind: str, **payload: object) -> None:
@@ -159,11 +175,16 @@ class _DecisionConnection:
 
 
 @dataclass(frozen=True)
-class _UpstreamResult:
+class UpstreamResult:
     status: int
     headers: dict[str, str]
     body: JsonValue
     error: str | None = None
+    attempts: int = 1
+    first_status: int | None = None
+
+
+_UpstreamResult = UpstreamResult
 
 
 @dataclass(frozen=True)
@@ -352,10 +373,14 @@ def _probabilities(value: object, expected: set[str]) -> dict[str, float] | None
         return None
     probabilities: dict[str, float] = {}
     for key, raw in value.items():
-        if not isinstance(key, str) or not _finite_number(raw) or cast(float, raw) < 0.0:
+        if (
+            not isinstance(key, str)
+            or not _finite_number(raw)
+            or not 0.0 <= float(cast(int | float, raw)) <= 1.0
+        ):
             return None
         probabilities[key] = float(cast(int | float, raw))
-    if not math.isclose(sum(probabilities.values()), 1.0, abs_tol=1e-6):
+    if not math.isclose(sum(probabilities.values()), 1.0, abs_tol=1e-3):
         return None
     return probabilities
 
@@ -423,6 +448,12 @@ def _validate_decision_response(
     return copied
 
 
+def validate_decision_response(
+    value: object, request: dict[str, JsonValue], model: str
+) -> dict[str, JsonValue]:
+    return _validate_decision_response(value, request, model)
+
+
 def _validate_models_response(value: object) -> dict[str, JsonValue]:
     canonical_json(value)
     if not isinstance(value, dict) or not isinstance(value.get("models"), list):
@@ -435,15 +466,248 @@ def _validate_models_response(value: object) -> dict[str, JsonValue]:
     return cast(dict[str, JsonValue], copy.deepcopy(value))
 
 
+def validate_models_response(value: object) -> dict[str, JsonValue]:
+    return _validate_models_response(value)
+
+
 def _allowed_headers(headers: dict[str, str]) -> dict[str, str]:
     allowed: dict[str, str] = {}
     for name, value in headers.items():
-        if name.lower() != "retry-after":
+        lowered = name.lower()
+        if lowered not in {"retry-after", "retry-after-ms", "x-typesafe-request-id"}:
             continue
         if "\r" in value or "\n" in value:
             raise ValueError("decision upstream returned an invalid header")
-        allowed["retry-after"] = value
+        allowed[lowered] = value
     return allowed
+
+
+def _join_upstream_path(base_url: str, endpoint: str) -> str:
+    """Join a validated base URL path prefix to an absolute API endpoint."""
+    prefix = urlsplit(base_url).path.rstrip("/")
+    return f"{prefix}/{endpoint.lstrip('/')}"
+
+
+def _retry_delay(headers: dict[str, str], *, now: float | None = None) -> float:
+    """Return the provider-requested retry delay, or the deterministic 500 ms default."""
+    lowered = {name.lower(): value for name, value in headers.items()}
+    raw_milliseconds = lowered.get("retry-after-ms")
+    if raw_milliseconds is not None:
+        try:
+            milliseconds = float(raw_milliseconds)
+            if math.isfinite(milliseconds) and milliseconds >= 0.0:
+                return milliseconds / 1000.0
+        except ValueError:
+            pass
+    raw_retry_after = lowered.get("retry-after")
+    if raw_retry_after is not None:
+        try:
+            seconds = float(raw_retry_after)
+            if math.isfinite(seconds) and seconds >= 0.0:
+                return seconds
+        except ValueError:
+            try:
+                parsed = email.utils.parsedate_to_datetime(raw_retry_after)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                return max(0.0, parsed.timestamp() - (time.time() if now is None else now))
+            except (TypeError, ValueError, OverflowError):
+                pass
+    return 0.5
+
+
+def _retry_wait_fits(wait_seconds: float, elapsed: float, request_seconds: float) -> bool:
+    """Reserve one second for the resend after the requested wait."""
+    return wait_seconds + 1.0 <= request_seconds - elapsed
+
+
+def _deadline_remaining(deadline: float, *, clock: Callable[[], float] = time.monotonic) -> float:
+    """Return time left on one upstream deadline, or the fixed timeout diagnostic."""
+    remaining = deadline - clock()
+    if remaining <= 0.0:
+        raise _DecisionTransportError("decision upstream timed out")
+    return remaining
+
+
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("agent-reliability-ci")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.5.0"
+
+
+def _tls_diagnostic(exc: ssl.SSLError) -> str:
+    reason = getattr(exc, "reason", None)
+    if isinstance(reason, str) and reason:
+        clean = reason.replace("_", " ").lower()
+    else:
+        clean = format_diagnostic(exc).lower()
+        if clean.startswith("sslerror: "):
+            clean = clean.removeprefix("sslerror: ")
+    return f"TLS failed: {clean}"[:299]
+
+
+def _request_upstream_once(
+    method: str,
+    endpoint: str,
+    body: dict[str, JsonValue] | None,
+    spec: DecisionSpec,
+    api_key: str,
+    deadline: float,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+) -> _UpstreamResult:
+    parts = urlsplit(spec.base_url)
+    if parts.hostname is None:
+        raise ValueError("decision upstream has no host")
+    connection_type = (
+        http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    )
+    connection = connection_type(
+        parts.hostname,
+        parts.port,
+        timeout=max(_deadline_remaining(deadline, clock=clock), 0.001),
+    )
+    raw = None if body is None else canonical_json(body)
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+        "Accept-Encoding": "identity",
+        "User-Agent": f"arci/{_package_version()}",
+    }
+    if raw is not None:
+        headers["Content-Type"] = "application/json"
+    expired = threading.Event()
+    # `getresponse()` detaches the socket from the connection on `Connection: close` replies;
+    # keep our own reference so the deadline can still interrupt a trickling body.
+    sockets: list[socket.socket] = []
+
+    def expire_connection() -> None:
+        expired.set()
+        sock = connection.sock or (sockets[0] if sockets else None)
+        if sock is not None:
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
+            with contextlib.suppress(OSError):
+                sock.close()
+
+    timer = threading.Timer(_deadline_remaining(deadline, clock=clock), expire_connection)
+    timer.daemon = True
+    timer.start()
+    try:
+        try:
+            connection.timeout = max(_deadline_remaining(deadline, clock=clock), 0.001)
+            connection.request(
+                method,
+                _join_upstream_path(spec.base_url, endpoint),
+                body=raw,
+                headers=headers,
+            )
+            if connection.sock is not None:
+                sockets.append(connection.sock)
+                connection.sock.settimeout(max(_deadline_remaining(deadline, clock=clock), 0.001))
+            response = connection.getresponse()
+            response_headers = dict(response.getheaders())
+            lowered_response_headers = {
+                name.lower(): value for name, value in response_headers.items()
+            }
+            encoding = lowered_response_headers.get("content-encoding", "identity")
+            if encoding.lower() != "identity":
+                raise _DecisionTransportError(f"decision upstream sent Content-Encoding {encoding}")
+            payload = bytearray()
+            while True:
+                remaining = _deadline_remaining(deadline, clock=clock)
+                for sock in sockets:
+                    with contextlib.suppress(OSError):
+                        sock.settimeout(max(remaining, 0.001))
+                chunk = response.read1(64 * 1024)
+                if not chunk:
+                    break
+                payload.extend(chunk)
+            _deadline_remaining(deadline, clock=clock)
+        except ssl.SSLError as exc:
+            raise _DecisionTransportError(_tls_diagnostic(exc)) from None
+        except TimeoutError:
+            raise _DecisionTransportError("decision upstream timed out") from None
+        except OSError:
+            if expired.is_set():
+                raise _DecisionTransportError("decision upstream timed out") from None
+            raise
+        try:
+            value = json.loads(bytes(payload).decode("utf-8"))
+            canonical_json(value)
+        except (json.JSONDecodeError, UnicodeError, TypeError, ValueError):
+            raise _DecisionTransportError("decision upstream returned non-JSON") from None
+        return _UpstreamResult(
+            response.status,
+            _allowed_headers(response_headers),
+            cast(JsonValue, value),
+        )
+    finally:
+        timer.cancel()
+        connection.close()
+
+
+def request_decision_upstream(
+    method: str,
+    endpoint: str,
+    body: dict[str, JsonValue] | None,
+    spec: DecisionSpec,
+    *,
+    api_key: str | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> _UpstreamResult:
+    """Call a DecisionSpec HTTP upstream with at most one bounded 429/529 wait."""
+    key = os.environ.get("TYPESAFE_API_KEY") if api_key is None else api_key
+    if not key:
+        raise RuntimeError("TYPESAFE_API_KEY is not set for the decision upstream")
+    started = clock()
+    deadline = started + spec.request_seconds
+    first = _request_upstream_once(method, endpoint, body, spec, key, deadline, clock=clock)
+    if first.status not in {429, 529}:
+        return first
+    delay = _retry_delay(first.headers)
+    elapsed = clock() - started
+    if not _retry_wait_fits(delay, elapsed, spec.request_seconds):
+        return first
+    sleep(delay)
+    remaining = _deadline_remaining(deadline, clock=clock)
+    if remaining < 1.0:
+        return first
+    second = _request_upstream_once(method, endpoint, body, spec, key, deadline, clock=clock)
+    if second.status != 200:
+        raise _DecisionTransportError("decision upstream failed after retry")
+    return _UpstreamResult(
+        second.status,
+        second.headers,
+        second.body,
+        second.error,
+        attempts=2,
+        first_status=first.status,
+    )
+
+
+def _raw_upstream_snapshot(upstream: _UpstreamResult) -> dict[str, JsonValue]:
+    value = cast(
+        dict[str, JsonValue],
+        {
+            "status": upstream.status,
+            "headers": _allowed_headers(upstream.headers),
+            "body": copy.deepcopy(upstream.body),
+            "attempts": upstream.attempts,
+            "first_status": upstream.first_status,
+        },
+    )
+    canonical_json(value)
+    return value
+
+
+def _attach_upstream(result: ToolResult, upstream: dict[str, JsonValue] | None) -> ToolResult:
+    value = cast(dict[str, JsonValue], copy.deepcopy(result.value))
+    value["upstream"] = copy.deepcopy(upstream)
+    canonical_json(value)
+    return result.model_copy(update={"value": value}, deep=True)
 
 
 def _http_response(status: int, body: JsonValue, headers: dict[str, str] | None = None) -> bytes:
@@ -795,9 +1059,9 @@ class _Boundary:
                     body = fixture(copy.deepcopy(pinned), self.spec.seed, call.occurrence)
                     result = _UpstreamResult(200, {}, cast(JsonValue, copy.deepcopy(body)))
                 else:
-                    result = self._http_upstream("POST", "/v1/systemone", pinned, spec)
+                    result = request_decision_upstream("POST", "/v1/systemone", pinned, spec)
             except BaseException as exc:
-                result = _UpstreamResult(500, {}, None, _scrub_diagnostic(exc))
+                result = _UpstreamResult(500, {}, None, upstream_diagnostic(exc))
             with contextlib.suppress(queue.Full):
                 results.put_nowait(_DecisionCompletion(time.monotonic(), result))
 
@@ -833,55 +1097,19 @@ class _Boundary:
                         },
                     )
                 else:
-                    result = self._http_upstream("GET", "/v1/models", None, spec)
+                    result = request_decision_upstream("GET", "/v1/models", None, spec)
             except BaseException as exc:
-                result = _UpstreamResult(500, {}, None, _scrub_diagnostic(exc))
+                result = _UpstreamResult(500, {}, None, upstream_diagnostic(exc))
             with contextlib.suppress(queue.Full):
                 results.put_nowait(_DecisionCompletion(time.monotonic(), result))
 
         self.decision_work = _DecisionWork(call, {}, results, time.monotonic())
         threading.Thread(target=invoke, daemon=True).start()
 
-    def _http_upstream(
-        self,
-        method: str,
-        path: str,
-        body: dict[str, JsonValue] | None,
-        spec: DecisionSpec,
-    ) -> _UpstreamResult:
-        api_key = os.environ.get("TYPESAFE_API_KEY")
-        if not api_key:
-            raise RuntimeError("TYPESAFE_API_KEY is not set for the decision upstream")
-        parts = urlsplit(spec.base_url)
-        if parts.hostname is None:
-            raise ValueError("decision upstream has no host")
-        port = parts.port
-        connection_type = (
-            http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
-        )
-        connection = connection_type(parts.hostname, port, timeout=spec.request_seconds)
-        raw = None if body is None else canonical_json(body)
-        headers = {"Authorization": f"Bearer {api_key}"}
-        if raw is not None:
-            headers["Content-Type"] = "application/json"
-        try:
-            connection.request(method, path, body=raw, headers=headers)
-            response = connection.getresponse()
-            payload = response.read()
-            try:
-                value = json.loads(payload.decode("utf-8"))
-                canonical_json(value)
-            except (json.JSONDecodeError, UnicodeError, TypeError, ValueError) as exc:
-                raise ValueError("decision upstream returned non-JSON") from exc
-            return _UpstreamResult(
-                response.status,
-                _allowed_headers(dict(response.getheaders())),
-                cast(JsonValue, value),
-            )
-        finally:
-            connection.close()
-
     def _decision_result(self, result: ToolResult) -> None:
+        value_before = cast(dict[str, JsonValue], result.value)
+        if "upstream" not in value_before:
+            result = _attach_upstream(result, None)
         value = cast(dict[str, JsonValue], copy.deepcopy(result.value))
         status = cast(int, value["status"])
         headers = cast(dict[str, str], value["headers"])
@@ -930,6 +1158,7 @@ class _Boundary:
             self.decision_work = None
             self._queue_http(200, value["body"], cast(dict[str, str], value["headers"]))
             return
+        raw_upstream = _raw_upstream_snapshot(upstream)
         if upstream.status == 422:
             value = cast(
                 dict[str, JsonValue],
@@ -948,6 +1177,22 @@ class _Boundary:
                 error_kind="http_422",
             )
             result = self._apply_after(call, result)
+            rewritten = cast(dict[str, JsonValue], result.value)
+            rewritten_status = rewritten.get("status")
+            if not isinstance(rewritten_status, int) or isinstance(rewritten_status, bool):
+                raise ValueError("decision perturbation returned an invalid status")
+            rewritten_body = copy.deepcopy(rewritten.get("body"))
+            canonical_json(rewritten_body)
+            result = result.model_copy(
+                update={
+                    "value": {
+                        "status": rewritten_status,
+                        "headers": _allowed_headers(cast(dict[str, str], rewritten.get("headers"))),
+                        "body": rewritten_body,
+                    }
+                },
+                deep=True,
+            )
             canonical_json(result.model_dump(mode="python"))
         elif upstream.status == 200:
             body = _validate_decision_response(upstream.body, work.request, spec.model)
@@ -980,6 +1225,7 @@ class _Boundary:
             self.decision_work = None
             self._queue_http(500, {"detail": "arci: decision upstream failed"})
             return
+        result = _attach_upstream(result, raw_upstream)
         self._decision_result(result)
 
     def _poll_decision_work(self) -> None:
@@ -1093,6 +1339,7 @@ class _Boundary:
             result = replayed.model_copy(
                 update={"call_id": call.call_id, "tool": DECISION_TOOL}, deep=True
             )
+            result = _attach_upstream(result, None)
             value = cast(dict[str, JsonValue], copy.deepcopy(result.value))
             self._emit_finish(result)
             self._queue_http(

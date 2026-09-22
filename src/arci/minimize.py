@@ -49,6 +49,7 @@ def minimize_faults(
     original = tuple(range(len(faults)))
     cache: dict[tuple[int, ...], TrialEnvelope] = {original: trial}
     trials_run = 0
+    uncertain_single_removal = False
 
     def candidate_spec(indices: Sequence[int]) -> TrialSpec:
         condition = Condition(
@@ -74,8 +75,11 @@ def minimize_faults(
         trials_run += 1
         return observed
 
-    def reproduces(indices: tuple[int, ...]) -> bool:
+    def reproduces(indices: tuple[int, ...], *, removed_from: tuple[int, ...]) -> bool:
+        nonlocal uncertain_single_removal
         observed = evaluate(indices)
+        if len(indices) == len(removed_from) - 1 and observed.outcome is Outcome.ERROR:
+            uncertain_single_removal = True
         return (
             observed.outcome is Outcome.FAIL
             and observed.failure_fingerprint == trial.failure_fingerprint
@@ -88,7 +92,7 @@ def minimize_faults(
         reduced_to: tuple[int, ...] | None = None
 
         for subset in subsets:
-            if reproduces(subset):
+            if reproduces(subset, removed_from=current):
                 reduced_to = subset
                 break
 
@@ -96,7 +100,7 @@ def minimize_faults(
             for subset in subsets:
                 members = set(subset)
                 complement = tuple(index for index in current if index not in members)
-                if reproduces(complement):
+                if reproduces(complement, removed_from=current):
                     reduced_to = complement
                     break
 
@@ -111,11 +115,14 @@ def minimize_faults(
     single_removals_lose_failure = True
     for removed_index in current:
         without_one = tuple(index for index in current if index != removed_index)
-        if reproduces(without_one):
+        if reproduces(without_one, removed_from=current):
             single_removals_lose_failure = False
 
     was_reduced = current != original
-    if current and single_removals_lose_failure:
+    live_http = spec.decisions is not None and spec.decisions.upstream == "http"
+    if live_http or uncertain_single_removal:
+        minimality = "reduced"
+    elif current and single_removals_lose_failure:
         minimality = "1-minimal"
     elif was_reduced:
         minimality = "reduced"

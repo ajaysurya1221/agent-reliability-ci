@@ -1,54 +1,34 @@
-# v0.5 to-do: the decision boundary (Jev / System One)
+# v0.6 to-do: ready for Jev day one
 
-Live checklist for the autonomous build started 2026-09-22. Goal: arci records, replays, budgets
-and perturbs System One (Jev) decisions made by the agent under test, with zero agent changes and
-the API key never entering the agent's process. Everything runs offline; a real key slots in later.
-Research: `docs/design/jev-research-2026-09-22.md`.
+Plan: `~/.claude/plans/you-are-in-plan-bubbly-moore.md` (approved 2026-09-22). The v0.5 log is in
+`CHANGELOG.md` and git history. Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
 
-Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
+## 1. Freeze (Claude; Astra xhigh design review folded in)
+- [x] Astra design review: PLAN_V06: CHANGE; folded in (request_seconds stays 5 s under the SDK
+      timeout, the bounded wait is recorded as attempts/first_status, ERROR on removal blocks 1-minimal)
+- [x] `schema.py`: `base_url` with path prefix; `max_requests_per_minute`; `request_seconds` stays 5 s
+- [x] `AGENTS.md` v0.6 rules (tolerant validation, headers, throttle, bounded wait, raw upstream,
+      preflight, minimality for http upstream)
+- [x] Frozen acceptance tests (`test_decisions_v06.py`, `test_decisions_node.py`): gateway-shaped fake upstream, 429-then-200, encoding, TLS message,
+      preflight exit codes, throttle timing, raw upstream in records, tokens/cost in report,
+      Node agent (skipped without node)
+- [x] `FROZEN.sha256`, worktrees wp-k1 / wp-k2 with `.venv`; design record `docs/design/0004-day-one.md`
 
-## 0. Ideation and design (Claude leads, Astra consults)
-- [x] Research Jev: blog, docs (api, models, confidence, jaggedness, patterns, cookbooks), SDK
-      source (`typesafe-sdk` 0.7.1, `system-one-adapter` 0.2.0), third-party write-ups
-- [x] Confirm the integration seam: SDKs read `TYPESAFE_BASE_URL` / `TYPESAFE_API_KEY`
-- [x] Astra (xhigh) adversarial review of the goal and design; fold in the verdict (DESIGN: CHANGE, all folded in)
-- [x] Write `docs/design/0003-decision-boundary.md` (decision record)
-
-## 1. Freeze (Claude owns; hash-pinned in FROZEN.sha256)
-- [x] `schema.py`: `DecisionSpec`, `Manifest.decisions`, `TrialSpec.decisions`; reserved tool
-      name `decision`; manifest validation rules
-- [x] `schedule.py`: bind `decisions` into every `TrialSpec` (spec hash changes)
-- [x] Perturbation kinds `decision_low_confidence`, `decision_unavailable` and their params
-- [x] Acceptance tests: HTTP boundary record/replay/miss, key isolation, budgets, 401/422/529
-      mapping, perturbation maths, diff signatures, fixture upstream, hero demo 2 exit codes
-- [x] `AGENTS.md` v0.5 section for the coder; regenerate `FROZEN.sha256`
-
-## 2. Build (Sol implements offline; Claude verifies outside the sandbox)
-- [x] WP-J1: loopback HTTP listener in the boundary process; record/replay/budget for decisions;
-      fixture and http upstreams; env injection in the runner (26/26 decision acceptance tests)
-- [x] WP-J2 (in J1): decision perturbations; diff signatures for decisions
-- [x] WP-J3 (WP-J2 job): `examples/jev_triage_agent` (A gated, B regression, C fix; fixture answers from
-      hidden ground truth; MCP tools `issue_refund` / `escalate` / `reply`; independent oracle)
-- [x] Hero demo 2 script: A vs B exit 1, A vs A exit 0, A vs C exit 0, replay REPRODUCED,
-      minimiser 1-minimal; wired into CI (test_hero_decisions.py 5/5)
+## 2. Build (Sol, two parallel work packages)
+- [x] WP-K1 boundary/runner/cli/report/minimize: A1 A2 A3 B4 B5 B6 C9 (v0.6 acceptance 13/13, all
+      decision and MCP socket suites green in the worktree; three test-side fixes on the way)
+- [x] WP-K2 example/docs: C8 Node agent + package.json + CI step, B7 runbook + results template,
+      README, CHANGELOG 0.6.0, ROADMAP, D10 calibration option (Node test 2/2 with the unmodified JS SDK)
 
 ## 3. Verify and review
-- [x] Full suite (406 tests), ruff, basedpyright strict, frozen hashes unchanged; hosted CI green on
-      Python 3.11 and 3.14 (first run caught a 3.11 json.dumps recursion limit in two probes; fixed)
-- [x] Astra adversarial review of the full diff with reproductions: CHANGES_REQUIRED, 5 blocking
-      (lost worker faults, non-total validation, cross-transport order, pipelining, key leaks) + Expect stall
-- [x] Frozen regression tests for every finding (`test_decisions_hardening.py`, 9 tests); Sol fixed them (WP-J1b)
-- [x] Astra re-check: findings 1-4, 6, 8-11 FIXED; 5 closed by rejecting harness-owned env vars in
-      manifests; its one new blocker (weakened score-legend validation) fixed with a unit test
-- [-] Specialist escalation: not needed this release
+- [x] Full suite (430 tests), ruff, basedpyright strict, frozen hashes; hero demo 2 via CLI; Node test locally
+- [x] Astra release review: CHANGES_REQUIRED (failed resend escaped ERROR, per-entry probability bound,
+      preflight echoing provider strings, temp-tarball lock, version 0.5.0) + slow-drip deadline + docs
+- [x] Frozen regression tests for every finding; version 0.6.0; registry lock; docs corrected; Sol fixed them (WP-K1b); all socket suites green
+- [~] Astra re-check of the fixes; final full gate on the merged branch
 
-## 4. Docs and release
-- [x] `docs/DECISIONS.md` user guide ("Testing agents that use Jev"), TRUST_MODEL addendum,
-      REAL_AGENTS pointer, README section + status, CHANGELOG 0.5.0, ROADMAP update
-- [x] Tag `v0.5.0` (8a54c0b), pushed; repo stays private; no PyPI
-- [x] Update project memory. This file stays as the release log for v0.5; delete it when the next cycle starts
+## 4. Release
+- [ ] Merge to main, CI green on 3.11 and 3.14, tag `v0.6.0`, memory, close this list
 
-## Cut first if behind
-- [-] Descriptive "Decisions" table in `arci report`: cut on Astra's advice (repeated decisions inside trials are not independent draws)
-- [-] Ollama-backed System One emulator (use `system-one-adapter`; roadmap note only)
-- [-] Python in-process agents (run them as command agents through the toolset bridge)
+## Cut order if behind
+D10, then C8's CI step (keep the local test), then B6's worker cap. Never cut A1, A3, B4, B5.

@@ -5,10 +5,10 @@ acts through MCP. Agent A applies the TypeSafe confidence-gating pattern: every 
 needs confidence 0.6, a refund needs 0.85, and uncertainty or provider failure escalates to a
 human. B is the regression: it silently returns in those cases. C restores escalation.
 
-The agent uses only the Python standard library. ARCI supplies the same `TYPESAFE_BASE_URL` and
-`TYPESAFE_API_KEY` variables the official SDKs read: the Python `typesafe-sdk` is exercised
-unchanged by the acceptance tests for the request shapes they cover; the JavaScript SDK has no
-test in this repository.
+`agent.py` uses only the Python standard library. `agent.mjs` mirrors it with the official
+`@typesafe-ai/sdk` 0.6.0 and Node 20 or newer. ARCI supplies the same `TYPESAFE_BASE_URL` and
+`TYPESAFE_API_KEY` variables both official SDKs read, and the acceptance suite exercises each SDK
+unchanged against the harness-owned boundary.
 
 ## Run
 
@@ -43,3 +43,12 @@ human, not whether escalation solves the ticket automatically.
 To use real Jev, build the same manifest with `DecisionSpec(upstream="http")` and provide
 `TYPESAFE_API_KEY` only in the harness environment. Real answers are sampled and may not replay
 the same agent path.
+
+## Synthetic miscalibration
+
+`calibrated_manifest()` is an offline fixture option. Its task puts
+`{"calibration":{"ambiguous_share":x,"confidence":c}}` on each public ticket; a seeded share `x`
+is treated as ambiguous, and the fixture selects a wrong department with probability `1 - c`
+while reporting confidence `c`. Selection is deterministic for each seed and decision occurrence.
+This is synthetic test data for confidence-gating regressions, never a claim about Jev's behaviour
+or calibration.
