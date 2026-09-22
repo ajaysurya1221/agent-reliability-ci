@@ -7,16 +7,31 @@ Every model is immutable and rejects unknown fields. Sealed records carry a
 
 from __future__ import annotations
 
+import math
 from enum import Enum, StrEnum
 from typing import Annotated, Any, ClassVar, Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from arci.hashing import hash_record
 
-SCHEMA_VERSION = "arci/0.2"
+SCHEMA_VERSION = "arci/0.5"
 N_PER_ARM_MIN = 1
 N_PER_ARM_MAX = 10_000
+
+# v0.5: decisions. A System One (Jev-style) request is recorded as a tool call under a reserved
+# name, so budgets, fingerprints, replay, diff and the minimiser apply unchanged. No MCP server may
+# advertise a tool under either reserved prefix.
+DECISION_TOOL = "decision:systemone"
+DECISION_MODELS_TOOL = "decision:models"
+DECISION_TOOL_PREFIX = "decision:"
+RPC_TOOL_PREFIX = "rpc:"
+# Perturbations that act on decisions, each with the parameter names it accepts.
+DECISION_PERTURBATIONS: dict[str, frozenset[str]] = {
+    "decision_low_confidence": frozenset({"confidence_max"}),
+    "decision_unavailable": frozenset(),
+}
 
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 AgentRef = Annotated[str, Field(pattern=r"^[A-Za-z_][\w.]*:[A-Za-z_]\w*$")]  # "module:function"
@@ -274,6 +289,54 @@ class McpServerSpec(Model):
     snapshot: AgentRef
 
 
+class DecisionSpec(Model):
+    """A System One decision endpoint (TypeSafe's `POST /v1/systemone`) for command agents.
+
+    The boundary process serves it on loopback and the agent is pointed at it through
+    `TYPESAFE_BASE_URL` / `TYPESAFE_API_KEY` (a per-trial token, never the real key), so an agent
+    using the official SDKs needs no code change. Every attempt the agent makes is recorded under
+    the reserved tool name `decision:systemone`, budgeted, perturbable and replayable exactly like
+    a tool call. `upstream` says where live answers come from: a trusted `fixture` function
+    `(request, seed, occurrence) -> response body` imported in the boundary, or `http`, forwarded
+    verbatim (with `model` pinned) to `base_url` with the real key taken from the HARNESS
+    environment. Real upstream failures are harness faults (ERROR), never agent failures.
+    """
+
+    upstream: Literal["fixture", "http"]
+    fixture: AgentRef | None = None
+    base_url: str = "https://api.typesafe.ai"
+    # Pinned model id. Forwarded requests carry it; a response reporting another model is a
+    # harness fault. Aliases such as `jev-latest` move under you; pin the version you tuned for.
+    model: str = "jev-1.13.0"
+    max_decisions: int = Field(default=50, ge=0, le=1000)
+    # Upstream or fixture time limit per attempt. Exceeding it is a harness fault, not a timeout.
+    request_seconds: float = Field(default=5.0, gt=0, le=3600)
+    # Largest request body the boundary accepts; a larger one is answered 413, agent's problem.
+    max_body_bytes: int = Field(default=262_144, ge=1, le=1_048_576)
+
+    @model_validator(mode="after")
+    def _upstream_is_consistent(self) -> DecisionSpec:
+        if (self.upstream == "fixture") != (self.fixture is not None):
+            raise ValueError("`fixture` is required for upstream 'fixture' and forbidden otherwise")
+        if not self.model or any(ch.isspace() for ch in self.model):
+            raise ValueError("model must be a non-empty id without whitespace")
+        parts = urlsplit(self.base_url)
+        loopback = parts.scheme == "http" and parts.hostname in {"127.0.0.1", "localhost"}
+        if not (parts.scheme == "https" or loopback):
+            raise ValueError("base_url must be an https origin or a loopback http origin")
+        if (
+            not parts.hostname
+            or "@" in parts.netloc
+            or parts.path not in {"", "/"}
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError(
+                "base_url must be a bare origin: no credentials, path, query, fragment"
+            )
+        return self
+
+
 class ArmSpec(Model):
     label: str
     agent: AgentRef | None = None  # python agent: (task, tools, rng) -> dict
@@ -292,7 +355,7 @@ class ArmSpec(Model):
 class Manifest(Sealed):
     """Frozen before execution. Changing anything means a new experiment."""
 
-    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.5"] = SCHEMA_VERSION
     experiment_id: str
     created_at: str = ""
     task_id: str
@@ -301,6 +364,8 @@ class Manifest(Sealed):
     # Command agents need `mcp_server`. Both arms of one experiment are the same kind.
     toolset: AgentRef | None = None
     mcp_server: McpServerSpec | None = None
+    # Command agents only: a System One decision endpoint the agent may call. See DecisionSpec.
+    decisions: DecisionSpec | None = None
     contract: ContractSpec
     baseline: ArmSpec
     candidate: ArmSpec
@@ -343,6 +408,52 @@ class Manifest(Sealed):
             raise ValueError("command agents need `mcp_server` and no `toolset`")
         return self
 
+    @model_validator(mode="after")
+    def _decisions_are_consistent(self) -> Manifest:
+        if self.decisions is not None and self.mcp_server is None:
+            raise ValueError("`decisions` needs command agents (an `mcp_server`)")
+        if self.decisions is not None:
+            # The harness owns these variables: it injects the loopback endpoint and a per-trial
+            # token into the agent and strips both from the MCP server. A manifest that carries
+            # them would seal a key into every record and bundle made from it.
+            owned = {"TYPESAFE_API_KEY", "TYPESAFE_BASE_URL"}
+            configured = [
+                env
+                for env in (
+                    self.baseline.command.env if self.baseline.command else {},
+                    self.candidate.command.env if self.candidate.command else {},
+                    self.mcp_server.env if self.mcp_server else {},
+                )
+                if owned & set(env)
+            ]
+            if configured:
+                raise ValueError(
+                    "TYPESAFE_API_KEY / TYPESAFE_BASE_URL are harness-owned; remove them from env"
+                )
+        for condition in self.conditions:
+            for fault in condition.faults:
+                allowed = DECISION_PERTURBATIONS.get(fault.name)
+                if allowed is None:
+                    if fault.tool is not None and fault.tool.startswith(DECISION_TOOL_PREFIX):
+                        raise ValueError(f"{fault.name} cannot target decisions")
+                    continue
+                if self.decisions is None:
+                    raise ValueError(f"{fault.name} needs `decisions`")
+                if fault.tool != DECISION_TOOL:
+                    raise ValueError(f"{fault.name} must target {DECISION_TOOL}")
+                unknown = set(fault.params) - allowed
+                if unknown:
+                    raise ValueError(f"{fault.name}: unknown params {sorted(unknown)}")
+                cap = fault.params.get("confidence_max")
+                if cap is not None and (
+                    isinstance(cap, bool)
+                    or not isinstance(cap, int | float)
+                    or not math.isfinite(cap)
+                    or not 0.0 <= cap <= 1.0
+                ):
+                    raise ValueError("confidence_max must be a finite number in [0, 1]")
+        return self
+
 
 class TrialSpec(Model):
     experiment_id: str
@@ -354,6 +465,7 @@ class TrialSpec(Model):
     command: CommandSpec | None = None
     toolset: AgentRef | None = None
     mcp_server: McpServerSpec | None = None
+    decisions: DecisionSpec | None = None
     task_id: str
     task: dict[str, JsonValue] = Field(default_factory=dict)
     condition: Condition
@@ -390,7 +502,7 @@ class ContractResult(Model):
 
 
 class TrialEnvelope(Sealed):
-    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.5"] = SCHEMA_VERSION
     spec_sha256: Sha256
     experiment_id: str
     trial_id: str
@@ -448,7 +560,7 @@ class LookDecision(Model):
 
 
 class GateDecision(Sealed):
-    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.5"] = SCHEMA_VERSION
     experiment_id: str
     manifest_sha256: str
     trials_sha256: str  # hash_record of the sorted trial record_sha256 list
@@ -472,7 +584,7 @@ class GateDecision(Sealed):
 class ReplayBundle(Sealed):
     """Portable, self-contained reproducer for one failing trial."""
 
-    schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
+    schema_version: Literal["arci/0.5"] = SCHEMA_VERSION
     manifest: Manifest
     spec: TrialSpec  # tool_mode REPLAY, recording filled in
     expected_outcome: Outcome

@@ -5,6 +5,11 @@ runs it once per trial and gives it an MCP config file. The boundary records the
 request/response exchanges; only `tools/call` is budgeted and fault-injected. Everything the agent
 does outside MCP is invisible (see the trust model).
 
+Command agents that also call a TypeSafe System One decision model can put those HTTP requests
+behind the v0.5 boundary without changing official SDK code. See
+[Testing agents that use Jev](DECISIONS.md) for `DecisionSpec`, key isolation, perturbations and
+replay.
+
 ```text
 your agent (any argv) --stdio--> arci.mcp_shim --unix socket--> arci.mcp_boundary --stdio--> MCP server
                                   byte relay only               recorder, faults, budgets     the environment

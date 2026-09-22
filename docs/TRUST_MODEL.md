@@ -59,3 +59,28 @@ A bundle embeds only the files you explicitly include (the minimiser's output em
 portable replay needs every referenced module, fixture and a compatible environment. Replay also
 requires the recording to be consumed exactly; anything else is INVALID.
 Payload paths are confined to the bundle's temp directory; absolute paths and `..` are rejected.
+
+## Decisions (v0.5)
+
+A command agent may call a System One decision endpoint (TypeSafe's Jev API) through a
+harness-owned loopback endpoint. What that adds, and what it does not:
+
+- Only supported, serial calls that reach the injected `TYPESAFE_BASE_URL` are observed. An agent
+  that hard-codes the provider's URL, or an SDK that ignores the environment, bypasses the boundary
+  and is invisible, exactly like direct network access.
+- The real API key stays in the harness and the boundary. The agent receives a per-trial token that
+  is unrelated to the protocol nonce and is never recorded.
+- Every admitted request (state and extra fields included) and every response (status, body and
+  the `retry-after` header) is recorded in the trial and in any bundle made from it. Records may
+  therefore contain sensitive state. Adversarial content in the state is the agent's problem.
+- Each attempt consumes both the tool-call and the decision budget; exhaustion is FAIL/budget.
+- Real provider or fixture faults (network, 401/403, 429, 5xx, a malformed or mis-typed answer,
+  a fixture that raises) are harness faults: ERROR, never an agent failure. Injected faults are not.
+- A local rejection (wrong token, oversize or malformed request) is served deterministically and
+  sets no latch; the oracle still decides the trial.
+- Replay executes no upstream, no fixture and no perturbation, and requires exact ordered
+  consumption; a parent-verified miss or leftover is ERROR/replay_miss and the replay is INVALID.
+- Confidence reported by a decision model is not certified accuracy. The oracle and the gate are
+  unchanged; nothing a decision model says enters a verdict except through the agent's actions.
+- Determinism and minimality claims hold for seeded fixtures. Live Jev is sampled; what replays
+  is the recording.

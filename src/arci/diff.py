@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import JsonValue
 
 from arci.hashing import canonical_json
-from arci.schema import Divergence, Event, TrialEnvelope
+from arci.schema import DECISION_TOOL_PREFIX, Divergence, Event, TrialEnvelope
 
 DiffMode = Literal["boundary", "all"]
 _BOUNDARY_KINDS = frozenset({"tool_start", "tool_finish", "agent_result", "trial_end"})
@@ -30,17 +30,32 @@ def _value_digest(value: object) -> str:
 def step_signature(event: Event) -> str:
     """Return a stable signature containing only the event's semantic content."""
     if event.kind == "tool_start":
+        tool = event.payload.get("tool")
+        if isinstance(tool, str) and tool.startswith(DECISION_TOOL_PREFIX):
+            return (
+                f"tool_start tool={_json(tool)} "
+                f"occurrence={_json(event.payload.get('occurrence'))} "
+                f"arguments#{_value_digest(event.payload.get('arguments', {}))}"
+            )
         return (
-            f"tool_start tool={_json(event.payload.get('tool'))} "
-            f"arguments={_json(event.payload.get('arguments', {}))}"
+            f"tool_start tool={_json(tool)} arguments={_json(event.payload.get('arguments', {}))}"
         )
     if event.kind == "tool_finish":
+        tool = event.payload.get("tool")
+        value = event.payload.get("value")
+        status = value.get("status") if isinstance(value, dict) else None
+        status_field = (
+            (f"status={_json(status)}",)
+            if isinstance(tool, str) and tool.startswith(DECISION_TOOL_PREFIX)
+            else ()
+        )
         return " ".join(
             (
                 "tool_finish",
-                f"tool={_json(event.payload.get('tool'))}",
+                f"tool={_json(tool)}",
                 f"ok={_json(event.payload.get('ok'))}",
-                f"value#{_value_digest(event.payload.get('value'))}",
+                *status_field,
+                f"value#{_value_digest(value)}",
                 f"error_kind={_json(event.payload.get('error_kind'))}",
                 f"injected_by={_json(event.payload.get('injected_by'))}",
             )

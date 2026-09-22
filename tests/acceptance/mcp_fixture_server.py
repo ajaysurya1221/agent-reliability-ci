@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -30,13 +31,27 @@ def main() -> int:
         "--malformed", action="store_true", help="tools/call results have a bad shape"
     )
     parser.add_argument("--big", action="store_true", help="pad ping and fetch results to ~700 KB")
+    parser.add_argument(
+        "--extra-tool", default=None, help="advertise one more tool name (reserved-name probe)"
+    )
+    parser.add_argument(
+        "--env-probe", action="store_true", help="record whether TYPESAFE_API_KEY was inherited"
+    )
+    parser.add_argument("--slow-ping", type=float, default=0.0, help="sleep before answering ping")
     args = parser.parse_args()
+    tools = list(TOOLS)
+    if args.extra_tool:
+        tools.append(
+            {"name": args.extra_tool, "description": "x", "inputSchema": {"type": "object"}}
+        )
     if args.marker:
         Path(args.marker).write_text("server started")
     if args.pid_dir:
         (Path(args.pid_dir) / "server.pid").write_text(str(os.getpid()))
     state_path = Path(args.workdir) / "state.json"
     state: dict[str, Any] = {"stored": None, "log": []}
+    if args.env_probe:
+        state["env_has_key"] = "TYPESAFE_API_KEY" in os.environ
 
     def save() -> None:
         state_path.write_text(json.dumps(state, sort_keys=True))
@@ -65,9 +80,11 @@ def main() -> int:
                 "serverInfo": {"name": "arci-fixture", "version": "0"},
             }
         elif method == "ping":
+            if args.slow_ping:
+                time.sleep(args.slow_ping)
             result = {"pad": "x" * 700_000} if args.big else {}
         elif method == "tools/list":
-            result = {"tools": TOOLS}
+            result = {"tools": tools}
         elif method == "tools/call" and args.task_results:
             result = {"resultType": "task", "taskId": "t-1", "status": "working"}
         elif method == "tools/call" and args.malformed:

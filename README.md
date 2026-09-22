@@ -14,8 +14,8 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.4.0. Python agents that use the declared tool boundary, and any program that speaks MCP
-over stdio. Read
+Status: v0.5.0. Python agents that use the declared tool boundary, any program that speaks MCP over
+stdio, and command agents that call a System One decision endpoint. Read
 [what it does not do](#limits) before you rely on it.
 
 ## Why
@@ -54,6 +54,20 @@ failure rate comes from the environment. Reservations already exist with configu
 65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`), and in those
 the missing retry never matters. That is exactly why one run hides it.
 
+### Hero demo 2: decision confidence
+
+```bash
+.venv/bin/python examples/jev_triage_agent/hero_demo.py --n 50
+```
+
+This six-step offline demo tests a support-triage agent that asks a Jev-shaped System One endpoint
+and then acts through MCP. A escalates when confidence is low, B silently abandons the ticket, and C
+restores escalation. The fixture needs no API key. Measured on a 15-core laptop, about 20 s: A vs B
+50/50 vs 0/50, bounds on the difference [-1.000, -0.832], BLOCK; A vs A 50/50 vs 50/50, bounds
+[-0.084, 0.084], PASS; the minimiser keeps only `decision_low_confidence` (1-minimal, 2 trials);
+the reduced failure replays REPRODUCED with no decision provider running; C passes B's reproducer
+live and A vs C is PASS.
+
 ## Real agents (v0.2)
 
 An agent does not have to be a Python function. A **command agent** is any program that speaks MCP
@@ -68,6 +82,17 @@ your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (th
 
 [docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) has the recipe and a worked example: a real tool-calling
 agent on a local Ollama model whose two arms differ by one sentence of the system prompt.
+
+## Agents that use a decision model (v0.5)
+
+ARCI can also put `POST /v1/systemone` behind the command-agent boundary. The harness supplies
+`TYPESAFE_BASE_URL` and a per-trial token, while the real key remains in the harness. The Python
+`typesafe-sdk` works unchanged for the request shapes the acceptance tests cover; the JavaScript
+SDK reads the same variables but has no test in this repository. Decisions are recorded, budgeted, perturbed and replayed under the
+reserved tool name `decision:systemone`.
+
+See [Testing agents that use Jev](docs/DECISIONS.md) and the offline
+[`examples/jev_triage_agent`](examples/jev_triage_agent) confidence-gating regression.
 
 ## How it works
 

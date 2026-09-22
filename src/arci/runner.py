@@ -46,7 +46,10 @@ from arci.schema import (
 from arci.storage import ExperimentStore
 from arci.toolbox import format_diagnostic
 
-_MAX_PROTOCOL_LINE = 1024 * 1024
+# A decision request may itself be 1 MiB.  Its authenticated event frame also
+# carries the event envelope and nonce, so the protocol limit must leave room
+# beyond the HTTP body limit.
+_MAX_PROTOCOL_LINE = 4 * 1024 * 1024
 _PROTOCOL_QUEUE_SIZE = 256
 _GRADER_TIMEOUT = "grader timed out"
 _GRADER_EXIT = "grader exited non-zero"
@@ -921,6 +924,7 @@ def _run_command_trial(
     protocol_error: str | None = None
     sink_error: str | None = None
     ready_seen = False
+    decision_port: int | None = None
     result_seen = False
     expected_seq = 0
     tool_starts = 0
@@ -932,6 +936,7 @@ def _run_command_trial(
     boundary: subprocess.Popen[bytes] | None = None
     agent: subprocess.Popen[bytes] | None = None
     nonce = secrets.token_hex(16)
+    decision_token = secrets.token_hex(16) if spec.decisions is not None else None
     messages: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=_PROTOCOL_QUEUE_SIZE)
     reader_stop = threading.Event()
     reader_abandon = threading.Event()
@@ -958,7 +963,7 @@ def _run_command_trial(
                 stop_all()
 
     def consume(message_kind: str, value: object) -> None:
-        nonlocal protocol_error, ready_seen, result_seen, worker_result
+        nonlocal protocol_error, ready_seen, result_seen, worker_result, decision_port
         nonlocal expected_seq, tool_starts, record_chunk_count, replay_consumed
         if message_kind == "reader_done":
             return
@@ -979,6 +984,14 @@ def _run_command_trial(
             if kind == "ready":
                 if ready_seen or result_seen:
                     raise ValueError("invalid boundary ready frame")
+                raw_port = decoded.get("decision_port")
+                if spec.decisions is None:
+                    if raw_port is not None:
+                        raise ValueError("unexpected decision port")
+                elif type(raw_port) is not int or raw_port < 1 or raw_port > 65535:
+                    raise ValueError("invalid decision port")
+                else:
+                    decision_port = raw_port
                 ready_seen = True
             elif kind == "event":
                 if result_seen:
@@ -1078,14 +1091,15 @@ def _run_command_trial(
             start_new_session=True,
         )
         assert boundary.stdin is not None and boundary.stdout is not None
-        boundary_request = canonical_json(
-            {
-                "nonce": nonce,
-                "spec": spec.model_dump(mode="json"),
-                "socket_path": socket_path,
-                "workdir": directory,
-            }
-        )
+        boundary_config: dict[str, object] = {
+            "nonce": nonce,
+            "spec": spec.model_dump(mode="json"),
+            "socket_path": socket_path,
+            "workdir": directory,
+        }
+        if decision_token is not None:
+            boundary_config["decision_token"] = decision_token
+        boundary_request = canonical_json(boundary_config)
 
         def write_boundary_config() -> None:
             try:
@@ -1136,6 +1150,10 @@ def _run_command_trial(
                     "PYTHONPATH": _pythonpath(extra_pythonpath),
                 }
             )
+            if spec.decisions is not None:
+                assert decision_port is not None and decision_token is not None
+                command_env["TYPESAFE_BASE_URL"] = f"http://127.0.0.1:{decision_port}"
+                command_env["TYPESAFE_API_KEY"] = decision_token
             agent = subprocess.Popen(
                 _expand_command(
                     spec.command.argv,
@@ -1174,7 +1192,7 @@ def _run_command_trial(
                     # closes the socket, and it writes its final frame on the way out.
                     # Give it a deadline-derived window to do that before asking it to
                     # stop; only a boundary still held open past the window is signalled.
-                    boundary_stop_at = now + remaining / 2.0
+                    boundary_stop_at = now if spec.decisions is not None else now + remaining / 2.0
             if (
                 boundary is not None
                 and boundary_exit is None
@@ -1285,6 +1303,9 @@ def _run_command_trial(
         else:
             base_termination = Termination.COMPLETED
             detail = ""
+
+        if base_termination is Termination.HARNESS_ERROR and harness_error is None:
+            harness_error = detail
 
         if isinstance(replay_error, str):
             termination = Termination.REPLAY_MISS

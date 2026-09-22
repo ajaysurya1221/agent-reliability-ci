@@ -106,6 +106,10 @@ class ToolSet(Protocol):
 AgentFn = Callable[[dict[str, JsonValue], ToolBoxProtocol, random.Random], dict[str, JsonValue]]
 ToolSetFactory = Callable[[dict[str, JsonValue], int], ToolSet]
 OracleFn = Callable[[dict[str, JsonValue], dict[str, JsonValue]], bool]
+# v0.5: a trusted stand-in for a System One endpoint, imported in the boundary process.
+# (request body with `model` already pinned, trial seed, 0-based occurrence) -> response body
+# `{"model", "answers", "usage"}`. Raising, or returning an invalid body, is a harness fault.
+DecisionFixture = Callable[[dict[str, JsonValue], int, int], dict[str, JsonValue]]
 
 
 @runtime_checkable

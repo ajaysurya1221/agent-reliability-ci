@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.5.0 (2026-09-22)
+
+Command agents can now test the decision logic around TypeSafe's Jev/System One API.
+
+- `Manifest.decisions: DecisionSpec` adds a harness-owned loopback `POST /v1/systemone` boundary.
+  Agents are redirected through `TYPESAFE_BASE_URL` and a per-trial token; the real upstream key
+  stays in the harness (the MCP server child does not inherit it, diagnostics are scrubbed). The
+  Python `typesafe-sdk` is exercised unchanged by the acceptance tests; the JavaScript SDK reads the
+  same variables but is untested here.
+- Admitted decisions use the existing `ToolCall`, `ToolResult` and `RecordedCall` records under
+  `decision:systemone`, so budgets, events, diff, minimisation, bundles and exact replay apply.
+- `decision_low_confidence` mixes choice probabilities toward uniform without changing the winner;
+  `decision_unavailable` returns an injected 529 from a selected occurrence onward.
+- The boundary now lives until the command agent exits when decisions are configured, including
+  decisions made after the MCP session closes. Decision/MCP overlap and concurrent decisions are
+  rejected as harness faults.
+- Schema `arci/0.5` adds decision configuration to sealed manifests and trial specs. Records sealed
+  by earlier schema versions are not readable; as with every field addition, experiments must be
+  re-run.
+- The official `typesafe-sdk` is a development-only dependency used by an acceptance test against
+  the boundary. Runtime code and `examples/jev_triage_agent` do not import it.
+- `examples/jev_triage_agent` is a six-step offline triage demo: a confidence-gating regression is
+  blocked, reduced, replayed, and repaired. `docs/DECISIONS.md` documents fixture and real-Jev use.
+
 ## v0.4.0 (2026-09-22)
 
 One thing: pre-registered looks, so an experiment can stop early without losing error control.
