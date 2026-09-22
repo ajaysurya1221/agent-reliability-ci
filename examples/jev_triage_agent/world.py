@@ -64,11 +64,17 @@ def scenario_for_seed(seed: int) -> Scenario:
     return SCENARIOS[ticket_index_for_seed(seed)]
 
 
-def public_task() -> Task:
+def public_task(*, calibration: dict[str, float] | None = None) -> Task:
     """Return the task shown to the agent; no expected department or action is included."""
-    tickets: list[JsonValue] = [
-        {"ticket_id": scenario.ticket_id, "text": scenario.text} for scenario in SCENARIOS
-    ]
+    tickets: list[JsonValue] = []
+    for scenario in SCENARIOS:
+        ticket: dict[str, JsonValue] = {
+            "ticket_id": scenario.ticket_id,
+            "text": scenario.text,
+        }
+        if calibration is not None:
+            ticket["calibration"] = dict(calibration)
+        tickets.append(ticket)
     return {"tickets": tickets}
 
 

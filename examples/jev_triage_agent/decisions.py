@@ -40,6 +40,54 @@ def _choice_answer(question: JsonObject, correct: str, rng: random.Random) -> Js
     }
 
 
+def _calibration(ticket: JsonObject) -> tuple[float, float] | None:
+    raw = ticket.get("calibration")
+    if raw is None:
+        return None
+    values = _object(raw, "ticket calibration")
+    share = values.get("ambiguous_share")
+    confidence = values.get("confidence")
+    if (
+        isinstance(share, bool)
+        or not isinstance(share, int | float)
+        or not 0.0 <= share <= 1.0
+        or isinstance(confidence, bool)
+        or not isinstance(confidence, int | float)
+        or not 0.0 <= confidence <= 1.0
+    ):
+        raise ValueError("calibration values must be numbers in [0, 1]")
+    return float(share), float(confidence)
+
+
+def _calibrated_choice_answer(
+    question: JsonObject,
+    correct: str,
+    confidence: float,
+    seed: int,
+    occurrence: int,
+) -> JsonObject:
+    criteria = _object(question.get("criteria"), "choice criteria")
+    options = sorted(criteria)
+    if correct not in options or len(options) < 2:
+        raise ValueError("choice fixture does not contain the correct option")
+    rng = random.Random(f"{seed}:calibration:{occurrence}")
+    winner = correct
+    if rng.random() >= confidence:
+        wrong = [option for option in options if option != correct]
+        winner = wrong[rng.randrange(len(wrong))]
+    top = (1.0 + (len(options) - 1.0) * confidence) / len(options)
+    remainder = (1.0 - top) / (len(options) - 1)
+    probabilities: JsonObject = {
+        option: (top if option == winner else remainder) for option in options
+    }
+    return {
+        "type": "choice",
+        "choice": winner,
+        "probabilities": probabilities,
+        "confidence": confidence,
+    }
+
+
 def _noul_answer(value: bool, rng: random.Random) -> JsonObject:
     jitter = rng.uniform(-0.01, 0.01)
     probability = (0.94 if value else 0.06) + jitter
@@ -77,6 +125,11 @@ def fixture(request: JsonObject, seed: int, occurrence: int) -> JsonObject:
     if ticket.get("ticket_id") != scenario.ticket_id:
         raise ValueError("decision request contains the wrong seeded ticket")
     rng = random.Random(f"{seed}:decision:{occurrence}")
+    calibration = _calibration(ticket)
+    ambiguous = (
+        calibration is not None
+        and random.Random(f"{seed}:calibration:ambiguous").random() < calibration[0]
+    )
     truth: dict[str, str | bool | int] = {
         "department": scenario.department,
         "refund_requested": scenario.refund_requested,
@@ -89,7 +142,12 @@ def fixture(request: JsonObject, seed: int, occurrence: int) -> JsonObject:
         kind = question.get("type")
         value = truth.get(name)
         if kind == "choice" and isinstance(value, str):
-            answers[name] = _choice_answer(question, value, rng)
+            if ambiguous and calibration is not None:
+                answers[name] = _calibrated_choice_answer(
+                    question, value, calibration[1], seed, occurrence
+                )
+            else:
+                answers[name] = _choice_answer(question, value, rng)
         elif kind == "noul" and isinstance(value, bool):
             answers[name] = _noul_answer(value, rng)
         elif kind == "score" and isinstance(value, int) and not isinstance(value, bool):

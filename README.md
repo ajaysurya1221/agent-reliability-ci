@@ -14,7 +14,7 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.5.0. Python agents that use the declared tool boundary, any program that speaks MCP over
+Status: v0.6.0. Python agents that use the declared tool boundary, any program that speaks MCP over
 stdio, and command agents that call a System One decision endpoint. Read
 [what it does not do](#limits) before you rely on it.
 
@@ -83,16 +83,13 @@ your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (th
 [docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) has the recipe and a worked example: a real tool-calling
 agent on a local Ollama model whose two arms differ by one sentence of the system prompt.
 
-## Agents that use a decision model (v0.5)
+## Agents that use a decision model (v0.6)
 
-ARCI can also put `POST /v1/systemone` behind the command-agent boundary. The harness supplies
-`TYPESAFE_BASE_URL` and a per-trial token, while the real key remains in the harness. The Python
-`typesafe-sdk` works unchanged for the request shapes the acceptance tests cover; the JavaScript
-SDK reads the same variables but has no test in this repository. Decisions are recorded, budgeted, perturbed and replayed under the
-reserved tool name `decision:systemone`.
-
-See [Testing agents that use Jev](docs/DECISIONS.md) and the offline
-[`examples/jev_triage_agent`](examples/jev_triage_agent) confidence-gating regression.
+Run `arci preflight` before a live experiment; ARCI supports the Vercel AI Gateway prefix, then
+records, budgets, perturbs and replays decisions under `decision:systemone` while the real key stays
+in the harness. Both official SDKs are tested unchanged, including the
+[`examples/jev_triage_agent`](examples/jev_triage_agent) Node agent; see
+[Testing agents that use Jev](docs/DECISIONS.md).
 
 ## How it works
 

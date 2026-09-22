@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.6.0 (2026-09-22)
+
+Day-one Jev readiness. The upstream behavior below is derived from vendor and official SDK
+documentation and tested against shaped fixtures; it was not run against Jev because no key was
+available.
+
+- **A1:** HTTP decision upstreams accept a path-prefixed base URL, including the Vercel AI Gateway
+  TypeSafe route and its `typesafe-ai/jev` model id.
+- **A2:** Response validation matches the official SDKs: unknown metadata is tolerated and rounded
+  probability sums are accepted within `1e-3`, while required keys and pinned-model checks remain.
+- **A3:** Harness-owned request headers, allowlisted response headers, deterministic transport
+  diagnostics, and one recorded bounded wait on an upstream 429/529 make gateway attempts auditable.
+- **B4:** `arci preflight MANIFEST` checks credentials, model discovery and one tiny smoke decision,
+  then emits a credential-free receipt with exit 0/2/3 semantics.
+- **B5:** HTTP experiments pace trial starts through a shared parent token bucket; users divide the
+  provider rate by the maximum decisions per trial.
+- **B6:** Markdown reports total admitted decisions and recorded token usage and show estimated input
+  cost at the list price read on 2026-09-22, never claimed as billed spend.
+- **B7:** The Jev guide now covers the three-command day-one workflow, provider limits, privacy,
+  sampled answers and live-run minimality; `docs/results/TEMPLATE-jev.md` standardises write-ups.
+- **C8:** The triage example gains a Node 20+ ES-module agent using `@typesafe-ai/sdk` 0.6.0 through
+  environment-only `new TypeSafeClient()`, plus CI coverage on Python 3.14 / Node 22.
+- **C9:** Decision records retain an independent raw upstream snapshot before perturbation; live
+  HTTP upstreams, removal trials ending in ERROR, and replay INVALID results report `reduced`, never
+  `1-minimal`.
+- **D10:** The offline triage fixture can inject seeded synthetic miscalibration for testing
+  confidence gates; it is explicitly not evidence about Jev's calibration.
+
 ## v0.5.0 (2026-09-22)
 
 Command agents can now test the decision logic around TypeSafe's Jev/System One API.
