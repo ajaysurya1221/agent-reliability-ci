@@ -100,6 +100,12 @@ def test_the_method_is_sealed_and_cannot_be_chosen_after_the_fact() -> None:
     assert decide(m, trials).verdict is Verdict.INCONCLUSIVE
     switched = m.model_copy(update={"interval_method": "newcombe"})  # breaks the manifest seal
     assert decide(switched, trials).verdict is Verdict.ERROR
+    # A VALIDLY resealed manifest with a different rule must not match the old trials either.
+    data = m.model_dump(exclude={"record_sha256"})
+    for change in ({"interval_method": "newcombe"}, {"delta": 0.2}, {"alpha": 0.2}):
+        resealed = Manifest.create(**{**data, **change})
+        assert resealed.validate_seal()
+        assert decide(resealed, trials).verdict is Verdict.ERROR, change
     with pytest.raises(ValidationError):
         _with_method("barnard")
 

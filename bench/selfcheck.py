@@ -126,6 +126,7 @@ def correlated_boundary(
     *,
     reps: int = 10_000,
     seed: int = 0,
+    method: str = "clopper_pearson",
 ) -> dict[str, float]:
     """Simulate paired Bernoulli arms with positive shared-uniform dependence."""
     _validate_probability(p_a, "p_a")
@@ -136,7 +137,7 @@ def correlated_boundary(
         raise ValueError("rho must be between 0 and 1")
     if reps < 1:
         raise ValueError("reps must be at least 1")
-    intervals = _intervals(n, 0.05 / 4.0)
+    table = _verdict_table(method, n, 0.05, 0.10, 1)
     rng = random.Random(seed)
     counts = {outcome: 0 for outcome in _OUTCOMES}
     for _ in range(reps):
@@ -150,10 +151,7 @@ def correlated_boundary(
             else:
                 successes_a += rng.random() < p_a
                 successes_b += rng.random() < p_b
-        bounds = difference_bounds(
-            baseline=intervals[successes_a], candidate=intervals[successes_b]
-        )
-        counts[classify(*bounds, 0.10).value] += 1
+        counts[table[successes_a * (n + 1) + successes_b]] += 1
     return {outcome: counts[outcome] / reps for outcome in _OUTCOMES}
 
 
@@ -242,7 +240,7 @@ def main() -> int:
         for p_a, p_b in _SCENARIOS
     ]
     correlated_rows = [
-        _row(p_a, p_b, 200, correlated_boundary(p_a, p_b, 200, 0.5, seed=index))
+        _row(p_a, p_b, 200, correlated_boundary(p_a, p_b, 200, 0.5, seed=index, method=method))
         for index, (p_a, p_b) in enumerate(_SCENARIOS)
     ]
     _print_table("Exact independent-binomial calibration", exact_rows)
@@ -253,13 +251,25 @@ def main() -> int:
     equal_rows = [row for row in exact_rows if row["p_a"] == row["p_b"]]
     false_pass_ok = all(row["PASS"] <= 0.05 + 1e-12 for row in boundary_rows)
     false_block_ok = all(row["BLOCK"] <= 0.05 + 1e-12 for row in equal_rows)
+    # Monte Carlo tolerance: 3 standard errors of a 0.05 rate over 10,000 reps, prespecified.
+    mc_limit = 0.05 + 3 * math.sqrt(0.05 * 0.95 / 10_000)
+    corr_boundary = [r for r in correlated_rows if math.isclose(r["p_a"] - r["p_b"], 0.10)]
+    corr_equal = [r for r in correlated_rows if r["p_a"] == r["p_b"]]
+    corr_ok = all(r["PASS"] <= mc_limit for r in corr_boundary) and all(
+        r["BLOCK"] <= mc_limit for r in corr_equal
+    )
     calibration = {
         "false_PASS_at_boundary_le_alpha": false_pass_ok,
         "false_BLOCK_when_equal_le_alpha": false_block_ok,
+        "correlated_rho0.5_within_mc_tolerance": corr_ok,
     }
     print()
     print(f"Calibration false-PASS at boundary <= alpha: {'PASS' if false_pass_ok else 'FAIL'}")
     print(f"Calibration false-BLOCK when equal <= alpha: {'PASS' if false_block_ok else 'FAIL'}")
+    print(
+        f"Correlated (rho=0.5) errors within MC tolerance {mc_limit:.4f}: "
+        f"{'PASS' if corr_ok else 'FAIL'}"
+    )
 
     sweep: dict[str, dict[str, float]] = {}
     if not args.no_sweep:

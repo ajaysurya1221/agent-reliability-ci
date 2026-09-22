@@ -347,6 +347,11 @@ class TrialSpec(Model):
     condition: Condition
     seed: int
     budgets: Budgets = Field(default_factory=Budgets)
+    # The decision rule, bound into every trial's identity: a manifest resealed after the run
+    # with a different alpha, delta or method no longer matches its trials (gate => ERROR).
+    alpha: float = 0.05
+    delta: float = 0.10
+    interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
     tool_mode: ToolMode = ToolMode.RECORD
     recording: tuple[RecordedCall, ...] = ()  # required when tool_mode is REPLAY
     # REPLAY only: recorded results do not mutate the environment, so the source

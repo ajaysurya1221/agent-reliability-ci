@@ -40,8 +40,11 @@ confidence `1 - alpha/K` (`z` at `1 - alpha/(2K)`), no continuity correction; wi
 `U = d + sqrt((u_B - b)^2 + (a - l_A)^2)` (Newcombe's hybrid score interval, method 10). Step 4 and
 everything after it are unchanged. The method is frozen in the manifest before execution and is
 printed in every decision and report. It is an approximate interval whose calibration is checked
-by exact enumeration (below), not proved; it is validated for independent arms and the published
-domain only. Under strong between-arm dependence keep the default.
+by exact enumeration (below), not proved. The claim is exactly this: both directional errors were
+<= 0.05 at the enumerated points with alpha 0.05, delta 0.10, K=1 and N in {20, 50, 100, 200, 400},
+for independent arms, plus the seeded correlated-arm simulation at N=200. Other alpha, delta, K,
+N, probabilities between grid points and stronger dependence are not validated. Under strong
+between-arm dependence, or outside that domain, keep the default.
 5. Any candidate trial with a hard invariant violation makes that condition `BLOCK`, whatever the
    rates say.
 
@@ -68,6 +71,10 @@ Exit codes: PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3.
 
 ## Discipline
 
+- The decision rule (`alpha`, `delta`, `interval_method`) is bound into every trial's identity
+  (`spec_sha256`), so a manifest resealed after the run with a different rule no longer matches its
+  trials and the gate returns `ERROR`. Choosing the rule after the data is not merely forbidden; it
+  is detected.
 - Evaluate once, at the frozen `n_per_arm`. No peeking, no outcome-dependent extension.
 - Every run is kept. A new experiment id does not reset error control and does not license
   retrying an unchanged candidate until it passes. The manifest author supplies
