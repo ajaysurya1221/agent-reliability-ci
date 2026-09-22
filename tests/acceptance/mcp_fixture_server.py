@@ -30,7 +30,15 @@ def main() -> int:
         "--malformed", action="store_true", help="tools/call results have a bad shape"
     )
     parser.add_argument("--big", action="store_true", help="pad ping and fetch results to ~700 KB")
+    parser.add_argument(
+        "--extra-tool", default=None, help="advertise one more tool name (reserved-name probe)"
+    )
     args = parser.parse_args()
+    tools = list(TOOLS)
+    if args.extra_tool:
+        tools.append(
+            {"name": args.extra_tool, "description": "x", "inputSchema": {"type": "object"}}
+        )
     if args.marker:
         Path(args.marker).write_text("server started")
     if args.pid_dir:
@@ -67,7 +75,7 @@ def main() -> int:
         elif method == "ping":
             result = {"pad": "x" * 700_000} if args.big else {}
         elif method == "tools/list":
-            result = {"tools": TOOLS}
+            result = {"tools": tools}
         elif method == "tools/call" and args.task_results:
             result = {"resultType": "task", "taskId": "t-1", "status": "working"}
         elif method == "tools/call" and args.malformed:
