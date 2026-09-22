@@ -206,10 +206,15 @@ def test_deep_raw_json_is_a_local_422_even_when_the_decoder_recurses(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     instance, _protocol, replies = _instance(monkeypatch, tmp_path, condition=COND_LOW_CONFIDENCE)
-    nested: object = "leaf"
-    for _ in range(5000):
-        nested = [nested]
-    raw = json.dumps({"state": nested, "model": "jev-latest", "questions": QUESTIONS}).encode()
+    # Built as text: json.dumps cannot encode 5000 levels on Python 3.11.
+    nested = "[" * 5000 + '"leaf"' + "]" * 5000
+    raw = (
+        '{"state": '
+        + nested
+        + ', "model": "jev-latest", "questions": '
+        + json.dumps(QUESTIONS)
+        + "}"
+    ).encode()
 
     instance._handle_http_request(
         "POST",

@@ -79,9 +79,14 @@ class Endpoint:
         self.key = os.environ["TYPESAFE_API_KEY"]
 
     def request(
-        self, method: str, path: str, body: Any = None, key: str | None = None
+        self,
+        method: str,
+        path: str,
+        body: Any = None,
+        key: str | None = None,
+        raw: bytes | None = None,
     ) -> tuple[int, Any]:
-        data = None if body is None else json.dumps(body).encode("utf-8")
+        data = raw if raw is not None else None if body is None else json.dumps(body).encode()
         request = urllib.request.Request(
             self.base + path,
             data=data,
@@ -96,11 +101,11 @@ class Endpoint:
             with opener.open(request, timeout=15) as response:
                 return response.status, json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
-            raw = error.read().decode("utf-8", errors="replace")
+            text = error.read().decode("utf-8", errors="replace")
             try:
-                return error.code, json.loads(raw)
+                return error.code, json.loads(text)
             except ValueError:
-                return error.code, raw
+                return error.code, text
 
     def ask(
         self, task: dict[str, Any], questions: dict[str, Any] | None = None, key: str | None = None
@@ -362,14 +367,17 @@ def main() -> int:
             session.close()
             return 0
     if variant == "deep":
-        nested: Any = "x"
-        for _ in range(5000):
-            nested = [nested]
-        status, _ = endpoint.request(
-            "POST",
-            "/v1/systemone",
-            {"state": nested, "model": "jev-latest", "questions": QUESTIONS},
-        )
+        # Built as text: json.dumps cannot encode 5000 levels on every Python version, and the
+        # point is what the boundary does with such a body, not what the client can build.
+        nested = "[" * 5000 + '"x"' + "]" * 5000
+        raw = (
+            '{"state": '
+            + nested
+            + ', "model": "jev-latest", "questions": '
+            + json.dumps(QUESTIONS)
+            + "}"
+        ).encode("utf-8")
+        status, _ = endpoint.request("POST", "/v1/systemone", raw=raw)
         if status != 422:
             session.call("store", value=f"status-{status}")
             session.close()
