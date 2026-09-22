@@ -56,6 +56,39 @@ _GRADER_EXIT = "grader exited non-zero"
 _GRADER_OUTPUT = "grader returned invalid output"
 
 
+class _TokenBucket:
+    """Thread-safe capacity-one token bucket used to pace trial starts."""
+
+    def __init__(
+        self,
+        requests_per_minute: int,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        if requests_per_minute <= 0:
+            raise ValueError("token bucket rate must be positive")
+        self._rate = requests_per_minute / 60.0
+        self._clock = clock
+        self._sleep = sleep
+        self._tokens = 1.0
+        self._updated = clock()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> None:
+        while True:
+            with self._lock:
+                now = self._clock()
+                elapsed = max(0.0, now - self._updated)
+                self._tokens = min(1.0, self._tokens + elapsed * self._rate)
+                self._updated = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                wait_seconds = (1.0 - self._tokens) / self._rate
+            self._sleep(wait_seconds)
+
+
 def _decode_recording_chunks(chunks: dict[int, str], count: int) -> RecordedCall:
     if count < 1 or set(chunks) != set(range(count)):
         raise ValueError("incomplete streamed recording")
@@ -1482,8 +1515,19 @@ def run_experiment(
     store = ExperimentStore(out_dir, manifest)
     lock = threading.Lock()
     results: list[TrialEnvelope | None] = [None] * len(schedule)
+    decisions = manifest.decisions
+    pacer = (
+        _TokenBucket(decisions.max_requests_per_minute)
+        if decisions is not None
+        and decisions.upstream == "http"
+        and decisions.max_requests_per_minute > 0
+        else None
+    )
 
     def run(index: int, spec: TrialSpec) -> tuple[int, TrialEnvelope]:
+        if pacer is not None:
+            pacer.acquire()
+
         def emit(event: Event) -> None:
             with lock:
                 store.append_event(event)

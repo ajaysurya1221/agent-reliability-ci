@@ -215,10 +215,20 @@ def test_response_validation_rejects_invalid_provider_shapes(
         validate_response(response, _request(), MODEL)
 
 
-def test_only_retry_after_is_forwarded() -> None:
+def test_only_allowlisted_provider_headers_are_forwarded() -> None:
     assert allowed_headers(
-        {"Retry-After": "3", "X-Request-ID": "secret", "Authorization": "Bearer key"}
-    ) == {"retry-after": "3"}
+        {
+            "Retry-After": "3",
+            "Retry-After-Ms": "250",
+            "X-TypeSafe-Request-ID": "req-1",
+            "X-Request-ID": "secret",
+            "Authorization": "Bearer key",
+        }
+    ) == {
+        "retry-after": "3",
+        "retry-after-ms": "250",
+        "x-typesafe-request-id": "req-1",
+    }
     with pytest.raises(ValueError, match="invalid header"):
         allowed_headers({"Retry-After": "3\r\nX-Leak: secret"})
 

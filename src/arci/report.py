@@ -5,8 +5,12 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from collections.abc import Sequence
+from typing import cast
+
+from pydantic import JsonValue
 
 from arci.schema import (
+    DECISION_TOOL,
     ArmStats,
     GateDecision,
     Manifest,
@@ -14,6 +18,9 @@ from arci.schema import (
     TrialEnvelope,
     Verdict,
 )
+
+USD_PER_MTOK_INPUT = 0.042
+_LIST_PRICE_DATE = "2026-09-22"
 
 _VERDICT_MEANINGS: dict[Verdict, str] = {
     Verdict.PASS: (
@@ -75,6 +82,33 @@ def _failure_clusters(trials: Sequence[TrialEnvelope]) -> list[tuple[str, int, s
     ]
 
 
+def _decision_usage(trials: Sequence[TrialEnvelope]) -> tuple[int, int, int]:
+    attempts = 0
+    input_tokens = 0
+    output_tokens = 0
+    for trial in trials:
+        for recorded in trial.recording:
+            if recorded.tool != DECISION_TOOL:
+                continue
+            attempts += 1
+            value = recorded.result.value
+            if not isinstance(value, dict):
+                continue
+            body = cast(dict[str, JsonValue], value).get("body")
+            if not isinstance(body, dict):
+                continue
+            usage = cast(dict[str, JsonValue], body).get("usage")
+            if not isinstance(usage, dict):
+                continue
+            raw_input = usage.get("input_tokens", 0)
+            raw_output = usage.get("output_tokens", 0)
+            if isinstance(raw_input, int) and not isinstance(raw_input, bool):
+                input_tokens += raw_input
+            if isinstance(raw_output, int) and not isinstance(raw_output, bool):
+                output_tokens += raw_output
+    return attempts, input_tokens, output_tokens
+
+
 def render_markdown(
     manifest: Manifest, decision: GateDecision, trials: Sequence[TrialEnvelope]
 ) -> str:
@@ -115,6 +149,29 @@ def render_markdown(
                 for condition in look.conditions
             )
             lines.append(f"| {look.look} | {look.pairs} | **{look.verdict.value}** | {bounds} |")
+
+    decision_attempts, input_tokens, output_tokens = _decision_usage(trials)
+    if decision_attempts:
+        estimated_cost = input_tokens * USD_PER_MTOK_INPUT / 1_000_000
+        lines.extend(
+            [
+                "",
+                "## Decisions",
+                "",
+                "| Attempts | Input tokens | Output tokens | Estimated cost at list price |",
+                "|---:|---:|---:|---:|",
+                (
+                    f"| {decision_attempts} | {input_tokens} | {output_tokens} | "
+                    f"USD {estimated_cost:.7f} |"
+                ),
+                "",
+                (
+                    f"List price: USD {USD_PER_MTOK_INPUT:.3f} per million input tokens "
+                    f"(read {_LIST_PRICE_DATE})."
+                ),
+                "Fixtures and replays cost nothing; this is an estimate, not billed spend.",
+            ]
+        )
 
     for condition in decision.conditions:
         baseline = _arm_summary(condition.baseline)

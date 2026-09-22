@@ -4,18 +4,30 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 import sys
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, NoReturn, Protocol, cast
 
+from pydantic import JsonValue
+
 from arci.gate import decide
+from arci.mcp_boundary import (
+    UpstreamResult,
+    request_decision_upstream,
+    upstream_diagnostic,
+    validate_decision_response,
+    validate_models_response,
+)
 from arci.replay import make_bundle, replay
 from arci.report import render_junit, render_markdown
 from arci.runner import run_experiment
 from arci.schedule import build_schedule
 from arci.schema import (
+    DecisionSpec,
     Divergence,
     Manifest,
     MinimizeResult,
@@ -39,6 +51,18 @@ class _FirstDivergence(Protocol):
         *,
         mode: Literal["boundary", "all"] = "boundary",
     ) -> Divergence: ...
+
+
+class _UpstreamClient(Protocol):
+    def __call__(
+        self,
+        method: str,
+        endpoint: str,
+        body: dict[str, JsonValue] | None,
+        spec: DecisionSpec,
+        *,
+        api_key: str | None = None,
+    ) -> UpstreamResult: ...
 
 
 class _Parser(argparse.ArgumentParser):
@@ -94,6 +118,91 @@ def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
     _write(run_dir / "decision.json", decision.model_dump_json(indent=2) + "\n")
     _print(render_markdown(manifest, decision, trials))
     return decision.exit_code
+
+
+def _preflight_failure(message: str) -> int:
+    _print(message)
+    return 3
+
+
+def _preflight_exception(prefix: str, exc: BaseException) -> int:
+    return _preflight_failure(f"{prefix}: {upstream_diagnostic(exc)}")
+
+
+def _cmd_preflight(
+    manifest_path: str,
+    *,
+    upstream: _UpstreamClient = request_decision_upstream,
+    clock: Callable[[], float] = time.monotonic,
+) -> int:
+    manifest = Manifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
+    if not manifest.validate_seal():
+        return _preflight_failure("manifest seal is invalid")
+    spec = manifest.decisions
+    if spec is None or spec.upstream != "http":
+        return _preflight_failure("nothing to preflight: no http upstream")
+    api_key = os.environ.get("TYPESAFE_API_KEY")
+    if not api_key:
+        return _preflight_failure("TYPESAFE_API_KEY is not set")
+    try:
+        models_result = upstream("GET", "/v1/models", None, spec, api_key=api_key)
+        if models_result.error is not None or models_result.status != 200:
+            return _preflight_failure("preflight models request failed")
+        models = validate_models_response(models_result.body)
+    except BaseException as exc:
+        return _preflight_exception("preflight models request failed", exc)
+    available = sorted(
+        cast(str, model["name"]) for model in cast(list[dict[str, JsonValue]], models["models"])
+    )
+    if spec.model not in available:
+        _print(f"pinned model unavailable; account models: {', '.join(available) or 'none'}")
+        return 2
+    smoke = cast(
+        dict[str, JsonValue],
+        {
+            "state": "preflight",
+            "model": spec.model,
+            "questions": {
+                "ready": {"type": "noul"},
+                "route": {
+                    "type": "choice",
+                    "criteria": {"yes": "Ready", "no": "Not ready"},
+                },
+                "quality": {"type": "score", "criteria": ["Low", "High"]},
+            },
+        },
+    )
+    started = clock()
+    try:
+        result = upstream("POST", "/v1/systemone", smoke, spec, api_key=api_key)
+        latency_ms = max(0.0, (clock() - started) * 1000.0)
+        if result.error is not None or result.status != 200:
+            return _preflight_failure("preflight smoke request failed")
+        body = validate_decision_response(result.body, smoke, spec.model)
+    except BaseException as exc:
+        return _preflight_exception("preflight smoke request failed", exc)
+    usage = cast(dict[str, JsonValue], body["usage"])
+    request_id = result.headers.get("x-typesafe-request-id", "")
+    endpoint = f"{spec.base_url.rstrip('/')}/v1/systemone"
+    _print(f"model: {body['model']}")
+    _print(f"request id: {request_id or 'none'}")
+    _print(f"usage: input_tokens={usage['input_tokens']} output_tokens={usage['output_tokens']}")
+    _print(f"latency: {latency_ms:.1f} ms")
+    receipt = {
+        "preflight": {
+            "manifest_sha256": manifest.record_sha256,
+            "endpoint": endpoint,
+            "model": body["model"],
+            "usage": {
+                "input_tokens": usage["input_tokens"],
+                "output_tokens": usage["output_tokens"],
+            },
+            "request_id": request_id,
+            "latency_ms": round(latency_ms, 1),
+        }
+    }
+    _print(json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+    return 0
 
 
 def _invalid_store_report(exc: BaseException) -> str:
@@ -215,6 +324,9 @@ def _parser() -> _Parser:
     run.add_argument("--out", required=True, metavar="DIR")
     run.add_argument("--workers", type=_positive_int, default=4, metavar="N")
 
+    preflight = commands.add_parser("preflight", help="check an HTTP decision upstream")
+    preflight.add_argument("manifest_json", metavar="MANIFEST")
+
     gate = commands.add_parser("gate", help="recompute the gate for a stored run")
     gate.add_argument("run_dir", metavar="RUN_DIR")
     gate.add_argument("--junit", metavar="PATH")
@@ -255,6 +367,8 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["out"]),
             cast(int, values["workers"]),
         )
+    if command == "preflight":
+        return _cmd_preflight(cast(str, values["manifest_json"]))
     if command == "gate":
         return _cmd_gate(
             cast(str, values["run_dir"]),
