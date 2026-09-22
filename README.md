@@ -89,7 +89,9 @@ Run `arci preflight` before a live experiment; ARCI supports the Vercel AI Gatew
 records, budgets, perturbs and replays decisions under `decision:systemone` while the real key stays
 in the harness. Both official SDKs are tested unchanged, including the
 [`examples/jev_triage_agent`](examples/jev_triage_agent) Node agent; see
-[Testing agents that use Jev](docs/DECISIONS.md).
+[Testing agents that use Jev](docs/DECISIONS.md). Gateway behaviour, model identifiers, prices and
+provider limits are derived from documentation dated 2026-09-22. Tests use fixtures and fake
+upstreams; Jev was not run.
 
 ## How it works
 

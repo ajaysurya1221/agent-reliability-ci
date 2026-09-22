@@ -508,3 +508,19 @@ against Jev. Reviewed by the senior consultant (gpt-6-astra, xhigh) on 2026-09-2
   agent. `experiment.build_manifest(..., runtime="node")` and `clean_manifest(..., runtime="node")`
   select it (`node <abs path>/agent.mjs ...`). The acceptance test skips when `node` is absent;
   CI installs the package with `npm ci` on the Python 3.14 job, so there the test must run.
+
+### v0.6 hardening (release review; more tests in tests/acceptance/test_decisions_v06.py)
+
+- After the one bounded wait, ANY non-200 second response (422 included) is the harness fault
+  "decision upstream failed after retry"; the ordinary 422 pass-through applies only to a first
+  response. Never record a resend's 422 as an agent-visible result.
+- Every probability (choice and score) must be finite and within [0, 1]; the 1e-3 tolerance is for
+  the sum only. Preflight validates the smoke response with the same code.
+- Preflight never prints or serialises a provider-controlled string unredacted: model names,
+  request ids, error messages and receipt fields are scrubbed of `TYPESAFE_API_KEY` (replace by
+  `<redacted>`) before printing; the receipt is built from scrubbed values.
+- The upstream client enforces one monotonic deadline of `request_seconds` across connect, send,
+  the bounded wait, the resend and the whole body read (read in chunks with the remaining time as
+  the socket timeout); a trickling body is the harness fault "decision upstream timed out".
+- Reports count completed decision recordings (incomplete admissions excluded; before-injected
+  results contribute zero tokens); label them "Recorded decisions".

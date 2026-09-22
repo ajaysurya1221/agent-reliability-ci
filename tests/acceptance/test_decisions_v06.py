@@ -70,7 +70,8 @@ def _finish(env: TrialEnvelope) -> Event:
 
 
 class _Gateway(ThreadingHTTPServer):
-    """Modes: ok, 429-once, 529-once, 429-always, slow-retry, gzip, text, nopin."""
+    """Modes: ok, 429-once, 529-once, 429-always, slow-retry, 529-then-422, prob-over-1, drip,
+    gzip, text, nopin, echo-key, nopin-echo."""
 
     def __init__(self, mode: str) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
@@ -100,6 +101,8 @@ class _Handler(BaseHTTPRequestHandler):
     def _json(self, status: int, body: dict[str, Any], extra: dict[str, str] | None = None) -> None:
         with self.server.lock:
             request_id = f"req-{len(self.server.paths):04d}"
+        if self.server.mode in {"echo-key", "nopin-echo"}:
+            request_id = "real-secret"  # the request id carries the bearer back
         headers = {"Content-Type": "application/json", "x-typesafe-request-id": request_id}
         headers.update(extra or {})
         self._send(status, json.dumps(body).encode("utf-8"), headers)
@@ -111,21 +114,18 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != "/typesafe/v1/models":
             self._json(404, {"message": "not found", "error_type": "not_found"})
             return
-        name = "typesafe-ai/jev-2" if self.server.mode == "nopin" else GATEWAY_MODEL
-        self._json(
-            200,
+        name = "typesafe-ai/jev-2" if self.server.mode in {"nopin", "nopin-echo"} else GATEWAY_MODEL
+        cards: list[dict[str, Any]] = [
             {
-                "models": [
-                    {
-                        "name": name,
-                        "description": "fake",
-                        "release_date": "2026-09-15",
-                        "context_window": 32000,
-                    }
-                ],
-                "object": "list",
-            },
-        )
+                "name": name,
+                "description": "fake",
+                "release_date": "2026-09-15",
+                "context_window": 32000,
+            }
+        ]
+        if self.server.mode in {"echo-key", "nopin-echo"}:  # a hostile or buggy provider
+            cards.append({"name": "real-secret", "description": "x", "release_date": "2026-09-15"})
+        self._json(200, {"models": cards, "object": "list"})
 
     def do_POST(self) -> None:
         with self.server.lock:
@@ -157,6 +157,29 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(
                 429, {"message": "rate limited", "error_type": "rate_limit"}, {"retry-after": "30"}
             )
+        elif mode == "529-then-422":
+            if attempt == 1:
+                self._json(529, {"message": "overloaded", "error_type": "overloaded"})
+            else:
+                self._json(422, {"message": "bad request", "error_type": "invalid_request"})
+        elif mode == "prob-over-1":
+            answer = self._answer(body)
+            department = answer["answers"]["department"]
+            department["probabilities"] = {
+                k: (1.0005 if k == department["choice"] else 0.0)
+                for k in department["probabilities"]
+            }
+            self._json(200, answer)
+        elif mode == "drip":
+            raw = json.dumps(self._answer(body)).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            for index in range(0, len(raw), 8):  # a byte trickle: never idle, never done
+                self.wfile.write(raw[index : index + 8])
+                self.wfile.flush()
+                time.sleep(0.05)
         elif mode == "gzip":
             raw = gzip.compress(json.dumps(self._answer(body)).encode("utf-8"))
             self._send(200, raw, {"Content-Type": "application/json", "Content-Encoding": "gzip"})
@@ -370,6 +393,32 @@ def test_the_parent_paces_trial_starts_for_http_upstreams(
     assert elapsed >= 9.0, elapsed  # 20 starts at 2 per second: at least 19 gaps of 0.5 s
 
 
+# --- release-review regressions ------------------------------------------------------------------
+
+
+def test_a_failed_resend_is_a_harness_fault_not_an_agent_failure(
+    gateway: Any, real_key: None
+) -> None:
+    server = gateway("529-then-422")
+    env = _run("gated", spec=gateway_decisions(server.server_port))
+    assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR
+    assert server.posts == 2
+
+
+def test_every_probability_must_lie_in_the_unit_interval(gateway: Any, real_key: None) -> None:
+    server = gateway("prob-over-1")
+    env = _run("gated", spec=gateway_decisions(server.server_port))
+    assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR
+
+
+def test_a_dripping_upstream_is_bounded_by_request_seconds(gateway: Any, real_key: None) -> None:
+    server = gateway("drip")
+    before = time.monotonic()
+    env = _run("gated", spec=gateway_decisions(server.server_port, request_seconds=1.0))
+    assert env.outcome is Outcome.ERROR and env.termination is Termination.HARNESS_ERROR
+    assert time.monotonic() - before < 12.0
+
+
 # --- B6: tokens and cost -------------------------------------------------------------------------
 
 
@@ -518,6 +567,34 @@ def test_preflight_reports_ready_missing_pin_and_unreachable(gateway: Any, tmp_p
 
     done = _preflight(tmp_path, decision_manifest(), "real-secret")  # fixture upstream
     assert done.returncode == 3 and "http" in done.stdout + done.stderr
+
+
+def test_preflight_never_prints_provider_controlled_secrets(gateway: Any, tmp_path: Path) -> None:
+    echo = gateway("echo-key")
+    done = _preflight(
+        tmp_path, decision_manifest(spec=gateway_decisions(echo.server_port)), "real-secret"
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "real-secret" not in done.stdout + done.stderr
+    nopin = gateway("nopin-echo")
+    done = _preflight(
+        tmp_path, decision_manifest(spec=gateway_decisions(nopin.server_port)), "real-secret"
+    )
+    assert done.returncode == 2 and "typesafe-ai/jev-2" in done.stdout
+    assert "real-secret" not in done.stdout + done.stderr
+    drip = gateway("drip")
+    before = time.monotonic()
+    done = _preflight(
+        tmp_path,
+        decision_manifest(spec=gateway_decisions(drip.server_port, request_seconds=1.0)),
+        "real-secret",
+    )
+    assert done.returncode == 3 and time.monotonic() - before < 20.0
+    bad = gateway("prob-over-1")
+    done = _preflight(
+        tmp_path, decision_manifest(spec=gateway_decisions(bad.server_port)), "real-secret"
+    )
+    assert done.returncode == 3
 
 
 def test_the_gate_and_the_hero_story_hold_through_the_gateway(

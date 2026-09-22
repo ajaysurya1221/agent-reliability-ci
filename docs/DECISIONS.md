@@ -54,7 +54,7 @@ t = 1 - confidence_max/c
 p'_i = (1 - t)*p_i + t/n
 ```
 
-and reports confidence `confidence_max`. The probabilities still sum to one; mixing never reverses
+and reports confidence `confidence_max`. The probability sum remains within the accepted tolerance; mixing never reverses
 their order and the `choice` field is preserved, though a cap of 0 or floating-point rounding can
 create ties. Noul and score answers are unchanged. This is normally a `falsify` fault
 when escalation is an accepted fallback; otherwise it should be `ceiling`.
@@ -98,6 +98,9 @@ calls, multiple decision transports, or streamable HTTP MCP. See
 
 ## Day one with a key
 
+Gateway behaviour, model identifiers, prices and provider limits are derived from documentation
+dated 2026-09-22. Tests use fixtures and fake upstreams; Jev was not run.
+
 Use a versioned model while tuning policy thresholds. For TypeSafe directly, use the configured
 API origin and pin the available versioned Jev id; through Vercel AI Gateway, use base URL
 `https://ai-gateway.vercel.sh/typesafe` and model `typesafe-ai/jev`.
@@ -113,8 +116,10 @@ pinned model is absent (available ids are printed); and 3 for missing credential
 manifest or any endpoint/response failure. Save its credential-free JSON receipt with the run.
 
 For HTTP upstreams, `run_experiment` paces trial starts at `max_requests_per_minute` across workers.
-One slot means one trial, so if an agent can make `k` decisions per trial, divide the provider rate
-by `k`. A 429 or 529 permits one bounded wait and one identical resend; the single recorded decision
+The parent spaces trial starts, not individual requests. Budget the maximum upstream sends per trial,
+including SDK retries, the boundary's possible resend and model discovery, and divide the provider
+rate by that number. This does not guarantee an instantaneous provider request rate. Standalone
+trials, preflight and minimisation are unpaced. A 429 or 529 permits one bounded wait and one identical resend; the single recorded decision
 keeps `upstream.attempts` and `upstream.first_status`. A second 429/529 is a harness error, not an
 agent failure. A 429 means the provider or account rate limit was exceeded; 529 means the provider
 is overloaded. Keep `request_seconds` below the SDKs' 10-second per-attempt timeout (the default is
@@ -122,7 +127,7 @@ is overloaded. Keep `request_seconds` below the SDKs' 10-second per-attempt time
 
 Live answers are sampled, and aliases such as `jev-latest` can move; pin the model version used to
 set confidence thresholds. Reports sum recorded tokens and show estimated cost at the list price
-read on 2026-09-22, not billed spend; fixtures and replays cost nothing. Every record also seals the
+read on 2026-09-22, not billed spend; fixtures and replays cost nothing. Completed upstream decision records also seal the
 raw validated response under `ToolResult.value.upstream` before after-perturbations. The request
 state is sealed separately in the tool-call arguments, so stores and bundles may contain private
 customer data. Live minimisation is reported only as `reduced`, never `1-minimal`, because a sampled

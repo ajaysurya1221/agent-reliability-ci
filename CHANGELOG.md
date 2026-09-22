@@ -8,7 +8,7 @@ available.
 
 - **A1:** HTTP decision upstreams accept a path-prefixed base URL, including the Vercel AI Gateway
   TypeSafe route and its `typesafe-ai/jev` model id.
-- **A2:** Response validation matches the official SDKs: unknown metadata is tolerated and rounded
+- **A2:** Response validation accepts the tested SDK response shapes: unknown metadata is tolerated and rounded
   probability sums are accepted within `1e-3`, while required keys and pinned-model checks remain.
 - **A3:** Harness-owned request headers, allowlisted response headers, deterministic transport
   diagnostics, and one recorded bounded wait on an upstream 429/529 make gateway attempts auditable.
@@ -16,8 +16,10 @@ available.
   then emits a credential-free receipt with exit 0/2/3 semantics.
 - **B5:** HTTP experiments pace trial starts through a shared parent token bucket; users divide the
   provider rate by the maximum decisions per trial.
-- **B6:** Markdown reports total admitted decisions and recorded token usage and show estimated input
-  cost at the list price read on 2026-09-22, never claimed as billed spend.
+- **B6:** Markdown reports count completed decision recordings and their available token usage,
+  and show estimated input cost at the list price read on 2026-09-22 (fixtures and replays are
+  free; this is an estimate, not billed spend). Incomplete admissions are excluded; before-injected
+  results contribute zero tokens.
 - **B7:** The Jev guide now covers the three-command day-one workflow, provider limits, privacy,
   sampled answers and live-run minimality; `docs/results/TEMPLATE-jev.md` standardises write-ups.
 - **C8:** The triage example gains a Node 20+ ES-module agent using `@typesafe-ai/sdk` 0.6.0 through

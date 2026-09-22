@@ -32,7 +32,7 @@ reported model differed from an alias used during development.
 
 ## Decisions, tokens and estimated cost
 
-| Admitted decisions | Input tokens | Output tokens | Estimated USD at list price |
+| Recorded decisions | Input tokens | Output tokens | Estimated USD at list price |
 |---:|---:|---:|---:|
 | `<count>` | `<count>` | `<count>` | `<estimate>` |
 
