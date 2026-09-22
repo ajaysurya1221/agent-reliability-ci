@@ -309,6 +309,9 @@ class Manifest(Sealed):
     alpha: float = Field(default=0.05, ge=1e-6, le=0.5)
     delta: float = Field(default=0.10, gt=0, lt=1)
     n_per_arm: int = Field(default=200, ge=N_PER_ARM_MIN, le=N_PER_ARM_MAX)
+    # How the bounds on p_candidate - p_baseline are formed. Frozen with the manifest, like
+    # everything else that decides. See docs/STATISTICS.md.
+    interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
     base_seed: int = 0
     budgets: Budgets = Field(default_factory=Budgets)
     fixtures_sha256: str = ""
@@ -344,6 +347,11 @@ class TrialSpec(Model):
     condition: Condition
     seed: int
     budgets: Budgets = Field(default_factory=Budgets)
+    # The decision rule, bound into every trial's identity: a manifest resealed after the run
+    # with a different alpha, delta or method no longer matches its trials (gate => ERROR).
+    alpha: float = 0.05
+    delta: float = 0.10
+    interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
     tool_mode: ToolMode = ToolMode.RECORD
     recording: tuple[RecordedCall, ...] = ()  # required when tool_mode is REPLAY
     # REPLAY only: recorded results do not mutate the environment, so the source
@@ -423,8 +431,9 @@ class GateDecision(Sealed):
     trials_sha256: str  # hash_record of the sorted trial record_sha256 list
     alpha: float
     delta: float
+    interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
     k_conditions: int
-    per_arm_confidence: float  # 1 - alpha / (2K)
+    per_arm_confidence: float  # clopper_pearson: 1 - alpha/(2K); newcombe: 1 - alpha/K
     n_per_arm: int
     conditions: tuple[ConditionDecision, ...]
     verdict: Verdict

@@ -12,7 +12,7 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.2.0. Python agents that use the declared tool boundary, and any program that speaks MCP
+Status: v0.3.0. Python agents that use the declared tool boundary, and any program that speaks MCP
 over stdio. Read
 [what it does not do](#limits) before you rely on it.
 
@@ -132,8 +132,11 @@ Read it honestly:
 - **Twenty runs decide almost nothing.** At N=20 a 95% -> 65% collapse is still INCONCLUSIVE 99% of
   the time. Zero failures in 20 trials still allows a 13.9% failure rate (one-sided 95%); showing a
   rate below 0.5% needs at least 598 clean trials.
-- A tighter exact test and sequential stopping are on the [roadmap](docs/ROADMAP.md). Until then the
-  rule errs toward "not enough evidence".
+- If that is too slow for you, set `interval_method: newcombe` in the manifest (v0.3). Same alpha,
+  about twice the power (two equal 80% agents: PASS 71% instead of 22% at N=200; a 0.94 -> 0.77
+  drop at N=400: BLOCK 83% instead of 37%), calibrated by exact enumeration rather than proved. It
+  must be frozen before the run like everything else. Sequential stopping is on the
+  [roadmap](docs/ROADMAP.md).
 
 ## Use it
 

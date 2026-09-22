@@ -86,12 +86,13 @@ def render_markdown(
         "",
         "## Gate configuration",
         "",
-        "| Alpha | Delta | K (gating conditions) | Per-arm confidence | n_per_arm |",
-        "|---:|---:|---:|---:|---:|",
+        "| Alpha | Delta | K (gating conditions) | Interval method | Per-arm confidence "
+        "| n_per_arm |",
+        "|---:|---:|---:|---|---:|---:|",
         (
             f"| {_number(decision.alpha)} | {_number(decision.delta)} | "
-            f"{decision.k_conditions} | {decision.per_arm_confidence:.4%} | "
-            f"{decision.n_per_arm} |"
+            f"{decision.k_conditions} | {decision.interval_method} | "
+            f"{decision.per_arm_confidence:.4%} | {decision.n_per_arm} |"
         ),
     ]
 
@@ -100,6 +101,8 @@ def render_markdown(
         candidate = _arm_summary(condition.candidate)
         role = "Gating" if condition.is_gating else "Descriptive (ceiling fault)"
         confidence = f"Clopper-Pearson ({decision.per_arm_confidence:.4%})"
+        if decision.interval_method == "newcombe":
+            confidence = "Clopper-Pearson (informational; the gate uses Newcombe below)"
         lines.extend(
             [
                 "",
@@ -114,7 +117,8 @@ def render_markdown(
                 f"| Wilson 95% (display only) | {baseline[3]} | {candidate[3]} |",
                 f"| {confidence} | {baseline[4]} | {candidate[4]} |",
                 (
-                    "| Bounds on difference (candidate - baseline) | — | "
+                    f"| Bounds on difference, {decision.interval_method} "
+                    f"(candidate - baseline) | — | "
                     f"{_interval(condition.delta_low, condition.delta_high)} |"
                 ),
                 (f"| Candidate hard violations | — | {condition.candidate_hard_violations} |"),

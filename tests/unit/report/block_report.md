@@ -4,9 +4,9 @@ BLOCK means the candidate is worse than the baseline by more than the configured
 
 ## Gate configuration
 
-| Alpha | Delta | K (gating conditions) | Per-arm confidence | n_per_arm |
-|---:|---:|---:|---:|---:|
-| 0.0500 | 0.1000 | 1 | 97.5000% | 12 |
+| Alpha | Delta | K (gating conditions) | Interval method | Per-arm confidence | n_per_arm |
+|---:|---:|---:|---|---:|---:|
+| 0.0500 | 0.1000 | 1 | clopper_pearson | 97.5000% | 12 |
 
 ## Condition: fetch_timeout
 
@@ -18,7 +18,7 @@ BLOCK means the candidate is worse than the baseline by more than the configured
 | Success rate | 100.0% | 0.0% |
 | Wilson 95% (display only) | [0.7575, 1.0000] | [0.0000, 0.2425] |
 | Clopper-Pearson (97.5000%) | [0.6941, 1.0000] | [0.0000, 0.3059] |
-| Bounds on difference (candidate - baseline) | — | [-1.0000, -0.3882] |
+| Bounds on difference, clopper_pearson (candidate - baseline) | — | [-1.0000, -0.3882] |
 | Candidate hard violations | — | 0 |
 | Condition verdict | — | **BLOCK** |
 

@@ -19,7 +19,13 @@ from arci.schema import (
     TrialSpec,
     Verdict,
 )
-from arci.stats import clopper_pearson_tail, difference_bounds, per_arm_confidence, wilson
+from arci.stats import (
+    clopper_pearson_tail,
+    difference_bounds,
+    newcombe,
+    per_arm_confidence,
+    wilson,
+)
 
 
 def classify(delta_low: float, delta_high: float, delta: float) -> Verdict:
@@ -175,8 +181,13 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
         for condition in manifest.conditions
     )
     adjusted_conditions = max(gating_count, 1)
-    confidence = per_arm_confidence(manifest.alpha, adjusted_conditions)
     tail = manifest.alpha / (4.0 * adjusted_conditions)
+    use_newcombe = manifest.interval_method == "newcombe"
+    confidence = (
+        1.0 - manifest.alpha / adjusted_conditions
+        if use_newcombe
+        else per_arm_confidence(manifest.alpha, adjusted_conditions)
+    )
     if tail < 2.5e-7:
         return _error_decision(manifest, trials, "statistical interval error")
 
@@ -246,10 +257,15 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
         candidate, candidate_interval_error = _arm_stats(candidate_trials, tail)
         if baseline_interval_error or candidate_interval_error:
             global_reasons.append("statistical interval error")
-        delta_low, delta_high = difference_bounds(
-            baseline=(baseline.cp_low, baseline.cp_high),
-            candidate=(candidate.cp_low, candidate.cp_high),
-        )
+        if use_newcombe and baseline.n and candidate.n:
+            delta_low, delta_high = newcombe(
+                baseline.successes, baseline.n, candidate.successes, candidate.n, confidence
+            )
+        else:
+            delta_low, delta_high = difference_bounds(
+                baseline=(baseline.cp_low, baseline.cp_high),
+                candidate=(candidate.cp_low, candidate.cp_high),
+            )
         statistical_verdict = classify(delta_low, delta_high, manifest.delta)
         hard_violations = _hard_violations(candidate_trials)
         is_gating = not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
@@ -299,6 +315,7 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
         trials_sha256=trials_sha256,
         alpha=manifest.alpha,
         delta=manifest.delta,
+        interval_method=manifest.interval_method,
         k_conditions=gating_count,
         per_arm_confidence=confidence,
         n_per_arm=manifest.n_per_arm,
