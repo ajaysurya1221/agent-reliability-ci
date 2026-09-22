@@ -11,23 +11,23 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
 - [x] Research Jev: blog, docs (api, models, confidence, jaggedness, patterns, cookbooks), SDK
       source (`typesafe-sdk` 0.7.1, `system-one-adapter` 0.2.0), third-party write-ups
 - [x] Confirm the integration seam: SDKs read `TYPESAFE_BASE_URL` / `TYPESAFE_API_KEY`
-- [~] Astra (xhigh) adversarial review of the goal and design; fold in the verdict
-- [ ] Write `docs/design/0003-decision-boundary.md` (decision record)
+- [x] Astra (xhigh) adversarial review of the goal and design; fold in the verdict (DESIGN: CHANGE, all folded in)
+- [x] Write `docs/design/0003-decision-boundary.md` (decision record)
 
 ## 1. Freeze (Claude owns; hash-pinned in FROZEN.sha256)
-- [ ] `schema.py`: `DecisionSpec`, `Manifest.decisions`, `TrialSpec.decisions`; reserved tool
+- [x] `schema.py`: `DecisionSpec`, `Manifest.decisions`, `TrialSpec.decisions`; reserved tool
       name `decision`; manifest validation rules
-- [ ] `schedule.py`: bind `decisions` into every `TrialSpec` (spec hash changes)
-- [ ] Perturbation kinds `decision_low_confidence`, `decision_unavailable` and their params
-- [ ] Acceptance tests: HTTP boundary record/replay/miss, key isolation, budgets, 401/422/529
+- [x] `schedule.py`: bind `decisions` into every `TrialSpec` (spec hash changes)
+- [x] Perturbation kinds `decision_low_confidence`, `decision_unavailable` and their params
+- [x] Acceptance tests: HTTP boundary record/replay/miss, key isolation, budgets, 401/422/529
       mapping, perturbation maths, diff signatures, fixture upstream, hero demo 2 exit codes
-- [ ] `AGENTS.md` v0.5 section for the coder; regenerate `FROZEN.sha256`
+- [x] `AGENTS.md` v0.5 section for the coder; regenerate `FROZEN.sha256`
 
 ## 2. Build (Sol implements offline; Claude verifies outside the sandbox)
-- [ ] WP-J1: loopback HTTP listener in the boundary process; record/replay/budget for decisions;
+- [~] WP-J1: loopback HTTP listener in the boundary process; record/replay/budget for decisions;
       fixture and http upstreams; env injection in the runner
-- [ ] WP-J2: decision perturbations; diff signatures for decisions; report additions
-- [ ] WP-J3: `examples/jev_triage_agent` (A gated, B regression, C fix; fixture answers from
+- [~] WP-J2: decision perturbations; diff signatures for decisions; report additions
+- [~] WP-J3 (folded into WP-J2): `examples/jev_triage_agent` (A gated, B regression, C fix; fixture answers from
       hidden ground truth; MCP tools `issue_refund` / `escalate` / `reply`; independent oracle)
 - [ ] Hero demo 2 script: A vs B exit 1, A vs A exit 0, A vs C exit 0, replay REPRODUCED,
       minimiser 1-minimal; wired into CI
