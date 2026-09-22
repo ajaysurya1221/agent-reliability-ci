@@ -1,5 +1,7 @@
 # agent-reliability-ci
 
+![arci: regression testing for stochastic AI agents. In the seeded retry demo, one clean trial passes both agents; over 200 trials per arm with a timeout on the first reserve call, A scores 192/200 and B 132/200, bounds on the difference minus 40.5 to minus 18.3 against a margin of minus 10: VERDICT BLOCK, exit 1.](docs/images/hero.png)
+
 **Regression testing for stochastic AI agents.** `arci` turns "it passed when I tried it" into a
 frozen, repeated experiment with an honest verdict, and turns a measured regression into a small
 failure case you can replay offline.
@@ -44,6 +46,8 @@ runner needs several minutes. `uv sync` needs the network once; the trials make 
 5. The exported bundle replays the failure offline from its recording.
 6. The repaired agent C passes the exact reproducer and its own separately frozen experiment.
 
+![Aligned traces of agents A and B: both call get_stock, both hit the injected tool_timeout on reserve; A reserves again and passes, B gives up without a reservation and fails. The failing condition shrinks from three injected faults to one, 1-minimal, and replays offline: REPRODUCED.](docs/images/trace-lanes.png)
+
 Agent B is not rigged with dice. It is agent A with the retry around `reserve` removed, a plausible
 refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
 failure rate comes from the environment. Reservations already exist with configured probability
@@ -66,6 +70,8 @@ your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (th
 agent on a local Ollama model whose two arms differ by one sentence of the system prompt.
 
 ## How it works
+
+![Sealed manifest, then runner plus recorder, then a pure gate with exit codes PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3; sealed trial records feed diff, minimize, bundle and replay. Only boundary calls are observed; not a sandbox.](docs/images/how-it-works.png)
 
 ```text
 manifest (sealed, frozen before the run)
@@ -124,6 +130,8 @@ leaving the denominator.
 | 0.95 -> 0.75 | .000 / .000 / 1.000 | .000 / .093 / .907 | .000 / .365 / .635 | .000 / .828 / .172 |
 | 0.95 -> 0.65 | .000 / .008 / .992 | .000 / .685 / .315 | .000 / .985 / .015 | .000 / 1.000 / .000 |
 | 0.80 -> 0.80 | .003 / .000 / .997 | .059 / .000 / .941 | .218 / .000 / .782 | .615 / .000 / .385 |
+
+![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](docs/images/calibration.png)
 
 Read it honestly:
 
