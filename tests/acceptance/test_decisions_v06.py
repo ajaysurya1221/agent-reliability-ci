@@ -166,19 +166,56 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(200, self._answer(body))
 
     def _answer(self, body: dict[str, JsonValue]) -> dict[str, Any]:
-        answer = cast(dict[str, Any], fixture(body, 0, 0))
-        department = answer["answers"]["department"]
-        # The real service rounds: sums land within 1e-4 of 1, not within 1e-6.
-        department["probabilities"] = {
-            k: round(v, 4) + (0.0002 if k == department["choice"] else 0.0)
-            for k, v in department["probabilities"].items()
-        }
+        state = body.get("state")
+        answer: dict[str, Any]
+        if isinstance(state, dict) and "ticket" in state:
+            answer = cast(dict[str, Any], fixture(body, 0, 0))
+            department = answer["answers"]["department"]
+            # The real service rounds: sums land within 1e-4 of 1, not within 1e-6.
+            department["probabilities"] = {
+                k: round(v, 4) + (0.0002 if k == department["choice"] else 0.0)
+                for k, v in department["probabilities"].items()
+            }
+        else:  # any other state (the preflight smoke): a plausible answer per question type
+            answer = {"answers": _generic_answers(cast(dict[str, Any], body["questions"]))}
         answer["model"] = GATEWAY_MODEL
         answer["usage"] = {"input_tokens": 275, "output_tokens": 20, "cached_input_tokens": 0}
         answer["provider_metadata"] = {
             "gateway": {"routing": {"canonicalSlug": GATEWAY_MODEL}, "cost": "0.00001155"}
         }
         return answer
+
+
+def _generic_answers(questions: dict[str, Any]) -> dict[str, Any]:
+    answers: dict[str, Any] = {}
+    for name, question in questions.items():
+        kind = question["type"]
+        if kind == "noul":
+            answers[name] = {"type": "noul", "noul": 0.9}
+        elif kind == "choice":
+            options = sorted(question["criteria"])
+            n = len(options)
+            probabilities = {o: (0.9 if i == 0 else 0.1 / (n - 1)) for i, o in enumerate(options)}
+            if n == 1:
+                probabilities = {options[0]: 1.0}
+            answers[name] = {
+                "type": "choice",
+                "choice": options[0],
+                "probabilities": probabilities,
+                "confidence": 1.0 if n == 1 else (n * 0.9 - 1) / (n - 1),
+            }
+        else:
+            levels = list(question["criteria"])
+            n = len(levels)
+            probabilities = {str(i): (0.9 if i == 0 else 0.1 / (n - 1)) for i in range(n)}
+            answers[name] = {
+                "type": "score",
+                "score": sum(i * p for i, p in enumerate(probabilities.values())),
+                "legend": {str(i): levels[i] for i in range(n)},
+                "probabilities": probabilities,
+                "confidence": (n * 0.9 - 1) / (n - 1),
+            }
+    return answers
 
 
 @pytest.fixture
