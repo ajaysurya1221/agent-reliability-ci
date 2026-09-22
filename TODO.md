@@ -24,7 +24,8 @@ Plan: `~/.claude/plans/you-are-in-plan-bubbly-moore.md` (approved 2026-09-22). T
 - [x] Full suite (430 tests), ruff, basedpyright strict, frozen hashes; hero demo 2 via CLI; Node test locally
 - [x] Astra release review: CHANGES_REQUIRED (failed resend escaped ERROR, per-entry probability bound,
       preflight echoing provider strings, temp-tarball lock, version 0.5.0) + slow-drip deadline + docs
-- [~] Frozen regression tests for every finding; version 0.6.0; registry lock; docs corrected; Sol fixing (WP-K1b)
+- [x] Frozen regression tests for every finding; version 0.6.0; registry lock; docs corrected; Sol fixed them (WP-K1b); all socket suites green
+- [~] Astra re-check of the fixes; final full gate on the merged branch
 
 ## 4. Release
 - [ ] Merge to main, CI green on 3.11 and 3.14, tag `v0.6.0`, memory, close this list
