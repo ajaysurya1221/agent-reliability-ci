@@ -10,13 +10,8 @@ from typing import Any, cast
 
 import pytest
 
-from arci.schema import DECISION_TOOL, Outcome, ReplayStatus, Termination, TrialEnvelope
-from tests.acceptance.decision_fixtures import (
-    decision_contract,
-    decision_manifest,
-    decision_spec,
-    decisions,
-)
+from arci.schema import DECISION_TOOL, Outcome, Termination, TrialEnvelope
+from tests.acceptance.decision_fixtures import decision_contract, decision_spec, decisions
 
 pytestmark = pytest.mark.acceptance
 
@@ -67,13 +62,11 @@ def test_a_decision_during_any_pending_mcp_exchange_is_a_harness_fault() -> None
 
 
 def test_one_request_per_connection_so_replay_sees_what_the_agent_saw() -> None:
-    from arci.replay import make_bundle, replay
-
     env = _run("pipeline")
     assert env.outcome is Outcome.PASS, env.failure_detail
     assert _starts(env).count(DECISION_TOOL) == 2  # the pipelined first request, then the real one
-    bundle = make_bundle(decision_manifest(), env, decision_spec("pipeline"))
-    assert replay(bundle).status is ReplayStatus.REPRODUCED
+    assert env.usage.tool_calls == 4  # log, decision, decision, store: the trailing bytes never ran
+    assert [r.occurrence for r in env.recording if r.tool == DECISION_TOOL] == [0, 1]
 
 
 def test_expect_continue_is_answered_at_once_and_never_admitted() -> None:

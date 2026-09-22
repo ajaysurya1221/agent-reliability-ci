@@ -34,7 +34,9 @@ Legend: `[ ]` open, `[~]` in progress, `[x]` done, `[-]` cut.
 
 ## 3. Verify and review
 - [ ] Full suite, ruff, basedpyright strict, frozen hashes unchanged
-- [~] Astra adversarial review of the full diff with reproductions; fix or list every finding
+- [x] Astra adversarial review of the full diff with reproductions: CHANGES_REQUIRED, 5 blocking
+      (lost worker faults, non-total validation, cross-transport order, pipelining, key leaks) + Expect stall
+- [~] Frozen regression tests for every finding (`test_decisions_hardening.py`); Sol fixing (WP-J1b)
 - [ ] Specialist escalation only for failures Sol cannot reproduce in its sandbox
 
 ## 4. Docs and release
