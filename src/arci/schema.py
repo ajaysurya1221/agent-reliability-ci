@@ -312,6 +312,9 @@ class Manifest(Sealed):
     # How the bounds on p_candidate - p_baseline are formed. Frozen with the manifest, like
     # everything else that decides. See docs/STATISTICS.md.
     interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
+    # Group-sequential looks: strictly increasing cumulative pairs per condition, the last equal
+    # to n_per_arm. Empty means one look at n_per_arm. Alpha is split equally, alpha/L per look.
+    looks: tuple[int, ...] = ()
     base_seed: int = 0
     budgets: Budgets = Field(default_factory=Budgets)
     fixtures_sha256: str = ""
@@ -319,6 +322,15 @@ class Manifest(Sealed):
     prior_runs: tuple[str, ...] = ()
 
     VOLATILE: ClassVar[frozenset[str]] = frozenset({"created_at"})
+
+    @model_validator(mode="after")
+    def _looks_are_a_plan(self) -> Manifest:
+        if self.looks:
+            if any(b <= a for a, b in zip(self.looks, self.looks[1:], strict=False)):
+                raise ValueError("looks must be strictly increasing")
+            if self.looks[0] < 1 or self.looks[-1] != self.n_per_arm:
+                raise ValueError("looks must start above 0 and end at n_per_arm")
+        return self
 
     @model_validator(mode="after")
     def _one_kind_of_experiment(self) -> Manifest:
@@ -352,6 +364,7 @@ class TrialSpec(Model):
     alpha: float = 0.05
     delta: float = 0.10
     interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
+    looks: tuple[int, ...] = ()
     tool_mode: ToolMode = ToolMode.RECORD
     recording: tuple[RecordedCall, ...] = ()  # required when tool_mode is REPLAY
     # REPLAY only: recorded results do not mutate the environment, so the source
@@ -424,6 +437,16 @@ class ConditionDecision(Model):
     reasons: tuple[str, ...]
 
 
+class LookDecision(Model):
+    """One pre-registered look, recomputed from all trials through it."""
+
+    look: int  # 1-based
+    pairs: int  # cumulative pairs per condition at this look
+    trials_sha256: str  # hash_record of the sorted record_sha256 of the trials through this look
+    conditions: tuple[ConditionDecision, ...]
+    verdict: Verdict  # the experiment verdict had the run stopped here
+
+
 class GateDecision(Sealed):
     schema_version: Literal["arci/0.2"] = SCHEMA_VERSION
     experiment_id: str
@@ -433,8 +456,11 @@ class GateDecision(Sealed):
     delta: float
     interval_method: Literal["clopper_pearson", "newcombe"] = "clopper_pearson"
     k_conditions: int
-    per_arm_confidence: float  # clopper_pearson: 1 - alpha/(2K); newcombe: 1 - alpha/K
+    per_arm_confidence: float  # per look: clopper_pearson 1 - alpha/(2KL); newcombe 1 - alpha/(KL)
     n_per_arm: int
+    looks: tuple[int, ...] = ()  # the plan, (n_per_arm,) when the manifest declared none
+    history: tuple[LookDecision, ...] = ()  # every look reached, in order; the last one decided
+    stopped_at_look: int = 0  # 1-based index of the deciding look; 0 for an ERROR decision
     conditions: tuple[ConditionDecision, ...]
     verdict: Verdict
     exit_code: int

@@ -41,6 +41,7 @@ from arci.schema import (
     TrialEnvelope,
     TrialSpec,
     Usage,
+    Verdict,
 )
 from arci.storage import ExperimentStore
 from arci.toolbox import format_diagnostic
@@ -1454,6 +1455,8 @@ def run_experiment(
     manifest: Manifest, out_dir: Path | str, *, max_workers: int = 4
 ) -> tuple[TrialEnvelope, ...]:
     validate_contract(manifest.contract)
+    from arci.gate import decide
+
     schedule = build_schedule(manifest)
     store = ExperimentStore(out_dir, manifest)
     lock = threading.Lock()
@@ -1466,14 +1469,30 @@ def run_experiment(
 
         return index, run_trial(spec, emit, manifest.contract)
 
+    looks = manifest.looks or (manifest.n_per_arm,)
+    start = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(run, index, spec) for index, spec in enumerate(schedule)]
-        for future in as_completed(futures):
-            index, trial = future.result()
-            try:
-                with lock:
-                    store.append_trial(trial)
-            except Exception:
-                trial = _store_failure(trial)
-            results[index] = trial
-    return tuple(cast(TrialEnvelope, trial) for trial in results)
+        for end in looks:
+            stage = [
+                (index, spec)
+                for index, spec in enumerate(schedule)
+                if start <= int(spec.pair_id.rsplit(":", 1)[1]) < end
+            ]
+            futures = [executor.submit(run, index, spec) for index, spec in stage]
+            for future in as_completed(futures):
+                index, trial = future.result()
+                try:
+                    with lock:
+                        store.append_trial(trial)
+                except Exception:
+                    trial = _store_failure(trial)
+                results[index] = trial
+            completed = tuple(trial for trial in results if trial is not None)
+            if decide(manifest, completed).verdict in {
+                Verdict.PASS,
+                Verdict.BLOCK,
+                Verdict.ERROR,
+            }:
+                break
+            start = end
+    return tuple(trial for trial in results if trial is not None)

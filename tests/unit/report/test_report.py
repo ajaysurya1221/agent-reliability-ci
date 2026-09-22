@@ -5,6 +5,7 @@ from pathlib import Path
 
 from arci.gate import decide
 from arci.report import render_junit, render_markdown
+from arci.schema import Manifest
 from tests.acceptance.helpers import manifest, synthetic_trials
 
 
@@ -47,3 +48,21 @@ def test_junit_has_candidate_cases_and_a_failing_gate_case() -> None:
     assert len(suite.findall("testcase")) == 3
     assert len(suite.findall("testcase/failure")) == 2
     assert len(suite.findall("testcase/error")) == 1
+
+
+def test_markdown_reports_sequential_looks_and_stopping_look() -> None:
+    data = manifest(n_per_arm=48).model_dump(exclude={"record_sha256"})
+    experiment = Manifest.create(**{**data, "looks": (12, 24, 48)})
+    trials = synthetic_trials(
+        experiment,
+        condition_id="fetch_timeout",
+        baseline_successes=12,
+        candidate_successes=0,
+        n=12,
+    )
+
+    report = render_markdown(experiment, decide(experiment, trials), trials)
+
+    assert "## Looks" in report
+    assert "Stopped at look 1 of 3." in report
+    assert "| 1 | 12 | **BLOCK** |" in report

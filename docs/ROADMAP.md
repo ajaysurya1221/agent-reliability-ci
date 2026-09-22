@@ -12,9 +12,9 @@ docs/design/0002-out-of-process-boundary.md.
 
 ## Next, most valuable first
 
-1. **Sequential testing** with confidence sequences, so an experiment can stop early without losing
-   error control. (The tighter interval shipped in v0.3 as `interval_method: newcombe`; an exact
-   unconditional test is not planned unless enumeration finds Newcombe miscalibrated somewhere.)
+1. (Shipped in v0.3 and v0.4: `interval_method: newcombe`, and pre-registered `looks` with equal
+   Bonferroni spending. Alpha-spending functions or confidence sequences are not planned unless
+   the Bonferroni cost proves too high in practice.)
 3. **Streamable HTTP transport** and several MCP servers per trial.
 4. **Importers**, split into analysis-only and replay-capable, built only from authentic versioned
    fixtures: OTLP GenAI spans, Claude Code `stream-json`, Codex `--json`.

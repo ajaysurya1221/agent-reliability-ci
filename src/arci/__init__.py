@@ -1,3 +1,3 @@
 """agent-reliability-ci: regression testing for stochastic AI agents."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

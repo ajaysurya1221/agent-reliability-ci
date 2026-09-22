@@ -14,7 +14,7 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer, 192/200, VERDICT: PASS (exit 0)
 ```
 
-Status: v0.3.0. Python agents that use the declared tool boundary, and any program that speaks MCP
+Status: v0.4.0. Python agents that use the declared tool boundary, and any program that speaks MCP
 over stdio. Read
 [what it does not do](#limits) before you rely on it.
 
@@ -143,8 +143,11 @@ Read it honestly:
 - If that is too slow for you, set `interval_method: newcombe` in the manifest (v0.3). Same alpha,
   about twice the power (two equal 80% agents: PASS 71% instead of 22% at N=200; a 0.94 -> 0.77
   drop at N=400: BLOCK 83% instead of 37%), calibrated by exact enumeration rather than proved. It
-  must be frozen before the run like everything else. Sequential stopping is on the
-  [roadmap](docs/ROADMAP.md).
+  must be frozen before the run like everything else.
+- Real agents make every trial expensive, so `looks: [50, 100, 200]` (v0.4) lets a run stop at a
+  pre-registered look: a clear regression costs about 300 trials instead of 400 with the default
+  method, 160 with Newcombe. Alpha is split equally across looks, and the gate refuses a store that
+  ran on past a decisive look.
 
 ## Use it
 
