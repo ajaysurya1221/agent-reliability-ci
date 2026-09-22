@@ -16,8 +16,8 @@ Plan: `~/.claude/plans/you-are-in-plan-bubbly-moore.md` (approved 2026-09-22). T
 
 ## 2. Build (Sol, two parallel work packages)
 - [~] WP-K1 boundary/runner/cli/report/minimize: A1 A2 A3 B4 B5 B6 C9
-- [~] WP-K2 example/docs: C8 Node agent + package.json + CI step, B7 runbook + results template,
-      README, CHANGELOG 0.6.0, ROADMAP, D10 calibration option
+- [x] WP-K2 example/docs: C8 Node agent + package.json + CI step, B7 runbook + results template,
+      README, CHANGELOG 0.6.0, ROADMAP, D10 calibration option (Node test 2/2 with the unmodified JS SDK)
 
 ## 3. Verify and review
 - [ ] Full suite, ruff, basedpyright strict, frozen hashes; hero demos; Node test locally
