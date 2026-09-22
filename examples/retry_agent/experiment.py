@@ -40,7 +40,7 @@ def _manifest(*, candidate: str, condition: Condition, n_per_arm: int) -> Manife
         conditions=(condition,),
         n_per_arm=n_per_arm,
         base_seed=12_000,
-        budgets=Budgets(max_tool_calls=10, max_model_steps=10, max_seconds=5.0),
+        budgets=Budgets(max_tool_calls=10, max_model_steps=10, max_seconds=15.0),
     )
 
 
