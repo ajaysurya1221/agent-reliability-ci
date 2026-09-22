@@ -194,6 +194,7 @@ def main() -> int:
 
     if variant == "late":
         session = Session(args.mcp_config)
+        session.rpc("tools/list")
         session.call("log", msg="start")
         session.call("store", value="escalate")
         session.close()
@@ -201,6 +202,7 @@ def main() -> int:
         return 0 if status == 200 else 9
 
     session = Session(args.mcp_config)
+    session.rpc("tools/list")  # what a real MCP client does first; the boundary checks the names
     session.call("log", msg="start")
     if variant == "leak":
         session.call("log", msg=f"base={endpoint.base} key={endpoint.key}")
