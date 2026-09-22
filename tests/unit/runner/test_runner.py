@@ -7,14 +7,27 @@ import random
 import signal
 import threading
 import time
+from collections.abc import Callable
+from pathlib import Path
 
+import pytest
 from pydantic import JsonValue
 
 import arci.runner as runner_module
 from arci.interfaces import BudgetExceeded, ToolBoxProtocol
-from arci.runner import run_trial
-from arci.schema import Budgets, Outcome, Termination
-from tests.acceptance.helpers import COND_CLEAN, contract, spec
+from arci.runner import run_experiment, run_trial
+from arci.schedule import spec_sha256
+from arci.schema import (
+    Budgets,
+    ContractSpec,
+    Event,
+    Manifest,
+    Outcome,
+    Termination,
+    TrialEnvelope,
+    TrialSpec,
+)
+from tests.acceptance.helpers import COND_CLEAN, contract, manifest, spec
 
 
 def model_budget_agent(
@@ -167,3 +180,39 @@ def test_boundary_exit_is_abnormal_only_when_it_was_not_the_parents_own_stop() -
     # Still running when the deadline passed: the timeout path owns this, not the fault path.
     assert not abnormal(alive_at_deadline=True, exit_code=-9, stop_signal=None, has_result=False)
     assert not abnormal(alive_at_deadline=False, exit_code=None, stop_signal=None, has_result=False)
+
+
+def test_run_experiment_submits_only_the_first_decisive_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = manifest(n_per_arm=48).model_dump(exclude={"record_sha256"})
+    experiment = Manifest.create(**{**data, "looks": (12, 24, 48)})
+    seen: list[int] = []
+
+    def fake_run_trial(
+        trial_spec: TrialSpec,
+        _emit: Callable[[Event], None],
+        _contract: ContractSpec,
+    ) -> TrialEnvelope:
+        seen.append(int(trial_spec.pair_id.rsplit(":", 1)[1]))
+        passed = trial_spec.arm == "baseline"
+        return TrialEnvelope.create(
+            spec_sha256=spec_sha256(trial_spec),
+            experiment_id=trial_spec.experiment_id,
+            trial_id=trial_spec.trial_id,
+            pair_id=trial_spec.pair_id,
+            arm=trial_spec.arm,
+            variant=trial_spec.variant,
+            task_id=trial_spec.task_id,
+            condition_id=trial_spec.condition.condition_id,
+            seed=trial_spec.seed,
+            outcome=Outcome.PASS if passed else Outcome.FAIL,
+            termination=Termination.COMPLETED,
+            failure_fingerprint=None if passed else "f" * 64,
+        )
+
+    monkeypatch.setattr(runner_module, "run_trial", fake_run_trial)
+    trials = run_experiment(experiment, tmp_path, max_workers=4)
+
+    assert len(trials) == 24
+    assert set(seen) == set(range(12))

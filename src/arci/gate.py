@@ -13,6 +13,7 @@ from arci.schema import (
     Bucket,
     ConditionDecision,
     GateDecision,
+    LookDecision,
     Manifest,
     Outcome,
     TrialEnvelope,
@@ -153,6 +154,15 @@ def _error_decision(
     alpha = _safe_float(getattr(manifest, "alpha", 0.0))
     delta = _safe_float(getattr(manifest, "delta", 0.0))
     n_per_arm = _safe_int(getattr(manifest, "n_per_arm", 0))
+    raw_looks = getattr(manifest, "looks", ())
+    looks = (
+        raw_looks
+        if isinstance(raw_looks, tuple)
+        and all(type(look) is int and 0 < look <= 10_000 for look in raw_looks)
+        else ()
+    )
+    if not looks and n_per_arm:
+        looks = (n_per_arm,)
     return GateDecision.create(
         experiment_id=_safe_text(getattr(manifest, "experiment_id", "")),
         manifest_sha256=_safe_text(getattr(manifest, "record_sha256", "")),
@@ -162,12 +172,77 @@ def _error_decision(
         k_conditions=gating_count,
         per_arm_confidence=0.0,
         n_per_arm=n_per_arm,
+        looks=looks,
+        history=(),
+        stopped_at_look=0,
         conditions=(),
         verdict=Verdict.ERROR,
         exit_code=EXIT_CODES[Verdict.ERROR],
         reasons=(reason,),
         prior_runs=(),
     )
+
+
+def _trial_digest(trials: Sequence[TrialEnvelope]) -> str:
+    return hash_record({"trials": sorted(trial.record_sha256 for trial in trials)})
+
+
+def _condition_decisions(
+    manifest: Manifest, trials: Sequence[TrialEnvelope], tail: float, confidence: float
+) -> tuple[tuple[ConditionDecision, ...], bool]:
+    decisions: list[ConditionDecision] = []
+    interval_error = False
+    for condition in manifest.conditions:
+        condition_trials = [
+            trial for trial in trials if trial.condition_id == condition.condition_id
+        ]
+        baseline_trials = [trial for trial in condition_trials if trial.arm == "baseline"]
+        candidate_trials = [trial for trial in condition_trials if trial.arm == "candidate"]
+        baseline, baseline_error = _arm_stats(baseline_trials, tail)
+        candidate, candidate_error = _arm_stats(candidate_trials, tail)
+        interval_error |= baseline_error or candidate_error
+        if manifest.interval_method == "newcombe" and baseline.n and candidate.n:
+            delta_low, delta_high = newcombe(
+                baseline.successes, baseline.n, candidate.successes, candidate.n, confidence
+            )
+        else:
+            delta_low, delta_high = difference_bounds(
+                baseline=(baseline.cp_low, baseline.cp_high),
+                candidate=(candidate.cp_low, candidate.cp_high),
+            )
+        verdict = classify(delta_low, delta_high, manifest.delta)
+        hard_violations = _hard_violations(candidate_trials)
+        is_gating = not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
+        reasons = ["ceiling condition is descriptive"] if not is_gating else []
+        if baseline.errors or candidate.errors:
+            verdict = Verdict.ERROR
+            reasons.append("trial outcome ERROR")
+        elif hard_violations:
+            verdict = Verdict.BLOCK
+            reasons.append("candidate hard violation")
+        else:
+            reasons.append(
+                {
+                    Verdict.PASS: "non-inferiority bound passed",
+                    Verdict.BLOCK: "regression bound crossed",
+                    Verdict.INCONCLUSIVE: "bounds cross the margin",
+                    Verdict.ERROR: "invalid statistical verdict",
+                }[verdict]
+            )
+        decisions.append(
+            ConditionDecision(
+                condition_id=condition.condition_id,
+                baseline=baseline,
+                candidate=candidate,
+                delta_low=delta_low,
+                delta_high=delta_high,
+                candidate_hard_violations=hard_violations,
+                is_gating=is_gating,
+                verdict=verdict,
+                reasons=tuple(reasons),
+            )
+        )
+    return tuple(decisions), interval_error
 
 
 def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision:
@@ -181,12 +256,18 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
         for condition in manifest.conditions
     )
     adjusted_conditions = max(gating_count, 1)
-    tail = manifest.alpha / (4.0 * adjusted_conditions)
+    looks = manifest.looks or (manifest.n_per_arm,)
+    look_count = len(looks)
+    tail = manifest.alpha / (4.0 * adjusted_conditions * look_count)
     use_newcombe = manifest.interval_method == "newcombe"
     confidence = (
-        1.0 - manifest.alpha / adjusted_conditions
+        1.0 - manifest.alpha / (adjusted_conditions * look_count)
         if use_newcombe
-        else per_arm_confidence(manifest.alpha, adjusted_conditions)
+        else (
+            per_arm_confidence(manifest.alpha, adjusted_conditions)
+            if look_count == 1
+            else 1.0 - manifest.alpha / (2.0 * adjusted_conditions * look_count)
+        )
     )
     if tail < 2.5e-7:
         return _error_decision(manifest, trials, "statistical interval error")
@@ -214,11 +295,9 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
             duplicate_id = True
         else:
             observed_by_id[trial.trial_id] = trial
+    observed_ids = set(observed_by_id)
     schedule_valid = (
-        expected_ids_unique
-        and not duplicate_id
-        and len(trials) == len(expected)
-        and set(observed_by_id) == set(expected_by_id)
+        expected_ids_unique and not duplicate_id and observed_ids <= set(expected_by_id)
     )
     if schedule_valid:
         try:
@@ -246,69 +325,56 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
     if gating_count == 0:
         global_reasons.append("no gating conditions")
 
-    condition_decisions: list[ConditionDecision] = []
-    for condition in manifest.conditions:
-        condition_trials = [
-            trial for trial in trials if trial.condition_id == condition.condition_id
-        ]
-        baseline_trials = [trial for trial in condition_trials if trial.arm == "baseline"]
-        candidate_trials = [trial for trial in condition_trials if trial.arm == "candidate"]
-        baseline, baseline_interval_error = _arm_stats(baseline_trials, tail)
-        candidate, candidate_interval_error = _arm_stats(candidate_trials, tail)
-        if baseline_interval_error or candidate_interval_error:
-            global_reasons.append("statistical interval error")
-        if use_newcombe and baseline.n and candidate.n:
-            delta_low, delta_high = newcombe(
-                baseline.successes, baseline.n, candidate.successes, candidate.n, confidence
-            )
-        else:
-            delta_low, delta_high = difference_bounds(
-                baseline=(baseline.cp_low, baseline.cp_high),
-                candidate=(candidate.cp_low, candidate.cp_high),
-            )
-        statistical_verdict = classify(delta_low, delta_high, manifest.delta)
-        hard_violations = _hard_violations(candidate_trials)
-        is_gating = not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
-        condition_reasons: list[str] = []
-        if not is_gating:
-            condition_reasons.append("ceiling condition is descriptive")
-        if baseline.errors or candidate.errors:
-            verdict = Verdict.ERROR
-            condition_reasons.append("trial outcome ERROR")
-        elif hard_violations:
-            verdict = Verdict.BLOCK
-            condition_reasons.append("candidate hard violation")
-        else:
-            verdict = statistical_verdict
-            condition_reasons.append(
-                {
-                    Verdict.PASS: "non-inferiority bound passed",
-                    Verdict.BLOCK: "regression bound crossed",
-                    Verdict.INCONCLUSIVE: "bounds cross the margin",
-                    Verdict.ERROR: "invalid statistical verdict",
-                }[verdict]
-            )
-        condition_decisions.append(
-            ConditionDecision(
-                condition_id=condition.condition_id,
-                baseline=baseline,
-                candidate=candidate,
-                delta_low=delta_low,
-                delta_high=delta_high,
-                candidate_hard_violations=hard_violations,
-                is_gating=is_gating,
-                verdict=verdict,
-                reasons=tuple(condition_reasons),
-            )
-        )
+    prefix_ids = [
+        {spec.trial_id for spec in expected if int(spec.pair_id.rsplit(":", 1)[1]) < pairs}
+        for pairs in looks
+    ]
+    endpoint = next((i for i, ids in enumerate(prefix_ids) if observed_ids == ids), None)
+    if endpoint is None and schedule_valid:
+        global_reasons.append("trial set does not match the stopping look")
 
-    has_error = bool(global_reasons)
-    verdict = _experiment_verdict(condition_decisions, has_error)
-    try:
-        trial_hashes = sorted(trial.record_sha256 for trial in trials)
-    except Exception:
-        trial_hashes = []
-    trials_sha256 = hash_record({"trials": trial_hashes})
+    history: list[LookDecision] = []
+    condition_decisions: tuple[ConditionDecision, ...] = ()
+    verdict = Verdict.ERROR
+    stopped_at_look = 0
+    if endpoint is not None and not global_reasons:
+        for index, pairs in enumerate(looks[: endpoint + 1]):
+            look_trials = tuple(trial for trial in trials if trial.trial_id in prefix_ids[index])
+            condition_decisions, interval_error = _condition_decisions(
+                manifest, look_trials, tail, confidence
+            )
+            if interval_error:
+                global_reasons.append("statistical interval error")
+            look_verdict = _experiment_verdict(condition_decisions, bool(global_reasons))
+            history.append(
+                LookDecision(
+                    look=index + 1,
+                    pairs=pairs,
+                    trials_sha256=_trial_digest(look_trials),
+                    conditions=condition_decisions,
+                    verdict=look_verdict,
+                )
+            )
+            if look_verdict in {Verdict.PASS, Verdict.BLOCK}:
+                if index != endpoint:
+                    global_reasons.append("trial set does not match the stopping look")
+                else:
+                    verdict = look_verdict
+                    stopped_at_look = index + 1
+                break
+        else:
+            if endpoint + 1 < look_count:
+                global_reasons.append("stopped without a decision")
+            else:
+                verdict = history[-1].verdict
+                stopped_at_look = look_count
+    else:
+        condition_decisions, _ = _condition_decisions(manifest, trials, tail, confidence)
+
+    if global_reasons:
+        verdict = Verdict.ERROR
+        stopped_at_look = 0
+    trials_sha256 = _trial_digest(trials)
     return GateDecision.create(
         experiment_id=manifest.experiment_id,
         manifest_sha256=manifest.record_sha256,
@@ -319,7 +385,10 @@ def _decide(manifest: Manifest, trials: Sequence[TrialEnvelope]) -> GateDecision
         k_conditions=gating_count,
         per_arm_confidence=confidence,
         n_per_arm=manifest.n_per_arm,
-        conditions=tuple(condition_decisions),
+        looks=looks,
+        history=tuple(history),
+        stopped_at_look=stopped_at_look,
+        conditions=condition_decisions,
         verdict=verdict,
         exit_code=EXIT_CODES[verdict],
         reasons=tuple(global_reasons),
