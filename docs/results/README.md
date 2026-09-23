@@ -41,3 +41,6 @@ Run 4 lists runs 1 to 3 in its sealed manifest's `prior_runs`, as the discipline
   the method after seeing the data is exactly what the discipline forbids.
 - Twice the experiment was wrong rather than the agent (a bridge bug, a dead model server). Both
   times the clusters and traces said so quickly, and both times the tool now says so by itself.
+
+The seeded retry demo's own gate reports (the README's headline 192/200 vs 132/200) are in
+`retry-demo-n200.md`.
