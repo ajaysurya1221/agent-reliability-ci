@@ -1,5 +1,9 @@
 # agent-reliability-ci
 
+[![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](pyproject.toml)
+
 ![arci: regression testing for stochastic AI agents. In the seeded retry demo, one clean trial passes both agents; over 200 trials per arm with a timeout on the first reserve call, A scores 192/200 and B 132/200, bounds on the difference minus 40.5 to minus 18.3 percentage points against a margin of minus 10: VERDICT BLOCK, exit 1.](docs/images/hero.png)
 
 **Regression testing for stochastic AI agents.** `arci` (the CLI of *agent-reliability-ci*) turns
@@ -17,9 +21,13 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
 
 Status: v0.6.0, [Apache-2.0](LICENSE), Python 3.11 or newer, POSIX only, not on PyPI (clone it, or
 use the GitHub Action). It tests Python agents that use the declared tool boundary, any program
-that speaks MCP over stdio, and command agents that call a System One decision endpoint. Built in
-September 2026 as a hackathon by one person orchestrating three models; maintained, issues welcome.
+that speaks MCP over stdio, and command agents that call a System One decision endpoint.
 Read [what it does not do](#what-it-does-not-do) before you rely on it.
+
+**How it was built.** One maintainer, September 2026, with Claude Code and Codex as
+pair-programmers (recorded in the commit trailers). The experiment design, the decision rule and
+its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
+demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
 
 ## Why repetition and a threshold are not enough
 
@@ -256,13 +264,24 @@ Manifest.create(
     experiment_id="retry-agent-agent_b-reserve-timeout-200",
     task_id="confirm-inventory-order",
     task={"order_id": "order-7", "sku": "widget", "quantity": 2, "stock": 10},
-    toolset="examples.retry_agent.world:make_world",       # (task, seed) -> tools + snapshot
-    contract=ContractSpec(oracle="examples.retry_agent.world:oracle"),  # (task, final_state) -> bool
+    toolset="examples.retry_agent.world:make_world",  # (task, seed) -> tools + snapshot
+    contract=ContractSpec(
+        oracle="examples.retry_agent.world:oracle"
+    ),  # (task, final_state) -> bool
     baseline=ArmSpec(label="agent_a", agent="examples.retry_agent.agents:agent_a"),
     candidate=ArmSpec(label="agent_b", agent="examples.retry_agent.agents:agent_b"),
-    conditions=(Condition(condition_id="reserve-timeout", faults=(
-        FaultSpec(name="tool_timeout", bucket=Bucket.FALSIFY, tool="reserve", at_occurrence=0),)),),
-    n_per_arm=200, base_seed=12_000,
+    conditions=(
+        Condition(
+            condition_id="reserve-timeout",
+            faults=(
+                FaultSpec(
+                    name="tool_timeout", bucket=Bucket.FALSIFY, tool="reserve", at_occurrence=0
+                ),
+            ),
+        ),
+    ),
+    n_per_arm=200,
+    base_seed=12_000,
     budgets=Budgets(max_tool_calls=10, max_model_steps=10, max_seconds=15.0),
 )
 ```
