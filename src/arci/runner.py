@@ -370,10 +370,17 @@ def _grade(
             try:
                 assert process is not None and process.stdout is not None
                 while True:
-                    timeout = 0.0 if reader_stop.is_set() else 0.05
-                    ready, _, _ = select.select([process.stdout.fileno()], [], [], timeout)
+                    # Snapshot the stop flag BEFORE polling. A poll that timed out before the
+                    # grader wrote (and before the parent asked us to stop) must not end the
+                    # read: on a loaded machine this thread can be descheduled across the
+                    # child's exit, and acting on that stale "not ready" verdict drops the
+                    # whole response. Only a poll made after the stop was observed may do so.
+                    stopping = reader_stop.is_set()
+                    ready, _, _ = select.select(
+                        [process.stdout.fileno()], [], [], 0.0 if stopping else 0.05
+                    )
                     if not ready:
-                        if reader_stop.is_set():
+                        if stopping:
                             return
                         continue
                     chunk = os.read(process.stdout.fileno(), 65536)
@@ -882,10 +889,15 @@ def _protocol_reader(
     try:
         assert process.stdout is not None
         while True:
-            timeout = 0.0 if stop.is_set() else 0.05
-            ready, _, _ = select.select([process.stdout.fileno()], [], [], timeout)
+            # Same rule as the worker reader: only a poll made after `stop` was observed
+            # may end the read, so a verdict computed before the boundary's final frames
+            # landed cannot drop them (seen as false "boundary exited before returning").
+            stopping = stop.is_set()
+            ready, _, _ = select.select(
+                [process.stdout.fileno()], [], [], 0.0 if stopping else 0.05
+            )
             if not ready:
-                if stop.is_set():
+                if stopping:
                     if buffer:
                         send("protocol_error", "partial boundary protocol line")
                     return

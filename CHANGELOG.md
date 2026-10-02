@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed:** two reader threads, the grader's response reader and the MCP boundary's frame
+  reader, could end a read on a "not ready" poll verdict computed before the child wrote and
+  before the parent asked them to stop. On a loaded machine the thread was descheduled across
+  the child's exit, the stale verdict dropped the whole response, and the trial ended `ERROR`
+  (`grader returned invalid output`, or `boundary exited before returning` for command agents)
+  at about 1 trial in 400 with 8 workers on 4 cores, which is enough to turn a 200-per-arm
+  experiment into an `ERROR` verdict on a busy CI runner. The worker reader already followed
+  the correct rule; both readers now snapshot the stop flag before polling, and only a poll
+  made after the stop was observed may end the read. Regression tests:
+  `tests/unit/runner/test_reader_stop_race.py`.
+
 ## v0.6.0 (2026-09-22)
 
 Day-one Jev readiness. The upstream behavior below is derived from vendor and official SDK
