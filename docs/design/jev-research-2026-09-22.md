@@ -3,7 +3,7 @@
 Sources: typesafe.ai blog "Introducing System One Models & Jev" (2026-09-15), docs.typesafe.ai
 (llms.txt index, api.md, models.md, confidence.md, model-jaggedness/jev-1.13.md, patterns,
 cookbooks), PyPI metadata, the installed `typesafe-sdk==0.7.1` and `system-one-adapter==0.2.0`
-sources (scratchpad `jev-sdk/.venv/lib/python3.13/site-packages/{typesafe_sdk,system_one_adapter}`),
+sources (installed from PyPI into a scratch virtualenv),
 third-party write-ups (LangChain, TrueFoundry, MindStudio, dev.to/valyu, Vercel).
 
 ## What Jev is
@@ -22,7 +22,8 @@ third-party write-ups (LangChain, TrueFoundry, MindStudio, dev.to/valyu, Vercel)
   the response carries the versioned id actually used. Pin versions when tuning thresholds.
 - Context: 64k tokens per request (state + all questions); 32k for state + longest question.
 - Access: early access / waitlist; keys from console.typesafe.ai; also via Vercel AI Gateway.
-  Ajay has no key (no `TYPESAFE_*` env on this machine).
+  No API key was available while these notes were written, so nothing here was run against the
+  live service.
 - Stochastic, not deterministic: the self-consistency cookbook repeats identical requests 15x and
   reports noul std dev ≈ 0.0102 per question (lower than LLMs at temperature 0, but nonzero).
   There is no seed or temperature parameter in the API.
