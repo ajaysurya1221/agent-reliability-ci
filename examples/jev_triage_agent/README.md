@@ -52,3 +52,8 @@ is treated as ambiguous, and the fixture selects a wrong department with probabi
 while reporting confidence `c`. Selection is deterministic for each seed and decision occurrence.
 This is synthetic test data for confidence-gating regressions, never a claim about Jev's behaviour
 or calibration.
+
+## Live results
+
+The same experiment ran against the real endpoint on 2026-10-03 through `day_one.sh`: sealed stores
+and one write-up per run in [docs/results/jev](../../docs/results/jev/README.md).

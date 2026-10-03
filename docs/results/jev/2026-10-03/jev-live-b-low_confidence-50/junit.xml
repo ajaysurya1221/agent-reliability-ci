@@ -1,0 +1,158 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="jev-live-b-low_confidence-50" tests="51" failures="51" errors="0">
+  <testsuite name="low_confidence" tests="51" failures="51" errors="0">
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00000:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00001:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00002:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00003:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00004:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00005:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00006:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00007:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00008:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00009:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00010:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00011:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00012:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00013:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00014:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00015:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00016:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00017:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00018:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00019:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00020:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00021:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00022:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00023:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00024:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00025:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00026:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00027:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00028:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00029:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00030:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00031:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00032:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00033:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00034:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00035:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00036:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00037:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00038:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00039:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00040:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00041:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00042:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00043:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00044:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00045:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00046:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00047:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00048:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence.candidate" name="low_confidence:00049:candidate">
+      <failure message="b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875" type="completed">b376c565db2dd4854767ef178cc9faa292faa0562e88e33b51d3bf2c14c57875: oracle rejected final state; first_failed_tool=none</failure>
+    </testcase>
+    <testcase classname="jev-live-b-low_confidence-50.low_confidence" name="gate">
+      <failure message="condition verdict is BLOCK" type="gate">regression bound crossed</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

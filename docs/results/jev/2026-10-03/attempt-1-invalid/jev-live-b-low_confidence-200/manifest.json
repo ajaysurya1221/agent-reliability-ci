@@ -1,0 +1,139 @@
+{
+  "record_sha256": "9401c00021f7acdc7e0c915c2cd8a700de30248e33a5a4c4d5e97dd2bf3e21ce",
+  "schema_version": "arci/0.5",
+  "experiment_id": "jev-live-b-low_confidence-200",
+  "created_at": "",
+  "task_id": "triage-support-ticket",
+  "task": {
+    "tickets": [
+      {
+        "ticket_id": "ticket-refund",
+        "text": "I was charged twice for order A-104. Please refund the duplicate charge."
+      },
+      {
+        "ticket_id": "ticket-bug",
+        "text": "The desktop app crashes whenever I attach a PDF to a new message."
+      },
+      {
+        "ticket_id": "ticket-pricing",
+        "text": "Which plan includes audit-log exports, and what does it cost for 20 seats?"
+      }
+    ]
+  },
+  "toolset": null,
+  "mcp_server": {
+    "name": "support",
+    "argv": [
+      "/home/user/agent-reliability-ci/.venv/bin/python",
+      "-P",
+      "-m",
+      "arci.mcp_toolset_server",
+      "--toolset",
+      "examples.jev_triage_agent.world:make_world",
+      "--workdir",
+      "{workdir}",
+      "--seed",
+      "{seed}",
+      "--task-file",
+      "{task_file}"
+    ],
+    "env": {},
+    "snapshot": "arci.mcp_toolset_server:snapshot"
+  },
+  "decisions": {
+    "upstream": "http",
+    "fixture": null,
+    "base_url": "https://api.typesafe.ai",
+    "model": "jev-1.13.0",
+    "max_decisions": 50,
+    "request_seconds": 5.0,
+    "max_body_bytes": 262144,
+    "max_requests_per_minute": 200
+  },
+  "contract": {
+    "oracle": "examples.jev_triage_agent.world:oracle",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "a",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/home/user/agent-reliability-ci/.venv/bin/python",
+        "-P",
+        "-m",
+        "examples.jev_triage_agent.agent",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--variant",
+        "a"
+      ],
+      "env": {},
+      "infra_exit_codes": []
+    },
+    "candidate_id": "triage-a"
+  },
+  "candidate": {
+    "label": "b",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/home/user/agent-reliability-ci/.venv/bin/python",
+        "-P",
+        "-m",
+        "examples.jev_triage_agent.agent",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--variant",
+        "b"
+      ],
+      "env": {},
+      "infra_exit_codes": []
+    },
+    "candidate_id": "triage-b"
+  },
+  "conditions": [
+    {
+      "condition_id": "low_confidence",
+      "faults": [
+        {
+          "name": "decision_low_confidence",
+          "bucket": "falsify",
+          "tool": "decision:systemone",
+          "at_occurrence": 0,
+          "params": {
+            "confidence_max": 0.4
+          }
+        }
+      ]
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 200,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 22000,
+  "budgets": {
+    "max_tool_calls": 8,
+    "max_model_steps": 10,
+    "max_seconds": 20.0,
+    "grader_seconds": 10.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": [
+    "jev-live-b-clean-1",
+    "jev-live-b-low_confidence-50",
+    "jev-live-a-low_confidence-50",
+    "jev-live-c-low_confidence-50",
+    "jev-live-b-low_confidence-50-node"
+  ]
+}

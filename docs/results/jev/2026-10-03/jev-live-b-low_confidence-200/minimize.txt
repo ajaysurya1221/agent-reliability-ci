@@ -1,0 +1,4 @@
+kept: decision_low_confidence
+removed: none
+minimality: reduced
+trials_run: 1
