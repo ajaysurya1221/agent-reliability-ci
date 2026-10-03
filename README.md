@@ -270,6 +270,15 @@ question needs `instructions`; a network whose only egress is an HTTP CONNECT pr
 repository root on `PYTHONPATH`. Prices and provider limits are still as documented, not measured,
 and the gateway route is still untested. See [docs/DECISIONS.md](docs/DECISIONS.md).
 
+**Is the model's confidence something you can gate on?** A separate, pre-registered audit of
+`jev-1.13.0` on CLINC150 and Banking77 (26,140 requests, hash-chained records committed, every
+number re-derivable) answers that for intent routing: zero-shot accuracy 0.921 on CLINC150
+with ECE 0.024, 0.801 on Banking77 with ECE 0.084 and confidence over-stated in the middle of
+the range, 97% accuracy on the 83% of CLINC150 traffic above confidence 0.9, out-of-scope AUROC
+0.977 when asked directly, 99.4% top-1 agreement on repeated requests. Write-up and limits:
+[docs/results/jev-calibration](docs/results/jev-calibration/README.md); protocol and code:
+[bench/jev_calibration](bench/jev_calibration/PROTOCOL.md).
+
 ## Gate your own agent
 
 A manifest is a sealed JSON document built in Python. The retry example's builder,

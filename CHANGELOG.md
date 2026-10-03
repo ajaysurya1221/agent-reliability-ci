@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Calibration audit of the decision model (2026-10-03):** `bench/jev_calibration/` is a
+  pre-registered audit of `jev-1.13.0` on CLINC150 (4,500 in-scope + 1,000 out-of-scope) and
+  Banking77 (3,080), three passes each plus a bundling check, 26,140 requests, about USD 4.6
+  at list price. `PROTOCOL.md` (hash posted on PR #2 before the first request) fixes the
+  questions, passes, measures and seven expectations; `run.py` seals every answer in a
+  hash-chained store; `metrics.py` (exact binomial intervals, ECE/MCE/Brier/log loss,
+  tie-aware AUROC and average precision, bootstrap, agreement) is unit tested; `analyze.py`
+  verifies the chains and writes `metrics.json`, `report.md`, reliability diagrams and a
+  self-verifying compact store from which every number re-derives. All seven expectations
+  met: zero-shot accuracy 0.921 [0.912, 0.928] on CLINC150 (a supervised TF-IDF+LR trained on
+  15,000 examples: 0.925) with ECE 0.024; 0.801 on Banking77 with ECE 0.084 and mid-range
+  over-confidence; 0.970 accuracy at confidence >= 0.9 on 83% coverage; out-of-scope AUROC
+  0.977 (yes/no question) against 0.911 from 1 - p_max; 99.4% repeat agreement; p50 322 ms.
+  Write-up: `docs/results/jev-calibration/README.md`.
 - **Added:** `examples/jev_triage_agent/experiment.py` builds live manifests
   (`live_manifest`, `decisions.upstream = "http"`, pinned model, paced trial starts, prior
   runs) and writes them from the command line

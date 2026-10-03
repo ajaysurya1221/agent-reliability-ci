@@ -50,3 +50,9 @@ The seeded retry demo's own gate reports (the README's headline 192/200 vs 132/2
 The triage agent against the real System One endpoint (2026-10-03, `jev-1.13.0`): six
 pre-registered runs, one exploratory clean run and one invalid attempt, each with its sealed store,
 in [jev/README.md](jev/README.md).
+
+## The calibration audit of the decision model
+
+A pre-registered audit of `jev-1.13.0` on CLINC150 (with out-of-scope queries) and Banking77,
+26,140 requests, every number re-derivable from the committed hash-chained records:
+[jev-calibration/README.md](jev-calibration/README.md).
