@@ -150,6 +150,7 @@ def _scrub_preflight_text(value: object, api_key: str) -> str:
 def _cmd_preflight(
     manifest_path: str,
     *,
+    allow_unlisted_model: bool = False,
     upstream: _UpstreamClient = request_decision_upstream,
     clock: Callable[[], float] = time.monotonic,
 ) -> int:
@@ -174,8 +175,19 @@ def _cmd_preflight(
     )
     if spec.model not in available:
         listed = ", ".join(_scrub_preflight_text(model, api_key) for model in available) or "none"
-        _print(f"pinned model unavailable; account models: {listed}")
-        return 2
+        if not allow_unlisted_model:
+            _print(f"pinned model unavailable; account models: {listed}")
+            _print(
+                "the list may carry only aliases while versioned ids stay accepted; "
+                "--allow-unlisted-model verifies the pin with the one smoke request instead"
+            )
+            return 2
+        # The vendor's list carries aliases (`jev-latest`); versioned ids are accepted whether
+        # or not they are listed. The smoke request below is the real check: its validated
+        # response must report exactly the pinned id, or preflight fails with exit 3.
+        _print(
+            f"pinned model not listed; account models: {listed}; verifying with the smoke request"
+        )
     smoke = cast(
         dict[str, JsonValue],
         {
@@ -349,6 +361,11 @@ def _parser() -> _Parser:
 
     preflight = commands.add_parser("preflight", help="check an HTTP decision upstream")
     preflight.add_argument("manifest_json", metavar="MANIFEST")
+    preflight.add_argument(
+        "--allow-unlisted-model",
+        action="store_true",
+        help="accept a pinned model missing from GET /v1/models if the smoke request reports it",
+    )
 
     gate = commands.add_parser("gate", help="recompute the gate for a stored run")
     gate.add_argument("run_dir", metavar="RUN_DIR")
@@ -391,7 +408,10 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(int, values["workers"]),
         )
     if command == "preflight":
-        return _cmd_preflight(cast(str, values["manifest_json"]))
+        return _cmd_preflight(
+            cast(str, values["manifest_json"]),
+            allow_unlisted_model=cast(bool, values["allow_unlisted_model"]),
+        )
     if command == "gate":
         return _cmd_gate(
             cast(str, values["run_dir"]),

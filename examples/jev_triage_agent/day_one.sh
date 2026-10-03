@@ -82,13 +82,13 @@ run_one() {  # manifest-path -> runs, gates, records; never aborts the sequence
 echo "## preflight ($BASE_URL, model $MODEL)"
 PRE_MANIFEST=$(manifest b 50 low_confidence python)
 set +e
-"$ARCI" preflight "$PRE_MANIFEST" > "$OUT/preflight.txt" 2>&1
+"$ARCI" preflight --allow-unlisted-model "$PRE_MANIFEST" > "$OUT/preflight.txt" 2>&1
 PRE=$?
 set -e
 cat "$OUT/preflight.txt"
 case "$PRE" in
   0) grep -E '^\{"preflight"' "$OUT/preflight.txt" > "$OUT/preflight.receipt.json" || true ;;
-  2) echo "preflight: the pinned model is not on this account; pick one of the ids above with --model" >&2; exit 2 ;;
+  2) echo "preflight: the pinned model is neither listed nor reported by the smoke request; pick one of the ids above with --model" >&2; exit 2 ;;
   *) echo "preflight failed (exit $PRE); nothing was run" >&2; exit "$PRE" ;;
 esac
 
