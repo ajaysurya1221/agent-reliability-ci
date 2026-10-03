@@ -14,6 +14,7 @@ from bench.jev_calibration.metrics import (
     bootstrap_interval,
     brier,
     choice_confidence,
+    clopper_pearson,
     ece,
     fpr_at_tpr,
     log_loss,
@@ -24,6 +25,19 @@ from bench.jev_calibration.metrics import (
     selective,
     threshold_for_coverage,
 )
+
+
+def test_clopper_pearson_matches_arci_within_its_range() -> None:
+    from arci.stats import clopper_pearson as reference
+
+    cases = ((0, 1), (1, 1), (3, 10), (50, 50), (0, 50), (376, 400), (9999, 10000), (5000, 10000))
+    for successes, n in cases:
+        low, high = clopper_pearson(successes, n, 0.95)
+        ref_low, ref_high = reference(successes, n, 0.95)
+        assert low == pytest.approx(ref_low, abs=1e-6)
+        assert high == pytest.approx(ref_high, abs=1e-6)
+    low, high = clopper_pearson(13000, 13500, 0.95)
+    assert 0.957 < low < high < 0.967
 
 
 def test_accuracy_interval_is_exact_clopper_pearson() -> None:

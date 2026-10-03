@@ -451,7 +451,7 @@ def pooled_block(passes: dict[int, dict[str, Record]]) -> dict[str, JsonValue]:
 def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
     def get(path: str) -> JsonValue:
         node: JsonValue = result
-        for key in path.split("."):
+        for key in path.split("/"):
             if not isinstance(node, dict) or key not in node:
                 return None
             node = node[key]
@@ -477,7 +477,7 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
             }
         )
 
-    v = number("clinc150.pass_1.closed_in_scope.accuracy.low")
+    v = number("clinc150/pass_1/closed_in_scope/accuracy/low")
     add(
         "H1",
         "zero-shot accuracy",
@@ -486,7 +486,7 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
         ">= 0.85",
         v >= 0.85,
     )
-    v = number("clinc150.pass_1.closed_in_scope.calibration_p_max.ece_high")
+    v = number("clinc150/pass_1/closed_in_scope/calibration_p_max/ece_high")
     add(
         "H2",
         "calibration",
@@ -496,10 +496,10 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
         v <= 0.05,
     )
     low = number(
-        "clinc150.pass_1.closed_in_scope.selective_confidence.by_threshold.0.90.accuracy_covered_low"
+        "clinc150/pass_1/closed_in_scope/selective_confidence/by_threshold/0.90/accuracy_covered_low"
     )
     coverage = number(
-        "clinc150.pass_1.closed_in_scope.selective_confidence.by_threshold.0.90.coverage"
+        "clinc150/pass_1/closed_in_scope/selective_confidence/by_threshold/0.90/coverage"
     )
     add(
         "H3",
@@ -509,7 +509,7 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
         ">= 0.95 with coverage >= 0.5",
         low >= 0.95 and coverage >= 0.5,
     )
-    v = number("clinc150.pass_1.oos.detection.p_out_of_scope_open.auroc")
+    v = number("clinc150/pass_1/oos/detection/p_out_of_scope_open/auroc")
     add(
         "H4",
         "out-of-scope detection",
@@ -518,7 +518,7 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
         ">= 0.90",
         v >= 0.90,
     )
-    v = number("clinc150.consistency.pass_1_vs_2.top1_agreement_in_scope")
+    v = number("clinc150/consistency/pass_1_vs_2/top1_agreement_in_scope")
     add(
         "H5",
         "consistency",
@@ -527,9 +527,9 @@ def hypotheses(result: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
         ">= 0.95",
         v >= 0.95,
     )
-    v = number("clinc150.pass_1.latency.p50")
+    v = number("clinc150/pass_1/latency/p50")
     add("H6", "speed", "CLINC150 p50 latency from this container, ms", v, "<= 500", v <= 500)
-    v = number("banking77.pass_1.closed_in_scope.accuracy.low")
+    v = number("banking77/pass_1/closed_in_scope/accuracy/low")
     add(
         "H7",
         "the harder benchmark",
@@ -599,8 +599,99 @@ def compact_record(r: Record) -> dict[str, JsonValue]:
         "closed": summary(r.closed, r.label),
         "open": summary(r.opened, r.label),
         "noul": r.noul,
-        "record_sha256": r.record_sha256,
+        "raw_record_sha256": r.record_sha256,
     }
+
+
+def write_compact(path: Path, records: Sequence[Record]) -> None:
+    """The committed evidence: one compact record per request, hash-chained like the raw store."""
+
+    prev = "0" * 64
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for record in records:
+            row = compact_record(record)
+            row["prev_sha256"] = prev
+            row["record_sha256"] = sha256_text(prev + "\n" + canonical(row))
+            prev = str(row["record_sha256"])
+            handle.write(canonical(row) + "\n")
+
+
+def _choice_from_compact(raw: JsonValue, label: str) -> ChoiceAnswer | None:
+    if not isinstance(raw, dict):
+        return None
+    probabilities: dict[str, float] = {
+        str(cast(list[JsonValue], pair)[0]): float(cast(float, cast(list[JsonValue], pair)[1]))
+        for pair in cast(list[JsonValue], raw.get("top5") or [])
+    }
+    probabilities.setdefault(label, float(cast(float, raw.get("p_true") or 0.0)))
+    p_oos = raw.get("p_out_of_scope")
+    if isinstance(p_oos, int | float):
+        probabilities.setdefault(OOS_OPTION, float(p_oos))
+    return ChoiceAnswer(
+        choice=str(raw["choice"]),
+        confidence=float(cast(float, raw["confidence"])),
+        probabilities=probabilities,
+    )
+
+
+def load_compact(path: Path) -> tuple[list[Record], dict[str, JsonValue]]:
+    """Parse the committed compact store and verify its own hash chain."""
+
+    records: list[Record] = []
+    prev = "0" * 64
+    verified = 0
+    broken: list[int] = []
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        for index, line in enumerate(handle):
+            if not line.strip():
+                continue
+            raw = cast(dict[str, JsonValue], json.loads(line))
+            claimed = str(raw["record_sha256"])
+            without = {k: v for k, v in raw.items() if k != "record_sha256"}
+            if (
+                claimed != sha256_text(prev + "\n" + canonical(without))
+                or raw["prev_sha256"] != prev
+            ):
+                broken.append(index)
+            else:
+                verified += 1
+            prev = claimed
+            label = str(raw["label"])
+            noul = raw.get("noul")
+            domain = raw.get("domain")
+            status = raw.get("status")
+            error = raw.get("error")
+            request_id = raw.get("request_id")
+            model = raw.get("model")
+            records.append(
+                Record(
+                    dataset=str(raw["dataset"]),
+                    item_id=str(raw["item_id"]),
+                    label=label,
+                    domain=str(domain) if isinstance(domain, str) else None,
+                    pass_no=int(cast(int, raw["pass"])),
+                    protocol=str(raw["protocol"]),
+                    status=int(status) if isinstance(status, int) else None,
+                    error=str(error) if isinstance(error, str) else None,
+                    request_id=str(request_id) if isinstance(request_id, str) else None,
+                    latency_ms=float(cast(float, raw["latency_ms"])),
+                    model=str(model) if isinstance(model, str) else None,
+                    input_tokens=int(cast(int, raw["input_tokens"])),
+                    output_tokens=int(cast(int, raw["output_tokens"])),
+                    closed=_choice_from_compact(raw.get("closed"), label),
+                    opened=_choice_from_compact(raw.get("open"), label),
+                    noul=float(noul) if isinstance(noul, int | float) else None,
+                    record_sha256=str(raw["raw_record_sha256"]),
+                )
+            )
+    report: dict[str, JsonValue] = {
+        "store": path.name,
+        "records": len(records),
+        "verified": verified,
+        "broken_seqs": cast(JsonValue, broken[:20]),
+        "chain_ok": not broken,
+    }
+    return records, report
 
 
 def reliability_svg(bins: Sequence[JsonValue], title: str) -> str:
@@ -855,28 +946,48 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--runs", type=Path, required=True)
+    parser.add_argument("--runs", type=Path, default=None, help="directory of raw stores")
+    parser.add_argument(
+        "--compact", type=Path, default=None, help="a committed records.compact.jsonl.gz instead"
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-    runs = cast(Path, args.runs)
+    runs = cast(Path | None, args.runs)
+    compact_in = cast(Path | None, args.compact)
+    if (runs is None) == (compact_in is None):
+        parser.error("give exactly one of --runs and --compact")
     out = cast(Path, args.out)
     out.mkdir(parents=True, exist_ok=True)
     result: dict[str, JsonValue] = {}
     chains: list[JsonValue] = []
     compact: list[Record] = []
-    for name in (CLINC, BANKING):
-        store = runs / f"{name}.{PROTOCOL_BUNDLED}.jsonl"
-        if not store.exists():
-            continue
-        records, chain = load_store(store)
+    by_dataset: dict[str, tuple[list[Record], list[Record]]] = {}
+    if compact_in is not None:
+        loaded, chain = load_compact(compact_in)
         chains.append(chain)
-        compact.extend(records)
-        closed_only: list[Record] = []
-        check = runs / f"{name}.{PROTOCOL_CLOSED_ONLY}.jsonl"
-        if check.exists():
-            closed_only, chain_check = load_store(check)
-            chains.append(chain_check)
-            compact.extend(closed_only)
+        for record in loaded:
+            bundled, alone = by_dataset.setdefault(record.dataset, ([], []))
+            (bundled if record.protocol == PROTOCOL_BUNDLED else alone).append(record)
+    else:
+        assert runs is not None
+        for name in (CLINC, BANKING):
+            store = runs / f"{name}.{PROTOCOL_BUNDLED}.jsonl"
+            if not store.exists():
+                continue
+            records, chain = load_store(store)
+            chains.append(chain)
+            compact.extend(records)
+            closed_only: list[Record] = []
+            check = runs / f"{name}.{PROTOCOL_CLOSED_ONLY}.jsonl"
+            if check.exists():
+                closed_only, chain_check = load_store(check)
+                chains.append(chain_check)
+                compact.extend(closed_only)
+            by_dataset[name] = (records, closed_only)
+    for name in (CLINC, BANKING):
+        if name not in by_dataset:
+            continue
+        records, closed_only = by_dataset[name]
         result[name] = dataset_result(name, records, closed_only)
         p1 = cast(dict[str, JsonValue], cast(dict[str, JsonValue], result[name])["pass_1"])
         bins = cast(
@@ -896,10 +1007,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (out / "report.md").write_text(render_report(result, chains) + "\n", encoding="utf-8")
-    with gzip.open(out / "records.compact.jsonl.gz", "wt", encoding="utf-8") as handle:
-        for record in compact:
-            handle.write(canonical(compact_record(record)) + "\n")
-    print(f"wrote {out / 'metrics.json'}, report.md, {len(compact)} compact records")
+    if compact_in is None:
+        write_compact(out / "records.compact.jsonl.gz", compact)
+    print(f"wrote {out / 'metrics.json'} and report.md ({len(compact)} compact records written)")
     for raw in cast(list[JsonValue], result["hypotheses"]):
         h = cast(dict[str, JsonValue], raw)
         print(f"  {h['id']}: {fmt(h['value'])} {h['rule']} -> {'met' if h['met'] else 'NOT met'}")

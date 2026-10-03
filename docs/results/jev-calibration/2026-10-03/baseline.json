@@ -1,0 +1,62 @@
+[
+  {
+    "dataset": "clinc150",
+    "train_items": 15000,
+    "test_items": 4500,
+    "fit_seconds": 76.0,
+    "accuracy": 0.9248888888888889,
+    "accuracy_low": 0.9167978051335892,
+    "accuracy_high": 0.9324232120627812,
+    "ece_p_max": 0.097419900663857,
+    "mean_p_max": 0.827468988225032,
+    "selective": {
+      "0.5": {
+        "coverage": 0.8773333333333333,
+        "accuracy_covered": 0.9721377912867275
+      },
+      "0.6": {
+        "coverage": 0.834,
+        "accuracy_covered": 0.9789501731947775
+      },
+      "0.85": {
+        "coverage": 0.6782222222222222,
+        "accuracy_covered": 0.9918086500655308
+      },
+      "0.9": {
+        "coverage": 0.602,
+        "accuracy_covered": 0.9929863418235512
+      }
+    },
+    "oos_auroc_one_minus_p_max": 0.951836888888889,
+    "oos_average_precision": 0.8203181643004464
+  },
+  {
+    "dataset": "banking77",
+    "train_items": 10003,
+    "test_items": 3080,
+    "fit_seconds": 39.7,
+    "accuracy": 0.913961038961039,
+    "accuracy_low": 0.9034976059746195,
+    "accuracy_high": 0.9236300720760258,
+    "ece_p_max": 0.09124691718230012,
+    "mean_p_max": 0.822744895631958,
+    "selective": {
+      "0.5": {
+        "coverage": 0.8798701298701299,
+        "accuracy_covered": 0.9634686346863469
+      },
+      "0.6": {
+        "coverage": 0.8301948051948052,
+        "accuracy_covered": 0.9741885021509582
+      },
+      "0.85": {
+        "coverage": 0.6344155844155844,
+        "accuracy_covered": 0.9923234390992836
+      },
+      "0.9": {
+        "coverage": 0.5571428571428572,
+        "accuracy_covered": 0.9941724941724942
+      }
+    }
+  }
+]

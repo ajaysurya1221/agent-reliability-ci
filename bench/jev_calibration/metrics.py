@@ -1,7 +1,9 @@
 """Estimators for the audit, on plain sequences so they can be unit tested by hand.
 
-Exact binomial intervals come from `arci.stats`; everything else is defined here, with ties
-handled explicitly because the API returns probabilities to two decimals.
+The exact binomial interval is implemented here (regularised incomplete beta by continued
+fraction, inverted by bisection) because `arci.stats.clopper_pearson` caps n at 10,000 and the
+pooled passes exceed it; the unit tests check it against `arci.stats` inside that range. Ties
+are handled explicitly because the API returns probabilities to two decimals.
 """
 
 from __future__ import annotations
@@ -10,8 +12,6 @@ import math
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-
-from arci.stats import clopper_pearson
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,76 @@ class Selective:
     covered: int
     accuracy_covered: float
     accuracy_rest: float
+
+
+def _betacf(a: float, b: float, x: float) -> float:
+    """Continued fraction for the incomplete beta function (modified Lentz)."""
+
+    tiny = 1e-300
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    d = 1.0 / (d if abs(d) >= tiny else tiny)
+    h = d
+    for m in range(1, 400):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) >= tiny else tiny)
+        c = 1.0 + aa / (c if abs(c) >= tiny else tiny)
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) >= tiny else tiny)
+        c = 1.0 + aa / (c if abs(c) >= tiny else tiny)
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-15:
+            break
+    return h
+
+
+def regularized_incomplete_beta(a: float, b: float, x: float) -> float:
+    """I_x(a, b) for a, b > 0 and x in [0, 1]."""
+
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    log_front = (
+        math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x)
+    )
+    front = math.exp(log_front)
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _betacf(a, b, x) / a
+    return 1.0 - front * _betacf(b, a, 1.0 - x) / b
+
+
+def beta_quantile(p: float, a: float, b: float) -> float:
+    """The x with I_x(a, b) = p, by bisection to 1e-12."""
+
+    low, high = 0.0, 1.0
+    for _ in range(200):
+        mid = (low + high) / 2
+        if regularized_incomplete_beta(a, b, mid) < p:
+            low = mid
+        else:
+            high = mid
+        if high - low < 1e-12:
+            break
+    return (low + high) / 2
+
+
+def clopper_pearson(successes: int, n: int, confidence: float = 0.95) -> tuple[float, float]:
+    """Exact two-sided binomial interval for any n >= 1."""
+
+    if n < 1 or not 0 <= successes <= n:
+        raise ValueError("need 0 <= successes <= n and n >= 1")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in (0, 1)")
+    alpha = 1.0 - confidence
+    low = 0.0 if successes == 0 else beta_quantile(alpha / 2, successes, n - successes + 1)
+    high = 1.0 if successes == n else beta_quantile(1 - alpha / 2, successes + 1, n - successes)
+    return low, high
 
 
 def accuracy_interval(
