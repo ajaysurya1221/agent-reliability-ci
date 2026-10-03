@@ -193,13 +193,20 @@ def _cmd_preflight(
         {
             "state": "preflight",
             "model": spec.model,
+            # The live service requires each question to carry `instructions` or `criteria`
+            # (a bare `{"type": "noul"}` is a 400); the fixtures never cared.
             "questions": {
-                "ready": {"type": "noul"},
+                "ready": {"type": "noul", "instructions": "The endpoint is ready to answer"},
                 "route": {
                     "type": "choice",
+                    "instructions": "Is the endpoint ready?",
                     "criteria": {"yes": "Ready", "no": "Not ready"},
                 },
-                "quality": {"type": "score", "criteria": ["Low", "High"]},
+                "quality": {
+                    "type": "score",
+                    "instructions": "How ready is the endpoint?",
+                    "criteria": ["Low", "High"],
+                },
             },
         },
     )

@@ -547,6 +547,36 @@ def _tls_diagnostic(exc: ssl.SSLError) -> str:
     return f"TLS failed: {clean}"[:299]
 
 
+UPSTREAM_PROXY_ENV = "ARCI_HTTPS_PROXY"
+
+
+def _open_upstream_connection(
+    scheme: str, hostname: str, port: int | None, *, timeout: float
+) -> http.client.HTTPConnection:
+    """Open the connection the upstream request will use.
+
+    The harness never reads the ambient `HTTPS_PROXY`: the real key travels on this connection,
+    so it goes only where the manifest's `base_url` says, directly. The one exception is an
+    explicit opt-in, `ARCI_HTTPS_PROXY=http://host:port`, for machines whose only egress is a
+    CONNECT proxy the operator trusts with the key (the proxy's CA must be in the system store,
+    since TLS to the upstream is still verified end to end from here). It applies to https
+    upstreams only; loopback http test upstreams are always direct.
+    """
+    if scheme != "https":
+        return http.client.HTTPConnection(hostname, port, timeout=timeout)
+    proxy_url = os.environ.get(UPSTREAM_PROXY_ENV, "").strip()
+    if not proxy_url:
+        return http.client.HTTPSConnection(hostname, port, timeout=timeout)
+    proxy = urlsplit(proxy_url)
+    if proxy.scheme != "http" or proxy.hostname is None or proxy.port is None:
+        raise _DecisionTransportError(
+            f"{UPSTREAM_PROXY_ENV} must be an http://host:port CONNECT proxy"
+        )
+    connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=timeout)
+    connection.set_tunnel(hostname, port or 443)
+    return connection
+
+
 def _request_upstream_once(
     method: str,
     endpoint: str,
@@ -560,10 +590,8 @@ def _request_upstream_once(
     parts = urlsplit(spec.base_url)
     if parts.hostname is None:
         raise ValueError("decision upstream has no host")
-    connection_type = (
-        http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
-    )
-    connection = connection_type(
+    connection = _open_upstream_connection(
+        parts.scheme,
         parts.hostname,
         parts.port,
         timeout=max(_deadline_remaining(deadline, clock=clock), 0.001),
