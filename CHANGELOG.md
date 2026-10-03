@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added:** `examples/jev_triage_agent/experiment.py` builds live manifests
+  (`live_manifest`, `decisions.upstream = "http"`, pinned model, paced trial starts, prior
+  runs) and writes them from the command line
+  (`python -m examples.jev_triage_agent.experiment --out manifest.json`), so the day-one
+  sequence in `docs/design/0004-day-one.md` runs from files. `examples/jev_triage_agent/day_one.sh`
+  drives it end to end: preflight, the clean pair, the N=50 trio, the Node agent through the
+  official SDK, the pre-registered N=200 run, and a minimised, replayed failure, with a gate
+  report per run and a refusal to finish if the key appears in any output. Results land under
+  `docs/results/jev/` (scaffolded; nothing has been run yet).
 - **Fixed:** two reader threads, the grader's response reader and the MCP boundary's frame
   reader, could end a read on a "not ready" poll verdict computed before the child wrote and
   before the parent asked them to stop. On a loaded machine the thread was descheduled across
