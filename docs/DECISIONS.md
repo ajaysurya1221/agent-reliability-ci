@@ -99,7 +99,47 @@ calls, multiple decision transports, or streamable HTTP MCP. See
 ## Day one with a key
 
 Gateway behaviour, model identifiers, prices and provider limits are derived from documentation
-dated 2026-09-22. Tests use fixtures and fake upstreams; Jev was not run.
+dated 2026-09-22. Tests use fixtures and fake upstreams. Jev was run on 2026-10-03; see "What day
+one found" below.
+
+### What day one found (2026-10-03)
+
+The pre-registered sequence ran against `https://api.typesafe.ai` with `jev-1.13.0` pinned. The
+sealed stores, the preflight receipt and one write-up per run are in
+[docs/results/jev](results/jev/README.md), and `arci gate` re-derives every `decision.json` from
+its committed `trials.jsonl` byte for byte. Headline: A vs B under `decision_low_confidence` at
+N=200 is 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK; A vs A and A vs C PASS at N=50; the
+Node agent through the unchanged official SDK BLOCKs; the minimised failure replays REPRODUCED; an
+exploratory clean run at N=50 had the model route all 100 decisions correctly at confidence 1.0.
+902 recorded decisions, 428,272 input tokens, about USD 0.018 at list price, no 429 or 529.
+
+Four things did not survive contact with the real service:
+
+1. **The model list carries only aliases.** `GET /v1/models` returned `jev-latest` and
+   `jev-preview`; versioned ids are accepted but not listed. The pre-registered preflight exits 2
+   on that, as the frozen acceptance test requires. `arci preflight --allow-unlisted-model` is the
+   additive escape: it prints the listed names, sends the smoke request, and still exits 3 unless
+   the validated response reports exactly the pinned id. The default stays exit 2.
+2. **A question needs `instructions` or `criteria`.** The vendor answers 400 to a noul question
+   with neither; the three smoke questions now carry one line each.
+3. **Egress through a CONNECT proxy.** The upstream sender opened a direct `HTTPSConnection`; where
+   the only route out is an HTTP CONNECT proxy, the proxy's plain-text 403 surfaced as "decision
+   upstream returned non-JSON". `ARCI_HTTPS_PROXY=http://host:port` tunnels through it; unset,
+   nothing changes.
+4. **The example manifests need the repository root on `PYTHONPATH`.** They name the agent and the
+   toolset server as `examples.jev_triage_agent.*` modules; the runner hands subprocesses the
+   parent's `sys.path`, and the `arci` console script's `sys.path` does not include the repository
+   root. The first attempt ran every trial to a crash in about 0.6 s before any decision, and the
+   gate reported INCONCLUSIVE, PASS, PASS, PASS for the four Python runs because both arms failed
+   identically (ERROR for the Node run, whose MCP server exited). That attempt is kept in the
+   results as invalid. The lesson is already in the discipline but worth stating plainly: the gate
+   compares arms, so a harness fault that breaks both arms equally yields PASS; the clean pair's
+   trial outcomes, not its verdict, are the sanity check, and `day_one.sh` now stops with exit 4
+   unless both clean-pair arms PASS.
+
+Still unverified: billed spend against the list price, provider rate limits under load (the paced
+200 trial starts per minute never produced a 429 or 529), the gateway route and its model id, and
+any ticket the model is not sure about.
 
 Use a versioned model while tuning policy thresholds. For TypeSafe directly, use the configured
 API origin and pin the available versioned Jev id; through Vercel AI Gateway, use base URL

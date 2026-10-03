@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="jev-live-a-low_confidence-50" tests="51" failures="0" errors="0">
+  <testsuite name="low_confidence" tests="51" failures="0" errors="0">
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00000:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00001:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00002:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00003:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00004:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00005:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00006:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00007:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00008:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00009:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00010:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00011:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00012:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00013:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00014:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00015:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00016:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00017:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00018:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00019:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00020:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00021:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00022:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00023:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00024:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00025:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00026:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00027:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00028:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00029:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00030:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00031:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00032:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00033:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00034:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00035:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00036:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00037:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00038:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00039:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00040:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00041:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00042:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00043:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00044:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00045:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00046:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00047:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00048:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence.candidate" name="low_confidence:00049:candidate" />
+    <testcase classname="jev-live-a-low_confidence-50.low_confidence" name="gate" />
+  </testsuite>
+</testsuites>

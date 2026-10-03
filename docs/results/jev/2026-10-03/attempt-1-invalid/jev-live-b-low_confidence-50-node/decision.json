@@ -1,0 +1,57 @@
+{
+  "record_sha256": "2f6a6a90a83d033ef461465d0b4cf3d4602c5923ac41771192d6bf8f4afb00a5",
+  "schema_version": "arci/0.5",
+  "experiment_id": "jev-live-b-low_confidence-50-node",
+  "manifest_sha256": "d011cd04cb2dd8bc460d7d2bf14f1f6b502ef2e3f5371973cfec25de092966c4",
+  "trials_sha256": "5c85fea8afad035debad03770503ad93f5f5922b116fb7d76781c7ed0a34811f",
+  "alpha": 0.05,
+  "delta": 0.1,
+  "interval_method": "clopper_pearson",
+  "k_conditions": 1,
+  "per_arm_confidence": 0.975,
+  "n_per_arm": 50,
+  "looks": [
+    50
+  ],
+  "history": [],
+  "stopped_at_look": 0,
+  "conditions": [
+    {
+      "condition_id": "low_confidence",
+      "baseline": {
+        "n": 50,
+        "successes": 0,
+        "errors": 50,
+        "rate": 0.0,
+        "cp_low": 0.0,
+        "cp_high": 0.08390987800799043,
+        "wilson_low": 0.0,
+        "wilson_high": 0.07134759913335868
+      },
+      "candidate": {
+        "n": 50,
+        "successes": 0,
+        "errors": 50,
+        "rate": 0.0,
+        "cp_low": 0.0,
+        "cp_high": 0.08390987800799043,
+        "wilson_low": 0.0,
+        "wilson_high": 0.07134759913335868
+      },
+      "delta_low": -0.08390987800799043,
+      "delta_high": 0.08390987800799043,
+      "candidate_hard_violations": 0,
+      "is_gating": true,
+      "verdict": "ERROR",
+      "reasons": [
+        "trial outcome ERROR"
+      ]
+    }
+  ],
+  "verdict": "ERROR",
+  "exit_code": 3,
+  "reasons": [
+    "trial outcome ERROR"
+  ],
+  "prior_runs": []
+}

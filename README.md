@@ -112,6 +112,13 @@ returns in those cases. C restores escalation.
 fixture is a deterministic CI example; it says nothing about any decision model's accuracy or
 calibration.
 
+**Run live on 2026-10-03** against `https://api.typesafe.ai` with `jev-1.13.0` pinned: the same
+steps reproduce every verdict (A vs B at N=200: 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK;
+A vs A and A vs C PASS; the Node agent through the unchanged official SDK BLOCK; one minimised
+failure replays REPRODUCED), plus an exploratory clean run in which the model routed all 100
+decisions correctly at confidence 1.0. 902 recorded decisions for about USD 0.018 at list price.
+Sealed stores and write-ups: [docs/results/jev](docs/results/jev/README.md).
+
 Measured on 2026-09-22, about 20 s for all six steps on a 15-core laptop, N=50 per arm:
 
 - clean pair: A and B both PASS
@@ -246,13 +253,22 @@ Python and JavaScript SDKs are exercised unchanged by the acceptance tests. `arc
 the key, the endpoint, the pinned model and one smoke decision before a live run; `run` paces
 trial starts for HTTP upstreams; `report` shows recorded decisions, tokens and an estimated cost.
 
-![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; Jev was not run.](docs/images/decision-boundary.png)
+![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](docs/images/decision-boundary.png)
 
-**This path has never been run against a vendor decision model.** v0.5 and v0.6 were built from
-vendor and official SDK documentation dated 2026-09-22 and are tested against seeded fixtures and
-fake upstreams shaped like that documentation; no key was available. Treat the gateway behaviour,
-model identifiers, prices and provider limits as documented, not verified. See
-[docs/DECISIONS.md](docs/DECISIONS.md).
+**Run against Jev on 2026-10-03.** v0.5 and v0.6 were built from vendor and official SDK
+documentation dated 2026-09-22 and tested against seeded fixtures and fake upstreams shaped like
+that documentation. With a key, the pre-registered day one
+([docs/design/0004-day-one.md](docs/design/0004-day-one.md)) ran end to end against
+`https://api.typesafe.ai` with `jev-1.13.0` pinned: preflight, the clean pair, the N=50 trio, the
+Node agent through the unchanged official SDK, the N=200 design, and a minimised, replayed failure.
+Every verdict re-derives from the committed stores ([docs/results/jev](docs/results/jev/README.md)).
+Four things did not survive contact with the real service and are fixed in this release: the
+account's model list carries only aliases, so a pinned versioned id needs
+`arci preflight --allow-unlisted-model` (the smoke response still has to report the pin); a smoke
+question needs `instructions`; a network whose only egress is an HTTP CONNECT proxy needs
+`ARCI_HTTPS_PROXY`; and running the example manifests through the `arci` console script needs the
+repository root on `PYTHONPATH`. Prices and provider limits are still as documented, not measured,
+and the gateway route is still untested. See [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Gate your own agent
 
@@ -352,10 +368,13 @@ there for steps that run after the gate.
   `--include` (the minimiser's output embeds none), so portable replay needs the referenced code and
   a compatible environment.
 - **A divergence is evidence, not proof of cause.** It shows where two runs part ways.
-- **The decision boundary is untested against a real vendor model.** Everything in v0.5 and v0.6 was
-  derived from documentation and exercised against fixtures and fake upstreams. Live answers are
-  sampled, so live minimisation is reported as `reduced`, never `1-minimal`, and a decision model's
-  confidence never enters a verdict except through the agent's actions.
+- **The decision boundary has been run against one vendor model, on one day, on three seeded
+  tickets.** The live model answered every clean decision with confidence 1.0, so the runs in
+  `docs/results/jev` show the harness, the pacing, both SDKs and the gate working end to end and the
+  planted regression caught; they say nothing about the model's calibration or about ambiguous
+  tickets. Live answers are sampled, so live minimisation is reported as `reduced`, never
+  `1-minimal`, and a decision model's confidence never enters a verdict except through the agent's
+  actions.
 - Command agents get one stdio MCP server (revision 2026-07-28), serial tool calls, no HTTP
   transport, no concurrent decisions.
 - No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only; Windows is untested.

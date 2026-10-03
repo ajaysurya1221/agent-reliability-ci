@@ -9,8 +9,35 @@
   sequence in `docs/design/0004-day-one.md` runs from files. `examples/jev_triage_agent/day_one.sh`
   drives it end to end: preflight, the clean pair, the N=50 trio, the Node agent through the
   official SDK, the pre-registered N=200 run, and a minimised, replayed failure, with a gate
-  report per run and a refusal to finish if the key appears in any output. Results land under
-  `docs/results/jev/` (scaffolded; nothing has been run yet).
+  report per run and a refusal to finish if the key appears in any output. Results:
+  `docs/results/jev/`.
+- **Run against Jev (2026-10-03):** the pre-registered day one ran end to end against
+  `https://api.typesafe.ai` with `jev-1.13.0` pinned. A vs B under `decision_low_confidence` at
+  N=200: 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK; A vs A and A vs C PASS at N=50; the
+  Node agent through the unchanged official SDK BLOCK; the minimised failure replays REPRODUCED;
+  an exploratory clean run at N=50 routed all 100 decisions correctly at confidence 1.0. 902
+  recorded decisions, about USD 0.018 at list price. Sealed stores, the preflight receipt, the
+  invalid first attempt and one write-up per run: `docs/results/jev/`; every `decision.json`
+  re-derives from its committed `trials.jsonl`. Findings: `docs/DECISIONS.md`, "What day one
+  found".
+- **Added:** `arci preflight --allow-unlisted-model`. The account's `GET /v1/models` lists only
+  the aliases `jev-latest` and `jev-preview`, so the pre-registered preflight exits 2 on a pinned
+  versioned id. With the flag, preflight prints the listed names, sends the smoke request, and
+  exits 0 only if the validated response reports exactly the pinned id (3 otherwise). Without the
+  flag nothing changes except a hint after the exit-2 message. Tests:
+  `tests/unit/cli/test_preflight_unlisted_model.py`.
+- **Added:** `ARCI_HTTPS_PROXY=http://host:port` makes the decision upstream sender tunnel through
+  an HTTP CONNECT proxy, for environments whose only egress is such a proxy; unset, the direct
+  connection is unchanged, and a malformed value is a transport error. Tests:
+  `tests/unit/decisions/test_upstream_proxy.py`.
+- **Fixed:** the three preflight smoke questions carry `instructions`; the vendor rejects a
+  question with neither `instructions` nor `criteria` (400), so the pre-registered smoke request
+  could not be accepted as written.
+- **Fixed:** `examples/jev_triage_agent/day_one.sh` puts the repository root on `PYTHONPATH`
+  (the manifests name `examples.jev_triage_agent.*` modules, invisible to the `arci` console
+  script), insists on running from the repository root, and stops with exit 4 unless both arms of
+  the N=1 clean pair PASS, so a harness fault that breaks both arms equally cannot be mistaken
+  for a measurement.
 - **Fixed:** two reader threads, the grader's response reader and the MCP boundary's frame
   reader, could end a read on a "not ready" poll verdict computed before the child wrote and
   before the parent asked them to stop. On a loaded machine the thread was descheduled across

@@ -1,0 +1,5 @@
+mode: boundary
+common_prefix: 2
+left: tool_finish tool="decision:systemone" ok=true status=200 value#0e7d6286 error_kind=null injected_by="decision_low_confidence"
+right: tool_finish tool="decision:systemone" ok=true status=200 value#2efc29db error_kind=null injected_by="decision_low_confidence"
+after_injection: decision_low_confidence
