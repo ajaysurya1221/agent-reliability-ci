@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-10-03)
 
 - **Calibration audit of the decision model (2026-10-03):** `bench/jev_calibration/` is a
   pre-registered audit of `jev-1.13.0` on CLINC150 (4,500 in-scope + 1,000 out-of-scope) and
