@@ -37,6 +37,15 @@ if [ -z "${TYPESAFE_API_KEY:-}" ]; then
   echo "TYPESAFE_API_KEY is not set in this environment" >&2
   exit 3
 fi
+if [ ! -f pyproject.toml ] || [ ! -d examples/jev_triage_agent ]; then
+  echo "run this script from the repository root" >&2
+  exit 64
+fi
+# The manifests name the agent and the toolset server as `examples.jev_triage_agent.*` modules.
+# The runner hands every subprocess the parent's sys.path, and the `arci` console script's
+# sys.path does not include the repository root, so put it on PYTHONPATH here (the acceptance
+# tests do the same). Without this every trial crashes before its first decision.
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 if [ "$SKIP_NODE" -eq 0 ] && ! command -v node >/dev/null 2>&1; then
   echo "node not found; skipping the Node agent run (pass --skip-node to silence this)" >&2
   SKIP_NODE=1
@@ -94,6 +103,18 @@ esac
 
 echo "## clean pair (N=1)"
 run_one "$(manifest b 1 clean python)"
+# The gate is INCONCLUSIVE at N=1 by construction; what this pair checks is that both arms can
+# complete a trial at all. Anything but two PASS outcomes is a harness fault, not a measurement.
+"$PY" - "$OUT/jev-live-b-clean-1/trials.jsonl" <<'PYEOF'
+import json, sys
+trials = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
+bad = [t for t in trials if t["outcome"] != "PASS"]
+if len(trials) != 2 or bad:
+    for t in bad:
+        print(f"clean pair: {t['trial_id']} {t['outcome']} ({t['termination']}): {t['failure_detail']}", file=sys.stderr)
+    print("the harness could not complete a clean trial; nothing below would measure the model", file=sys.stderr)
+    sys.exit(4)
+PYEOF
 
 echo "## hero trio at N=50"
 run_one "$(manifest b 50 low_confidence python)"
