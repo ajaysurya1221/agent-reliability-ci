@@ -8,13 +8,20 @@ own functions: the two-sided Clopper-Pearson interval per arm at tail alpha / (4
 (`arci.stats.difference_bounds`) and the strict margin test (`arci.gate.classify`). Summing the
 pair probabilities per verdict gives P(PASS), P(BLOCK) and P(INCONCLUSIVE); they sum to one.
 
-Certainty is decided from the support, not from the floats. A count pair is reachable when both
-counts are possible under their arm's rate: every count when the rate is strictly between 0 and 1,
-only 0 at rate 0 and only N at rate 1. A verdict that no reachable pair produces has probability
-exactly 0; a verdict that every reachable pair produces (the certain verdict) has probability
-exactly 1. Any other probability is the summed float clamped into [0, 1], after checking that the
-unclamped sums meet one within 1e-12. A target probability of 1 is met only by the certain verdict,
-so float rounding can neither create nor hide certainty.
+Probabilities are exact before they become floats, so the output is identical on every
+platform. Each rate is the exact binary value of its float, a/b with b a power of two; the mass of
+x successes out of N is the integer comb(N, x) * a**x * (b - a)**(N - x) over b**N, and the mass of
+a count pair is the product of its two numerators over b_baseline**N * b_candidate**N. The planner
+sums those integers per verdict, requires the three sums to add up to the common denominator
+exactly, and converts each sum to a float once, by CPython's correctly rounded integer division.
+
+Certainty is decided from the integers, not from the floats. A count pair is reachable when its
+numerator is positive: every count when the rate is strictly between 0 and 1, only 0 at rate 0 and
+only N at rate 1. A verdict that no reachable pair produces has probability exactly 0; a verdict
+that every reachable pair produces (the certain verdict) has probability exactly 1. Any other
+probability lies strictly between 0 and 1 yet may still round to the float 0.0 or 1.0, so a target
+probability of 1 is met only by the certain verdict: rounding can neither create nor hide
+certainty.
 
 Domain: `interval_method` clopper_pearson, exactly one gating condition (K=1), one look (fixed
 sample), 1 <= N <= 400 per arm. Anything else raises `UnsupportedDesignError`; the planner never
@@ -44,6 +51,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import lru_cache
 from itertools import pairwise
 from typing import Final
@@ -63,7 +71,6 @@ LOOKS: Final = 1
 # at or above the 2.5e-7 floor that `clopper_pearson_tail` accepts.
 _ALPHA_MIN: Final = 1e-6
 _ALPHA_MAX: Final = 0.5
-_MASS_TOLERANCE: Final = 1e-12
 
 ASSUMPTIONS: Final = (
     "This is planning under assumptions, not observed power: the true success rates are inputs, "
@@ -150,35 +157,44 @@ def per_arm_tail(alpha: float) -> float:
     return alpha / (4.0 * CONDITIONS * LOOKS)
 
 
-def binomial_pmf(p: float, n: int) -> tuple[float, ...]:
-    """Binomial(n, p) probabilities of 0..n successes, normalised to sum to one.
+def _denominator(rate: float) -> int:
+    """The power of two b with rate == a / b exactly (Fraction reduces the float's binary value)."""
+    return Fraction(rate).denominator
 
-    The same computation as `bench/selfcheck.py`, which the package must not import.
+
+@lru_cache(maxsize=16)
+def _pmf_numerators(rate: float, n: int) -> tuple[int, ...]:
+    """Binomial(n, rate) masses of 0..n successes as integers over the denominator b**n.
+
+    With rate == a / b exactly, the mass of x successes is comb(n, x) * a**x * (b - a)**(n - x)
+    over b**n. At rate 0 (a = 0) and rate 1 (a = b) only one count is positive, since 0**0 == 1.
     """
-    if p == 0.0:
-        return (1.0, *([0.0] * n))
-    if p == 1.0:
-        return (*([0.0] * n), 1.0)
-    log_p = math.log(p)
-    log_q = math.log1p(-p)
-    log_n_factorial = math.lgamma(n + 1)
-    logs = tuple(
-        log_n_factorial - math.lgamma(x + 1) - math.lgamma(n - x + 1) + x * log_p + (n - x) * log_q
-        for x in range(n + 1)
-    )
-    largest = max(logs)
-    weights = tuple(math.exp(value - largest) for value in logs)
-    total = math.fsum(weights)
-    return tuple(weight / total for weight in weights)
+    a, b = Fraction(rate).as_integer_ratio()
+    successes = [1]
+    failures = [1]
+    for _ in range(n):
+        successes.append(successes[-1] * a)
+        failures.append(failures[-1] * (b - a))
+    return tuple(math.comb(n, x) * successes[x] * failures[n - x] for x in range(n + 1))
 
 
-def _support(rate: float, n: int) -> range:
-    """The success counts with nonzero probability under Binomial(n, rate), decided exactly."""
-    if rate == 0.0:
-        return range(1)
-    if rate == 1.0:
-        return range(n, n + 1)
-    return range(n + 1)
+def _to_float(numerator: int, denominator: int) -> float:
+    # One correctly rounded conversion: CPython divides the two integers exactly, then rounds.
+    return float(Fraction(numerator, denominator))
+
+
+def binomial_pmf(p: float, n: int) -> tuple[float, ...]:
+    """Binomial(n, p) probabilities of 0..n successes, each the exact mass rounded once to a float.
+
+    The masses are exact rationals (see `_pmf_numerators`), so the result is the same on every
+    platform. It agrees with the float computation in `bench/selfcheck.py` to within 1e-12 per
+    term; the planner sums the exact integers, never these floats.
+    """
+    _check_rate(p, "p")
+    if n < 0:
+        raise ValueError("n must not be negative")
+    denominator: int = _denominator(p) ** n
+    return tuple(_to_float(numerator, denominator) for numerator in _pmf_numerators(p, n))
 
 
 @lru_cache(maxsize=32)
@@ -262,37 +278,51 @@ def verdict_table(
     return _verdict_table(n, alpha, delta)
 
 
-def _enumerate(
-    baseline_rate: float, candidate_rate: float, n: int, *, alpha: float, delta: float
-) -> tuple[dict[Verdict, float], frozenset[Verdict]]:
+def exact_verdict_masses(
+    baseline_rate: float,
+    candidate_rate: float,
+    n: int,
+    *,
+    alpha: float = 0.05,
+    delta: float = 0.10,
+) -> tuple[dict[Verdict, int], int]:
+    """P(PASS), P(BLOCK) and P(INCONCLUSIVE) at N per arm as exact integer numerators.
+
+    Returns the numerator per verdict and their common denominator b_baseline**n *
+    b_candidate**n (unreduced); the numerators add up to the denominator exactly.
+    """
     _check_rate(baseline_rate, "baseline rate")
     _check_rate(candidate_rate, "candidate rate")
     table = verdict_table(n, alpha=alpha, delta=delta)
-    baseline_pmf = binomial_pmf(baseline_rate, n)
-    candidate_pmf = binomial_pmf(candidate_rate, n)
-    masses: dict[Verdict, list[float]] = {verdict: [] for verdict in OUTCOMES}
-    for baseline_probability, row in zip(baseline_pmf, table, strict=True):
-        for candidate_probability, verdict in zip(candidate_pmf, row, strict=True):
-            masses[verdict].append(baseline_probability * candidate_probability)
-    sums = {verdict: math.fsum(masses[verdict]) for verdict in OUTCOMES}
-    if abs(math.fsum(sums.values()) - 1.0) > _MASS_TOLERANCE:
-        raise ArithmeticError("enumerated verdict probabilities do not sum to one")
-    # Decided from the support, not from the floats: a reachable pair whose float mass underflows
-    # to zero still counts, and the summed floats may miss 1 by a rounding error.
-    reachable = frozenset(
-        table[baseline][candidate]
-        for baseline in _support(baseline_rate, n)
-        for candidate in _support(candidate_rate, n)
+    candidate_numerators = _pmf_numerators(candidate_rate, n)
+    numerators: dict[Verdict, int] = dict.fromkeys(OUTCOMES, 0)
+    for baseline_numerator, row in zip(_pmf_numerators(baseline_rate, n), table, strict=True):
+        if not baseline_numerator:
+            continue
+        # The pair masses of one baseline count share its numerator: sum the candidate side per
+        # verdict first, then multiply once. Integer arithmetic makes the regrouping exact.
+        row_sums: dict[Verdict, int] = dict.fromkeys(OUTCOMES, 0)
+        for candidate_numerator, verdict in zip(candidate_numerators, row, strict=True):
+            row_sums[verdict] += candidate_numerator
+        for verdict, row_sum in row_sums.items():
+            numerators[verdict] += baseline_numerator * row_sum
+    denominator: int = _denominator(baseline_rate) ** n * _denominator(candidate_rate) ** n
+    if sum(numerators.values()) != denominator:
+        raise ArithmeticError("enumerated verdict masses do not sum to one")
+    return numerators, denominator
+
+
+def _enumerate(
+    baseline_rate: float, candidate_rate: float, n: int, *, alpha: float, delta: float
+) -> tuple[dict[Verdict, float], frozenset[Verdict]]:
+    numerators, denominator = exact_verdict_masses(
+        baseline_rate, candidate_rate, n, alpha=alpha, delta=delta
     )
-
-    def probability(verdict: Verdict) -> float:
-        if verdict not in reachable:
-            return 0.0
-        if len(reachable) == 1:
-            return 1.0
-        return min(1.0, max(0.0, sums[verdict]))
-
-    return {verdict: probability(verdict) for verdict in OUTCOMES}, reachable
+    # Exact: a zero numerator is an unreachable verdict (probability 0.0) and a numerator equal to
+    # the denominator is the certain verdict (probability 1.0), whatever the floats round to.
+    reachable = frozenset(verdict for verdict in OUTCOMES if numerators[verdict] > 0)
+    probabilities = {verdict: _to_float(numerators[verdict], denominator) for verdict in OUTCOMES}
+    return probabilities, reachable
 
 
 def verdict_probabilities(
