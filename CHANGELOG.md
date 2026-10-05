@@ -26,7 +26,8 @@
 - **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
   existing Clopper-Pearson gate for independent binomial arms, one gating condition, one
   fixed-sample look and N <= 400 per arm, reporting assumptions and the smallest tested N meeting
-  a target or "target not reached".
+  a target or "target not reached"; probabilities are enumerated with exact integer arithmetic
+  and converted to floating point once, so the output is identical on every platform.
 - **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
   separately per arm and condition, with explicit IID assumptions and unavailability for n < k,
   ERROR verdicts and multi-look designs; default report output, gate decisions and stored records

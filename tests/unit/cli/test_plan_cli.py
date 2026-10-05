@@ -161,7 +161,8 @@ def test_a_target_of_one_needs_a_certain_verdict(capsys: pytest.CaptureFixture[s
     assert certain["rows"][0]["INCONCLUSIVE"] == 1.0
     assert certain["rows"][0]["certain_verdict"] == "INCONCLUSIVE"
     assert certain["smallest_n_per_arm"] == 1
-    almost = run("0.999", "0.001", "BLOCK", "20")
+    # P(BLOCK) rounds to the float 1.0 at N=25, but INCONCLUSIVE stays reachable.
+    almost = run("0.999", "0.001", "BLOCK", "25")
     assert almost["rows"][0]["BLOCK"] == 1.0
     assert almost["rows"][0]["certain_verdict"] is None
     assert almost["target_reached"] is False
