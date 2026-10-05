@@ -1,0 +1,71 @@
+{
+  "schema": "arci.plan.v1",
+  "design": {
+    "baseline_rate": 0.95,
+    "candidate_rate": 0.75,
+    "alpha": 0.05,
+    "delta": 0.1,
+    "interval_method": "clopper_pearson",
+    "conditions": 1,
+    "looks": 1,
+    "per_arm_tail": 0.0125
+  },
+  "target": {
+    "verdict": "BLOCK",
+    "probability": 0.8
+  },
+  "rows": [
+    {
+      "n_per_arm": 20,
+      "total_trials": 40,
+      "PASS": 1.0484856641620773e-06,
+      "BLOCK": 0.0003472039352379798,
+      "INCONCLUSIVE": 0.9996517475790979,
+      "meets_target": false
+    },
+    {
+      "n_per_arm": 50,
+      "total_trials": 100,
+      "PASS": 1.8639619473487974e-06,
+      "BLOCK": 0.01565136127212323,
+      "INCONCLUSIVE": 0.9843467747659295,
+      "meets_target": false
+    },
+    {
+      "n_per_arm": 100,
+      "total_trials": 200,
+      "PASS": 1.1599209796246918e-07,
+      "BLOCK": 0.09309944526425504,
+      "INCONCLUSIVE": 0.906900438743647,
+      "meets_target": false
+    },
+    {
+      "n_per_arm": 200,
+      "total_trials": 400,
+      "PASS": 6.964950797580511e-10,
+      "BLOCK": 0.3647316956588909,
+      "INCONCLUSIVE": 0.6352683036446141,
+      "meets_target": false
+    },
+    {
+      "n_per_arm": 400,
+      "total_trials": 800,
+      "PASS": 1.548350629052395e-13,
+      "BLOCK": 0.8279193645266361,
+      "INCONCLUSIVE": 0.17208063547320912,
+      "meets_target": true
+    }
+  ],
+  "target_reached": true,
+  "smallest_n_per_arm": 400,
+  "conclusion": "smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 (800 trials in total).",
+  "assumptions": [
+    "This is planning under assumptions, not observed power: the true success rates are inputs, not measurements.",
+    "Independent binomial arms: each arm is N independent trials at its stated true rate.",
+    "No pairing: shared seeds or any other dependence between the arms is not modelled.",
+    "Fixed sample: one look at N per arm, no early stopping and no extension.",
+    "One gating condition (K=1), no trial ERROR and no candidate hard-invariant violation; either of those overrides the rates in the real gate.",
+    "The gate's exact rule: two-sided Clopper-Pearson per arm with tail alpha/(4K), bounds [L_B - U_A, U_B - L_A] on the difference, PASS iff L > -delta, BLOCK iff U < -delta, otherwise INCONCLUSIVE.",
+    "Probabilities enumerate every pair of success counts; they are not simulated. They need not rise monotonically with N, so only the tested N values are claimed."
+  ]
+}

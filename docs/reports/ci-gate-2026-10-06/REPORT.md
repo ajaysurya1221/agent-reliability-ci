@@ -44,9 +44,9 @@ A twenty-percentage-point drop from 0.95 to 0.75 therefore BLOCKs only about 36.
 
 The planner makes this cost visible before execution. Its approved scope is the existing CP gate, independent arms, K=1, one look, and N≤400; it reports all verdict probabilities and the smallest tested N meeting the requested target, or “target not reached.” It does not discover the true rates or retroactively register historical experiments.
 
-Planner evidence: <<PLANNER: committed output path and supported-domain checks>>; <<PLANNER: 0.95 vs 0.75, N=200, P(BLOCK)>>; <<PLANNER: smallest tested N meeting P(BLOCK)>=0.80 on 20,50,100,200,400>>.
+Planner evidence: `metrics/plan-0.95-vs-0.75.md` and `.json` (schema `arci.plan.v1`); unsupported designs (N > 400, K != 1, more than one look, Newcombe) are refused with exit 3 and a message beginning "unsupported design", exercised by `tests/unit/cli/test_plan_cli.py`; 0.365 (`metrics/plan-0.95-vs-0.75.json`: 0.3647316956588909); <<PLANNER: smallest tested N meeting P(BLOCK)>=0.80 on 20,50,100,200,400>>.
 
-Optional descriptive `pass^k` reports the all-success estimator `C(successes,k)/C(n,k)` for a declared population under IID assumptions, without changing decisions. Delivery status and exclusions: <<PLANNER: pass^k shipped or omitted; committed evidence for invalid, insufficient-N, and outcome-selected-stopping exclusions>>.
+Optional descriptive `pass^k` reports the all-success estimator `C(successes,k)/C(n,k)` for a declared population under IID assumptions, without changing decisions. Delivery status and exclusions: shipped as the opt-in `arci report RUN --pass-k 1,2,4` (Markdown only); `tests/unit/report/test_pass_k.py` covers "unavailable" for n < k, ERROR verdicts and manifests declaring more than one look, and `tests/unit/report/test_report_pass_k_cli.py` pins the default report bytes of all 19 committed stores with the flag absent.
 
 ## 4. Three worked examples
 
