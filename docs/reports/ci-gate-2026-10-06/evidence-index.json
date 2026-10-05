@@ -1,7 +1,7 @@
 {
   "schema": "arci.evidence-index.v1",
   "package": "docs/reports/ci-gate-2026-10-06",
-  "source_commit": "1e0e5450169c682d876ad62c5098e6e092470415",
+  "source_commit": "acd9a46811e0d97d1dd41c488489106e840257e2",
   "source_commit_note": "HEAD when the index was written; the index and SHA256SUMS are committed on top of it",
   "arci_version": "0.7.0",
   "python": "3.13.12",
@@ -34,8 +34,8 @@
     },
     {
       "path": "REPORT.md",
-      "sha256": "34db6e7822eda5f116dd848167aae82e04a59703e4a521a79816ee161f34cc3f",
-      "size": 25172,
+      "sha256": "710af08970702217e954dbc7d5be661d6c0fe4535126d3b5303f0730925c54b9",
+      "size": 26416,
       "what": "The technical report: gate, planner, worked examples, reproducibility, related work and limitations.",
       "proves": "Nothing by itself: each claim cites a committed source or a file in this index."
     },

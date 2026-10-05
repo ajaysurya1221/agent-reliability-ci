@@ -1,6 +1,6 @@
 # ARCI: Planning, Gating and Reproducing Agent Regressions
 
-Technical report draft for the dated evidence package. Paths below are repository-root relative. Release identity: <<REPRO: final source commit, evidence tag, and evidence-index.json>>.
+Technical report draft for the dated evidence package. Paths below are repository-root relative. Release identity: the commit on `main` tagged `evidence-2026-10-06`, with the Release notes at `https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06` naming that commit and the SHA256SUMS digest; `evidence-index.json` records the commit it was generated from and the hash of every file it covers.
 
 ## 1. The question
 
@@ -44,7 +44,7 @@ A twenty-percentage-point drop from 0.95 to 0.75 therefore BLOCKs only about 36.
 
 The planner makes this cost visible before execution. Its approved scope is the existing CP gate, independent arms, K=1, one look, and N≤400; it reports all verdict probabilities and the smallest tested N meeting the requested target, or “target not reached.” It does not discover the true rates or retroactively register historical experiments.
 
-Planner evidence: `metrics/plan-0.95-vs-0.75.md` and `.json` (schema `arci.plan.v1`); unsupported designs (N > 400, K != 1, more than one look, Newcombe) are refused with exit 3 and a message beginning "unsupported design", exercised by `tests/unit/cli/test_plan_cli.py`; 0.365 (`metrics/plan-0.95-vs-0.75.json`: 0.3647316956588909); <<PLANNER: smallest tested N meeting P(BLOCK)>=0.80 on 20,50,100,200,400>>.
+Planner evidence: `metrics/plan-0.95-vs-0.75.md` and `.json` (schema `arci.plan.v1`); unsupported designs (N > 400, K != 1, more than one look, Newcombe) are refused with exit 3 and a message beginning "unsupported design", exercised by `tests/unit/cli/test_plan_cli.py`; 0.365 (`metrics/plan-0.95-vs-0.75.json`: 0.3647316956588909); 400 per arm (800 trials in total; `metrics/plan-0.95-vs-0.75.md`).
 
 Optional descriptive `pass^k` reports the all-success estimator `C(successes,k)/C(n,k)` for a declared population under IID assumptions, without changing decisions. Delivery status and exclusions: shipped as the opt-in `arci report RUN --pass-k 1,2,4` (Markdown only); `tests/unit/report/test_pass_k.py` covers "unavailable" for n < k, ERROR verdicts and manifests declaring more than one look, and `tests/unit/report/test_report_pass_k_cli.py` pins the default report bytes of all 19 committed stores with the flag absent.
 
@@ -101,11 +101,11 @@ Two portability defects were corrected before this package. A one-ulp platform d
 
 The CP correction re-derived six Jev and five guardrail decisions from unchanged manifests and trials. Bounds and decision seals changed; verdicts, counts, exit codes, stopping histories, and rendered reports did not. The Wilson normalization also changed some display fields by one or two ulps. These historical normalizations are disclosed in `docs/results/jev/README.md`, `docs/results/guardrail/README.md`, and `CHANGELOG.md`; they are not permission to reseal archived bundles for this package.
 
-`.github/workflows/ci.yml` defines Ubuntu checks and macOS statistics checks on Python 3.11 and 3.14. Workflow configuration is distinct from evidence that the final release head passed: <<REPRO: exact PR-head and post-merge CI URLs, commits, platforms, and outcomes>>.
+`.github/workflows/ci.yml` defines Ubuntu checks and macOS statistics checks on Python 3.11 and 3.14. Workflow configuration is distinct from evidence that the final release head passed: the planner landed through PR #7 (`6a14a8c`, merged as `2002e1b`; run https://github.com/ajaysurya1221/agent-reliability-ci/actions/runs/37341739297) and PR #8 (`cd7dac9`, merged as `1de5007`; run https://github.com/ajaysurya1221/agent-reliability-ci/actions/runs/37347230147), each green on Ubuntu Python 3.11 and 3.14 (full suite) and macOS Python 3.11 and 3.14 (statistics and re-derivation); the pull request that introduced this package and its post-merge run on `main` are linked from the Release notes.
 
 The committed minimized bundles contain no embedded source files and seal different absolute interpreter paths: `/home/user/agent-reliability-ci/.venv/bin/python` for Jev and `/Users/ajay/Developer/.arci-worktrees/guardrail-live/.venv/bin/python` for the guardrail. Reproduction recreates those paths with the required source/environment; changing the bundle would change the evidence. Sources: each campaign’s `min-bundle.json`, `docs/reports/ci-gate-2026-10-06/reproduction/README.md`.
 
-The preliminary log `docs/reports/ci-gate-2026-10-06/logs/docker-replay-probe-2026-10-05.txt` records REPRODUCED for both bundles with networking disabled. Final package evidence remains: <<REPRO: pinned source, container image digest, dependency inventory, and clean-clone check>>; `REPRODUCED: failure reproduced`, exit 0 (probe of 2026-10-05, `logs/docker-replay-probe-2026-10-05.txt`); `REPRODUCED: failure reproduced`, exit 0 (same probe); `examples/retry_agent/hero_demo.py --n 200` from the release source on 2026-10-05 (`logs/hero-demo-2026-10-05.txt`): A vs B BLOCK (exit 1), A vs A PASS (exit 0), the reduced bundle is `1-minimal` keeping only `tool_timeout`, offline replay `REPRODUCED`, and A vs C PASS under its own frozen experiment.
+The preliminary log `docs/reports/ci-gate-2026-10-06/logs/docker-replay-probe-2026-10-05.txt` records REPRODUCED for both bundles with networking disabled. Final package evidence remains: the container run recorded in `logs/docker-reproduce-2026-10-05.txt` (image `python@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff`, Python 3.11.15 on x86_64 glibc 2.41, the installed dependency inventory from `pip freeze`, the source commit the tracked files were copied from) and `reproduce.py --check --full --strict`, which passed on this package with every row `ok`; `REPRODUCED: failure reproduced`, exit 0 (probe of 2026-10-05, `logs/docker-replay-probe-2026-10-05.txt`); `REPRODUCED: failure reproduced`, exit 0 (same probe); `examples/retry_agent/hero_demo.py --n 200` from the release source on 2026-10-05 (`logs/hero-demo-2026-10-05.txt`): A vs B BLOCK (exit 1), A vs A PASS (exit 0), the reduced bundle is `1-minimal` keeping only `tool_timeout`, offline replay `REPRODUCED`, and A vs C PASS under its own frozen experiment.
 
 ## 6. Related work and honest positioning
 
@@ -153,7 +153,7 @@ After the reproduction tooling is committed:
 # the two-stage recipe in `reproduction/README.md` (stage 1 installs the pinned source into the sealed Linux path with network on; stage 2 replays with `--platform linux/amd64 --network none`, the macOS worktree path recreated as a symlink)
 ```
 
-Verify the downloaded Release assets using `shasum -a 256 -c SHA256SUMS` from the manifest’s documented working directory. Release verification: <<REPRO: Release URL, source commit, SHA256SUMS digest, asset inventory, working directory, and successful verification log>>. The evidence index must distinguish decision regeneration, agent replay, archival-only reports, and checks not completed.
+Verify the downloaded Release assets using `shasum -a 256 -c SHA256SUMS` from the manifest’s documented working directory. Release verification: the Release at `https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06` lists the source commit, the SHA256SUMS digest and the assets (this report, `evidence-index.json`, `SHA256SUMS`, `metrics/`, `logs/`, `reproduction/`); run `shasum -a 256 -c SHA256SUMS` from `docs/reports/ci-gate-2026-10-06/` in a clone at that commit, then `python reproduce.py --check --full --strict`. The evidence index must distinguish decision regeneration, agent replay, archival-only reports, and checks not completed.
 
 ## Appendix A. Frontier-scout verifier
 
