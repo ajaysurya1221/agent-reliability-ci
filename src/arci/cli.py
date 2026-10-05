@@ -22,6 +22,14 @@ from arci.mcp_boundary import (
     validate_decision_response,
     validate_models_response,
 )
+from arci.planning import (
+    DEFAULT_N_GRID,
+    INTERVAL_METHOD,
+    plan,
+    plan_to_json,
+    render_plan_markdown,
+)
+from arci.reliability import validate_ks
 from arci.replay import make_bundle, replay
 from arci.report import render_junit, render_markdown
 from arci.runner import run_experiment
@@ -35,6 +43,7 @@ from arci.schema import (
     ReplayStatus,
     TrialEnvelope,
     TrialSpec,
+    Verdict,
 )
 from arci.storage import load_run
 
@@ -273,15 +282,58 @@ def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -
     return decision.exit_code
 
 
-def _cmd_report(run_dir: str, report_format: str) -> int:
+def _cmd_report(run_dir: str, report_format: str, pass_k: str | None = None) -> int:
+    ks = () if pass_k is None else validate_ks(_int_list(pass_k, "--pass-k"))
+    if ks and report_format != "md":
+        raise CliError("--pass-k is reported in the md format only")
     manifest, trials = load_run(run_dir)
     decision = decide(manifest, trials)
     report = (
-        render_markdown(manifest, decision, trials)
+        render_markdown(manifest, decision, trials, pass_k=ks)
         if report_format == "md"
         else render_junit(manifest, decision, trials)
     )
     _print(report)
+    return 0
+
+
+def _int_list(text: str, flag: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(value) for value in text.split(","))
+    except ValueError:
+        raise CliError(f"{flag} must be comma-separated integers") from None
+
+
+def _cmd_plan(
+    *,
+    baseline_rate: float,
+    candidate_rate: float,
+    alpha: float,
+    delta: float,
+    n_grid: str,
+    target_verdict: str,
+    target_probability: float,
+    output_format: str,
+    interval_method: str,
+    conditions: int,
+    looks: str | None,
+) -> int:
+    result = plan(
+        baseline_rate=baseline_rate,
+        candidate_rate=candidate_rate,
+        target_verdict=Verdict(target_verdict),
+        target_probability=target_probability,
+        alpha=alpha,
+        delta=delta,
+        n_grid=_int_list(n_grid, "--n-grid"),
+        interval_method=interval_method,
+        conditions=conditions,
+        looks=() if looks is None else _int_list(looks, "--looks"),
+    )
+    if output_format == "json":
+        _print(json.dumps(plan_to_json(result), indent=2))
+    else:
+        _print(render_plan_markdown(result))
     return 0
 
 
@@ -382,6 +434,48 @@ def _parser() -> _Parser:
     report = commands.add_parser("report", help="render a stored run")
     report.add_argument("run_dir", metavar="RUN_DIR")
     report.add_argument("--format", choices=("md", "junit"), default="md")
+    report.add_argument(
+        "--pass-k",
+        metavar="K,K,...",
+        help="opt-in descriptive pass^k per arm and condition (md only; never changes the verdict)",
+    )
+
+    plan_command = commands.add_parser(
+        "plan",
+        help="plan N per arm: exact verdict probabilities under stated assumptions",
+        description=(
+            "Planning under assumptions, not observed power: for each N per arm, the exact "
+            "probability of PASS, BLOCK and INCONCLUSIVE under the gate's fixed-sample "
+            "Clopper-Pearson rule, with independent binomial arms at the given true rates. "
+            "Domain: clopper_pearson, K=1, one look, N <= 400; other designs are refused."
+        ),
+    )
+    plan_command.add_argument("--baseline-rate", type=float, required=True, metavar="P")
+    plan_command.add_argument("--candidate-rate", type=float, required=True, metavar="P")
+    plan_command.add_argument("--alpha", type=float, default=0.05)
+    plan_command.add_argument("--delta", type=float, default=0.10)
+    plan_command.add_argument(
+        "--n-grid", default=",".join(map(str, DEFAULT_N_GRID)), metavar="N,N,..."
+    )
+    plan_command.add_argument(
+        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=True
+    )
+    plan_command.add_argument("--target-probability", type=float, default=0.80, metavar="P")
+    plan_command.add_argument(
+        "--format", dest="plan_format", choices=("json", "markdown"), default="markdown"
+    )
+    plan_command.add_argument(
+        "--interval-method",
+        default=INTERVAL_METHOD,
+        metavar="METHOD",
+        help="only clopper_pearson is supported",
+    )
+    plan_command.add_argument(
+        "--conditions", type=int, default=1, metavar="K", help="only K=1 is supported"
+    )
+    plan_command.add_argument(
+        "--looks", metavar="N,N,...", help="refused: the planner covers one fixed-sample look"
+    )
 
     bundle = commands.add_parser("bundle", help="create a portable failure bundle")
     bundle.add_argument("run_dir", metavar="RUN_DIR")
@@ -426,7 +520,25 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str | None, values["markdown"]),
         )
     if command == "report":
-        return _cmd_report(cast(str, values["run_dir"]), cast(str, values["format"]))
+        return _cmd_report(
+            cast(str, values["run_dir"]),
+            cast(str, values["format"]),
+            cast(str | None, values["pass_k"]),
+        )
+    if command == "plan":
+        return _cmd_plan(
+            baseline_rate=cast(float, values["baseline_rate"]),
+            candidate_rate=cast(float, values["candidate_rate"]),
+            alpha=cast(float, values["alpha"]),
+            delta=cast(float, values["delta"]),
+            n_grid=cast(str, values["n_grid"]),
+            target_verdict=cast(str, values["target_verdict"]),
+            target_probability=cast(float, values["target_probability"]),
+            output_format=cast(str, values["plan_format"]),
+            interval_method=cast(str, values["interval_method"]),
+            conditions=cast(int, values["conditions"]),
+            looks=cast(str | None, values["looks"]),
+        )
     if command == "bundle":
         return _cmd_bundle(
             cast(str, values["run_dir"]),

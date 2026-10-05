@@ -23,6 +23,14 @@
   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
   committed guardrail decision byte for byte with `arci gate`.
+- **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
+  existing Clopper-Pearson gate for independent binomial arms, one gating condition, one
+  fixed-sample look and N <= 400 per arm, reporting assumptions and the smallest tested N meeting
+  a target or "target not reached".
+- **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
+  separately per arm and condition, with explicit IID assumptions and unavailability for n < k,
+  ERROR verdicts and multi-look designs; default report output, gate decisions and stored records
+  are unchanged.
 
 ## v0.7.0 (2026-10-03)
 

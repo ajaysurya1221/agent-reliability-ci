@@ -9,6 +9,7 @@ from typing import cast
 
 from pydantic import JsonValue
 
+from arci.reliability import IID_ASSUMPTION, UNAVAILABLE_SMALL_N, pass_k_report
 from arci.schema import (
     DECISION_TOOL,
     ArmStats,
@@ -109,10 +110,55 @@ def _decision_usage(trials: Sequence[TrialEnvelope]) -> tuple[int, int, int]:
     return recorded_decisions, input_tokens, output_tokens
 
 
+def _pass_k_lines(decision: GateDecision, ks: Sequence[int]) -> list[str]:
+    report = pass_k_report(decision, ks)
+    lines = [
+        "",
+        "## Descriptive pass^k (not part of the verdict)",
+        "",
+        (
+            "Opt-in and descriptive: it never changes the verdict, a seal or decision.json. "
+            "Each arm of each declared condition is its own population, never pooled across "
+            "conditions. pass^k = C(successes, k) / C(n, k), the share of k-trial subsets in "
+            f"which every trial passed. {IID_ASSUMPTION}"
+        ),
+        "",
+    ]
+    if report.unavailable is not None:
+        lines.append(f"Unavailable: {report.unavailable}.")
+        return lines
+    lines.extend(
+        [
+            "| Condition | Arm | Role | n | Successes | "
+            + " | ".join(f"pass^{k}" for k in report.ks)
+            + " |",
+            "|---|---|---|---:|---:|" + "---:|" * len(report.ks),
+        ]
+    )
+    for row in report.rows:
+        role = "Gating" if row.is_gating else "Descriptive (ceiling fault)"
+        estimates = " | ".join(
+            f"unavailable ({UNAVAILABLE_SMALL_N})" if value is None else f"{value:.4f}"
+            for value in row.estimates
+        )
+        lines.append(
+            f"| `{_cell(row.condition_id)}` | {row.arm} | {role} | {row.n} | {row.successes} | "
+            f"{estimates} |"
+        )
+    return lines
+
+
 def render_markdown(
-    manifest: Manifest, decision: GateDecision, trials: Sequence[TrialEnvelope]
+    manifest: Manifest,
+    decision: GateDecision,
+    trials: Sequence[TrialEnvelope],
+    *,
+    pass_k: Sequence[int] = (),
 ) -> str:
-    """Render a deterministic Markdown gate report."""
+    """Render a deterministic Markdown gate report.
+
+    `pass_k` (opt-in) adds a descriptive pass^k section; without it the report is unchanged.
+    """
     lines = [
         f"# Experiment {manifest.experiment_id}",
         "",
@@ -203,6 +249,9 @@ def render_markdown(
                 f"| Condition verdict | — | **{condition.verdict.value}** |",
             ]
         )
+
+    if pass_k:
+        lines.extend(_pass_k_lines(decision, pass_k))
 
     lines.extend(["", "## Candidate failure clusters", ""])
     clusters = _failure_clusters(trials)
