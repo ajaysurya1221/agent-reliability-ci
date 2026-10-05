@@ -21,6 +21,7 @@
       "PASS": 1.0484856641620773e-06,
       "BLOCK": 0.0003472039352379798,
       "INCONCLUSIVE": 0.9996517475790979,
+      "certain_verdict": null,
       "meets_target": false
     },
     {
@@ -29,6 +30,7 @@
       "PASS": 1.8639619473487974e-06,
       "BLOCK": 0.01565136127212323,
       "INCONCLUSIVE": 0.9843467747659295,
+      "certain_verdict": null,
       "meets_target": false
     },
     {
@@ -37,6 +39,7 @@
       "PASS": 1.1599209796246918e-07,
       "BLOCK": 0.09309944526425504,
       "INCONCLUSIVE": 0.906900438743647,
+      "certain_verdict": null,
       "meets_target": false
     },
     {
@@ -45,6 +48,7 @@
       "PASS": 6.964950797580511e-10,
       "BLOCK": 0.3647316956588909,
       "INCONCLUSIVE": 0.6352683036446141,
+      "certain_verdict": null,
       "meets_target": false
     },
     {
@@ -53,6 +57,7 @@
       "PASS": 1.548350629052395e-13,
       "BLOCK": 0.8279193645266361,
       "INCONCLUSIVE": 0.17208063547320912,
+      "certain_verdict": null,
       "meets_target": true
     }
   ],

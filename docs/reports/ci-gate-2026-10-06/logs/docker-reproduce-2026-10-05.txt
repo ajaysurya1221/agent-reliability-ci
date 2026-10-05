@@ -1,17 +1,14 @@
 # reproduce.py --docker, 2026-10-05
 host: macOS-26.6.2-arm64-arm-64bit-Mach-O; python 3.13.12
-source commit (HEAD): 3ef0321ff09a2f61924243bf51945d0cee93dfd2
+source commit (HEAD): 19674a7b25d82a4e5703602e5c6ea19eef6616c2
 $ docker version --format {{.Server.Version}}
 29.8.2
 [exit 0]
 uncommitted changes copied into the container (git status --short):
-  M docs/reports/ci-gate-2026-10-06/reproduction/README.md
-  ?? docs/reports/ci-gate-2026-10-06/SHA256SUMS
-  ?? docs/reports/ci-gate-2026-10-06/evidence-index.json
-  ?? docs/reports/ci-gate-2026-10-06/logs/docker-reproduce-2026-10-05.txt
-  ?? docs/reports/ci-gate-2026-10-06/reproduce.py
-  ?? tests/unit/reports/__init__.py
-  ?? tests/unit/reports/test_ci_gate_package.py
+  M docs/reports/ci-gate-2026-10-06/SHA256SUMS
+   M docs/reports/ci-gate-2026-10-06/evidence-index.json
+   M docs/reports/ci-gate-2026-10-06/metrics/plan-0.95-vs-0.75.json
+   M docs/reports/ci-gate-2026-10-06/metrics/plan-0.95-vs-0.75.md
 $ docker image inspect python:3.11-slim --format x
 x
 [exit 0]
@@ -68,25 +65,25 @@ REPRODUCED: failure reproduced
 exit 0
 == byte-exact tests
 ..................                                                       [100%]
-18 passed, 11 deselected in 5.70s
+18 passed, 11 deselected in 5.46s
 exit 0
 == reproduce.py --check
 step                                 result  detail
 SHA256SUMS                           ok      13 files match; no unlisted file
 index: evidence outside the package  ok      24 files match (decisions, bundles, archival reports)
 decision re-derivation               ok      18/18 byte-identical, exit codes match
-planner json                         FAIL    `arci plan` is absent from the installed arci 0.7.0; this step is required and never skipped: install an arci that provides `arci plan` and re-run
-planner markdown                     FAIL    `arci plan` is absent from the installed arci 0.7.0; this step is required and never skipped: install an arci that provides `arci plan` and re-run
+planner json                         FAIL    metrics/plan-0.95-vs-0.75.json: bytes differ
+planner markdown                     ok      metrics/plan-0.95-vs-0.75.md byte-identical
 REPORT.md placeholders               info    7 tolerated without --strict (REPRO 4, WP3 2, PLANNER 1)
-overall                              FAIL    2 failed of 6
+overall                              FAIL    1 failed of 6
 exit 1
 [exit 0]
 == summary
 stage 1 install       ok      exit 0
 replay jev            ok      REPRODUCED: failure reproduced (docs/results/jev/2026-10-03/jev-live-b-low_confidence-200/min-bundle.json)
 replay guardrail      ok      REPRODUCED: failure reproduced (docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200/min-bundle.json)
-18 byte-exact tests   ok      18 passed, 11 deselected in 5.70s
-in-container --check  FAIL    planner json FAIL `arci plan` is absent from the installed arci 0.7.0; this step is required and never skipped: install an arci that provides `arci plan` and re-run; planner markdown FAIL `arci plan` is absent from the installed arci 0.7.0; this step is required and never skipped: install an arci that provides `arci plan` and re-run
+18 byte-exact tests   ok      18 passed, 11 deselected in 5.46s
+in-container --check  FAIL    planner json FAIL metrics/plan-0.95-vs-0.75.json: bytes differ
 image digest          info    python@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
 docker server         info    29.8.2
 overall: FAIL
