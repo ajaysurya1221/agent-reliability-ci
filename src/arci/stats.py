@@ -8,6 +8,8 @@ from statistics import NormalDist
 _MAX_N = 10_000
 _BISECTION_STEPS = 60
 _MIN_TAIL = 2.5e-7
+# Match CPython's Python fallback for reproducible 95% Wilson intervals.
+_WILSON_Z_95 = 1.9599639845400536
 
 
 def _validate_counts(successes: int, n: int) -> None:
@@ -110,7 +112,7 @@ def wilson(successes: int, n: int, confidence: float = 0.95) -> tuple[float, flo
     """Return the Wilson score interval used for display only."""
     _validate(successes, n, confidence)
     rate = successes / n
-    z = NormalDist().inv_cdf((1.0 + confidence) / 2.0)
+    z = _WILSON_Z_95 if confidence == 0.95 else NormalDist().inv_cdf((1.0 + confidence) / 2.0)
     z_squared = z * z
     denominator = 1.0 + z_squared / n
     centre = (rate + z_squared / (2.0 * n)) / denominator

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
+  value used by the existing Linux-produced records (CPython's C accelerator on arm64 macOS
+  differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
+  the archived Clopper-Pearson stores without changing any verdict. Regression tests re-derive
+  every committed `docs/results/jev` decision byte for byte.
+
 ## v0.7.0 (2026-10-03)
 
 - **Calibration audit of the decision model (2026-10-03):** `bench/jev_calibration/` is a
