@@ -19,15 +19,6 @@
   trials. Only CP bounds, their derived difference bounds, and decision seals changed; verdicts,
   exit codes, counts, stopping histories, and rendered Markdown/JUnit reports are unchanged.
   Byte-for-byte regeneration is checked on macOS and Ubuntu.
-- **Guardrail experiment:** published the pre-registered live run of
-  `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
-  runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
-  and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
-  generated from the committed evidence by `docs/results/guardrail/summarize.py`
-  (`--check` fails if they are stale), including the N=50 `decision_unavailable` run that came
-  out INCONCLUSIVE rather than the pre-registered BLOCK. Added
-  `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
-  committed guardrail decision byte for byte with `arci gate`.
 - **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
   existing Clopper-Pearson gate for independent binomial arms, one gating condition, one
   fixed-sample look and N <= 400 per arm, reporting assumptions and the smallest tested N meeting
@@ -37,6 +28,15 @@
   separately per arm and condition, with explicit IID assumptions and unavailability for n < k,
   ERROR verdicts and multi-look designs; default report output, gate decisions and stored records
   are unchanged.
+- **Guardrail experiment:** published the pre-registered live run of
+  `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
+  runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
+  and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
+  generated from the committed evidence by `docs/results/guardrail/summarize.py`
+  (`--check` fails if they are stale), including the N=50 `decision_unavailable` run that came
+  out INCONCLUSIVE rather than the pre-registered BLOCK. Added
+  `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
+  committed guardrail decision byte for byte with `arci gate`.
 
 ## v0.7.0 (2026-10-03)
 
