@@ -8,7 +8,7 @@ A practitioner changes an agent’s prompt, retry policy, harness, or model: is 
 
 The demand is visible in public engineering records:
 
-- Promptfoo’s request for repeated-success measurement, opened 2025-10-16, and its linked implementation proposal show demand for consistency beyond average success: [issue #5947](https://github.com/promptfoo/promptfoo/issues/5947), [PR #8108](https://github.com/promptfoo/promptfoo/pull/8108), checked 2026-10-05.
+- Promptfoo’s request for repeated-success measurement, opened 2025-10-16, and its linked implementation proposal show demand for consistency beyond average success: [issue #5947](https://github.com/promptfoo/promptfoo/issues/5947), [PR #8108](https://github.com/promptfoo/promptfoo/pull/8108) (both still open on 2026-10-05: the issue since 2025-10-16, the PR last updated 2026-09-16), checked 2026-10-05.
 - *On Randomness in Agentic Evals*, an ICLR 2026 Agents in the Wild workshop paper, recommends independent repetitions and power analysis because apparently improved scores can reflect sampling variation: [paper, revision 2026-03-23](https://arxiv.org/html/2602.07150v2).
 - Anthropic’s 2025-09-17 postmortem describes noisy evaluations that failed to expose reported degradation or connect it promptly to serving changes: [postmortem](https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues).
 - Anthropic’s 2026-04-23 postmortem connects quality regressions to reasoning configuration, context handling, and prompt changes that existing checks initially missed: [postmortem](https://www.anthropic.com/engineering/april-23-postmortem).
