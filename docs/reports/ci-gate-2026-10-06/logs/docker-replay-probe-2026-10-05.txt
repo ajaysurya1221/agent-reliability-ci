@@ -1,0 +1,10 @@
+== stage 1: prepare (network on)
+
+arci installed at /home/user/agent-reliability-ci/.venv
+== stage 2: replay (network none)
+== replay docs/results/jev/2026-10-03/jev-live-b-low_confidence-200/min-bundle.json
+REPRODUCED: failure reproduced
+exit 0
+== replay docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200/min-bundle.json
+REPRODUCED: failure reproduced
+exit 0
