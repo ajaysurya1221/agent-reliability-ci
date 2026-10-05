@@ -19,7 +19,7 @@ arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (e
                      repaired Agent C: passes the reproducer; 192/200 vs 192/200, PASS (exit 0)
 ```
 
-Status: v0.6.0, [Apache-2.0](LICENSE), Python 3.11 or newer, POSIX only, not on PyPI (clone it, or
+Status: v0.7.0, [Apache-2.0](LICENSE), Python 3.11 or newer, POSIX only, not on PyPI (clone it, or
 use the GitHub Action). It tests Python agents that use the declared tool boundary, any program
 that speaks MCP over stdio, and command agents that call a System One decision endpoint.
 Read [what it does not do](#what-it-does-not-do) before you rely on it.
@@ -344,7 +344,7 @@ schema); re-run the experiment rather than trust an unreadable store.
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v0.6.0
+- uses: ajaysurya1221/agent-reliability-ci@v0.7.0
   id: gate
   with:
     manifest: reliability/manifest.json
