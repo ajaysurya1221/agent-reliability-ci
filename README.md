@@ -29,6 +29,17 @@ pair-programmers (recorded in the commit trailers). The experiment design, the d
 its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
 demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
 
+## Technical report and reproduction package (2026-10-06)
+
+[`docs/reports/ci-gate-2026-10-06/REPORT.md`](docs/reports/ci-gate-2026-10-06/REPORT.md) answers
+the practitioner's question "is this change real or noise, and what broke?" with the gate's
+enumerated operating characteristics, the three archived live campaigns as worked examples, and
+a clean-environment reproduction package: every committed `decision.json` re-derives byte for
+byte on macOS and Linux, and both committed failure bundles replay offline in a container with
+networking disabled (`docs/reports/ci-gate-2026-10-06/reproduction/README.md`). Plan a run
+before spending trials with `arci plan` (see the report, section 3), and cite the project with
+`CITATION.cff`.
+
 ## Why repetition and a threshold are not enough
 
 Running an agent a hundred times and failing the build under 90% is the easy part, and several

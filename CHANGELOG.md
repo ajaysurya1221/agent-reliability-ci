@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
+  record, enumerated operating-characteristics metrics for both interval methods, the Linux
+  container re-derivation log for all 18 archived decisions, the offline replay probe log for
+  both committed failure bundles, and the two-stage Docker reproduction recipe) and
+  `CITATION.cff`.
 - **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
   value used by the existing Linux-produced records (CPython's C accelerator on arm64 macOS
   differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
