@@ -1,0 +1,88 @@
+# reproduce.py --docker, 2026-10-05
+host: macOS-26.6.2-arm64-arm-64bit-Mach-O; python 3.13.12
+source commit (HEAD): 1e0e5450169c682d876ad62c5098e6e092470415
+$ docker version --format {{.Server.Version}}
+29.8.2
+[exit 0]
+uncommitted changes copied into the container (git status --short):
+  M docs/reports/ci-gate-2026-10-06/SHA256SUMS
+   M docs/reports/ci-gate-2026-10-06/evidence-index.json
+   M docs/reports/ci-gate-2026-10-06/metrics/plan-0.95-vs-0.75.json
+$ docker image inspect python:3.11-slim --format x
+x
+[exit 0]
+$ docker image inspect python:3.11-slim --format {{index .RepoDigests 0}}
+python@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+[exit 0]
+image digest: python@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+$ docker volume rm -f arci-repro
+arci-repro
+[exit 0]
+$ docker volume create arci-repro
+arci-repro
+[exit 0]
+== stage 1: install the pinned source into the sealed Linux path (network on)
+$ docker run --rm --platform linux/amd64 -v <exported source>:/w:ro -v arci-repro:/home/user python:3.11-slim bash -lc set -e; rm -rf /home/user/agent-reliability-ci; cp -r /w /home/user/agent-reliability-ci; cd /home/user/agent-reliability-ci && rm -rf .venv && python -m venv .venv && .venv/bin/pip install -q --no-cache-dir --disable-pip-version-check . 'pytest==9.1.1'; .venv/bin/python -VV; uname -m; echo 'dependency inventory (pip freeze):'; .venv/bin/pip freeze --all
+Python 3.11.15 (main, Aug  5 2026, 01:10:23) [GCC 14.2.0]
+x86_64
+dependency inventory (pip freeze):
+agent-reliability-ci @ file:///home/user/agent-reliability-ci
+annotated-types==0.8.0
+iniconfig==2.3.0
+packaging==26.3
+pip==24.0
+pluggy==1.6.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+Pygments==2.21.0
+pytest==9.1.1
+PyYAML==6.0.3
+setuptools==79.0.1
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+[exit 0]
+== stage 2: replay and re-derive (network none)
+$ docker run --rm --platform linux/amd64 --network none -v arci-repro:/home/user python:3.11-slim bash -l -c 
+set +e
+mkdir -p /Users/ajay/Developer/.arci-worktrees
+ln -s /home/user/agent-reliability-ci /Users/ajay/Developer/.arci-worktrees/guardrail-live
+cd /home/user/agent-reliability-ci && export PYTHONPATH=$PWD
+echo '== replay jev'; .venv/bin/arci replay docs/results/jev/2026-10-03/jev-live-b-low_confidence-200/min-bundle.json; echo "exit $?"
+echo '== replay guardrail'; .venv/bin/arci replay docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200/min-bundle.json; echo "exit $?"
+echo '== byte-exact tests'
+.venv/bin/python -m pytest -p no:cacheprovider tests/unit/stats/test_wilson_quantile_pin.py tests/unit/examples/test_guardrail_results.py -k byte_for_byte
+echo "exit $?"
+echo '== reproduce.py --check'
+.venv/bin/python docs/reports/ci-gate-2026-10-06/reproduce.py --check
+echo "exit $?"
+
+== replay jev
+REPRODUCED: failure reproduced
+exit 0
+== replay guardrail
+REPRODUCED: failure reproduced
+exit 0
+== byte-exact tests
+..................                                                       [100%]
+18 passed, 11 deselected in 5.39s
+exit 0
+== reproduce.py --check
+step                                 result  detail
+SHA256SUMS                           ok      13 files match; no unlisted file
+index: evidence outside the package  ok      24 files match (decisions, bundles, archival reports)
+decision re-derivation               ok      18/18 byte-identical, exit codes match
+planner json                         ok      metrics/plan-0.95-vs-0.75.json byte-identical
+planner markdown                     ok      metrics/plan-0.95-vs-0.75.md byte-identical
+REPORT.md placeholders               info    5 tolerated without --strict (REPRO 4, PLANNER 1)
+overall                              ok      0 failed of 6
+exit 0
+[exit 0]
+== summary
+stage 1 install       ok      exit 0
+replay jev            ok      REPRODUCED: failure reproduced (docs/results/jev/2026-10-03/jev-live-b-low_confidence-200/min-bundle.json)
+replay guardrail      ok      REPRODUCED: failure reproduced (docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200/min-bundle.json)
+18 byte-exact tests   ok      18 passed, 11 deselected in 5.39s
+in-container --check  ok      all rows ok
+image digest          info    python@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+docker server         info    29.8.2
+overall: ok

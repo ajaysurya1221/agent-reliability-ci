@@ -1,0 +1,5 @@
+== stage 1b: add pytest to the prepared container venv
+
+Linux-7.0.14-linuxkit-x86_64-with-glibc2.41 3.11.15
+== 18 byte-exact re-derivations, network none
+....................                                                     [100%]

@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use agent-reliability-ci or its archived evidence, please cite it as below."
+title: "agent-reliability-ci: pre-registered, exact non-inferiority gating for stochastic AI agents with seeded fault injection and offline-replayable failure bundles"
+type: software
+authors:
+  - family-names: Senthilrajan
+    given-names: Ajay Surya
+repository-code: "https://github.com/ajaysurya1221/agent-reliability-ci"
+license: Apache-2.0
+version: "0.7.0"
+date-released: "2026-10-03"
+keywords:
+  - ai-agents
+  - reliability
+  - fault-injection
+  - statistics
+  - evaluation
+  - reproducibility
+references:
+  - type: report
+    title: "ARCI: Planning, Gating and Reproducing Agent Regressions (technical report, 2026-10-06)"
+    authors:
+      - family-names: Senthilrajan
+        given-names: Ajay Surya
+    url: "https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md"
+    date-released: "2026-10-06"

@@ -1,0 +1,36 @@
+
+=== 1. One illustrative run: A and B look the same
+  ok   pass@1, no fault: A=PASS B=PASS
+
+=== 2. The frozen experiment, N=200 per arm, fault: tool_timeout on reserve
+  VERDICT: BLOCK (exit 1)   [A vs agent_b]
+  VERDICT: PASS (exit 0)   [A vs agent_a]
+  ok   A vs B is BLOCKED (exit 1)
+  ok   A vs A PASSES (exit 0)
+
+=== 3. Where do a passing and a failing run part ways?
+  mode: boundary
+  common_prefix: 9
+  left: tool_start tool="reserve" arguments={"order_id":"order-7","quantity":2,"sku":"widget"}
+  right: tool_start tool="confirm" arguments={"order_id":"order-7","sku":"widget"}
+  after_injection: tool_timeout
+  ok   the divergence sits right after the injected tool_timeout
+
+=== 4. Shrink the failing condition (3 injected faults)
+  kept: tool_timeout
+  removed: empty_result, tool_error_once
+  minimality: 1-minimal
+  trials_run: 3
+  ok   1-minimal reproducer keeps only ['tool_timeout']
+
+=== 5. Replay the reduced bundle offline
+  REPRODUCED: failure reproduced
+  ok   REPRODUCED from the recording, no live tools
+
+=== 6. The repair: agent C
+  ok   C passes the exact reproducer that B fails
+  VERDICT: PASS (exit 0)   [A vs agent_c]
+  ok   A vs C PASSES its own separately frozen experiment (exit 0)
+
+All six steps held. Run stores: /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-hero-ska7eda1
+exit 0
