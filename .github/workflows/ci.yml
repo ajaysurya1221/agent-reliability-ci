@@ -65,7 +65,20 @@ jobs:
         env:
           PYTEST_ADDOPTS: >-
             --basetemp="${{ runner.temp }}/pytest" -o tmp_path_retention_policy=failed
-        run: .venv/bin/pytest -p no:cacheprovider
+        run: |
+          cat > "$RUNNER_TEMP/test_p7_artifact_probe.py" <<'PROBE'
+          from arci.gate import decide
+          from arci.runner import run_experiment
+          from tests.acceptance.helpers import COND_CLEAN, manifest
+
+          def test_p7_probe(tmp_path):
+              m = manifest(n_per_arm=1, conditions=(COND_CLEAN,), oracle="raising_oracle")
+              trials = run_experiment(m, tmp_path, max_workers=1)
+              decision = decide(m, trials)
+              (tmp_path / m.experiment_id / "decision.json").write_text(decision.model_dump_json())
+              assert False, "P7 intentional artifact probe"
+          PROBE
+          PYTHONPATH="$GITHUB_WORKSPACE" .venv/bin/pytest -c pyproject.toml -p no:cacheprovider "$RUNNER_TEMP/test_p7_artifact_probe.py"
 
       - name: Upload failed pytest stores
         if: failure()
