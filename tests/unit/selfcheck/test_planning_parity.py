@@ -24,11 +24,18 @@ def test_planner_matches_the_selfcheck_enumeration(p_a: float, p_b: float, n: in
     packaged = verdict_probabilities(p_a, p_b, n)
     bench = operating_characteristics(p_a, p_b, n)
     for verdict in (Verdict.PASS, Verdict.BLOCK, Verdict.INCONCLUSIVE):
-        # The bench folds its rounding residual into INCONCLUSIVE; the planner does not.
+        # The planner sums exact integers and rounds once; the bench sums floats and folds its
+        # rounding residual into INCONCLUSIVE. They agree to within 1e-12, not bit for bit.
         assert packaged[verdict] == pytest.approx(bench[verdict.value], abs=1e-12)
 
 
 @pytest.mark.parametrize("n", (1, 20, 400))
 @pytest.mark.parametrize("p", (0.0, 0.25, 0.95, 1.0))
-def test_binomial_pmf_is_the_selfcheck_pmf(p: float, n: int) -> None:
-    assert binomial_pmf(p, n) == bench_pmf(p, n)
+def test_binomial_pmf_matches_the_selfcheck_pmf(p: float, n: int) -> None:
+    # The planner rounds exact rational masses once; the bench computes in floating point. They
+    # agree to within 1e-12 per term, not bit for bit.
+    packaged = binomial_pmf(p, n)
+    bench = bench_pmf(p, n)
+    assert len(packaged) == len(bench) == n + 1
+    for packaged_term, bench_term in zip(packaged, bench, strict=True):
+        assert packaged_term == pytest.approx(bench_term, abs=1e-12)

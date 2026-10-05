@@ -16,6 +16,7 @@ from arci.planning import (
     Plan,
     UnsupportedDesignError,
     binomial_pmf,
+    exact_verdict_masses,
     per_arm_tail,
     plan,
     reachable_verdicts,
@@ -319,8 +320,8 @@ def test_binomial_pmf_is_a_distribution(n: int, p: float) -> None:
     pmf = binomial_pmf(p, n)
     assert len(pmf) == n + 1
     assert abs(math.fsum(pmf) - 1.0) <= 1e-12
-    exact = _pmf(n, Fraction(p))
-    assert max(abs(value - float(truth)) for value, truth in zip(pmf, exact, strict=True)) < 1e-13
+    # Each term is the exact rational mass of the float rate, rounded once.
+    assert pmf == tuple(float(truth) for truth in _pmf(n, Fraction(p)))
 
 
 def test_every_plan_row_conserves_mass() -> None:
@@ -478,8 +479,10 @@ def _single_row_plan(
 def test_a_certain_verdict_is_exactly_one_although_the_floats_miss_it(
     p_a: float, p_b: float
 ) -> None:
-    # Every pair at N=1 is INCONCLUSIVE; the float sums are 0.9999999999999998 at 0.9 and
-    # 1.0000000000000002 at 0.3.
+    # Every pair at N=1 is INCONCLUSIVE. A float enumeration sums to 0.9999999999999998 at 0.9 and
+    # 1.0000000000000002 at 0.3; the exact INCONCLUSIVE numerator is the whole denominator.
+    numerators, denominator = exact_verdict_masses(p_a, p_b, 1)
+    assert numerators == {PASS: 0, BLOCK: 0, INCONCLUSIVE: denominator}
     result = _single_row_plan(p_a, p_b, 1, INCONCLUSIVE)
     row = result.rows[0]
     assert row.inconclusive_probability == 1.0
@@ -491,16 +494,24 @@ def test_a_certain_verdict_is_exactly_one_although_the_floats_miss_it(
 
 
 def test_a_float_of_one_is_not_certainty() -> None:
-    # 0.999 -> 0.001 at N=20: BLOCK sums to the float 1.0, yet INCONCLUSIVE keeps 7.45e-17.
-    assert reachable_verdicts(0.999, 0.001, 20) == {PASS, BLOCK, INCONCLUSIVE}
-    result = _single_row_plan(0.999, 0.001, 20, BLOCK)
+    # 0.999 -> 0.001 at N=25: P(BLOCK) rounds to the float 1.0, yet INCONCLUSIVE keeps 3.47e-23.
+    assert reachable_verdicts(0.999, 0.001, 25) == {PASS, BLOCK, INCONCLUSIVE}
+    result = _single_row_plan(0.999, 0.001, 25, BLOCK)
     row = result.rows[0]
     assert row.block_probability == 1.0
-    assert 0.0 < row.inconclusive_probability < 1e-15
+    assert 0.0 < row.inconclusive_probability < 1e-22
     assert row.certain_verdict is None
     assert not row.meets_target
     assert result.smallest_n_per_arm is None
     assert result.conclusion.startswith("target not reached")
+
+
+def test_a_rival_above_half_an_ulp_keeps_the_probability_below_one() -> None:
+    # 0.999 -> 0.001 at N=20: INCONCLUSIVE keeps 7.45e-17, more than half the float spacing below
+    # 1 (2**-54), so the exact P(BLOCK) rounds to 1 - 2**-53. Summed floats gave 1.0 here.
+    probabilities = verdict_probabilities(0.999, 0.001, 20)
+    assert probabilities[BLOCK] == 1.0 - 2.0**-53
+    assert 7.4e-17 < probabilities[INCONCLUSIVE] < 7.5e-17
 
 
 def test_a_certain_block_is_exactly_one_and_meets_a_target_of_one() -> None:
