@@ -26,5 +26,21 @@ docker run --rm --platform linux/amd64 --network none -v arci-repro:/home/user p
 ```
 
 Observed: both replays print `REPRODUCED: failure reproduced` and exit 0 (Python 3.11.15,
-glibc 2.41, linux/amd64 under emulation on an arm64 host). A scripted form of this recipe
-(`reproduce.py`) is added by the planner work package; until then this file is the recipe.
+glibc 2.41, linux/amd64 under emulation on an arm64 host).
+
+## Scripted form: `reproduce.py`
+
+`../reproduce.py` scripts this recipe and the package's other checks (standard library and the
+installed `arci` only). From the repository root:
+
+| Command | What it does |
+|---|---|
+| `.venv/bin/python docs/reports/ci-gate-2026-10-06/reproduce.py --index` | Writes `evidence-index.json` (every package file except `reproduce.py`, the index and `SHA256SUMS`, with sha256, size, what it is and what it proves; the source commit, arci version and platform; the hashes of the 18 decisions, the two bundles and the archival Ollama reports it cites) and `SHA256SUMS` (`cd docs/reports/ci-gate-2026-10-06 && shasum -a 256 -c SHA256SUMS`). Re-run after any edit to a package file. |
+| `... reproduce.py` or `... reproduce.py --check` | Verifies `SHA256SUMS` and the index's external hashes; re-derives all 18 archived `docs/results/**/decision.json` byte for byte with matching exit codes (copies of `manifest.json` and `trials.jsonl`, `python -m arci.cli gate` in a subprocess, `TYPESAFE_API_KEY`, `jev_key` and `GITHUB_STEP_SUMMARY` removed from the environment, 30 s each); regenerates `metrics/plan-0.95-vs-0.75.{json,md}` with `arci plan` (the flags of the acceptance command in `../PLAN.md`) and compares bytes. An `arci` without `plan` fails this step; nothing is skipped. |
+| `... reproduce.py --check --full` | Also regenerates `metrics/selfcheck-{clopper_pearson,newcombe}.json` with `bench/selfcheck.py` (minutes; values compared exactly) and runs `docs/results/guardrail/summarize.py --check`. |
+| `... reproduce.py --check --strict` | Also fails on any `<<...>>` placeholder left in `../REPORT.md` (without `--strict`, the `REPRO`, `WP3` and `PLANNER` families are reported as tolerated). |
+| `... reproduce.py --docker` | Runs the two stages above (volume `arci-repro` recreated; the source is the checkout's tracked and non-ignored files, so `.venv` is not copied; `pytest` pinned to the `uv.lock` version is added in stage 1), then with `--network none` replays both bundles, runs the 18 byte-exact tests and an in-container `reproduce.py --check`; writes `../logs/docker-reproduce-<date>.txt` with the source commit, uncommitted changes, image digest, interpreter and `pip freeze`. Re-run `--index` afterwards. |
+
+Exit codes: 0 when every row is ok, 1 on any mismatch or failed step, 2 on a usage error. The
+fast guard `tests/unit/reports/test_ci_gate_package.py` checks the index, `SHA256SUMS` and the
+placeholder families; `ARCI_REPORT_STRICT=1` makes it tolerate no placeholder (release mode).
