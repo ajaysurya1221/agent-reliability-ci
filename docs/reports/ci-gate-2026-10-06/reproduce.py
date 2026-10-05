@@ -274,7 +274,8 @@ def write_index() -> int:
         "package": PACKAGE,
         "source_commit": _git("rev-parse", "HEAD"),
         "source_commit_note": (
-            "Commit checked out when this index was generated; package hashes identify the indexed files. The release tag identifies the delivered snapshot."
+            "Commit checked out when this index was generated; package hashes identify "
+            "the indexed files. The release tag identifies the delivered snapshot."
         ),
         "arci_version": _arci_version(),
         "python": platform.python_version(),
