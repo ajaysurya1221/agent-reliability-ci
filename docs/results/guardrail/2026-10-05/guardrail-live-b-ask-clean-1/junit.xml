@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="guardrail-live-b-ask-clean-1" tests="2" failures="1" errors="0">
+  <testsuite name="clean" tests="2" failures="1" errors="0">
+    <testcase classname="guardrail-live-b-ask-clean-1.clean.candidate" name="clean:00000:candidate" />
+    <testcase classname="guardrail-live-b-ask-clean-1.clean" name="gate">
+      <failure message="condition verdict is INCONCLUSIVE" type="gate">bounds cross the margin</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

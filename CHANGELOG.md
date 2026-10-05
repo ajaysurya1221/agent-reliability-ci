@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Guardrail experiment:** published the pre-registered live run of
+  `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
+  runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
+  and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
+  generated from the committed evidence by `docs/results/guardrail/summarize.py`
+  (`--check` fails if they are stale), including the N=50 `decision_unavailable` run that came
+  out INCONCLUSIVE rather than the pre-registered BLOCK. Added
+  `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
+  committed guardrail decision byte for byte with `arci gate`.
+
 ## v0.7.0 (2026-10-03)
 
 - **Calibration audit of the decision model (2026-10-03):** `bench/jev_calibration/` is a

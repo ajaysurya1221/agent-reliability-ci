@@ -1,0 +1,95 @@
+{
+  "record_sha256": "2f7d8eb2be50a2867525838cca73fc7e44facd61f323c12057631415e38a6097",
+  "schema_version": "arci/0.5",
+  "experiment_id": "guardrail-live-c-ask-clean-50",
+  "manifest_sha256": "9b9600226b434635e959932ca450e40dc2782093845c307303f5fd9d5514d2d3",
+  "trials_sha256": "eb307f928bd0398000246d18ef4308bc118ae3d8aafa27cbc9cd69fcb003843b",
+  "alpha": 0.05,
+  "delta": 0.1,
+  "interval_method": "clopper_pearson",
+  "k_conditions": 1,
+  "per_arm_confidence": 0.975,
+  "n_per_arm": 50,
+  "looks": [
+    50
+  ],
+  "history": [
+    {
+      "look": 1,
+      "pairs": 50,
+      "trials_sha256": "eb307f928bd0398000246d18ef4308bc118ae3d8aafa27cbc9cd69fcb003843b",
+      "conditions": [
+        {
+          "condition_id": "clean",
+          "baseline": {
+            "n": 50,
+            "successes": 50,
+            "errors": 0,
+            "rate": 1.0,
+            "cp_low": 0.9160901219920096,
+            "cp_high": 1.0,
+            "wilson_low": 0.9286524008666414,
+            "wilson_high": 1.0
+          },
+          "candidate": {
+            "n": 50,
+            "successes": 50,
+            "errors": 0,
+            "rate": 1.0,
+            "cp_low": 0.9160901219920096,
+            "cp_high": 1.0,
+            "wilson_low": 0.9286524008666414,
+            "wilson_high": 1.0
+          },
+          "delta_low": -0.08390987800799043,
+          "delta_high": 0.08390987800799043,
+          "candidate_hard_violations": 0,
+          "is_gating": true,
+          "verdict": "PASS",
+          "reasons": [
+            "non-inferiority bound passed"
+          ]
+        }
+      ],
+      "verdict": "PASS"
+    }
+  ],
+  "stopped_at_look": 1,
+  "conditions": [
+    {
+      "condition_id": "clean",
+      "baseline": {
+        "n": 50,
+        "successes": 50,
+        "errors": 0,
+        "rate": 1.0,
+        "cp_low": 0.9160901219920096,
+        "cp_high": 1.0,
+        "wilson_low": 0.9286524008666414,
+        "wilson_high": 1.0
+      },
+      "candidate": {
+        "n": 50,
+        "successes": 50,
+        "errors": 0,
+        "rate": 1.0,
+        "cp_low": 0.9160901219920096,
+        "cp_high": 1.0,
+        "wilson_low": 0.9286524008666414,
+        "wilson_high": 1.0
+      },
+      "delta_low": -0.08390987800799043,
+      "delta_high": 0.08390987800799043,
+      "candidate_hard_violations": 0,
+      "is_gating": true,
+      "verdict": "PASS",
+      "reasons": [
+        "non-inferiority bound passed"
+      ]
+    }
+  ],
+  "verdict": "PASS",
+  "exit_code": 0,
+  "reasons": [],
+  "prior_runs": []
+}

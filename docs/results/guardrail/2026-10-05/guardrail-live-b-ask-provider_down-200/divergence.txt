@@ -1,0 +1,5 @@
+mode: boundary
+common_prefix: 3
+left: tool_start tool="record" arguments={"applied":"unavailable","decision":"ask","static":"ask"}
+right: tool_start tool="record" arguments={"applied":"unavailable-allowed","decision":"allow","static":"ask"}
+after_injection: decision_unavailable

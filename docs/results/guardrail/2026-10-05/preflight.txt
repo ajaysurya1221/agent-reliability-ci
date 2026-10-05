@@ -1,0 +1,6 @@
+pinned model not listed; account models: jev-latest, jev-preview; verifying with the smoke request
+model: jev-1.13.0
+request id: req_01a10ae737b172229a70ee2d061bcf27
+usage: input_tokens=353 output_tokens=60
+latency: 347.5 ms
+{"preflight":{"endpoint":"https://api.typesafe.ai/v1/systemone","latency_ms":347.5,"manifest_sha256":"0a15b43aae0b7bdd4b319220b4f9d5d4ed8f5f9ff18714b70b80d36d0622f483","model":"jev-1.13.0","request_id":"req_01a10ae737b172229a70ee2d061bcf27","usage":{"input_tokens":353,"output_tokens":60}}}

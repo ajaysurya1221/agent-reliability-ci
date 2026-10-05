@@ -1,0 +1,348 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="guardrail-live-b-ask-provider_down-200" tests="201" failures="71" errors="0">
+  <testsuite name="provider_down" tests="201" failures="71" errors="0">
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00000:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00001:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00002:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00003:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00004:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00005:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00006:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00007:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00008:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00009:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00010:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00011:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00012:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00013:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00014:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00015:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00016:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00017:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00018:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00019:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00020:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00021:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00022:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00023:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00024:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00025:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00026:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00027:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00028:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00029:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00030:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00031:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00032:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00033:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00034:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00035:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00036:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00037:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00038:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00039:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00040:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00041:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00042:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00043:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00044:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00045:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00046:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00047:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00048:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00049:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00050:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00051:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00052:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00053:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00054:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00055:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00056:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00057:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00058:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00059:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00060:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00061:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00062:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00063:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00064:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00065:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00066:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00067:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00068:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00069:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00070:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00071:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00072:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00073:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00074:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00075:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00076:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00077:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00078:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00079:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00080:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00081:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00082:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00083:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00084:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00085:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00086:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00087:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00088:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00089:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00090:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00091:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00092:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00093:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00094:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00095:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00096:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00097:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00098:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00099:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00100:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00101:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00102:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00103:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00104:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00105:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00106:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00107:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00108:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00109:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00110:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00111:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00112:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00113:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00114:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00115:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00116:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00117:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00118:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00119:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00120:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00121:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00122:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00123:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00124:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00125:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00126:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00127:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00128:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00129:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00130:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00131:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00132:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00133:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00134:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00135:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00136:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00137:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00138:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00139:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00140:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00141:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00142:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00143:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00144:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00145:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00146:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00147:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00148:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00149:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00150:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00151:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00152:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00153:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00154:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00155:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00156:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00157:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00158:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00159:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00160:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00161:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00162:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00163:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00164:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00165:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00166:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00167:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00168:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00169:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00170:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00171:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00172:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00173:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00174:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00175:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00176:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00177:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00178:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00179:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00180:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00181:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00182:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00183:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00184:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00185:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00186:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00187:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00188:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00189:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00190:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00191:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00192:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00193:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00194:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00195:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00196:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00197:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00198:candidate">
+      <failure message="d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f" type="completed">d6f37728a2478b3bc05e5a2e3a7d58f189548565d3ef658cd00b9352cd18036f: oracle rejected final state; first_failed_tool=decision:systemone:http_529</failure>
+    </testcase>
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down.candidate" name="provider_down:00199:candidate" />
+    <testcase classname="guardrail-live-b-ask-provider_down-200.provider_down" name="gate">
+      <failure message="condition verdict is BLOCK" type="gate">regression bound crossed</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
