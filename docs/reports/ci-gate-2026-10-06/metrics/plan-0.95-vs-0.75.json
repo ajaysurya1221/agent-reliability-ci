@@ -18,45 +18,45 @@
     {
       "n_per_arm": 20,
       "total_trials": 40,
-      "PASS": 1.0484856641620773e-06,
-      "BLOCK": 0.0003472039352379798,
-      "INCONCLUSIVE": 0.9996517475790979,
+      "PASS": 1.048485664162077e-06,
+      "BLOCK": 0.0003472039352379785,
+      "INCONCLUSIVE": 0.9996517475790978,
       "certain_verdict": null,
       "meets_target": false
     },
     {
       "n_per_arm": 50,
       "total_trials": 100,
-      "PASS": 1.8639619473487974e-06,
-      "BLOCK": 0.01565136127212323,
-      "INCONCLUSIVE": 0.9843467747659295,
+      "PASS": 1.8639619473488054e-06,
+      "BLOCK": 0.015651361272123354,
+      "INCONCLUSIVE": 0.9843467747659292,
       "certain_verdict": null,
       "meets_target": false
     },
     {
       "n_per_arm": 100,
       "total_trials": 200,
-      "PASS": 1.1599209796246918e-07,
-      "BLOCK": 0.09309944526425504,
-      "INCONCLUSIVE": 0.906900438743647,
+      "PASS": 1.1599209796246949e-07,
+      "BLOCK": 0.09309944526425445,
+      "INCONCLUSIVE": 0.9069004387436476,
       "certain_verdict": null,
       "meets_target": false
     },
     {
       "n_per_arm": 200,
       "total_trials": 400,
-      "PASS": 6.964950797580511e-10,
-      "BLOCK": 0.3647316956588909,
-      "INCONCLUSIVE": 0.6352683036446141,
+      "PASS": 6.964950797580904e-10,
+      "BLOCK": 0.3647316956588898,
+      "INCONCLUSIVE": 0.6352683036446152,
       "certain_verdict": null,
       "meets_target": false
     },
     {
       "n_per_arm": 400,
       "total_trials": 800,
-      "PASS": 1.548350629052395e-13,
-      "BLOCK": 0.8279193645266361,
-      "INCONCLUSIVE": 0.17208063547320912,
+      "PASS": 1.5483506290524075e-13,
+      "BLOCK": 0.8279193645266348,
+      "INCONCLUSIVE": 0.17208063547321037,
       "certain_verdict": null,
       "meets_target": true
     }
