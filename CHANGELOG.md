@@ -2,13 +2,18 @@
 
 ## Unreleased
 
-## Unreleased
-
 - **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
   value used by the existing Linux-produced records (CPython's C accelerator on arm64 macOS
   differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
   the archived Clopper-Pearson stores without changing any verdict. Regression tests re-derive
   every committed `docs/results/jev` decision byte for byte.
+- **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
+  integer arithmetic, including zero-success and all-success bounds. The existing 60-step
+  bisection, statistical method, confidence allocation, and gate rules are unchanged. Re-derived
+  six archived Jev decisions and five guardrail decisions from unchanged sealed manifests and
+  trials. Only CP bounds, their derived difference bounds, and decision seals changed; verdicts,
+  exit codes, counts, stopping histories, and rendered Markdown/JUnit reports are unchanged.
+  Byte-for-byte regeneration is checked on macOS and Ubuntu.
 - **Guardrail experiment:** published the pre-registered live run of
   `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
   runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
@@ -18,7 +23,6 @@
   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
   committed guardrail decision byte for byte with `arci gate`.
-||||||| e304e81
 
 ## v0.7.0 (2026-10-03)
 

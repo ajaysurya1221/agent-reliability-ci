@@ -1,5 +1,5 @@
 {
-  "record_sha256": "c06d00405f613b8fe81244a11249b1e50fcb68f0b5855d69521d82e214cf0793",
+  "record_sha256": "711769a2554fac1f7a82e402563aa1d796d203a3567a2d7fcccdc7e88fd2d39f",
   "schema_version": "arci/0.5",
   "experiment_id": "jev-live-b-low_confidence-50",
   "manifest_sha256": "2a1dd8fef3e3d5a102a20fc94fa330cf0128300aeee30f6c409c3387fc31a56f",
@@ -26,7 +26,7 @@
             "successes": 50,
             "errors": 0,
             "rate": 1.0,
-            "cp_low": 0.9160901219920096,
+            "cp_low": 0.9160901219920095,
             "cp_high": 1.0,
             "wilson_low": 0.9286524008666414,
             "wilson_high": 1.0
@@ -42,7 +42,7 @@
             "wilson_high": 0.07134759913335868
           },
           "delta_low": -1.0,
-          "delta_high": -0.8321802439840191,
+          "delta_high": -0.832180243984019,
           "candidate_hard_violations": 0,
           "is_gating": true,
           "verdict": "BLOCK",
@@ -63,7 +63,7 @@
         "successes": 50,
         "errors": 0,
         "rate": 1.0,
-        "cp_low": 0.9160901219920096,
+        "cp_low": 0.9160901219920095,
         "cp_high": 1.0,
         "wilson_low": 0.9286524008666414,
         "wilson_high": 1.0
@@ -79,7 +79,7 @@
         "wilson_high": 0.07134759913335868
       },
       "delta_low": -1.0,
-      "delta_high": -0.8321802439840191,
+      "delta_high": -0.832180243984019,
       "candidate_hard_violations": 0,
       "is_gating": true,
       "verdict": "BLOCK",

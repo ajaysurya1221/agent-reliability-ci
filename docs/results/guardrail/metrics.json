@@ -344,8 +344,8 @@
               "successes": 38
             },
             "condition_id": "provider_down",
-            "delta_high": -0.03483429582450215,
-            "delta_low": -0.40160725862240665,
+            "delta_high": -0.03483429582450226,
+            "delta_low": -0.401607258622406,
             "errors": {
               "baseline": 0,
               "candidate": 0
@@ -360,7 +360,7 @@
         "k_conditions": 1,
         "per_arm_confidence": 0.975,
         "reasons": [],
-        "record_sha256": "988474bef680ae83facc1dd56caea6471eca1e18402c6f01514c764995c1f200",
+        "record_sha256": "f5180309d92b49385bb38e4d9eac9b88af8619d9ef4b37676fe0af0cd28c92e9",
         "verdict": "INCONCLUSIVE"
       },
       "experiment_id": "guardrail-live-b-ask-provider_down-50",
@@ -519,8 +519,8 @@
               "successes": 50
             },
             "condition_id": "low_confidence",
-            "delta_high": 0.08390987800799043,
-            "delta_low": -0.08390987800799043,
+            "delta_high": 0.08390987800799055,
+            "delta_low": -0.08390987800799055,
             "errors": {
               "baseline": 0,
               "candidate": 0
@@ -535,7 +535,7 @@
         "k_conditions": 1,
         "per_arm_confidence": 0.975,
         "reasons": [],
-        "record_sha256": "658935f549d156822bac336073f1a53b343e6f15deca898b17cccbe8818704e5",
+        "record_sha256": "c711eb8f87fd237e3619338d6b5082fcb7ebc98c0d4dbc85a7917b072b4a05e5",
         "verdict": "PASS"
       },
       "experiment_id": "guardrail-live-b-ask-low_confidence-50",
@@ -688,8 +688,8 @@
               "successes": 50
             },
             "condition_id": "clean",
-            "delta_high": 0.08390987800799043,
-            "delta_low": -0.08390987800799043,
+            "delta_high": 0.08390987800799055,
+            "delta_low": -0.08390987800799055,
             "errors": {
               "baseline": 0,
               "candidate": 0
@@ -704,7 +704,7 @@
         "k_conditions": 1,
         "per_arm_confidence": 0.975,
         "reasons": [],
-        "record_sha256": "2f7d8eb2be50a2867525838cca73fc7e44facd61f323c12057631415e38a6097",
+        "record_sha256": "fe2e793037e2e26aaeea7a210cc13aa1abf6e621b7edeb0a5fb646c8ed0dab14",
         "verdict": "PASS"
       },
       "experiment_id": "guardrail-live-c-ask-clean-50",
@@ -855,8 +855,8 @@
               "successes": 130
             },
             "condition_id": "provider_down",
-            "delta_high": -0.25367246830942947,
-            "delta_low": -0.43036960660186296,
+            "delta_high": -0.2536724683094298,
+            "delta_low": -0.4303696066018623,
             "errors": {
               "baseline": 0,
               "candidate": 0
@@ -871,7 +871,7 @@
         "k_conditions": 1,
         "per_arm_confidence": 0.975,
         "reasons": [],
-        "record_sha256": "058aff087453b7b3e81c04adc9200651e55a3b1e4a314c2385ace42d51dc4a5b",
+        "record_sha256": "13fa8a91fe7b98d059be460bb04f21399b064ff99d5a150fa5f5b102e7f4e3dc",
         "verdict": "BLOCK"
       },
       "experiment_id": "guardrail-live-b-ask-provider_down-200",
@@ -1068,8 +1068,8 @@
               "successes": 138
             },
             "condition_id": "provider_down",
-            "delta_high": -0.12308796990344706,
-            "delta_low": -0.35699976138279976,
+            "delta_high": -0.12308796990344884,
+            "delta_low": -0.3569997613827991,
             "errors": {
               "baseline": 0,
               "candidate": 0
@@ -1084,7 +1084,7 @@
         "k_conditions": 1,
         "per_arm_confidence": 0.975,
         "reasons": [],
-        "record_sha256": "d18216d2d06d05ca3042d2f7c44b8f01544a96ff3b2605cbddbc4c685207a6b0",
+        "record_sha256": "d696127d291975110623523df75edd87e0cf3854d3cd1072215508d20c083c9b",
         "verdict": "BLOCK"
       },
       "experiment_id": "guardrail-live-b-all-provider_down-200",
