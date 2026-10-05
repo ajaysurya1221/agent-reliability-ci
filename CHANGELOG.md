@@ -7,6 +7,22 @@
   differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
   the archived Clopper-Pearson stores without changing any verdict. Regression tests re-derive
   every committed `docs/results/jev` decision byte for byte.
+- **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
+  integer arithmetic, including zero-success and all-success bounds. The existing 60-step
+  bisection, statistical method, confidence allocation, and gate rules are unchanged. Re-derived
+  six archived Jev decisions and five guardrail decisions from unchanged sealed manifests and
+  trials. Only CP bounds, their derived difference bounds, and decision seals changed; verdicts,
+  exit codes, counts, stopping histories, and rendered Markdown/JUnit reports are unchanged.
+  Byte-for-byte regeneration is checked on macOS and Ubuntu.
+- **Guardrail experiment:** published the pre-registered live run of
+  `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
+  runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
+  and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
+  generated from the committed evidence by `docs/results/guardrail/summarize.py`
+  (`--check` fails if they are stale), including the N=50 `decision_unavailable` run that came
+  out INCONCLUSIVE rather than the pre-registered BLOCK. Added
+  `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
+  committed guardrail decision byte for byte with `arci gate`.
 
 ## v0.7.0 (2026-10-03)
 

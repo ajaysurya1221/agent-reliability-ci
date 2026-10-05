@@ -25,43 +25,62 @@ def _validate(successes: int, n: int, confidence: float) -> None:
         raise ValueError("confidence must be strictly between 0 and 1")
 
 
-def _log_binomial_sum(start: int, stop: int, n: int, p: float) -> float:
-    """Log-sum binomial probabilities for ``start <= X < stop``."""
-    log_p = math.log(p)
-    log_q = math.log1p(-p)
-    log_n_factorial = math.lgamma(n + 1)
-    logs = [
-        log_n_factorial - math.lgamma(k + 1) - math.lgamma(n - k + 1) + k * log_p + (n - k) * log_q
-        for k in range(start, stop)
-    ]
-    largest = max(logs)
-    return largest + math.log(math.fsum(math.exp(value - largest) for value in logs))
+def _compare_binomial_prefix(m: int, n: int, a: int, b: int, t: int, d: int) -> int:
+    """Compare P(X <= m) with t/d, for p=a/b and power-of-two b."""
+    if m < 0:
+        return -1
+
+    q = b - a
+    term = math.comb(n, m) * a**m * q ** (n - m)
+    total = term
+    scale = 1 << (n * (b.bit_length() - 1))
+    threshold = scale * t
+
+    while True:
+        scaled = total * d
+        if scaled > threshold:
+            return 1
+        if m == 0:
+            return (scaled > threshold) - (scaled < threshold)
+
+        numerator = m * q
+        denominator = (n - m + 1) * a
+
+        # Remaining descending terms have decreasing ratios. Their sum
+        # is bounded above by term * r / (1-r), when r < 1.
+        if numerator < denominator:
+            gap = denominator - numerator
+            if scaled * gap + term * d * numerator < threshold * gap:
+                return -1
+
+        # Exact division: this is the next integer binomial numerator.
+        term = term * numerator // denominator
+        total += term
+        m -= 1
 
 
 def _tail_is_greater(x: int, n: int, p: float, target: float, *, upper: bool) -> bool:
-    """Compare one binomial tail with ``target`` without subtracting a CDF.
-
-    The smaller-probability side is log-summed. When that is the complement of
-    the requested tail, the comparison is reversed against ``1 - target`` in
-    log space, so no rounded probability is subtracted from one.
-    """
+    """Compare a binomial tail exactly at the supplied binary64 inputs."""
     if p <= 0.0:
-        return not upper
+        return x == 0 if upper else True
     if p >= 1.0:
-        return upper
+        return True if upper else x == n
 
-    # floor(np + p) is a binomial median. It identifies which side has at most
-    # half the mass, including the only ambiguous point around the mean.
-    median = math.floor(n * p + p)
-    log_target = math.log(target)
-    log_complement_target = math.log1p(-target)
-    if upper:
-        if x > median:
-            return _log_binomial_sum(x, n + 1, n, p) > log_target
-        return _log_binomial_sum(0, x, n, p) < log_complement_target
-    if x < median:
-        return _log_binomial_sum(0, x + 1, n, p) > log_target
-    return _log_binomial_sum(x + 1, n + 1, n, p) < log_complement_target
+    a, b = p.as_integer_ratio()
+    t, d = target.as_integer_ratio()
+    cutoff = x - 1 if upper else x
+    complement = upper
+
+    # Reflect when needed so descending terms decrease from the start.
+    # Form complements as integers, without rounded float subtraction.
+    if cutoff * b > (n + 1) * a:
+        cutoff = n - cutoff - 1
+        a = b - a
+        complement = not complement
+
+    if complement:
+        return _compare_binomial_prefix(cutoff, n, a, b, d - t, d) < 0
+    return _compare_binomial_prefix(cutoff, n, a, b, t, d) > 0
 
 
 def _tail_root(x: int, n: int, target: float, *, upper: bool) -> float:
@@ -89,15 +108,8 @@ def clopper_pearson_tail(successes: int, n: int, tail: float) -> tuple[float, fl
     if not _MIN_TAIL <= tail < 0.5:
         raise ValueError("tail must be between 2.5e-7 (inclusive) and 0.5 (exclusive)")
 
-    if successes == 0:
-        low = 0.0
-        high = 1.0 - tail ** (1.0 / n)
-    elif successes == n:
-        low = tail ** (1.0 / n)
-        high = 1.0
-    else:
-        low = _tail_root(successes, n, tail, upper=True)
-        high = _tail_root(successes, n, tail, upper=False)
+    low = 0.0 if successes == 0 else _tail_root(successes, n, tail, upper=True)
+    high = 1.0 if successes == n else _tail_root(successes, n, tail, upper=False)
     return low, high
 
 

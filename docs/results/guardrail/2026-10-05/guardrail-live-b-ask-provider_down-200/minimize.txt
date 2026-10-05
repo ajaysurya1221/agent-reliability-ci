@@ -1,0 +1,4 @@
+kept: decision_unavailable
+removed: none
+minimality: reduced
+trials_run: 1

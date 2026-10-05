@@ -1,9 +1,9 @@
 {
-  "record_sha256": "ce9af4a7c4684a51f2287c0b3126839753e0c12ef7a17233f7e176e77a0d07eb",
+  "record_sha256": "13fa8a91fe7b98d059be460bb04f21399b064ff99d5a150fa5f5b102e7f4e3dc",
   "schema_version": "arci/0.5",
-  "experiment_id": "jev-live-b-low_confidence-200",
-  "manifest_sha256": "9401c00021f7acdc7e0c915c2cd8a700de30248e33a5a4c4d5e97dd2bf3e21ce",
-  "trials_sha256": "89f883ac64b17a2637bbf6b2b7de31794128c8936db30a53dd727614dc67ea4d",
+  "experiment_id": "guardrail-live-b-ask-provider_down-200",
+  "manifest_sha256": "4046a23989ec8dbd6abf8ae02e1b8622a6b811a55eec58ef1cac7ac9bf20139f",
+  "trials_sha256": "e974ff934f3131213041fc08cb5431f70cfc0cfdcfffc9cbc8f03e14fc654c48",
   "alpha": 0.05,
   "delta": 0.1,
   "interval_method": "clopper_pearson",
@@ -17,10 +17,10 @@
     {
       "look": 1,
       "pairs": 200,
-      "trials_sha256": "89f883ac64b17a2637bbf6b2b7de31794128c8936db30a53dd727614dc67ea4d",
+      "trials_sha256": "e974ff934f3131213041fc08cb5431f70cfc0cfdcfffc9cbc8f03e14fc654c48",
       "conditions": [
         {
-          "condition_id": "low_confidence",
+          "condition_id": "provider_down",
           "baseline": {
             "n": 200,
             "successes": 200,
@@ -33,16 +33,16 @@
           },
           "candidate": {
             "n": 200,
-            "successes": 0,
+            "successes": 130,
             "errors": 0,
-            "rate": 0.0,
-            "cp_low": 0.0,
-            "cp_high": 0.02167184965290838,
-            "wilson_low": 0.0,
-            "wilson_high": 0.018845326377266564
+            "rate": 0.65,
+            "cp_low": 0.5696303933981377,
+            "cp_high": 0.7246556820376617,
+            "wilson_low": 0.5816346433604008,
+            "wilson_high": 0.7127117587264192
           },
-          "delta_low": -1.0,
-          "delta_high": -0.9566563006941832,
+          "delta_low": -0.4303696066018623,
+          "delta_high": -0.2536724683094298,
           "candidate_hard_violations": 0,
           "is_gating": true,
           "verdict": "BLOCK",
@@ -57,7 +57,7 @@
   "stopped_at_look": 1,
   "conditions": [
     {
-      "condition_id": "low_confidence",
+      "condition_id": "provider_down",
       "baseline": {
         "n": 200,
         "successes": 200,
@@ -70,16 +70,16 @@
       },
       "candidate": {
         "n": 200,
-        "successes": 0,
+        "successes": 130,
         "errors": 0,
-        "rate": 0.0,
-        "cp_low": 0.0,
-        "cp_high": 0.02167184965290838,
-        "wilson_low": 0.0,
-        "wilson_high": 0.018845326377266564
+        "rate": 0.65,
+        "cp_low": 0.5696303933981377,
+        "cp_high": 0.7246556820376617,
+        "wilson_low": 0.5816346433604008,
+        "wilson_high": 0.7127117587264192
       },
-      "delta_low": -1.0,
-      "delta_high": -0.9566563006941832,
+      "delta_low": -0.4303696066018623,
+      "delta_high": -0.2536724683094298,
       "candidate_hard_violations": 0,
       "is_gating": true,
       "verdict": "BLOCK",
@@ -92,10 +92,9 @@
   "exit_code": 1,
   "reasons": [],
   "prior_runs": [
-    "jev-live-b-clean-1",
-    "jev-live-b-low_confidence-50",
-    "jev-live-a-low_confidence-50",
-    "jev-live-c-low_confidence-50",
-    "jev-live-b-low_confidence-50-node"
+    "guardrail-live-b-ask-clean-1",
+    "guardrail-live-b-ask-provider_down-50",
+    "guardrail-live-b-ask-low_confidence-50",
+    "guardrail-live-c-ask-clean-50"
   ]
 }

@@ -56,3 +56,10 @@ in [jev/README.md](jev/README.md).
 A pre-registered audit of `jev-1.13.0` on CLINC150 (with out-of-scope queries) and Banking77,
 26,140 requests, every number re-derivable from the committed hash-chained records:
 [jev-calibration/README.md](jev-calibration/README.md).
+
+## The guardrail experiment
+
+The pre-registered guardrail experiment (frontier-scout's tool-call guard under decision faults,
+against the live endpoint), with its sealed stores, preflight receipt, minimised and replayed
+failure, and a write-up generated from the committed evidence:
+[guardrail/README.md](guardrail/README.md).

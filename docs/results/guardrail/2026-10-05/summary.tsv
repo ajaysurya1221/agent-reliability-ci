@@ -1,0 +1,6 @@
+guardrail-live-b-ask-clean-1	INCONCLUSIVE 2
+guardrail-live-b-ask-provider_down-50	INCONCLUSIVE 2
+guardrail-live-b-ask-low_confidence-50	PASS 0
+guardrail-live-c-ask-clean-50	PASS 0
+guardrail-live-b-ask-provider_down-200	BLOCK 1
+guardrail-live-b-all-provider_down-200	BLOCK 1

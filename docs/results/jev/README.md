@@ -9,6 +9,18 @@ under `2026-10-03/<experiment_id>/`, so `arci gate 2026-10-03/<experiment_id>` r
 verdict from the committed records (checked before committing: byte-identical `decision.json` for
 all seven). Invalid and inconclusive runs stay in the table.
 
+After the Clopper-Pearson tail comparisons in `src/arci/stats.py` were made exact with integer
+arithmetic (the earlier libm-based evaluation differed in the last digits between macOS and
+Linux), the `decision.json` files of six stores were re-derived from their unchanged sealed
+`manifest.json` and `trials.jsonl` with `arci gate`: `jev-live-b-low_confidence-50`,
+`jev-live-a-low_confidence-50`, `jev-live-c-low_confidence-50`,
+`jev-live-b-low_confidence-50-node`, `jev-live-b-low_confidence-200` and `jev-live-b-clean-50`.
+Only the Clopper-Pearson bounds, the difference bounds derived from them and the decision seal
+changed; `report.md`, `junit.xml`, the verdicts and the exit codes are identical.
+`jev-live-b-clean-1` and the `attempt-1-invalid/` stores re-derived unchanged.
+`tests/unit/stats/test_wilson_quantile_pin.py` re-derives all twelve committed decisions byte for
+byte, and CI runs it on Ubuntu and macOS.
+
 ## Preflight
 
 The account's `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`. The

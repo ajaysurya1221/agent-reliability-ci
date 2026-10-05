@@ -1,0 +1,95 @@
+{
+  "record_sha256": "f5180309d92b49385bb38e4d9eac9b88af8619d9ef4b37676fe0af0cd28c92e9",
+  "schema_version": "arci/0.5",
+  "experiment_id": "guardrail-live-b-ask-provider_down-50",
+  "manifest_sha256": "423b6719ac42281a2951aa30a8fda54c4848c4dc252964cd9b245784056f5585",
+  "trials_sha256": "a5ad54cc34ed0dd1566fcb97766e3614cca7bd37ff764f2dff9fc86a9a610d62",
+  "alpha": 0.05,
+  "delta": 0.1,
+  "interval_method": "clopper_pearson",
+  "k_conditions": 1,
+  "per_arm_confidence": 0.975,
+  "n_per_arm": 50,
+  "looks": [
+    50
+  ],
+  "history": [
+    {
+      "look": 1,
+      "pairs": 50,
+      "trials_sha256": "a5ad54cc34ed0dd1566fcb97766e3614cca7bd37ff764f2dff9fc86a9a610d62",
+      "conditions": [
+        {
+          "condition_id": "provider_down",
+          "baseline": {
+            "n": 50,
+            "successes": 50,
+            "errors": 0,
+            "rate": 1.0,
+            "cp_low": 0.9160901219920095,
+            "cp_high": 1.0,
+            "wilson_low": 0.9286524008666414,
+            "wilson_high": 1.0
+          },
+          "candidate": {
+            "n": 50,
+            "successes": 38,
+            "errors": 0,
+            "rate": 0.76,
+            "cp_low": 0.598392741377594,
+            "cp_high": 0.8812558261675072,
+            "wilson_low": 0.6258731624205708,
+            "wilson_high": 0.8570260860300828
+          },
+          "delta_low": -0.401607258622406,
+          "delta_high": -0.03483429582450226,
+          "candidate_hard_violations": 0,
+          "is_gating": true,
+          "verdict": "INCONCLUSIVE",
+          "reasons": [
+            "bounds cross the margin"
+          ]
+        }
+      ],
+      "verdict": "INCONCLUSIVE"
+    }
+  ],
+  "stopped_at_look": 1,
+  "conditions": [
+    {
+      "condition_id": "provider_down",
+      "baseline": {
+        "n": 50,
+        "successes": 50,
+        "errors": 0,
+        "rate": 1.0,
+        "cp_low": 0.9160901219920095,
+        "cp_high": 1.0,
+        "wilson_low": 0.9286524008666414,
+        "wilson_high": 1.0
+      },
+      "candidate": {
+        "n": 50,
+        "successes": 38,
+        "errors": 0,
+        "rate": 0.76,
+        "cp_low": 0.598392741377594,
+        "cp_high": 0.8812558261675072,
+        "wilson_low": 0.6258731624205708,
+        "wilson_high": 0.8570260860300828
+      },
+      "delta_low": -0.401607258622406,
+      "delta_high": -0.03483429582450226,
+      "candidate_hard_violations": 0,
+      "is_gating": true,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "bounds cross the margin"
+      ]
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [],
+  "prior_runs": []
+}

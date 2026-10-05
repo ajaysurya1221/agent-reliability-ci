@@ -1,0 +1,101 @@
+{
+  "record_sha256": "d696127d291975110623523df75edd87e0cf3854d3cd1072215508d20c083c9b",
+  "schema_version": "arci/0.5",
+  "experiment_id": "guardrail-live-b-all-provider_down-200",
+  "manifest_sha256": "17bd82f08d9c414f3441609b34accf617ed5ba44db65bb8b90aee9449cf7d27a",
+  "trials_sha256": "a0fd1fc60dab5d76f2e2bd9b44c1e70e9bada7def5a1a1da91251a635aed6d87",
+  "alpha": 0.05,
+  "delta": 0.1,
+  "interval_method": "clopper_pearson",
+  "k_conditions": 1,
+  "per_arm_confidence": 0.975,
+  "n_per_arm": 200,
+  "looks": [
+    200
+  ],
+  "history": [
+    {
+      "look": 1,
+      "pairs": 200,
+      "trials_sha256": "a0fd1fc60dab5d76f2e2bd9b44c1e70e9bada7def5a1a1da91251a635aed6d87",
+      "conditions": [
+        {
+          "condition_id": "provider_down",
+          "baseline": {
+            "n": 200,
+            "successes": 187,
+            "errors": 0,
+            "rate": 0.935,
+            "cp_low": 0.8847189603124772,
+            "cp_high": 0.9681221095593762,
+            "wilson_low": 0.8919809207009312,
+            "wilson_high": 0.961623645350847
+          },
+          "candidate": {
+            "n": 200,
+            "successes": 138,
+            "errors": 0,
+            "rate": 0.69,
+            "cp_low": 0.6111223481765771,
+            "cp_high": 0.7616309904090284,
+            "wilson_low": 0.6228282243374195,
+            "wilson_high": 0.750010551639219
+          },
+          "delta_low": -0.3569997613827991,
+          "delta_high": -0.12308796990344884,
+          "candidate_hard_violations": 0,
+          "is_gating": true,
+          "verdict": "BLOCK",
+          "reasons": [
+            "regression bound crossed"
+          ]
+        }
+      ],
+      "verdict": "BLOCK"
+    }
+  ],
+  "stopped_at_look": 1,
+  "conditions": [
+    {
+      "condition_id": "provider_down",
+      "baseline": {
+        "n": 200,
+        "successes": 187,
+        "errors": 0,
+        "rate": 0.935,
+        "cp_low": 0.8847189603124772,
+        "cp_high": 0.9681221095593762,
+        "wilson_low": 0.8919809207009312,
+        "wilson_high": 0.961623645350847
+      },
+      "candidate": {
+        "n": 200,
+        "successes": 138,
+        "errors": 0,
+        "rate": 0.69,
+        "cp_low": 0.6111223481765771,
+        "cp_high": 0.7616309904090284,
+        "wilson_low": 0.6228282243374195,
+        "wilson_high": 0.750010551639219
+      },
+      "delta_low": -0.3569997613827991,
+      "delta_high": -0.12308796990344884,
+      "candidate_hard_violations": 0,
+      "is_gating": true,
+      "verdict": "BLOCK",
+      "reasons": [
+        "regression bound crossed"
+      ]
+    }
+  ],
+  "verdict": "BLOCK",
+  "exit_code": 1,
+  "reasons": [],
+  "prior_runs": [
+    "guardrail-live-b-ask-clean-1",
+    "guardrail-live-b-ask-provider_down-50",
+    "guardrail-live-b-ask-low_confidence-50",
+    "guardrail-live-c-ask-clean-50",
+    "guardrail-live-b-ask-provider_down-200"
+  ]
+}
