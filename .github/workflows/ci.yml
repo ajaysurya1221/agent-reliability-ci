@@ -55,6 +55,8 @@ jobs:
         run: npm ci --prefix examples/jev_triage_agent
       - name: Frozen files unchanged
         run: shasum -a 256 -c FROZEN.sha256
+      - name: README figures match their generator
+        run: python docs/assets/src/make_figures.py --check
       - name: Check formatting
         run: .venv/bin/ruff format --check .
       - name: Lint
