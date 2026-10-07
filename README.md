@@ -10,24 +10,13 @@
 "it passed when I tried it" into a frozen, repeated experiment with an honest verdict, and turns a
 measured regression into a small failure case you can replay offline.
 
-```text
-Normal CI            Agent A: PASS      Agent B: PASS          ship it
-arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (exit 1)
-                     bounds on the difference [-0.405, -0.183] against a margin of -0.10
-                     first divergence: right after the injected tool_timeout on `reserve`
-                     1-minimal reproducer: 3 injected faults -> 1, replays offline: REPRODUCED
-                     repaired Agent C: passes the reproducer; 192/200 vs 192/200, PASS (exit 0)
-```
+[Try the offline demo](#try-the-offline-demo) ·
+[Read the evidence report](docs/reports/ci-gate-2026-10-06/REPORT.md) ·
+[Understand the limits](#what-it-does-not-do)
 
-Status: v0.7.0, [Apache-2.0](LICENSE), Python 3.11 or newer, POSIX only, not on PyPI (clone it, or
-use the GitHub Action). It tests Python agents that use the declared tool boundary, any program
-that speaks MCP over stdio, and command agents that call a System One decision endpoint.
-Read [what it does not do](#what-it-does-not-do) before you rely on it.
-
-**How it was built.** One maintainer, September 2026, with Claude Code and Codex as
-pair-programmers (recorded in the commit trailers). The experiment design, the decision rule and
-its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
-demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
+**Availability:** clone `main` for the planner and current portability fixes. The `v0.7.0` GitHub
+Action predates those additions. Python 3.11+, POSIX; not published on PyPI. The CLI supports
+Python agents, command agents using the MCP boundary, and supported decision-endpoint calls.
 
 ## Technical report and reproduction package (2026-10-06)
 
@@ -40,22 +29,7 @@ networking disabled (`docs/reports/ci-gate-2026-10-06/reproduction/README.md`). 
 before spending trials with `arci plan` (see the report, section 3), and cite the project with
 `CITATION.cff`.
 
-## Why repetition and a threshold are not enough
-
-Running an agent a hundred times and failing the build under 90% is the easy part, and several
-tools already do it (as of September 2026: Promptfoo, LangSmith, Braintrust, Inspect AI,
-pytest-repeat; check their current docs). Two things are usually missing. The first is a rule that
-can admit it does not know: with 200 trials per arm, two genuinely equal agents at 80% success reach
-a confident PASS only 21.8% of the time, and at 20 trials a collapse from 95% to 65% is still
-INCONCLUSIVE 99.2% of the time, so a tool that only prints PASS or FAIL is mostly printing noise.
-The second is everything that happens after the number moves: *which* run to look at, *where* it
-went wrong, and a failure case small enough to fix against. `arci` freezes the experiment before it
-runs, decides with an exact interval rather than a threshold, and then hands you the aligned trace
-divergence, the minimised fault condition and a bundle that replays that failure with no model and
-no network. That last step is the whole claim: **a measured regression becomes an executable,
-reduced failure case.**
-
-## Five minutes
+## Try the offline demo
 
 You need [uv](https://docs.astral.sh/uv/) and, for the `just` shortcuts, [just](https://github.com/casey/just).
 
@@ -68,8 +42,7 @@ uv sync                                                 # needs the network once
 ```
 
 The demo runs six steps through the real CLI and the Python API: 1,231 trials, each in a fresh
-process with a separate grader process, no model calls. About 30 seconds on a 15-core laptop; a
-2-vCPU CI runner needs several minutes.
+process with a separate grader process, no model calls. Runtime depends on the machine and current load.
 
 1. One illustrative run: agents A and B both pass.
 2. The frozen experiment (200 trials per arm, `tool_timeout` injected on the first `reserve` call)
@@ -102,6 +75,21 @@ Every gating command ends in a verdict and an exit code. Nothing else decides.
 An agent crash, timeout, blown budget or uncaught tool fault is a `FAIL`. A broken environment,
 injector, grader or event sink is an `ERROR`, and it invalidates the experiment instead of quietly
 leaving the denominator. `arci replay` uses its own codes: 0 reproduced, 1 not reproduced, 3 invalid.
+
+## Why repetition and a threshold are not enough
+
+```text
+Normal CI            Agent A: PASS      Agent B: PASS          ship it
+arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (exit 1)
+                     bounds on the difference [-0.405, -0.183] against a margin of -0.10
+                     first divergence: right after the injected tool_timeout on `reserve`
+                     1-minimal reproducer: 3 injected faults -> 1, replays offline: REPRODUCED
+                     repaired Agent C: passes the reproducer; 192/200 vs 192/200, PASS (exit 0)
+```
+
+ARCI freezes the experiment and decision rule before execution. Its planner shows when the
+selected design is likely to remain INCONCLUSIVE. When a supported experiment detects a
+regression, the trace comparison, fault reduction and replay tools help investigate the failure.
 
 ## The evidence
 
@@ -351,6 +339,9 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
+This example pins `v0.7.0`, the released feature set. The planner (`arci plan`) and the later
+portability fixes are not in that tag; see the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
@@ -403,14 +394,19 @@ there for steps that run after the gate.
 
 Most valuable first: per-request pacing through parent IPC instead of the divide-by-k trial-start
 approximation; counterfactual replay of recorded decisions, if it can be done without overstating
-what a re-perturbed recording proves; an independent calibration audit of decision models on exact
-intervals (needs labelled real outputs and a key); a System One emulator over a local model;
-streamable HTTP transport and several MCP servers per trial; importers built only from authentic
-versioned fixtures; cohort localisation across all passing and failing trials; task-clustered
-aggregation; then a SQLite index, resumable runs, an HTML report and a larger perturbation library.
-Full list in [docs/ROADMAP.md](docs/ROADMAP.md).
+what a re-perturbed recording proves; extend the published intent-routing calibration audit to
+labelled coding-agent permission decisions, with a separate protocol and explicit limits; a
+System One emulator over a local model; streamable HTTP transport and several MCP servers per
+trial; importers built only from authentic versioned fixtures; cohort localisation across all
+passing and failing trials; task-clustered aggregation; then a SQLite index, resumable runs, an
+HTML report and a larger perturbation library. Full list in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Development
+
+**How it was built.** One maintainer, September 2026, with Claude Code and Codex as
+pair-programmers (recorded in the commit trailers). The experiment design, the decision rule and
+its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
+demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
 
 ```bash
 uv sync
@@ -421,13 +417,10 @@ just demo
 npm ci --prefix examples/jev_triage_agent   # only for the Node agent and its test (Node 20+)
 ```
 
-The acceptance suite under `tests/acceptance/` is the specification, hash-pinned in `FROZEN.sha256`.
-It was written before the implementation and hardened by an adversarial reviewer at every release:
-about 45 findings in four rounds at v0.1, with reproductions; eleven more against the
-out-of-process boundary at v0.2; five blockers each at v0.5 and v0.6, every one now a frozen
-regression test. More than 430 tests and basedpyright strict; CI runs Python 3.11 and 3.14, with
-Node 22 for the JavaScript SDK test. The reviewer's findings are why the trust model and the
-hardening tests exist. Design records live in [docs/design](docs/design/), the changelog in
-[CHANGELOG.md](CHANGELOG.md).
+The acceptance suite is hash-pinned in `FROZEN.sha256`. CI checks formatting, lint, strict typing
+and tests on Python 3.11 and 3.14, with separate macOS statistics checks. See
+[the workflow](.github/workflows/ci.yml) for coverage and
+[the evidence report](docs/reports/ci-gate-2026-10-06/REPORT.md) for measured results. Design
+records live in [docs/design](docs/design/), the changelog in [CHANGELOG.md](CHANGELOG.md).
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for adapted code.
