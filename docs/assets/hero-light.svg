@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520" role="img" aria-labelledby="title desc">
+<title id="title">Did this change make the agent less reliable, and what broke?</title>
+<desc id="desc">arci: agent-reliability-ci, regression gate for stochastic agents. Did this change make the agent less reliable, and what broke? A frozen experiment, an exact verdict with its uncertainty, and a failure case you can replay offline. Evidence card: Seeded retry demo, 200 trials per arm, timeout on the first reserve call. A 192/200, B 132/200. Bounds on the difference [−0.405, −0.183], margin −0.10. VERDICT: BLOCK (exit 1); 3 injected faults reduced to 1, 1-minimal; offline replay REPRODUCED. B is A with one retry removed. Source: docs/results/retry-demo-n200.md.</desc>
+<rect x="0" y="0" width="1600" height="520" fill="#F4F1EA"/>
+<text x="72" y="101" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#6B6A65" letter-spacing="0.44"><tspan fill="#B8431F" font-weight="600">arci</tspan><tspan x="139">agent-reliability-ci</tspan></text>
+<text x="72" y="131" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#6B6A65" letter-spacing="0.44">regression gate for stochastic agents</text>
+<text x="72" y="210" font-family="Georgia, 'Times New Roman', serif" font-size="56" fill="#16211D" font-weight="600">Did this change make</text>
+<text x="72" y="271" font-family="Georgia, 'Times New Roman', serif" font-size="56" fill="#16211D" font-weight="600">the agent less reliable,</text>
+<text x="72" y="332" font-family="Georgia, 'Times New Roman', serif" font-size="56" fill="#16211D" font-weight="600">and what broke?</text>
+<text x="72" y="393" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" fill="#3E3D38">A frozen experiment, an exact verdict with its</text>
+<text x="72" y="431" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" fill="#3E3D38">uncertainty, and a failure case you can replay offline.</text>
+<rect x="888" y="56" width="640" height="408" rx="16" fill="#16211D"/>
+<text x="922" y="111" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="17" fill="#A8A397" letter-spacing="1.36">SEEDED RETRY DEMO · 200 TRIALS PER ARM</text>
+<text x="922" y="135" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="17" fill="#A8A397" letter-spacing="1.36">TIMEOUT ON THE FIRST reserve CALL</text>
+<text x="922" y="197" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="40" fill="#E9E4D8" font-weight="600">A <tspan fill="#7FD1A8">192/200</tspan><tspan x="1178">B </tspan><tspan fill="#F0A48A">132/200</tspan></text>
+<text x="922" y="249" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#E9E4D8">bounds on the difference</text>
+<text x="922" y="281" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#E9E4D8"><tspan fill="#F0A48A">[−0.405, −0.183]</tspan> · margin −0.10</text>
+<text x="922" y="325" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#F0A48A" font-weight="600">VERDICT: BLOCK (exit 1)</text>
+<text x="922" y="357" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="22" fill="#E9E4D8">3 faults → 1-minimal → replay <tspan fill="#7FD1A8" font-weight="600">REPRODUCED</tspan></text>
+<text x="922" y="400" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" fill="#A8A397">B is A with one retry removed</text>
+<text x="922" y="422" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" fill="#A8A397">docs/results/retry-demo-n200.md</text>
+</svg>

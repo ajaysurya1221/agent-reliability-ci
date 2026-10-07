@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Documentation:** the README opens with the recorded retry result (200 trials per arm,
+  192/200 vs 132/200, BLOCK), its boundary and availability, links to the evidence, and the
+  offline demo with lines from the committed demo log; a "Where it has been run" summary links
+  every campaign's records, including the guardrail run and the invalid and inconclusive
+  attempts; repeated presentations of the retry result are removed. The hero PNG is replaced by
+  generated light and dark SVGs (`docs/assets/hero-*.svg`) and the how-it-works exposition by a
+  generated pipeline figure (`docs/assets/where-*.svg`), both written by
+  `docs/assets/src/make_figures.py` (stdlib only), whose `--check` mode runs in CI and in
+  `tests/unit/docs/test_figures.py`.
 - **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
   record, enumerated operating-characteristics metrics for both interval methods, the Linux
   container re-derivation log for all 18 archived decisions, the offline replay probe log for

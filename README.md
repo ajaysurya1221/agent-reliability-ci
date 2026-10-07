@@ -1,67 +1,91 @@
 # agent-reliability-ci
 
+**Did removing a retry break your agent?**
+
+One clean run passes both versions. A transient tool timeout exposes the difference.
+ARCI freezes a repeated experiment, gates the change and exports a replayable failure.
+
+**Recorded fixture: 200 trials per arm; timeout on `reserve`.**
+Baseline: **192/200**. Retry removed: **132/200**. Verdict: **BLOCK (exit 1)**.
+[Recorded results](docs/results/retry-demo-n200.md) · [Trace, reduction and replay](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt)
+
+**Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
+**Availability:** main adds planner and portability fixes beyond v0.7.0; no PyPI package.
+
+**Evidence:** [18 archived decisions re-derived](docs/reports/ci-gate-2026-10-06/REPORT.md) · [Frozen contracts](FROZEN.sha256)
+[Design records](docs/design/) · [CI and macOS statistics checks](.github/workflows/ci.yml)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
+  <img src="docs/assets/hero-light.svg" alt="arci, agent-reliability-ci: Did this change make the agent less reliable, and what broke? A frozen experiment, an exact verdict with its uncertainty, and a failure case you can replay offline. Seeded retry demo, 200 trials per arm, timeout on the first reserve call: A 192/200, B 132/200; bounds on the difference minus 0.405 to minus 0.183 against a margin of minus 0.10; VERDICT BLOCK, exit 1; 3 injected faults reduced to 1, 1-minimal; offline replay REPRODUCED. B is A with one retry removed. Source: docs/results/retry-demo-n200.md.">
+</picture>
+
+Re-derived means each archived `decision.json` regenerates byte for byte from its committed
+inputs, whatever its verdict: reproducing a BLOCK, INCONCLUSIVE or ERROR counts, and no archived
+run is turned green ([reproduction recipe](docs/reports/ci-gate-2026-10-06/reproduction/README.md),
+[CITATION.cff](CITATION.cff)).
+
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.7.0)
+[![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](pyproject.toml)
-
-![arci: regression testing for stochastic AI agents. In the seeded retry demo, one clean trial passes both agents; over 200 trials per arm with a timeout on the first reserve call, A scores 192/200 and B 132/200, bounds on the difference minus 40.5 to minus 18.3 percentage points against a margin of minus 10: VERDICT BLOCK, exit 1.](docs/images/hero.png)
-
-**Regression testing for stochastic AI agents.** `arci` (the CLI of *agent-reliability-ci*) turns
-"it passed when I tried it" into a frozen, repeated experiment with an honest verdict, and turns a
-measured regression into a small failure case you can replay offline.
-
-[Try the offline demo](#try-the-offline-demo) ·
-[Read the evidence report](docs/reports/ci-gate-2026-10-06/REPORT.md) ·
-[Understand the limits](#what-it-does-not-do)
-
-**Availability:** clone `main` for the planner and current portability fixes. The `v0.7.0` GitHub
-Action predates those additions. Python 3.11+, POSIX; not published on PyPI. The CLI supports
-Python agents, command agents using the MCP boundary, and supported decision-endpoint calls.
-
-## Technical report and reproduction package (2026-10-06)
-
-[`docs/reports/ci-gate-2026-10-06/REPORT.md`](docs/reports/ci-gate-2026-10-06/REPORT.md) answers
-the practitioner's question "is this change real or noise, and what broke?" with the gate's
-enumerated operating characteristics, the three archived live campaigns as worked examples, and
-a clean-environment reproduction package: every committed `decision.json` re-derives byte for
-byte on macOS and Linux, and both committed failure bundles replay offline in a container with
-networking disabled (`docs/reports/ci-gate-2026-10-06/reproduction/README.md`). Plan a run
-before spending trials with `arci plan` (see the report, section 3), and cite the project with
-`CITATION.cff`.
+[Security policy](SECURITY.md)
 
 ## Try the offline demo
 
-You need [uv](https://docs.astral.sh/uv/) and, for the `just` shortcuts, [just](https://github.com/casey/just).
-
+Python 3.11+, POSIX and uv. Installation needs network; the fixture makes no model calls.
 ```bash
 git clone https://github.com/ajaysurya1221/agent-reliability-ci
 cd agent-reliability-ci
-uv sync                                                 # needs the network once
-.venv/bin/arci --help
-.venv/bin/python examples/retry_agent/hero_demo.py      # or: just demo
+uv sync && .venv/bin/python examples/retry_agent/hero_demo.py
 ```
 
-The demo runs six steps through the real CLI and the Python API: 1,231 trials, each in a fresh
-process with a separate grader process, no model calls. Runtime depends on the machine and current load.
+`just demo` runs the same script. It takes six steps through the real CLI and the Python API,
+each trial in a fresh process with a separate grader process. Runtime depends on the machine and
+current load. Lines from one run:
 
-1. One illustrative run: agents A and B both pass.
-2. The frozen experiment (200 trials per arm, `tool_timeout` injected on the first `reserve` call)
-   BLOCKs B and PASSes A against itself.
-3. The paired trace diff names the first divergent step, right after the injected fault.
-4. The fault minimiser shrinks a 3-fault condition to the one fault that matters, and only then
-   calls it 1-minimal.
-5. The exported bundle replays the failure offline from its recording.
-6. The repaired agent C passes the exact reproducer and its own separately frozen experiment.
+```text
+=== 2. The frozen experiment, N=200 per arm, fault: tool_timeout on reserve
+  VERDICT: BLOCK (exit 1)   [A vs agent_b]
+  VERDICT: PASS (exit 0)   [A vs agent_a]
 
-![Aligned traces of agents A and B: both call get_stock, both hit the injected tool_timeout on reserve; A reserves again and passes, B gives up without a reservation and fails. The failing condition shrinks from three injected faults to one, 1-minimal, and replays offline: REPRODUCED.](docs/images/trace-lanes.png)
+=== 3. Where do a passing and a failing run part ways?
+  left: tool_start tool="reserve" arguments={"order_id":"order-7","quantity":2,"sku":"widget"}
+  right: tool_start tool="confirm" arguments={"order_id":"order-7","sku":"widget"}
+  after_injection: tool_timeout
+
+=== 4. Shrink the failing condition (3 injected faults)
+  kept: tool_timeout
+  removed: empty_result, tool_error_once
+  minimality: 1-minimal
+
+=== 5. Replay the reduced bundle offline
+  REPRODUCED: failure reproduced
+```
+
+Copied from the unedited, committed log
+[hero-demo-2026-10-05.txt](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt), without
+the `ok` lines. Step 1 passes both agents on one clean run; step 6 passes the repaired agent C on
+the exact reproducer and on its own frozen experiment; the run ends `All six steps held`, exit 0.
+The experiment is also a frozen acceptance test ([test_hero.py](tests/acceptance/test_hero.py)).
 
 Agent B is not rigged with dice. It is agent A with the retry around `reserve` removed, a plausible
 refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
 failure rate comes from the environment. Reservations already exist with configured probability
 65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`), and in those
-the missing retry never matters. That is exactly why one run hides it. The three gate reports
-behind the headline numbers are committed in
-[docs/results/retry-demo-n200.md](docs/results/retry-demo-n200.md).
+the missing retry never matters. That is exactly why one run hides it.
+
+> **Review a retry-policy change before merging**
+>
+> In the recorded inventory-reservation fixture, the candidate loses its retry after a timeout. ARCI reports BLOCK, locates the trace divergence, reduces three injected faults to one, and reproduces the failure offline. The repaired candidate passes the reproducer and its own separately frozen experiment.
+>
+> Use the example’s manifest builder as the starting point for your agent. Define the oracle, fault conditions, margin and sample size before running. A small experiment may remain INCONCLUSIVE.
+
+Manifest builder: [examples/retry_agent/experiment.py](examples/retry_agent/experiment.py).
+Recorded run: [hero-demo-2026-10-05.txt](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt).
+
+## Verdicts and exit codes
 
 Every gating command ends in a verdict and an exit code. Nothing else decides.
 
@@ -76,145 +100,20 @@ An agent crash, timeout, blown budget or uncaught tool fault is a `FAIL`. A brok
 injector, grader or event sink is an `ERROR`, and it invalidates the experiment instead of quietly
 leaving the denominator. `arci replay` uses its own codes: 0 reproduced, 1 not reproduced, 3 invalid.
 
-## Why repetition and a threshold are not enough
-
-```text
-Normal CI            Agent A: PASS      Agent B: PASS          ship it
-arci (N=200 each)    Agent A: 192/200   Agent B: 132/200       VERDICT: BLOCK (exit 1)
-                     bounds on the difference [-0.405, -0.183] against a margin of -0.10
-                     first divergence: right after the injected tool_timeout on `reserve`
-                     1-minimal reproducer: 3 injected faults -> 1, replays offline: REPRODUCED
-                     repaired Agent C: passes the reproducer; 192/200 vs 192/200, PASS (exit 0)
-```
-
-ARCI freezes the experiment and decision rule before execution. Its planner shows when the
-selected design is likely to remain INCONCLUSIVE. When a supported experiment detects a
-regression, the trace comparison, fault reduction and replay tools help investigate the failure.
-
-## The evidence
-
-Four pieces: the demo above, a second offline demo, one real local model, and the gate measured
-against itself.
-
-### A confidence-gating regression, offline
-
-```bash
-.venv/bin/python examples/jev_triage_agent/hero_demo.py --n 50
-```
-
-A support-triage command agent asks a System One decision endpoint, then acts through MCP. Agent A
-applies the confidence-gating pattern: every autonomous action needs confidence 0.6, a refund needs
-0.85, and uncertainty or provider failure escalates to a human. B is the regression: it silently
-returns in those cases. C restores escalation.
-
-**The endpoint here is a seeded local fixture, not a vendor model.** No API key, no network. The
-fixture is a deterministic CI example; it says nothing about any decision model's accuracy or
-calibration.
-
-**Run live on 2026-10-03** against `https://api.typesafe.ai` with `jev-1.13.0` pinned: the same
-steps reproduce every verdict (A vs B at N=200: 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK;
-A vs A and A vs C PASS; the Node agent through the unchanged official SDK BLOCK; one minimised
-failure replays REPRODUCED), plus an exploratory clean run in which the model routed all 100
-decisions correctly at confidence 1.0. 902 recorded decisions for about USD 0.018 at list price.
-Sealed stores and write-ups: [docs/results/jev](docs/results/jev/README.md).
-
-Measured on 2026-09-22, about 20 s for all six steps on a 15-core laptop, N=50 per arm:
-
-- clean pair: A and B both PASS
-- A versus B under `decision_low_confidence`: 50/50 vs 0/50, bounds on the difference
-  [-1.000, -0.832], BLOCK (exit 1)
-- A versus A: 50/50 vs 50/50, bounds [-0.084, 0.084], PASS (exit 0)
-- the minimiser keeps `decision_low_confidence` and removes the benign `empty_result`
-  (1-minimal, 2 trials); the reduced bundle replays REPRODUCED with no provider running
-- A versus C: 50/50 vs 50/50, PASS (exit 0)
-
-### A real local model, one sentence of prompt
-
-Needs [Ollama](https://ollama.com) running with `ollama pull qwen3.5:4b-mlx`; then:
-
-```bash
-.venv/bin/python -m examples.ollama_mcp_agent.experiment --n 30 --workers 3 --out runs
-```
-
-Exploratory evidence from one machine (Apple M5 Pro, 24 GB), one small local model
-(`qwen3.5:4b-mlx` through Ollama, temperature 0.7, loopback only, zero API cost), one task. The two
-arms differ by ONE sentence of the system prompt: A says "Retry a failed tool call up to three times
-before giving up"; B says "Never call a tool twice; if a tool fails, carry on with the next step."
-
-| Run | N per arm | A | B | Verdict | What happened |
-|---|---:|---:|---:|---|---|
-| 1 | 30 | 17/30 | 15/30 | INCONCLUSIVE, and meaningless | All 28 failures shared one fingerprint that was not the injected fault: the toolset bridge advertised tools with no parameters. A harness bug, found from the clusters and the trace in minutes. Fixed. |
-| 2 | 30 | 29/30 | 23/30 | INCONCLUSIVE | A 20-point gap, visible by eye, bounds [-0.45, +0.11]. Small N on a real agent. |
-| 3 | 400 | 172/182 | 143/183 | ERROR (invalid) | The model server died at pair 182 of 400, so 435 trials "crashed"; a shutdown race made one trial an ERROR, which invalidated the run. Both led to fixes. Counts are over trials where the agent actually ran. |
-| 4 | 400 | 376/400 (94.0%) | 308/400 (77.0%) | **INCONCLUSIVE** | Clean run. 68 of B's 92 failures on the `reserve:timeout` fingerprint; B calls `reserve` 0.56 times per trial against A's 0.82. Bounds [-0.2445, -0.0921]; BLOCK needs the upper bound below -0.10. It missed by 0.008. |
-
-Read honestly: a one-sentence prompt edit that survives a manual try cost about twenty points of
-reliability under a single transient tool fault, and under the pre-registered rule even N=400 did
-not confirm it. We report that and we do not re-run until it blocks. For scale only (not the gate,
-not pre-registered), an ordinary Wald 95% interval on the same data is [-0.217, -0.123]. Re-analysed
-under the later `newcombe` method the same counts give [-0.2178, -0.1225], which is BLOCK; the
-sealed verdict of run 4 stays INCONCLUSIVE, because its manifest froze Clopper-Pearson before the
-run. Twice the experiment was wrong rather than the agent, and both times the tool now says so by
-itself. Run 3 is also why a command agent can exit with `infra_exit_codes` (75 by default) to say
-"my infrastructure failed, not me": that trial becomes ERROR and invalidates the experiment instead
-of counting against the agent. Full write-ups in [docs/results](docs/results/).
-
-### The gate, measured against itself
-
-`just selfcheck` (or `.venv/bin/python bench/selfcheck.py`) computes the gate's own operating
-characteristics by exact enumeration (`alpha` 0.05, `delta` 0.10, one condition). Probabilities of
-PASS / BLOCK / INCONCLUSIVE:
-
-| baseline -> candidate | N=20 | N=100 | N=200 | N=400 |
-|---|---|---|---|---|
-| 0.95 -> 0.95 | .000 / .000 / 1.000 | .443 / .000 / .557 | .889 / .000 / .111 | .999 / .000 / .001 |
-| 0.95 -> 0.85 (the margin) | .000 / .000 / 1.000 | .001 / .000 / .999 | .001 / .000 / .999 | .001 / .001 / .999 |
-| 0.95 -> 0.75 | .000 / .000 / 1.000 | .000 / .093 / .907 | .000 / .365 / .635 | .000 / .828 / .172 |
-| 0.95 -> 0.65 | .000 / .008 / .992 | .000 / .685 / .315 | .000 / .985 / .015 | .000 / 1.000 / .000 |
-| 0.80 -> 0.80 | .003 / .000 / .997 | .059 / .000 / .941 | .218 / .000 / .782 | .615 / .000 / .385 |
-
-![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](docs/images/calibration.png)
-
-- False PASS at the margin and false BLOCK under no change are both far below `alpha`: worst
-  directional errors over the boundary sweep are 0.004 false-PASS and 0.001 false-BLOCK. The price
-  is conservatism: two equal agents at 80% reach PASS only 21.8% of the time at N=200.
-- **Twenty runs decide almost nothing.** At N=20 a 95% -> 65% collapse is still INCONCLUSIVE 99.2%
-  of the time. Zero failures in 20 trials still allows a 13.9% failure rate (one-sided 95%);
-  showing a rate below 0.5% needs at least 598 clean trials.
-- If that is too slow, `interval_method: newcombe` (v0.3) keeps the same alpha with about twice the
-  power: two equal 80% agents reach PASS .706 instead of .218 at N=200, and the real 0.94 -> 0.77
-  run at N=400 blocks with probability .829 instead of .372. It is calibrated by exact enumeration
-  rather than proved (worst false-PASS 0.031 at N=20, 0.026 at N >= 200; worst false-BLOCK 0.027),
-  and must be frozen before the run like everything else.
-- Real agents make every trial expensive, so `looks: [50, 100, 200]` (v0.4) lets a run stop at a
-  pre-registered look. A 0.95 -> 0.65 regression then costs 302 expected trials with
-  Clopper-Pearson and 159 with Newcombe, against 400 for the fixed design; alpha is split equally
-  across looks, and the gate refuses a store that ran on past a decisive look.
-
 ## How it works
 
-![Sealed manifest, then runner plus recorder, then a pure gate with exit codes PASS 0, BLOCK 1, INCONCLUSIVE 2, ERROR 3; sealed trial records feed diff, minimize, bundle and replay. Only boundary calls are observed; not a sandbox.](docs/images/how-it-works.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/where-dark.svg">
+  <img src="docs/assets/where-light.svg" alt="Where arci sits. Before the run, a frozen manifest declares the baseline and candidate, oracle, faults, seeds, N and the decision rule. In CI, the recorded trials (seeded trials per arm, injected tool faults, sealed boundary records) feed the arci gate, which computes exact Clopper-Pearson bounds on the difference against a frozen margin and returns PASS, BLOCK, INCONCLUSIVE or ERROR with exit 0, 1, 2 or 3; merge on PASS, while BLOCK and ERROR fail the job and INCONCLUSIVE fails by default. A separate branch reads the same records for any verdict: trace comparison (the first divergent step between a passing and a failing trial), fault reduction (ddmin over injected faults, same failure fingerprint) and offline replay of the recorded boundary calls, not fresh model inference.">
+</picture>
 
-```text
-manifest (sealed, frozen before the run)
-  task + toolset + independent oracle + contract
-  baseline agent, candidate agent
-  K fault conditions, alpha, delta, n_per_arm, seeds
-        |
-        v
-runner: per trial, a Python worker OR a command agent + MCP boundary + server; a separate
-  grader process; everything killed as process groups at the deadline
-  ToolBox = the tool boundary: budgets, seeded fault injection, record / replay
-  every event streams to ONE parent writer -> events.jsonl, trials.jsonl (sealed envelopes)
-        |
-        v
-gate: pure function (manifest, trials) -> sealed decision, exit code 0 / 1 / 2 / 3
-        |
-        +--> diff       first divergence between a passing and a failing trial
-        +--> minimize   ddmin over the injected faults, same failure fingerprint required
-        +--> bundle     portable reproducer: spec + recording + embedded code + hashes
-        +--> replay     REPRODUCED / NOT_REPRODUCED / INVALID
-```
+In words: the manifest (task, toolset, oracle, contract, both arms, fault conditions, `alpha`,
+`delta`, `n_per_arm`, seeds) is sealed before the run. Each trial runs as a Python worker or a
+command agent behind an MCP boundary, with a separate grader process; the tool boundary applies
+budgets and seeded faults and records every call into sealed `trials.jsonl`. The gate is a pure
+function of manifest and trials. Diagnosis reads the same records, whatever the verdict: `diff`
+(first divergence), `minimize` (ddmin over injected faults, same failure fingerprint), `bundle`
+and `replay` (re-serves recorded boundary calls: REPRODUCED, NOT_REPRODUCED or INVALID).
 
 A Python agent is a plain function, `agent(task, tools, rng) -> dict`. It calls `tools.call("name", ...)`
 and may annotate its reasoning with `tools.note_model_step(...)`. Success is decided by an oracle
@@ -231,7 +130,7 @@ listed in `prior_runs` and printed in the decision and the Markdown report; `arc
 discover them or enforce a cross-run error budget for you. Wilson intervals are shown for
 readability and never decide.
 
-**Command agents (v0.2).** An agent does not have to be a Python function: it can be any program
+**Command agents.** An agent does not have to be a Python function: it can be any program
 that speaks MCP over stdio. `arci` owns the one MCP server behind it, so every tool call is
 recorded, budgeted, fault-injected and replayable from outside the agent's process.
 
@@ -243,40 +142,90 @@ your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (th
 
 [docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) has the recipe and the local-model worked example.
 
-**Decision calls (v0.5, v0.6).** A command agent may call a System One decision endpoint
-(TypeSafe's Jev API). The same harness-owned boundary serves `POST /v1/systemone` on loopback,
-records each admitted request as a tool call named `decision:systemone`, and applies budgets,
-perturbations, diff, minimisation, bundles and exact replay to it. The agent is redirected with
-`TYPESAFE_BASE_URL` and a per-trial token while any real key stays in the harness; the official
-Python and JavaScript SDKs are exercised unchanged by the acceptance tests. `arci preflight` checks
-the key, the endpoint, the pinned model and one smoke decision before a live run; `run` paces
-trial starts for HTTP upstreams; `report` shows recorded decisions, tokens and an estimated cost.
+**Decision calls.** A command agent may call a System One decision endpoint (TypeSafe's Jev
+API). The same boundary serves `POST /v1/systemone` on loopback, records each admitted request as
+a tool call named `decision:systemone`, and applies budgets, perturbations, diff, minimisation,
+bundles and exact replay to it. The agent is redirected with `TYPESAFE_BASE_URL` and a per-trial token
+while any real key stays in the harness; the official Python and JavaScript SDKs are exercised
+unchanged by the acceptance tests. `arci preflight` checks key, endpoint, pinned model and one
+smoke decision before a live run.
 
 ![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](docs/images/decision-boundary.png)
 
-**Run against Jev on 2026-10-03.** v0.5 and v0.6 were built from vendor and official SDK
-documentation dated 2026-09-22 and tested against seeded fixtures and fake upstreams shaped like
-that documentation. With a key, the pre-registered day one
-([docs/design/0004-day-one.md](docs/design/0004-day-one.md)) ran end to end against
-`https://api.typesafe.ai` with `jev-1.13.0` pinned: preflight, the clean pair, the N=50 trio, the
-Node agent through the unchanged official SDK, the N=200 design, and a minimised, replayed failure.
-Every verdict re-derives from the committed stores ([docs/results/jev](docs/results/jev/README.md)).
-Four things did not survive contact with the real service and are fixed in this release: the
-account's model list carries only aliases, so a pinned versioned id needs
-`arci preflight --allow-unlisted-model` (the smoke response still has to report the pin); a smoke
-question needs `instructions`; a network whose only egress is an HTTP CONNECT proxy needs
-`ARCI_HTTPS_PROXY`; and running the example manifests through the `arci` console script needs the
-repository root on `PYTHONPATH`. Prices and provider limits are still as documented, not measured,
-and the gateway route is still untested. See [docs/DECISIONS.md](docs/DECISIONS.md).
+**Run against Jev on 2026-10-03.** Built from documentation dated 2026-09-22, the boundary ran the
+pre-registered [day one](docs/design/0004-day-one.md) live. Four things did not survive contact
+and are fixed: alias-only model lists (`arci preflight --allow-unlisted-model`), smoke questions
+needing `instructions`, CONNECT-only egress (`ARCI_HTTPS_PROXY`), and the console script needing
+the repository root on `PYTHONPATH`. Prices and provider limits are still as documented, not
+measured, and the gateway route is still untested. See [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Where it has been run
+
+All runs are the maintainer's own; no external users yet. Failed and invalid attempts stay in
+the linked records.
+
+- **Seeded retry demo** (2026-09-23): the result above; A against itself and the repaired C both
+  PASS ([retry-demo-n200.md](docs/results/retry-demo-n200.md)).
+- **Support-triage agent, live Jev endpoint** (2026-10-03, `jev-1.13.0` pinned, Python and Node
+  SDKs unchanged; planted regression, the harness caps confidence and B stops escalating): A vs B
+  at N=200, 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK; one minimised failure replays
+  REPRODUCED; 902 recorded decisions ([docs/results/jev](docs/results/jev/README.md)). Offline
+  against a seeded fixture: `.venv/bin/python examples/jev_triage_agent/hero_demo.py --n 50`.
+- **The tool-call guard of the maintainer's other project, frontier-scout** (2026-10-05,
+  `hook_runtime.py` verbatim at `58b0b17`, run through the harness boundary, not inside a
+  coding-agent session; outages injected): fail-closed against fail-open under
+  `decision_unavailable` at N=200, 200/200 vs 130/200, bounds [-0.4304, -0.2537], BLOCK; diffed,
+  minimised (`reduced`) and replayed REPRODUCED ([docs/results/guardrail](docs/results/guardrail/README.md)).
+- **A local model, one sentence of prompt** (`qwen3.5:4b-mlx` through Ollama, one machine,
+  exploratory): N=400, 376/400 vs 308/400, bounds [-0.2445, -0.0921], INCONCLUSIVE; BLOCK needed
+  the upper bound below -0.10 and missed by 0.008. Not re-run until it blocks
+  ([docs/results](docs/results/README.md)).
+
+**What went wrong and was kept.**
+
+- Ollama run 1: a harness bug (tools advertised with no parameters), found from the failure
+  clusters ([ollama-run1-n30-bridge-bug.md](docs/results/ollama-run1-n30-bridge-bug.md)). Run 3:
+  the model server died and one ERROR trial invalidated the run
+  ([ollama-run3-n400-invalid.md](docs/results/ollama-run3-n400-invalid.md)); hence
+  `infra_exit_codes` (75 by default), which turns an agent's own infrastructure failure into ERROR.
+- Jev attempt 1: every trial crashed on an import error, so equally broken arms "passed"; the
+  invalid stores are kept in [attempt-1-invalid](docs/results/jev/2026-10-03/attempt-1-invalid/).
+- Guardrail at N=50: 50/50 vs 38/50, bounds [-0.4016, -0.0348], INCONCLUSIVE against the
+  pre-registered BLOCK, reported as is ([docs/results/guardrail](docs/results/guardrail/README.md)).
 
 **Is the model's confidence something you can gate on?** A separate, pre-registered audit of
-`jev-1.13.0` on CLINC150 and Banking77 (26,140 requests, hash-chained records committed, every
-number re-derivable) answers that for intent routing: zero-shot accuracy 0.921 on CLINC150
-with ECE 0.024, 0.801 on Banking77 with ECE 0.084 and confidence over-stated in the middle of
-the range, 97% accuracy on the 83% of CLINC150 traffic above confidence 0.9, out-of-scope AUROC
-0.977 when asked directly, 99.4% top-1 agreement on repeated requests. Write-up and limits:
-[docs/results/jev-calibration](docs/results/jev-calibration/README.md); protocol and code:
+`jev-1.13.0` on CLINC150 and Banking77 answers that for intent routing, not permission
+calibration: zero-shot accuracy 0.921 with ECE 0.024 on CLINC150, and 0.801 with ECE 0.084 on
+Banking77, where confidence is over-stated in the middle of the range. Write-up, full table and
+limits: [docs/results/jev-calibration](docs/results/jev-calibration/README.md); protocol and code:
 [bench/jev_calibration](bench/jev_calibration/PROTOCOL.md).
+
+## The gate, measured against itself
+
+`just selfcheck` (or `.venv/bin/python bench/selfcheck.py`) computes the gate's own operating
+characteristics by exact enumeration (`alpha` 0.05, `delta` 0.10, one condition). Probabilities of
+PASS / BLOCK / INCONCLUSIVE:
+
+| baseline -> candidate | N=20 | N=100 | N=200 | N=400 |
+|---|---|---|---|---|
+| 0.95 -> 0.95 | .000 / .000 / 1.000 | .443 / .000 / .557 | .889 / .000 / .111 | .999 / .000 / .001 |
+| 0.95 -> 0.85 (the margin) | .000 / .000 / 1.000 | .001 / .000 / .999 | .001 / .000 / .999 | .001 / .001 / .999 |
+| 0.95 -> 0.75 | .000 / .000 / 1.000 | .000 / .093 / .907 | .000 / .365 / .635 | .000 / .828 / .172 |
+| 0.95 -> 0.65 | .000 / .008 / .992 | .000 / .685 / .315 | .000 / .985 / .015 | .000 / 1.000 / .000 |
+| 0.80 -> 0.80 | .003 / .000 / .997 | .059 / .000 / .941 | .218 / .000 / .782 | .615 / .000 / .385 |
+
+![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](docs/images/calibration.png)
+
+- False PASS at the margin and false BLOCK under no change are both far below `alpha` (worst
+  0.004 and 0.001 over the boundary sweep). The price is conservatism: two equal agents at 80%
+  reach PASS only 21.8% of the time at N=200.
+- **Twenty runs decide almost nothing.** At N=20 a 95% -> 65% collapse is still INCONCLUSIVE 99.2%
+  of the time, and showing a failure rate below 0.5% needs at least 598 clean trials. A
+  twenty-point drop from 0.95 to 0.75 BLOCKs only 36.5% of the time at N=200.
+- `interval_method: newcombe` (about twice the power, calibrated by exact enumeration rather than
+  proved) and pre-registered `looks` must be frozen before the run; `arci plan` shows a design's
+  verdict probabilities before you spend trials. Details: [docs/STATISTICS.md](docs/STATISTICS.md),
+  [report section 3](docs/reports/ci-gate-2026-10-06/REPORT.md#3-operating-characteristics).
 
 ## Gate your own agent
 
@@ -321,6 +270,7 @@ replace `toolset` with `mcp_server` and the arms' `agent` with `command`, as
 [docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) shows.
 
 ```bash
+arci plan --help                                   # verdict probabilities of a design, before any trial
 arci preflight manifest.json                       # live decision upstreams: key, model, smoke call
 arci run manifest.json --out runs --workers 8      # run + gate; exit code is the verdict
 arci gate runs/<experiment> --junit junit.xml --markdown report.md
@@ -358,7 +308,8 @@ This assumes your agent's repository is checked out and installed, and that you 
 you have verified. The report lands in the job summary (a start-up failure shows only in the step's
 stderr). `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it unless you set
 `allow-inconclusive: "true"`. The `verdict` output (`PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR`) is
-there for steps that run after the gate.
+there for steps that run after the gate. This repository's own CI runs the test suite and
+re-derives the archived decisions; it does not run the Action itself.
 
 ## What it does not do
 
@@ -390,16 +341,14 @@ there for steps that run after the gate.
   transport, no concurrent decisions.
 - No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only; Windows is untested.
 
+**Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
+
 ## Roadmap
 
-Most valuable first: per-request pacing through parent IPC instead of the divide-by-k trial-start
-approximation; counterfactual replay of recorded decisions, if it can be done without overstating
-what a re-perturbed recording proves; extend the published intent-routing calibration audit to
-labelled coding-agent permission decisions, with a separate protocol and explicit limits; a
-System One emulator over a local model; streamable HTTP transport and several MCP servers per
-trial; importers built only from authentic versioned fixtures; cohort localisation across all
-passing and failing trials; task-clustered aggregation; then a SQLite index, resumable runs, an
-HTML report and a larger perturbation library. Full list in [docs/ROADMAP.md](docs/ROADMAP.md).
+Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
+decisions, if it can be done without overstating what a re-perturbed recording proves; extending
+the intent-routing calibration audit to labelled coding-agent permission decisions, with a
+separate protocol and explicit limits. Full list in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Development
 
@@ -415,6 +364,7 @@ just frozen       # the frozen contract files are unchanged
 just selfcheck    # the calibration table above
 just demo
 npm ci --prefix examples/jev_triage_agent   # only for the Node agent and its test (Node 20+)
+python docs/assets/src/make_figures.py --check   # the README figures match their generator
 ```
 
 The acceptance suite is hash-pinned in `FROZEN.sha256`. CI checks formatting, lint, strict typing
