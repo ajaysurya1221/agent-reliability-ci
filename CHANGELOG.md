@@ -37,8 +37,15 @@
   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
   committed guardrail decision byte for byte with `arci gate`.
+- **Documentation:** the README opens with links to the offline demo (now the
+  "Try the offline demo" section), the evidence report and the limits; an availability note
+  separates `main` (planner, portability fixes) from the `v0.7.0` Action; unsupported comparison
+  and reviewer-count wording removed; the calibration roadmap item now extends the published
+  intent-routing audit. `CITATION.cff` gives the release date as 2026-10-05 and pins the report
+  URL to the `evidence-2026-10-06` tag. Added `SECURITY.md` (private reporting through GitHub
+  security advisories, the trusted-code assumption, no private stores or credentials in reports).
 
-## v0.7.0 (2026-10-03)
+## v0.7.0 (2026-10-05)
 
 - **Calibration audit of the decision model (2026-10-03):** `bench/jev_calibration/` is a
   pre-registered audit of `jev-1.13.0` on CLINC150 (4,500 in-scope + 1,000 out-of-scope) and

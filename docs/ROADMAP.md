@@ -21,8 +21,10 @@ and a real Jev upstream. See docs/DECISIONS.md and docs/design/0003-decision-bou
 
 Day-one readiness: gateway path prefixes, tolerant vendor-shaped responses, preflight receipts,
 parent-paced live runs, token/cost reporting, raw upstream snapshots, a pinned JavaScript SDK agent,
-and release/write-up guidance. These behaviors are fixture-tested and derived from documentation;
-they have not been run against Jev without a key.
+and release/write-up guidance. These behaviours were initially fixture-tested from vendor
+documentation. The pre-registered workflow ran against the direct Jev endpoint on 2026-10-03; see
+[the committed results](results/jev/README.md). The gateway route, provider rate limits under
+load and billed spend remain unverified.
 
 ## Next, most valuable first
 
@@ -33,8 +35,8 @@ they have not been run against Jev without a key.
    approximation for agents that make several decisions per trial.
 3. **Counterfactual replay of recorded decisions**, if agent-path dependence can be represented
    without overstating what a re-perturbed recording proves.
-4. **Independent calibration audit of decision models on exact intervals**, which needs labelled
-   real outputs and a key.
+4. **Extend the published intent-routing calibration audit** to labelled coding-agent permission
+   decisions, with a separate protocol and explicit limits.
 5. **System One emulator over a local model via `system-one-adapter`**.
 6. **Streamable HTTP transport** and several MCP servers per trial.
 7. **Importers**, split into analysis-only and replay-capable, built only from authentic versioned
