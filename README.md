@@ -349,6 +349,18 @@ re-derives the archived decisions; it does not run the Action itself.
 
 **Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
 
+**Independence.** ARCI's job is preregistered stochastic regression testing: the manifest fixes the
+task, fault conditions, sample size and decision rule before any trial, and the gate reports relative
+non-inferiority against the baseline under those conditions, never absolute reliability or a general
+quality score. It is one of the maintainer's independent projects alongside the earlier
+[evalopt-graph](https://github.com/ajaysurya1221/evalopt-graph) experiment, whose standalone feature
+development has ended. ARCI does not depend on, import or share a runtime layer with evalopt or with
+the maintainer's other projects; the only evalopt-derived code is the canonical JSON hashing helpers in
+`src/arci/hashing.py` and the self-sealing decision pattern in `src/arci/schema.py`, adapted under MIT
+with attribution in [NOTICE](NOTICE), as adaptation inside the frozen manifest and not as a dependency.
+ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing here
+claims adoption, performance or superiority.
+
 ## Roadmap
 
 Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
