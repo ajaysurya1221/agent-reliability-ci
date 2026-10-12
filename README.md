@@ -349,17 +349,22 @@ re-derives the archived decisions; it does not run the Action itself.
 
 **Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
 
-**Independence.** ARCI's job is preregistered stochastic regression testing: the manifest fixes the
-task, fault conditions, sample size and decision rule before any trial, and the gate reports relative
-non-inferiority against the baseline under those conditions, never absolute reliability or a general
-quality score. It is one of the maintainer's independent projects alongside the earlier
+**Independence.** ARCI's job is preregistered stochastic regression testing. The manifest is a
+prospective contract supplied by its author: it fixes the task, fault conditions, sample size and
+decision rule before the trials run, and a rule changed after the fact is detected, not merely
+forbidden. It does not independently authenticate when the manifest was written or that every earlier
+run was disclosed; that discipline stays with the author. A `PASS` reports relative non-inferiority
+against the baseline within the registered margin under those conditions, never absolute reliability
+or a general quality score; `BLOCK`, `INCONCLUSIVE` and `ERROR` are defined above. ARCI is one of the
+maintainer's independent projects alongside the earlier
 [evalopt-graph](https://github.com/ajaysurya1221/evalopt-graph) experiment, whose standalone feature
-development has ended. ARCI does not depend on, import or share a runtime layer with evalopt or with
-the maintainer's other projects; the only evalopt-derived code is the canonical JSON hashing helpers in
-`src/arci/hashing.py` and the self-sealing decision pattern in `src/arci/schema.py`, adapted under MIT
-with attribution in [NOTICE](NOTICE), as adaptation inside the frozen manifest and not as a dependency.
-ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing here
-claims adoption, performance or superiority.
+development has ended. ARCI declares no package or runtime dependency on evalopt and imports nothing
+from it, and it shares no runtime layer with the maintainer's sibling projects Actseal, Dorian and
+Frontier Scout. [NOTICE](NOTICE) records two adaptations from evalopt under MIT with attribution: the
+canonical JSON hashing helpers in `src/arci/hashing.py` and the self-sealing decision pattern in
+`src/arci/schema.py`, both attributed source adaptation inside the frozen manifest, not a dependency.
+ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing
+here claims adoption, performance or superiority.
 
 ## Roadmap
 
