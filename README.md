@@ -3,14 +3,16 @@
 **Did removing a retry break your agent?**
 
 One clean run passes both versions. A transient tool timeout exposes the difference.
-ARCI freezes a repeated experiment, gates the change and exports a replayable failure.
+ARCI (agent-reliability-ci) freezes a repeated experiment, gates the change and exports a
+replayable failure.
 
 **Recorded fixture: 200 trials per arm; timeout on `reserve`.**
 Baseline: **192/200**. Retry removed: **132/200**. Verdict: **BLOCK (exit 1)**.
 [Recorded results](docs/results/retry-demo-n200.md) · [Trace, reduction and replay](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt)
 
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
-**Availability:** main adds planner and portability fixes beyond v0.7.0; no PyPI package.
+**Availability:** main adds the planner (`arci plan`), opt-in pass^k reporting
+(`arci report --pass-k`) and portability fixes beyond v0.7.0; no PyPI package.
 
 **Evidence:** [18 archived decisions re-derived](docs/reports/ci-gate-2026-10-06/REPORT.md) · [Frozen contracts](FROZEN.sha256)
 [Design records](docs/design/) · [CI and macOS statistics checks](.github/workflows/ci.yml)
@@ -41,9 +43,10 @@ cd agent-reliability-ci
 uv sync && .venv/bin/python examples/retry_agent/hero_demo.py
 ```
 
-`just demo` runs the same script. It takes six steps through the real CLI and the Python API,
-each trial in a fresh process with a separate grader process. Runtime depends on the machine and
-current load. Lines from one run:
+`just demo` runs the same script (the `just` recipes need `just` and zsh; the `.venv/bin/...`
+commands need neither). It takes six steps through the real CLI and the Python API, each trial in a
+fresh process with a separate grader process. Runtime depends on the machine and current load. Lines
+from one run:
 
 ```text
 === 2. The frozen experiment, N=200 per arm, fault: tool_timeout on reserve
@@ -73,8 +76,10 @@ The experiment is also a frozen acceptance test ([test_hero.py](tests/acceptance
 Agent B is not rigged with dice. It is agent A with the retry around `reserve` removed, a plausible
 refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
 failure rate comes from the environment. Reservations already exist with configured probability
-65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`), and in those
-the missing retry never matters. That is exactly why one run hides it.
+65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`; shares set in
+[world.py](examples/retry_agent/world.py), counts asserted in
+[test_retry_example.py](tests/unit/examples/test_retry_example.py)), and in those the missing retry
+never matters. That is exactly why one run hides it.
 
 > **Review a retry-policy change before merging**
 >
@@ -289,8 +294,9 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v0.7.0`, the released feature set. The planner (`arci plan`) and the later
-portability fixes are not in that tag; see the Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in pass^k
+reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; see the
+Unreleased section of [CHANGELOG.md](CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
@@ -352,8 +358,8 @@ separate protocol and explicit limits. Full list in [docs/ROADMAP.md](docs/ROADM
 
 ## Development
 
-**How it was built.** One maintainer, September 2026, with Claude Code and Codex as
-pair-programmers (recorded in the commit trailers). The experiment design, the decision rule and
+**How it was built.** One maintainer, September to October 2026, with Claude Code and Codex as
+pair-programmers (recorded in the commit messages). The experiment design, the decision rule and
 its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
 demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
 
