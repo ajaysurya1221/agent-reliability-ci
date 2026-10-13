@@ -9,4 +9,4 @@ Budget clock start (Task 00 commit): 2026-10-13T18:12:20Z. Stop starting tasks a
 | 20 | DONE (design accepted) | Astra: REVISE, REVISE, ACCEPT (three rounds) | plan/exec/run2/adr-0010-draft.md v3, fixtures.md | D2 design done; D3 (importer + fixtures + re-freeze) not in this run |
 | 16 | REVIEWS PENDING | Fable + reviewer + Astra | sprint/t16-code (pushed) | coder 28 min: full suite 1225 passed; actionlint/shellcheck clean; deviations: CI summary check via a stub run of the Action's gate script; four tests' stderr expectations updated; frames via sys.__stdout__ |
 | 17 | REVIEWS PENDING | Fable + reviewer | sprint/t17-protocol (pushed) | coder: 62 tests; --legacy-sentence reproduces the committed receipts; persisted result JSON kept at plan/exec/run2/data/ |
-| 18 | CODING | Fable + reviewer + Astra | sprint/t18-refmachines (wt-t18) | dispatched 18:27Z |
+| 18 | REVIEWS PENDING; workflow running live | Fable + reviewer + Astra | sprint/t18-refmachines cd44d22 (pushed 18:49Z; trigger narrowed to sprint/t18-** by the orchestrator) | coder 6 min: actionlint/shellcheck clean, dry-run test executes the workflow's run bodies; ttfv-reference run started on push |
