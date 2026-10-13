@@ -1,0 +1,33 @@
+{
+ "reader": "AI agent (Claude Opus 5.5, high; general-purpose subagent with Read only on README.md at main 6f52431); labelled AI-agent read, NOT a cold reader (protocol 1.4)",
+ "readme_commit": "6f52431",
+ "date": "2026-10-13T07:08Z",
+ "answers": {
+  "q1_what_is_it": "ARCI (agent-reliability-ci) is a regression gate that tells you whether a change made your AI agent less reliable. It runs a baseline and a candidate version of the agent many times on the same predeclared tasks, with the same injected tool faults. An independent oracle grades each run, and ARCI returns a verdict (PASS, BLOCK, INCONCLUSIVE or ERROR) with an exit code. It can also diff, minimise and replay a recorded failure offline.",
+  "q2_who_for": "It is for developers who change an agent and want a statistical CI check before merging. The README names no specific audience beyond \"your agent\". The agent must reach its environment only through ARCI's tool boundary. There are two ways to do that. A Python agent is a plain function `agent(task, tools, rng) -> dict` that calls `tools.call(...)`, alongside a toolset `(task, seed) -> object with .tools and .snapshot()` and an oracle `(task, final_state) -> bool`. A command agent is any program that speaks MCP over stdio, with its tools served through ARCI's MCP boundary.",
+  "q3_pass_means": "PASS (exit 0) means only one thing. For this specific predeclared experiment, the evidence supports that any drop in reliability from baseline to candidate is smaller than the allowed margin (delta). In the statistics, the lower bound on the success-rate difference is above -delta. It is a claim of relative non-inferiority, not of absolute reliability or general quality.",
+  "q4_does_not_do": "It is not a sandbox or a security boundary: it assumes agent code is buggy but not hostile, and a hostile agent could forge or bypass its record. It also replays the tool boundary, not the model: a live model will not repeat itself, so replaying its bundle is usually INVALID. Two more: it cannot see files, network calls or subprocesses the agent touches directly, and declaring a fault does not guarantee the fault was actually injected.",
+  "q5_first_three_commands": "1) `uv tool install agent-reliability-ci`\n2) `arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed` (replace the references with your own modules and functions)\n3) `arci run arci.yaml`\nThe README then suggests `arci plan`, because the 8-trial smoke scaffold will likely come out INCONCLUSIVE.",
+  "interpretation_block": "In the frozen experiment (200 trials per arm, timeout injected on `reserve`), the candidate B (agent A with its retry around `reserve` removed) succeeded 132/200 times against baseline A's 192/200. The bounds on the difference were -0.405 to -0.183, entirely below the -0.10 margin. So B is reliably worse than A by more than the allowed drop, and the run gives exit code 1, which fails the CI job. It means a regression was detected; it does not explain the cause. That comes from the separate diff, minimise and replay steps.",
+  "read_whole_readme": true,
+  "time_reading_seconds_estimate": 420
+ },
+ "scores": {
+  "q1_what_is_it": true,
+  "q2_who_for": true,
+  "q3_pass_means": true,
+  "q4_does_not_do": true,
+  "q5_first_three_commands": true,
+  "interpretation_block": true
+ },
+ "all_correct": true,
+ "scorer": "Fable (orchestrator), key: docs/measurement/ttfv-protocol.md section 5",
+ "scoring_notes": {
+  "q1": "a: baseline vs candidate; b: many runs, same predeclared tasks and injected faults; c: PASS/BLOCK/INCONCLUSIVE/ERROR with exit code",
+  "q2": "a: developers changing an agent, CI check before merging; b: agent(task, tools, rng) function or MCP-over-stdio command",
+  "q3": "relative; lower bound above -delta; this predeclared experiment only; not absolute reliability",
+  "q4": "not a sandbox; replays the boundary not the model (both in the first-screen boundary sentence and 'What it does not do')",
+  "q5": "uv tool install; arci init with the four flags; arci run arci.yaml, in order",
+  "interpretation": "worse than baseline by more than the allowed drop (bounds below -0.10); under these conditions on this experiment; cause not explained by the verdict"
+ }
+}

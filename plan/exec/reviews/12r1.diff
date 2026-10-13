@@ -1,0 +1,440 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 25147f8..9dd5124 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,42 +2,111 @@
+ 
+ ## Unreleased
+ 
+-- **Documentation:** the README opens with the recorded retry result (200 trials per arm,
+-  192/200 vs 132/200, BLOCK), its boundary and availability, links to the evidence, and the
+-  offline demo with lines from the committed demo log; a "Where it has been run" summary links
+-  every campaign's records, including the guardrail run and the invalid and inconclusive
+-  attempts; repeated presentations of the retry result are removed. The hero PNG is replaced by
++(nothing yet)
++
++## v0.8.0 (2026-10-13)
++
++The onboarding release: install from PyPI, run the recorded retry story with one `uvx` command, scaffold
++a first experiment from four references, and read the whole point on one screen. No change to the
++decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
++
++- **Added:** the PyPI package `agent-reliability-ci` and `.github/workflows/release.yml`: a version
++  tag builds the wheel and sdist once, smoke-tests that wheel on Ubuntu and macOS (Python 3.11 and
++  3.14) from an empty directory, and publishes the same files through PyPI trusted publishing with
++  attestations. The guard refuses a tag that is not `v` + the package version. `docs/RELEASING.md`
++  has the steps; `docs/design/0005-v0.8.0-packaging-and-version-bump.md` records the frozen-file
++  changes (version, project URLs, classifiers, keywords, an sdist restricted by `only-include` to
++  the package, README, LICENSE, NOTICE, CHANGELOG and pyproject, plus hatchling's own `PKG-INFO`
++  and `.gitignore`).
++- **Added:** `arci demo` (and `python -m arci`): the six-step retry story from an installed wheel with
++  no checkout, through the real `run`, `diff`, `minimize` and `replay`. The seeded world and agents
++  now live in `arci.demo` (`examples/retry_agent/{world,agents}.py` re-export them); the demo's
++  manifests use `arci.demo` references and an `arci-demo-` experiment id, so their seals differ from
++  the recorded run while the seeds, counts (192/200 vs 132/200) and verdicts are the same, and the
++  demo says whether its counts matched. Run stores go to a temporary directory unless `--keep DIR`.
++- **Added:** the `arci.yaml` descriptor (`src/arci/descriptor.py`, `docs/DESCRIPTOR.md`,
++  `docs/design/0007-descriptor.md`): a thin, `extra="forbid"` front-end whose keys are the `Manifest`'s
++  fields with the same defaults, compiled and sealed with `Manifest.create` exactly as the Python
++  builders do. `arci run` accepts a `.yaml`/`.yml` descriptor or a sealed `.json` manifest, and its
++  `--out` now defaults to `runs`. `arci schema` prints the JSON Schema generated from the model;
++  the bytes are committed at `docs/schema/arci.schema.json` and tested for staleness. Pydantic is
++  authoritative; the YAML loader resolves only `true`/`false` as booleans and decimal, `0x`, `0o`,
++  `0b` as integers, so `yes` and `on` stay strings and `010` is ten, not octal eight; explicit
++  `!!int`, `!!float` and `!!null` tags accept only those same forms, and alias expansion is capped.
++- **Added:** `arci init EXPERIMENT_ID --baseline --candidate --toolset --oracle [...]`
++  (`docs/design/0008-arci-init.md`): validates the four references in a child process with the
++  runner's import rule (the toolset factory is called once; agents and the oracle are only imported),
++  checks every `--fault` tool against the toolset's tools, and writes a smoke-design descriptor
++  (`n_per_arm` 8, the smallest N at which a total collapse can still BLOCK under the default rule;
++  two perfect arms cannot PASS below N=42). One line on stderr and exit 3 on the first problem. The
++  file is published atomically (a hard link, or a rename with `--force`); without `--force` an
++  existing file is never replaced.
++- **Added:** a smoke-design notice on stderr from `arci run` when a gating condition has fewer than
++  100 trials per arm, pointing at `arci plan`. stdout, reports, decisions and stores are unchanged.
++- **Changed:** the runner appends the current directory to the import path of every child it starts
++  (worker, grader, boundary, command agent, MCP server;
++  `docs/design/0006-cwd-on-the-child-import-path.md`), so references into the project directory
++  resolve under the `arci` console script as they already did under `python -m arci.cli`. Appended,
++  never prepended; an MCP server whose `env` sets `PYTHONPATH` keeps that configured value, as
++  before; records are unaffected.
++- **Added:** CI jobs that build the wheel and run `arci demo` from an empty directory on Ubuntu and
++  macOS, a Windows job that only installs the wheel and runs `arci --help` (execution stays
++  unsupported on Windows), and an Action fixture (`examples/action_fixture/`) that runs the composite
++  Action on the demo's A-vs-B manifest and asserts `BLOCK`. CI also runs on `sprint/**` branches.
++- **Added:** `docs/measurement/`: the time-to-first-verdict and cold-read protocol, a receipt
++  template and a receipts directory; maintainer measurements are labelled and never counted as
++  cold readers.
++- **Documentation:** the README opens with the question, one sentence, the two commands, the pipeline
++  line, what PASS means, what a small run means and the boundary (`docs/design/0009-readme-first-screen.md`);
++  the recorded result, the figure and the badges moved below the fold; "What it does not do" gains two
++  items (reference validation imports your code; a fault naming a tool the agent never calls silently
++  never fires). Links from the old first screen are absolute so the PyPI page renders them.
++- **Documentation:** two recipes, each a runnable tree under `examples/recipes/` with a narrative in
++  `docs/recipes/` and a test that runs it at smoke N from a copied directory without `PYTHONPATH`:
++  `python_agent` (a blank project with `app/v1.py`, `app/v2.py` and `tests/world.py`; `arci init`,
++  the smoke run, `arci plan`, the confirmatory run, then `diff`, `minimize` and `replay`, with the
++  recorded output) and `mcp_agent` (a stdlib newline-JSON-RPC client against
++  `arci.mcp_toolset_server`, a hand-written command-arm descriptor and an Inspector preflight). The
++  Inspector step is recorded as blocked on 2026-10-13: Inspector 2.10.1 (TypeScript SDK 1.29.0)
++  rejects the bridge's protocol revision `2026-07-28` at `initialize`; the recipe keeps the verbatim
++  result and the ARCI steps run without it.
++- Everything that was already on `main` and unreleased is in this version:
++  - **Documentation:** the README presents the recorded retry result once (200 trials per arm,
++  192/200 vs 132/200, BLOCK) with its boundary, links to the evidence, and the offline demo with
++  lines from the committed demo log (in this release these sections sit below the new first
++  screen); a "Where it has been run" summary links every campaign's records, including the
++  guardrail run and the invalid and inconclusive attempts. The hero PNG is replaced by
+   generated light and dark SVGs (`docs/assets/hero-*.svg`) and the how-it-works exposition by a
+   generated pipeline figure (`docs/assets/where-*.svg`), both written by
+   `docs/assets/src/make_figures.py` (stdlib only), whose `--check` mode runs in CI and in
+   `tests/unit/docs/test_figures.py`.
+-- **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
++  - **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
+   record, enumerated operating-characteristics metrics for both interval methods, the Linux
+   container re-derivation log for all 18 archived decisions, the offline replay probe log for
+   both committed failure bundles, and the two-stage Docker reproduction recipe) and
+   `CITATION.cff`.
+-- **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
++  - **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
+   value used by the existing Linux-produced records (CPython's C accelerator on arm64 macOS
+   differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
+   the archived Clopper-Pearson stores without changing any verdict. Regression tests re-derive
+   every committed `docs/results/jev` decision byte for byte.
+-- **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
++  - **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
+   integer arithmetic, including zero-success and all-success bounds. The existing 60-step
+   bisection, statistical method, confidence allocation, and gate rules are unchanged. Re-derived
+   six archived Jev decisions and five guardrail decisions from unchanged sealed manifests and
+   trials. Only CP bounds, their derived difference bounds, and decision seals changed; verdicts,
+   exit codes, counts, stopping histories, and rendered Markdown/JUnit reports are unchanged.
+   Byte-for-byte regeneration is checked on macOS and Ubuntu.
+-- **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
++  - **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
+   existing Clopper-Pearson gate for independent binomial arms, one gating condition, one
+   fixed-sample look and N <= 400 per arm, reporting assumptions and the smallest tested N meeting
+   a target or "target not reached"; probabilities are enumerated with exact integer arithmetic
+   and converted to floating point once, so the output is identical on every platform.
+-- **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
++  - **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
+   separately per arm and condition, with explicit IID assumptions and unavailability for n < k,
+   ERROR verdicts and multi-look designs; default report output, gate decisions and stored records
+   are unchanged.
+-- **Guardrail experiment:** published the pre-registered live run of
++  - **Guardrail experiment:** published the pre-registered live run of
+   `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
+   runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
+   and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
+@@ -46,12 +115,14 @@
+   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
+   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
+   committed guardrail decision byte for byte with `arci gate`.
+-- **Documentation:** the "Five minutes" section is renamed "Try the offline demo"; an availability
+-  note separates `main` (planner, portability fixes) from the `v0.7.0` Action; unsupported
+-  comparison and reviewer-count wording removed; the calibration roadmap item now extends the
+-  published intent-routing audit. `CITATION.cff` gives the release date as 2026-10-05 and pins the
+-  report URL to the `evidence-2026-10-06` tag. Added `SECURITY.md` (private reporting through GitHub
+-  security advisories, the trusted-code assumption, no private stores or credentials in reports).
++  - **Documentation:** the offline demo section was renamed "Try the offline demo" (this release's
++  README now points it at `arci demo`); the availability note that separated `main` from the
++  `v0.7.0` Action is replaced by this release's Availability line; unsupported comparison and
++  reviewer-count wording removed; the calibration roadmap item now extends the published
++  intent-routing audit. `CITATION.cff` pins the report URL to the `evidence-2026-10-06` tag (its
++  version and date are now 0.8.0 and 2026-10-13). Added `SECURITY.md` (private reporting through
++  GitHub security advisories, the trusted-code assumption, no private stores or credentials in
++  reports).
+ 
+ ## v0.7.0 (2026-10-05)
+ 
+diff --git a/CITATION.cff b/CITATION.cff
+index 52f6eec..c7dd5a9 100644
+--- a/CITATION.cff
++++ b/CITATION.cff
+@@ -7,8 +7,8 @@ authors:
+     given-names: Ajay Surya
+ repository-code: "https://github.com/ajaysurya1221/agent-reliability-ci"
+ license: Apache-2.0
+-version: "0.7.0"
+-date-released: "2026-10-05"
++version: "0.8.0"
++date-released: "2026-10-13"
+ keywords:
+   - ai-agents
+   - reliability
+diff --git a/FROZEN.sha256 b/FROZEN.sha256
+index 3904622..8c79182 100644
+--- a/FROZEN.sha256
++++ b/FROZEN.sha256
+@@ -5,9 +5,14 @@ d99e291089d2c8f70721ef745566b89ef164e9e6f0c593c510fcebf2dd86ee9c  docs/TRUST_MOD
+ 69e262ecb8be06ae83492252b8e1b67a7e32c4be45d011b0da32864cd54678a3  docs/design/0002-out-of-process-boundary.md
+ 46d9eb3fa62a6117444d34a30d479c101def6aa21d578ea6e2bfe0bba3c667e0  docs/design/0003-decision-boundary.md
+ 6762324f9401d5c4149ddfbb6fc04e37982ce918cf151b4e6fb94d0df606d7e2  docs/design/0004-day-one.md
++ee48b1bff246e3115069d192b4718b3ca3e6c813c357b6afb06e2a27f9864087  docs/design/0005-v0.8.0-packaging-and-version-bump.md
++94cb0a1bc4ca96f7a2e084c2acdd235b89000a1d65ff36a76b536cabdff2e2c9  docs/design/0006-cwd-on-the-child-import-path.md
++465b2bc4286495212e664e613132b83d1d9bd920c0193b1490668345ebaac790  docs/design/0007-descriptor.md
++7b5b28bb063a6867579f6f7c179dc5505bb9ea9351dff158ac77df263571036b  docs/design/0008-arci-init.md
++d71f66d30d6e8f00931193609286e20c8d084a103a5087b7073a9b2bdc3fc8fb  docs/design/0009-readme-first-screen.md
+ 817b9d79f80e30581caf0c2d0da989848b1c9b8fb7ec5e514681ec45856d22ff  docs/design/jev-research-2026-09-22.md
+ 4e020e2c69f08c7076f0b82a1e85c8989172d05a2d35b7bc5a8ed8277803776d  justfile
+-b0de2b3e26cde1c1d8caef5249baec70a92c68bf54b4385e4b7f137561150ac4  pyproject.toml
++6ed12bab2a0e64bf987daa5bab8f8203354a44c09517a59fdbfc44b414e7ccfd  pyproject.toml
+ 0d96491eb7c5305b4538013c7d0b4df23e270af3046af3361a6296f61bd48f62  src/arci/contracts.py
+ 094255e3450a171b8f006ccdd6e263c59b9f73ff4e460f8137da450651897782  src/arci/fingerprint.py
+ 230d847e80c1be05c90e06921e2c0222016390a523565e69c1da832e1a62cfb3  src/arci/hashing.py
+@@ -45,4 +50,4 @@ ce5502e9b33dce16a702813e6bfde70f969a03e82f9272ae38309c91435e38cd  tests/acceptan
+ c91bb4026e36c674d6979196d8945de18d622075c629e1e7c0e9dc68ca795701  tests/acceptance/test_schema.py
+ d0e9aa5ff9d516c82a91308b33b73573fa1f74ee7307c9465630cf26c7149046  tests/acceptance/test_sequential.py
+ e276731d87a7e63ffa2b3a26ec2a60f461586ee438dcf305b4901bd4da97e59b  tests/acceptance/test_stats_gate.py
+-3de161034853bf7c9cd578ec706dc1d924e420cdcd520d3f8116d83f2595ca1c  uv.lock
++137acfbc4b87b56e1011ab3dcf6011e881208301bef2d4908f1eb79d9e6f5638  uv.lock
+diff --git a/README.md b/README.md
+index ef3af9d..e331ff4 100644
+--- a/README.md
++++ b/README.md
+@@ -351,15 +351,15 @@ schema); re-run the experiment rather than trust an unreadable store.
+ 
+ ### GitHub Actions
+ 
+-This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in pass^k
+-reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; see the
+-Unreleased section of [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
++This example pins `v0.8.0`, the released feature set (the Action installs that tag's source; the
++same code is on PyPI as `agent-reliability-ci==0.8.0`). See
++[CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
+ 
+ ```yaml
+ - uses: actions/setup-python@v7
+   with: { python-version: "3.12" }
+ - run: pip install -e .            # your agent, importable
+-- uses: ajaysurya1221/agent-reliability-ci@v0.7.0
++- uses: ajaysurya1221/agent-reliability-ci@v0.8.0
+   id: gate
+   with:
+     manifest: reliability/manifest.json
+@@ -462,13 +462,14 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
+ 
+ ### Availability and project status
+ 
+-**Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`),
+-`arci init`, the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability
+-fixes beyond v0.7.0; the v0.8.0 release and the PyPI package follow this sprint. **Boundary:** PASS means
+-relative non-inferiority, not absolute reliability. This is not a sandbox.
++**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it
++adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the
++planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over
++v0.7.0. **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a
++sandbox.
+ 
+ [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.7.0)
++[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0)
+ [![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
+ [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
+ [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
+diff --git a/docs/RELEASING.md b/docs/RELEASING.md
+index d30b326..e7aafa3 100644
+--- a/docs/RELEASING.md
++++ b/docs/RELEASING.md
+@@ -9,7 +9,9 @@ number, once uploaded, can never be uploaded again, even after a deletion.
+ 
+ 1. Add a design record under `docs/design/` that names the new version and why it is cut.
+ 2. Set the version in `pyproject.toml` (`[project].version`) and in `src/arci/__init__.py`
+-   (`__version__`) to the same `X.Y.Z`; regenerate `uv.lock` with `uv lock`.
++   (`__version__`) to the same `X.Y.Z`; regenerate `uv.lock` with `uv lock`. `uv lock` may also
++   rewrite equivalent dependency markers (it did at `e304e81` and again for v0.8.0); resolved
++   versions must not change, `uv lock --check` must pass, and the design record says what moved.
+ 3. Move the CHANGELOG `Unreleased` entries under `vX.Y.Z (YYYY-MM-DD)`.
+ 4. Recompute `FROZEN.sha256` for the files the bump touched (`pyproject.toml`, `uv.lock`, the new
+    design record) and check that every other hash is unchanged:
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index fbd4cdd..67ee412 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -3,7 +3,10 @@
+ v0.1 proved one thing: a measured regression becomes an executable, reduced failure case, for
+ Python agents. v0.2 extends that to any program that speaks MCP over stdio. v0.5 adds System One
+ decisions made by command agents, and v0.6 makes the documented Jev workflow ready for day one, and
+-v0.7.0 runs it against Jev and publishes an intent-routing calibration audit.
++v0.7.0 runs it against Jev and publishes an intent-routing calibration audit, and v0.8.0 ships
++the onboarding path (PyPI, `arci demo`, `arci.yaml` and `arci init`) whose target, a first
++experiment in ten minutes, is measured by `docs/measurement/ttfv-protocol.md` and not yet
++established by cold-reader receipts.
+ 
+ ## Done in v0.2
+ 
+@@ -39,11 +42,14 @@ the decision model is published in [results/jev-calibration](results/jev-calibra
+ (protocol: `bench/jev_calibration/PROTOCOL.md`). The gateway route, provider rate limits under load
+ and billed spend remain unverified.
+ 
+-## On main, not yet released
++## Done in v0.8.0
+ 
+-`arci plan` (PASS/BLOCK/INCONCLUSIVE probabilities of a fixed-sample Clopper-Pearson design) and
+-opt-in `arci report --pass-k`, plus platform-portability fixes. These are not in the v0.7.0 tag; see
+-the Unreleased section of [CHANGELOG.md](../CHANGELOG.md).
++The onboarding release: the PyPI package and `uvx --from agent-reliability-ci arci demo`, the
++`arci.yaml` descriptor with its generated JSON Schema, `arci init`, the smoke-design notice, the
++current directory on the child import path, the CI install matrix and release workflow, the
++measurement protocol, and the README's first screen. Also released: `arci plan`, opt-in
++`arci report --pass-k` and the platform-portability fixes that had been on `main` since v0.7.0.
++See [CHANGELOG.md](../CHANGELOG.md).
+ 
+ ## Next, most valuable first
+ 
+diff --git a/docs/design/0005-v0.8.0-packaging-and-version-bump.md b/docs/design/0005-v0.8.0-packaging-and-version-bump.md
+new file mode 100644
+index 0000000..bcc0730
+--- /dev/null
++++ b/docs/design/0005-v0.8.0-packaging-and-version-bump.md
+@@ -0,0 +1,53 @@
++# 0005: v0.8.0 packaging metadata and the version bump (v0.8.0)
++
++Decision by the orchestrator (Claude Fable 5.1), reviewed by the read-only consultant (gpt-6-astra,
++xhigh) and an independent Opus 5.5 reviewer, 2026-10-13. Part of the v0.8.0 onboarding sprint
++(plan/exec/PLAN.md, task 12). This record exists because `pyproject.toml` and `uv.lock` are frozen
++(`FROZEN.sha256`), and the repository's rule is that a frozen file changes only with a design record
++and an explicit re-freeze commit that says why.
++
++## Problem
++
++v0.8.0 is the first release published to PyPI. The frozen `pyproject.toml` still says `0.7.0`, has no
++project URLs, classifiers or keywords, and builds an sdist from every non-ignored file in the tree
++(about 20 MB, mostly archived evidence under `docs/`). The lockfile records the project version too.
++PyPI versions are immutable, so the wheel must carry the right version before anything is published.
++
++## Decision
++
++One commit changes exactly these things in the two frozen files, and nothing else:
++
++- `pyproject.toml`: `version = "0.8.0"`; `[project.urls]` (Homepage, Source, Changelog, Issues,
++  Design records); `classifiers` (development status, intended audience, Python versions, topic,
++  OS :: POSIX; no `License ::` classifier because the SPDX `license` field already applies);
++  `keywords` copied from `CITATION.cff`; `[tool.hatch.build.targets.sdist] only-include = ["src/arci",
++  "README.md", "LICENSE", "NOTICE", "CHANGELOG.md", "pyproject.toml"]`. Dependencies, the build
++  backend, the console script, the wheel target and every tool section are untouched.
++- `uv.lock`: regenerated with `uv lock` so the root package records `0.8.0`; no dependency or
++  resolved-version changes (`uv lock --check` passes). uv also rewrites four equivalent dependency
++  markers on the `anyio` and `httpcore` entries (the same normalisation the v0.7.0 lock showed in
++  the other direction); the reachable dependency graph is identical.
++- `FROZEN.sha256`: the two hashes above are replaced, and the design records written during this
++  sprint (0005 to 0009) are added so that `docs/design/**` is pinned in full, as `AGENTS.md`
++  describes. Every other hash is unchanged.
++
++In the same release: `src/arci/__init__.py` and `CITATION.cff` move to 0.8.0 in lockstep (neither is
++frozen), the release workflow's guard refuses any tag that does not equal `v` + this version, and
++the sdist contains the listed paths plus what hatchling adds on its own (`PKG-INFO` and the
++force-included `.gitignore`). The release workflow lists the wheel's contents; an allowlist check
++of the sdist is a follow-up, not a guarantee of this record.
++
++## Consequences
++
++- The wheel is unchanged in content by this record; only metadata, the version and the sdist
++  contents change.
++- The v0.7.0 release commit (`e304e81`) re-froze the same two files without a design record; from
++  v0.8.0 on, every version bump carries one.
++- The sdist no longer contains tests, examples or archived evidence. Reproduction of the evidence
++  package still needs the repository at the tagged commit, as `docs/reports/ci-gate-2026-10-06`
++  already states.
++
++## Not in v0.8.0
++
++Dynamic versioning, a `__version__` read from package metadata, hash-pinning the build backend
++(hatchling stays `>=1.27,<2`), a TestPyPI leg.
+diff --git a/pyproject.toml b/pyproject.toml
+index 02443d4..206d9cc 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,11 +1,24 @@
+ [project]
+ name = "agent-reliability-ci"
+-version = "0.7.0"
++version = "0.8.0"
+ description = "Regression testing for stochastic AI agents: frozen experiments, fault injection, replayable reduced failures."
+ readme = "README.md"
+ license = "Apache-2.0"
+ license-files = ["LICENSE", "NOTICE"]
+ requires-python = ">=3.11"
++keywords = ["ai-agents", "reliability", "fault-injection", "statistics", "evaluation", "reproducibility"]
++classifiers = [
++  "Development Status :: 4 - Beta",
++  "Intended Audience :: Developers",
++  "Operating System :: POSIX",
++  "Programming Language :: Python :: 3",
++  "Programming Language :: Python :: 3.11",
++  "Programming Language :: Python :: 3.12",
++  "Programming Language :: Python :: 3.13",
++  "Programming Language :: Python :: 3.14",
++  "Topic :: Software Development :: Testing",
++  "Typing :: Typed",
++]
+ dependencies = [
+   "pydantic>=2.7,<3",
+   "pyyaml>=6,<7",
+@@ -21,6 +34,13 @@ dev = [
+   "typesafe-sdk>=0.7,<1",
+ ]
+ 
++[project.urls]
++Homepage = "https://github.com/ajaysurya1221/agent-reliability-ci"
++Source = "https://github.com/ajaysurya1221/agent-reliability-ci"
++Changelog = "https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md"
++Issues = "https://github.com/ajaysurya1221/agent-reliability-ci/issues"
++"Design records" = "https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/design"
++
+ [project.scripts]
+ arci = "arci.cli:main"
+ 
+@@ -31,6 +51,9 @@ build-backend = "hatchling.build"
+ [tool.hatch.build.targets.wheel]
+ packages = ["src/arci"]
+ 
++[tool.hatch.build.targets.sdist]
++only-include = ["src/arci", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md", "pyproject.toml"]
++
+ [tool.pytest.ini_options]
+ addopts = "-q"
+ testpaths = ["tests"]
+diff --git a/src/arci/__init__.py b/src/arci/__init__.py
+index 925b774..a5f94e2 100644
+--- a/src/arci/__init__.py
++++ b/src/arci/__init__.py
+@@ -1,3 +1,3 @@
+ """agent-reliability-ci: regression testing for stochastic AI agents."""
+ 
+-__version__ = "0.7.0"
++__version__ = "0.8.0"
+diff --git a/uv.lock b/uv.lock
+index 9c155b5..d000140 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -8,7 +8,7 @@ resolution-markers = [
+ 
+ [[package]]
+ name = "agent-reliability-ci"
+-version = "0.7.0"
++version = "0.8.0"
+ source = { editable = "." }
+ dependencies = [
+     { name = "pydantic" },
+@@ -53,8 +53,8 @@ name = "anyio"
+ version = "4.15.1"
+ source = { registry = "https://pypi.org/simple" }
+ dependencies = [
+-    { name = "idna", marker = "python_full_version < '3.12' or sys_platform != 'emscripten'" },
+-    { name = "typing-extensions", marker = "(python_full_version < '3.15' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')" },
++    { name = "idna" },
++    { name = "typing-extensions", marker = "python_full_version < '3.15'" },
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
+ wheels = [
+@@ -96,8 +96,8 @@ name = "httpcore2"
+ version = "2.13.0"
+ source = { registry = "https://pypi.org/simple" }
+ dependencies = [
+-    { name = "h11", marker = "python_full_version < '3.12' or sys_platform != 'emscripten'" },
+-    { name = "truststore", marker = "python_full_version < '3.12' or sys_platform != 'emscripten'" },
++    { name = "h11" },
++    { name = "truststore" },
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/15/8c/e925b1c92018abb3a1863ce1549d76d2381e334d21d65d4ac8f65dabd78a/httpcore2-2.13.0.tar.gz", hash = "sha256:2adc8be4fb285fbcd6d894298db3b52c177e74b6674eda3a76bd36be3292a3db", size = 67740, upload-time = "2026-09-14T14:18:04.717Z" }
+ wheels = [
