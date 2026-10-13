@@ -59,12 +59,13 @@ release (checksums below): `uvx --from <wheel URL or path> arci demo`.
 
 - Seeded retry demo, 2026-09-23: 192/200 vs 132/200, bounds [-0.405, -0.183], BLOCK.
 - Jev day one, 2026-10-03: 200/200 vs 0/200, BLOCK; minimised failure replays REPRODUCED.
-- Guardrail, 2026-10-05: 200/200 vs 130/200, BLOCK; the N=50 run INCONCLUSIVE, kept as is.
+- Guardrail, 2026-10-05: 200/200 vs 130/200, BLOCK; `guardrail-live-b-ask-provider_down-50` (38/50,
+  bounds [-0.4016, -0.0348]) INCONCLUSIVE, kept as is.
 - Local model, N=400: 376/400 vs 308/400, INCONCLUSIVE by 0.008, not re-run.
 
 ## Measured in this release's run (orchestrator's machine, 15-core Apple Silicon)
 
-- `arci demo` from the checkout: 38 s. Through `uvx --from <the 0.8.0 wheel> arci demo` in an empty
+- `examples/retry_agent/hero_demo.py --n 200` from the checkout (the same six steps): 38 s. Through `uvx --from <the 0.8.0 wheel> arci demo` in an empty
   directory, including environment creation: 80 s with a cold uv cache (9 s resolve/install + 71 s
   run), 72 s and 73 s warm. Own-agent path on the sample tree (`arci init` + `arci run` at
   N=8): 3 s to a validated INCONCLUSIVE. Receipts in `docs/measurement/receipts/`, labelled as
@@ -84,7 +85,7 @@ shasum -a 256 -c SHA256SUMS                                   # the attached fil
 uvx --from agent_reliability_ci-0.8.0-py3-none-any.whl arci demo   # or, once on PyPI: uvx --from agent-reliability-ci==0.8.0 arci demo
 ```
 
-Built by release workflow run 38365660814 from tag `v0.8.0` (commit 48e60ac): 
+Built by release workflow run 38365660814 from tag `v0.8.0` (commit 48e60ac):
 
 ```text
 10ddc6823b446edd745d7904c5ab24a2fa098a0b9313ccc2df1b3277c4212899  agent_reliability_ci-0.8.0-py3-none-any.whl

@@ -51,7 +51,7 @@ The tag exists; the release page does not. The files to attach are the CI-built 
 38365660814 (byte-identical to a local `uv build` of commit 48e60ac). From a checkout of main:
 
 ```bash
-gh run download 38365660814 -n dist -D dist-v0.8.0 && shasum -a 256 -c dist-v0.8.0/SHA256SUMS
+gh run download 38365660814 -n dist -D dist-v0.8.0 && (cd dist-v0.8.0 && shasum -a 256 -c SHA256SUMS)
 ```
 
 ```bash
