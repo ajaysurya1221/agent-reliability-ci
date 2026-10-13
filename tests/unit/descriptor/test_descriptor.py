@@ -424,3 +424,39 @@ def test_the_global_safe_load_is_unchanged() -> None:
 def test_yes_in_a_task_stays_a_string_in_the_manifest() -> None:
     text = SMALL + "task: {answer: yes, code: 010, day: 2026-10-13}\n"
     assert _compile(text).task == {"answer": "yes", "code": 10, "day": "2026-10-13"}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "experiment_id: a\nexperiment_id: b\n",
+            'descriptor <descriptor>:experiment_id: duplicate key "experiment_id" at line 2, '
+            "column 1; give each key once",
+        ),
+        (
+            "task: {sku: a, sku: b}\n",
+            'descriptor <descriptor>:task.sku: duplicate key "sku" at line 1, column 16; '
+            "give each key once",
+        ),
+        (
+            "conditions:\n  - id: c\n    fault: {name: tool_timeout}\n    fault: {name: x}\n",
+            'descriptor <descriptor>:conditions[0].fault: duplicate key "fault" at line 4, '
+            "column 5; give each key once",
+        ),
+    ],
+)
+def test_a_repeated_mapping_key_is_rejected_with_its_path(text: str, expected: str) -> None:
+    # PyYAML alone keeps the last value silently; the descriptor loader refuses instead.
+    assert isinstance(yaml.safe_load(text), dict)
+    with pytest.raises(DescriptorError) as caught:
+        loads_descriptor(text)
+    assert str(caught.value) == expected
+
+
+def test_a_merge_key_override_is_not_a_duplicate() -> None:
+    text = "base: &arm {label: A, agent: 'm.a:f'}\ndata:\n  <<: *arm\n  label: B\n"
+    assert parse_yaml(text) == {
+        "base": {"label": "A", "agent": "m.a:f"},
+        "data": {"label": "B", "agent": "m.a:f"},
+    }

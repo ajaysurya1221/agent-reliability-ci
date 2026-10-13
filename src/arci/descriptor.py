@@ -17,7 +17,7 @@ import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal, Self, cast
 
 import yaml
 from pydantic import (
@@ -183,9 +183,70 @@ def _construct_int(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> int:
 DescriptorLoader.add_constructor(_INT_TAG, _construct_int)
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+class _DuplicateKeyError(yaml.YAMLError):
+    """A mapping repeats a key. PyYAML's default (the last value wins) would hide it."""
+
+    def __init__(self, path: SourcePath, message: str) -> None:
+        self.path = path
+        self.message = message
+        super().__init__(message)
+
+
+def _path_segment(key: object) -> str | int:
+    return key if isinstance(key, str | int) and not isinstance(key, bool) else str(key)
+
+
+def _reject_duplicate_keys(
+    loader: DescriptorLoader, node: yaml.Node, path: SourcePath, seen: set[int]
+) -> None:
+    """Walk the composed node graph; the first repeated mapping key raises, with its path.
+
+    A merge key (`<<`) is not a duplicate: keys it brings in may be overridden, as YAML intends.
+    Anchored nodes are visited once, so recursive aliases terminate.
+    """
+    if id(node) in seen:
+        return
+    seen.add(id(node))
+    if isinstance(node, yaml.MappingNode):
+        keys: set[object] = set()
+        for key_node, value_node in cast(list[tuple[yaml.Node, yaml.Node]], node.value):
+            if key_node.tag == _MERGE_TAG:
+                _reject_duplicate_keys(loader, value_node, path, seen)
+                continue
+            key = loader.construct_object(key_node, deep=True)
+            try:
+                repeated = key in keys
+                keys.add(key)
+            except TypeError:  # an unhashable key: the constructor reports it
+                continue
+            segment = _path_segment(key)
+            if repeated:
+                mark = key_node.start_mark
+                raise _DuplicateKeyError(
+                    (*path, segment),
+                    f"duplicate key {_quote(key)} at line {mark.line + 1}, column "
+                    f"{mark.column + 1}; give each key once",
+                )
+            _reject_duplicate_keys(loader, value_node, (*path, segment), seen)
+    elif isinstance(node, yaml.SequenceNode):
+        for index, item in enumerate(cast(list[yaml.Node], node.value)):
+            _reject_duplicate_keys(loader, item, (*path, index), seen)
+
+
 def parse_yaml(text: str) -> object:
-    """Ruling 3: one YAML document through `DescriptorLoader`."""
-    return yaml.load(text, Loader=DescriptorLoader)  # a SafeLoader subclass: safe
+    """Ruling 3: one YAML document through `DescriptorLoader`; repeated keys are rejected."""
+    loader = DescriptorLoader(text)  # a SafeLoader subclass: safe
+    try:
+        node = loader.get_single_node()
+        if node is None:
+            return None
+        _reject_duplicate_keys(loader, node, (), set())
+        return loader.construct_document(node)
+    finally:
+        loader.dispose()
 
 
 # --- the models -------------------------------------------------------------------------------
@@ -566,6 +627,8 @@ def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
     """Parse one YAML document and validate it. Raises `DescriptorError`."""
     try:
         data = parse_yaml(text)
+    except _DuplicateKeyError as exc:
+        raise DescriptorError(exc.message, exc.path, source) from None
     except yaml.MarkedYAMLError as exc:
         mark = exc.problem_mark
         where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""

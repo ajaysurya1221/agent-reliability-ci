@@ -8,6 +8,7 @@ import sys
 import textwrap
 from pathlib import Path
 
+from arci.cli import smoke_followup, smoke_notice
 from arci.descriptor import compile_descriptor_text
 from arci.schema import GateDecision, Manifest
 
@@ -57,7 +58,9 @@ def test_run_yaml_matches_the_json_path(tmp_path: Path) -> None:
 
     assert from_yaml.returncode == 2, from_yaml.stderr[-2000:]  # 6/6 vs 0/6: INCONCLUSIVE
     assert from_json.returncode == 2, from_json.stderr[-2000:]
-    assert from_yaml.stderr == ""
+    # stderr carries only the smoke-design notice (task 05), identical for both paths.
+    assert from_yaml.stderr == f"{smoke_notice(compiled)}\n{smoke_followup(compiled)}\n"
+    assert from_yaml.stderr == from_json.stderr
     last = from_yaml.stdout.strip().splitlines()[-1]
     assert last.startswith("VERDICT: INCONCLUSIVE")
     assert last == from_json.stdout.strip().splitlines()[-1]
