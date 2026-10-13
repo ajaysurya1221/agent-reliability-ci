@@ -37,3 +37,11 @@ created mid-session and the Agent tool does not register new agent types until t
 claude-opus-5-5` and `effort = high`, so the pinned model and effort hold. The agent files stay in
 the repo for future sessions. Rule: (a) the prompt's intent (Opus 5.5 at high, verified in the
 transcript) over its literal mechanism; (e).
+
+### D-02 (Task 01): dependency fixes from CONSULT 01
+Astra's connectivity consult (plan/exec/consults/01.md) found three inconsistencies; adopted:
+(1) T06's smoke no longer needs `arci schema` (T07 adds that step after T03 merges); (2) T04 owns a
+minimal fixture tree under tests/unit/init/fixtures/ instead of borrowing T08's sample; (3) T12
+depends on 02–07 and 11; a cut task (08–10) never blocks the release and is listed in CHANGELOG as
+not shipped. Astra's first risk (scope vs 10 h) is accepted as is: the cut order S8 → S9 → reduced
+S7 applies at the 4 h mark if lane C has not merged by then. Rule: (d) on a plan defect, (a) on scope.
