@@ -1,6 +1,6 @@
 """Build TTFV receipts (one per reader per track) from the AI-cohort workflow result.
 
-    python plan/exec/scripts/cohort_receipts.py <workflow result json> <receipts dir> <readme commit>
+    python plan/exec/scripts/cohort_receipts.py <result json> <receipts dir> <readme commit>
 
 The result json is the Workflow tool's return value: {"results": [{"reader": {...}, "out": {...}}],
 "scores": [{"id": ..., "score": {...}}]}. Readers are AI agents: every receipt sets reader.kind to
@@ -99,8 +99,9 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         model = reader["model"]
         common_notes = (
             f"AI-agent reader (Claude {model} via the Workflow tool, persona: {persona}); "
-            "self-stamped milestones with `date -u` under the facilitator's wrapper; machine shared "
-            "with the orchestrator session (not controlled). Never counted as a cold reader. "
+            "self-stamped milestones with `date -u` under the facilitator's wrapper; machine "
+            "shared with the orchestrator session (not controlled). Never counted as a cold "
+            "reader. "
             f"Files read: {', '.join(out.get('files_read', [])) or 'none listed'}. "
             f"Confusions: {' | '.join(out.get('confusions', [])) or 'none'}. "
             f"Reader notes: {out.get('notes', '')}"
@@ -250,10 +251,12 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             f"| ai-{reader['id']} ({model}) | A: {ra['durations_seconds']['install']}+"
             f"{ra['durations_seconds']['run']}={ra['durations_seconds']['total']} s, "
             f"exit {a.get('exit_code')} | B: install {rb['durations_seconds']['install']} s, "
-            f"scaffold {rb['durations_seconds']['scaffold']} s, run {rb['durations_seconds']['run']} s, "
+            f"scaffold {rb['durations_seconds']['scaffold']} s, "
+            f"run {rb['durations_seconds']['run']} s, "
             f"{v}, validated={bool(validated)}, init_attempts={b.get('init_attempts')} | "
             f"q1-q5: {sum(1 for k in ra['comprehension']['scores'].values() if k)}/5 | "
-            f"interp demo {sc.get('interpretation_demo_block')}, own {sc.get('interpretation_own_run')} | "
+            f"interp demo {sc.get('interpretation_demo_block')}, "
+            f"own {sc.get('interpretation_own_run')} | "
             f"failures {len(out.get('failures', []))} |"
         )
     print("| reader | Track A | Track B | comprehension | interpretation | failures |")
