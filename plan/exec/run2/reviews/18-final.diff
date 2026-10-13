@@ -841,10 +841,10 @@ index 0000000..d7d603f
 +}
 diff --git a/docs/measurement/reference-machines/README.md b/docs/measurement/reference-machines/README.md
 new file mode 100644
-index 0000000..81ef0e6
+index 0000000..efb9011
 --- /dev/null
 +++ b/docs/measurement/reference-machines/README.md
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,152 @@
 +# Reference-machine demo timings
 +
 +How long the packaged demo takes on a clean machine, measured by CI rather than by a person. It
@@ -880,7 +880,7 @@ index 0000000..81ef0e6
 +demo's own computation (two experiments of 200 trials per arm, the diff, the minimisation, the
 +replay, and the repaired agent's experiment). The warm samples are reported separately, for
 +information, and never pooled with the cold ones. As an example, not a guarantee: on 2026-10-13
-+(run 38451606669) the five cold samples took 222–227 s on `ubuntu-latest` and 213–227 s on
++(runs 38451606669 and 38470699338) the five cold samples took 222–232 s on `ubuntu-latest` and 208–244 s on
 +`macos-latest`, over both targets on both runners.
 +
 +## Network traffic
@@ -966,7 +966,9 @@ index 0000000..81ef0e6
 +## Reading p50 and p95
 +
 +```
-+python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/reference-*.json
++.venv/bin/python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/*.json
++
++(The script needs Python 3.10 or later; the repository's `.venv` has it.)
 +```
 +
 +For each file it first checks the structure and the timestamps (stamps present and in order
