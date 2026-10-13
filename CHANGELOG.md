@@ -15,8 +15,9 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   3.14) from an empty directory, and publishes the same files through PyPI trusted publishing with
   attestations. The guard refuses a tag that is not `v` + the package version. `docs/RELEASING.md`
   has the steps; `docs/design/0005-v0.8.0-packaging-and-version-bump.md` records the frozen-file
-  changes (version, project URLs, classifiers, keywords, an sdist restricted to the package, README,
-  LICENSE, NOTICE, CHANGELOG and pyproject).
+  changes (version, project URLs, classifiers, keywords, an sdist restricted by `only-include` to
+  the package, README, LICENSE, NOTICE, CHANGELOG and pyproject, plus hatchling's own `PKG-INFO`
+  and `.gitignore`).
 - **Added:** `arci demo` (and `python -m arci`): the six-step retry story from an installed wheel with
   no checkout, through the real `run`, `diff`, `minimize` and `replay`. The seeded world and agents
   now live in `arci.demo` (`examples/retry_agent/{world,agents}.py` re-export them); the demo's
@@ -42,10 +43,12 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   existing file is never replaced.
 - **Added:** a smoke-design notice on stderr from `arci run` when a gating condition has fewer than
   100 trials per arm, pointing at `arci plan`. stdout, reports, decisions and stores are unchanged.
-- **Changed:** the runner appends the current directory to every child's import path
-  (`docs/design/0006-cwd-on-the-child-import-path.md`), so references into the project directory
+- **Changed:** the runner appends the current directory to the import path of every child it starts
+  (worker, grader, boundary, command agent, MCP server;
+  `docs/design/0006-cwd-on-the-child-import-path.md`), so references into the project directory
   resolve under the `arci` console script as they already did under `python -m arci.cli`. Appended,
-  never prepended; records are unaffected.
+  never prepended; an MCP server whose `env` sets `PYTHONPATH` keeps that configured value, as
+  before; records are unaffected.
 - **Added:** CI jobs that build the wheel and run `arci demo` from an empty directory on Ubuntu and
   macOS, a Windows job that only installs the wheel and runs `arci --help` (execution stays
   unsupported on Windows), and an Action fixture (`examples/action_fixture/`) that runs the composite
@@ -68,11 +71,11 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   rejects the bridge's protocol revision `2026-07-28` at `initialize`; the recipe keeps the verbatim
   result and the ARCI steps run without it.
 - Everything that was already on `main` and unreleased is in this version:
-  - **Documentation:** the README opens with the recorded retry result (200 trials per arm,
-  192/200 vs 132/200, BLOCK), its boundary and availability, links to the evidence, and the
-  offline demo with lines from the committed demo log; a "Where it has been run" summary links
-  every campaign's records, including the guardrail run and the invalid and inconclusive
-  attempts; repeated presentations of the retry result are removed. The hero PNG is replaced by
+  - **Documentation:** the README presents the recorded retry result once (200 trials per arm,
+  192/200 vs 132/200, BLOCK) with its boundary, links to the evidence, and the offline demo with
+  lines from the committed demo log (in this release these sections sit below the new first
+  screen); a "Where it has been run" summary links every campaign's records, including the
+  guardrail run and the invalid and inconclusive attempts. The hero PNG is replaced by
   generated light and dark SVGs (`docs/assets/hero-*.svg`) and the how-it-works exposition by a
   generated pipeline figure (`docs/assets/where-*.svg`), both written by
   `docs/assets/src/make_figures.py` (stdlib only), whose `--check` mode runs in CI and in
@@ -112,12 +115,14 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
   committed guardrail decision byte for byte with `arci gate`.
-  - **Documentation:** the "Five minutes" section is renamed "Try the offline demo"; an availability
-  note separates `main` (planner, portability fixes) from the `v0.7.0` Action; unsupported
-  comparison and reviewer-count wording removed; the calibration roadmap item now extends the
-  published intent-routing audit. `CITATION.cff` gives the release date as 2026-10-05 and pins the
-  report URL to the `evidence-2026-10-06` tag. Added `SECURITY.md` (private reporting through GitHub
-  security advisories, the trusted-code assumption, no private stores or credentials in reports).
+  - **Documentation:** the offline demo section was renamed "Try the offline demo" (this release's
+  README now points it at `arci demo`); the availability note that separated `main` from the
+  `v0.7.0` Action is replaced by this release's Availability line; unsupported comparison and
+  reviewer-count wording removed; the calibration roadmap item now extends the published
+  intent-routing audit. `CITATION.cff` pins the report URL to the `evidence-2026-10-06` tag (its
+  version and date are now 0.8.0 and 2026-10-13). Added `SECURITY.md` (private reporting through
+  GitHub security advisories, the trusted-code assumption, no private stores or credentials in
+  reports).
 
 ## v0.7.0 (2026-10-05)
 

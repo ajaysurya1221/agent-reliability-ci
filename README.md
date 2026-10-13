@@ -462,10 +462,11 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it adds the
-packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the planner
-(`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over v0.7.0. **Boundary:** PASS means
-relative non-inferiority, not absolute reliability. This is not a sandbox.
+**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it
+adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the
+planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over
+v0.7.0. **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a
+sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0)

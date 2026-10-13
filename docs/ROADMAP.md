@@ -3,8 +3,10 @@
 v0.1 proved one thing: a measured regression becomes an executable, reduced failure case, for
 Python agents. v0.2 extends that to any program that speaks MCP over stdio. v0.5 adds System One
 decisions made by command agents, and v0.6 makes the documented Jev workflow ready for day one, and
-v0.7.0 runs it against Jev and publishes an intent-routing calibration audit, and v0.8.0 makes
-the first experiment a ten-minute job: PyPI, `arci demo`, `arci.yaml` and `arci init`.
+v0.7.0 runs it against Jev and publishes an intent-routing calibration audit, and v0.8.0 ships
+the onboarding path (PyPI, `arci demo`, `arci.yaml` and `arci init`) whose target, a first
+experiment in ten minutes, is measured by `docs/measurement/ttfv-protocol.md` and not yet
+established by cold-reader receipts.
 
 ## Done in v0.2
 
