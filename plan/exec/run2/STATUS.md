@@ -11,3 +11,4 @@ Budget clock start (Task 00 commit): 2026-10-13T18:12:20Z. Stop starting tasks a
 | V (19:18Z) | GREEN (local) | Fable | main 6a73fd9 (T17 + T16 merged locally) | isolated: just frozen 53 OK; just check 1225 passed, 2 skipped (8:05); figures current; schema current; first screen 191; actionlint clean; receipts byte-identical to origin/main; push waits for lane CI on 9b2e4b5 and dfdb11f |
 | 17 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT, reviewer ACCEPT (r1, r2) | sprint/t17-protocol 9b2e4b5 → main | lane CI green |
 | 16 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT; reviewer ACCEPT ×3; Astra ACCEPT (r1, r3) | sprint/t16-code dfdb11f → main | lane CI green; isolated merge bar 1225 passed; main CI running |
+| V (19:53Z) | GREEN | Fable | main d152ea3 (T17 + T16 merged and pushed) | main CI run success; T18 still on its lane |
