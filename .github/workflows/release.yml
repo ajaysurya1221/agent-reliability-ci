@@ -1,0 +1,154 @@
+name: Release
+
+# A version tag builds the wheel and the sdist once, smoke-tests that exact wheel on Linux and
+# macOS, then publishes those same files to PyPI through trusted publishing (no token), with
+# attestations. PyPI versions are immutable: the guard refuses any tag that is not
+# "v" + the version in pyproject.toml and src/arci/__init__.py. See docs/RELEASING.md.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.12.5"
+
+jobs:
+  build:
+    name: guard and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Refuse to build unless the tag is v plus the package version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import ast
+          import os
+          import pathlib
+          import sys
+          import tomllib
+
+          ref_type, tag = os.environ["REF_TYPE"], os.environ["REF_NAME"]
+          project = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          module = None
+          for node in ast.parse(pathlib.Path("src/arci/__init__.py").read_text()).body:
+              if (
+                  isinstance(node, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == "__version__" for t in node.targets)
+                  and isinstance(node.value, ast.Constant)
+              ):
+                  module = node.value.value
+          if ref_type != "tag":
+              problem = f"releases build only from a tag, not from {ref_type} {tag!r}"
+          elif tag != f"v{project}":
+              problem = f"tag {tag!r} is not 'v' + pyproject.toml version {project!r}"
+          elif module != project:
+              problem = f"src/arci/__init__.py __version__ {module!r} != pyproject.toml version {project!r}"
+          else:
+              problem = None
+          if problem:
+              print(f"::error title=release guard::{problem}")
+              sys.exit(1)
+          print(f"release guard: tag {tag} = v{project} = arci.__version__")
+          PY
+      - name: Build the wheel and the sdist
+        run: uv build --no-sources
+      - name: List the wheel contents
+        run: python -m zipfile -l dist/*.whl
+      - name: Write SHA256SUMS to dist and to the job summary
+        run: |
+          cd dist
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
+          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
+          {
+            echo "### SHA256SUMS"
+            echo
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS
+      - name: Upload dist
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    name: wheel smoke / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.14"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Download dist
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Smoke-test the built wheel from an empty directory
+        env:
+          PYTHON: python
+        run: bash .github/scripts/wheel_smoke.sh dist/*.whl
+
+  publish:
+    name: publish to PyPI
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/agent-reliability-ci
+    permissions:
+      id-token: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Verify the checksums and keep only the wheel and the sdist
+        run: |
+          cd dist
+          sha256sum -c SHA256SUMS
+          rm SHA256SUMS
+          ls -l
+      - name: Publish to PyPI with attestations
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          attestations: true
+          skip-existing: false
