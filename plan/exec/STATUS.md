@@ -14,5 +14,5 @@ Budget clock start (Task 00 commit): 2026-10-13T03:42:56Z. Hard stop for startin
 | 04+05 | REVISE r1 pending | Fable ACCEPT, reviewer-subagent REVISE (2 required), Astra running | 76523e5 on sprint/descriptor | coder 26 min; isolated just check at 76523e5: exit 0 (1035 passed); r1 after T03r1 |
 | 03r1 | IN PROGRESS | — | — | descriptor REVISE round 1 dispatched 05:22Z on the same lane (wf_bbd63819-968) |
 | 08+09 | IN PROGRESS | — | — | recipes coder dispatched 05:23Z on sprint/recipes (= main + descriptor lane) |
-| 11 | IN REVIEW r1 | reviewer-subagent ACCEPT, Astra REVISE → applied, re-review running | b34dac1 on sprint/readme (pushed) | all links absolute; first screen 191 words; merge after the descriptor lane |
+| 11 | ACCEPTED, awaiting lane C | reviewer-subagent ACCEPT, Astra ACCEPT (round 1) | b34dac1 on sprint/readme (pushed) | all links absolute; first screen 191 words; merge right after the descriptor lane |
 | 12 | DRAFTED | — (reviews at the end) | sprint/release c5d091d (pushed) | ADR 0005, pyproject metadata + 0.8.0, uv.lock, FROZEN re-freeze (53 lines), CITATION, __init__, CHANGELOG v0.8.0 draft with one placeholder, ROADMAP; wheel 116 KB, sdist 119 KB; lane just check running |

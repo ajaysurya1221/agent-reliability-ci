@@ -93,3 +93,11 @@ stated as the positive non-inferiority finding ("the evidence supports that any 
 is smaller than the allowed drop") because "not shown to be worse" also describes INCONCLUSIVE;
 demo first with the recorded result beneath it; no runtime promise; no link row (word count 190).
 Rule: (d); (c) STATISTICS.md for the PASS sentence.
+
+### D-09 (T11): the first-screen scaffold command stays the memo's, without `--fault`
+The reviewer noted that the memo's second command writes a clean condition (no injected fault), while
+the README's first sentence mentions injected tool faults and the YAML below shows one. Decision:
+keep the two commands verbatim as the memo and ADR 0009 fixed them (a repeated clean comparison is a
+valid first verdict and the smoke notice still fires), and say below the fold that `--fault
+tool_timeout:reserve` adds a fault and that the YAML shown is hand-written. Rule: (b) the memo's
+commands are fixed; (e) a sentence is reversible, a changed first-screen command is a new decision.
