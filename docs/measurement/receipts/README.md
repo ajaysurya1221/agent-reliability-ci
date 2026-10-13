@@ -1,6 +1,6 @@
 # TTFV receipts
 
-One JSON file per reader per track, filled in by hand from
+One JSON file per reader per track per attempt, filled in by hand from
 [../receipt.template.json](../receipt.template.json) following
 [../ttfv-protocol.md](../ttfv-protocol.md). ARCI collects no telemetry; this directory is the
 only place these measurements live.

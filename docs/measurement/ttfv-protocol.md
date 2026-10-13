@@ -34,6 +34,19 @@ Protocol; no cold-reader receipt yet (the receipts committed so far are maintain
    records both values in `notes`. `package.source` is then `wheel` and `package.wheel_sha256` is
    filled. After a wheel attempt the facilitator checks that the installed version equals
    `package.version` (`uv tool list` is enough) and records any mismatch in `failures`.
+   A Track A `uvx` run installs no `arci` command, so `uv tool list` and `arci --version` cannot
+   show the version. After the attempt, outside the clock and with the reader's shell settings,
+   the facilitator runs the command below (or the same with `--from <wheel path>` to pin the
+   wheel), records the printed version in `notes`, and records a mismatch with `package.version`
+   in `failures`:
+
+   ```bash
+   uvx --from agent-reliability-ci python -c "import importlib.metadata as m; print(m.version('agent-reliability-ci'))"
+   ```
+
+   The facilitator runs it with the same uv cache (`UV_CACHE_DIR`, or the default cache) and the
+   same `UV_FIND_LINKS` the reader used, so it resolves the same release rather than a newer one.
+
 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
@@ -126,7 +139,9 @@ later `arci run` that does.
    no valid verdict, true if the reader edited `arci.yaml` by hand before any `arci run` that
    started trials. Re-running `arci init` with corrected flags is not hand editing.
    `outcome.trials_started` is true if `trials.jsonl` in the run store (4.2) exists and is
-   non-empty after the attempt.
+   non-empty after the attempt. When the attempt produced several run stores (a retry with
+   `--out`, or runs from more than one directory), it is true if any store's `trials.jsonl` is
+   non-empty, and `notes` names the store used for the verdict.
 
 ## 5. Comprehension
 
@@ -144,7 +159,7 @@ later `arci run` that does.
 | # | Question | Key elements (all required unless marked optional) |
 |---|---|---|
 | q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict usable as a CI gate, naming at least PASS and BLOCK (required); naming all four, PASS, BLOCK, INCONCLUSIVE and ERROR (optional). |
-| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
+| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. An answer that correctly describes either integration route (the Python function or the MCP-over-stdio command) satisfies (b); naming both is not required. |
 | q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) shown not to be worse than the baseline by more than the allowed drop (`delta`), i.e. non-inferior within `delta` (the lower bound on the candidate-minus-baseline difference is above `-delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
 | q4 | What does it not do? Name two. | Two distinct items, each a limit stated in the README version under test (`package.readme_url`) under "What it does not do" or in the first-screen boundary sentence. For example: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
 | q5 | What are the first three commands for your own agent? | In order: install the `agent-reliability-ci` package (for example `uv tool install agent-reliability-ci`); `arci init <id>` with `--baseline`, `--candidate`, `--toolset`, `--oracle`; `arci run arci.yaml`. |
@@ -173,12 +188,29 @@ later `arci run` that does.
 
 ## 7. Filling the receipt
 
-1. Copy `receipt.template.json`, one file per reader per track; delete no keys. `track`: `demo` or
-   `own-agent`; `reader.kind`: `cold`, `maintainer` or `ai-agent`. A milestone not reached or not
-   in the track stays null. Durations are whole seconds as defined above; null if an end is null.
+1. Copy `receipt.template.json`: one JSON file per reader per track per attempt; delete no keys.
+   A repeat attempt by the same reader on the same track appends an attempt suffix to the handle
+   (for example `-2`, or `-pypi` for a different package source) and says so in `notes`; it is
+   the same reader for every count. `track`: `demo` or `own-agent`; `reader.kind`: `cold`,
+   `maintainer` or `ai-agent`. A milestone not reached or not in the track stays null. Durations
+   are whole seconds as defined above; null if an end is null.
 2. Every error, wrong turn or abandonment goes into `failures` as
-   `{"at", "milestone", "what"}` with the first line of any error verbatim. Failed attempts are
-   kept and contributed like successful ones.
+   `{"at", "milestone", "what"}` with the first line of any error verbatim. `at` is an ISO 8601
+   time as in 2.6, or empty when the moment was not stamped; a remark about the time ("approx.",
+   "before readme_opened") goes in `what`, never in `at`. `milestone` names the stage the failure
+   belongs to, one of:
+   - `install`: getting the package and the `arci` command (Track A up to `demo_banner`, Track B
+     up to `install_done`), e.g. a resolver error or `arci` not on `PATH`;
+   - `scaffold`: `arci init` refusing or writing an unusable `arci.yaml` (Track B);
+   - `run`: the demo or `arci run` (a step that does not hold, an `ERROR` line,
+     `run directory is not empty`);
+   - `store`: the store check in 4.3 (a missing file, `arci gate` disagreeing, a changed sha256);
+   - `interpretation`: a wrong answer to the interpretation question (5.3);
+   - `environment`: anything outside ARCI and the README (a harness or policy denying a command,
+     a shell difference, no network, a full disk). It is recorded, and the attempt still counts.
+
+   Failed attempts are kept and contributed like successful ones. `outcome.verdict` is `ERROR`
+   when no valid verdict line was printed (the template's "ERROR if none").
 3. Path: `docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json`, the date of the attempt.
    No personal data beyond the handle; `facilitator` and `comprehension.scorer` are handles only,
    with no personal data.
@@ -187,12 +219,16 @@ later `arci run` that does.
 
 1. Use only receipts with `reader.kind: cold` and no coaching events. Report the count used and
    the count excluded, and why.
-2. Per track, sort `total` ascending; a failed attempt counts as longer than every success.
+2. Per track, only each reader's first attempt enters the ranking (the receipt without an attempt
+   suffix, 7.1; if in doubt, the earliest `readme_opened`). Repeat attempts are listed separately
+   and never replace or improve a reader's number. Sort `total` ascending; a failed attempt counts
+   as longer than every success.
    Percentiles are nearest rank: pN is the value at rank ceil(N/100 × n). If that rank is a
    failure, report "not reached". With fewer than 20 receipts p95 is the maximum; say so.
-3. With fewer than five receipts in a track, make no percentile claim; list the raw values.
-4. Report the "4/5 within 15 min" metric as k of n attempts with `total` ≤ 900 s, and the
-   cold-read metric as k of n readers with `all_correct: true`.
+3. With fewer than five first attempts in a track, make no percentile claim; list the raw values.
+4. Report the "4/5 within 15 min" metric as k of n attempts with `total` ≤ 900 s, where n counts
+   only each reader's first attempt on the track (8.2), and the cold-read metric as k of n
+   readers with `all_correct: true`.
 5. Report `agent_execution` beside Track B totals (never subtracted), and Track A's
    interpretation correctness (k of n) beside Track A totals.
 6. Beside Track A's `total`, report the memo-definition figure `readme_opened` →
