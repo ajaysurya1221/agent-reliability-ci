@@ -52,7 +52,7 @@ shasum -a 256 -c SHA256SUMS
 uvx --from agent-reliability-ci==X.Y.Z arci demo
 ```
 
-The demo must end with `All six steps held.`
+The demo must print `All six steps held.`
 
 ## When the publish job fails
 
