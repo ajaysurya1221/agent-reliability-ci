@@ -5,7 +5,7 @@ d99e291089d2c8f70721ef745566b89ef164e9e6f0c593c510fcebf2dd86ee9c  docs/TRUST_MOD
 69e262ecb8be06ae83492252b8e1b67a7e32c4be45d011b0da32864cd54678a3  docs/design/0002-out-of-process-boundary.md
 46d9eb3fa62a6117444d34a30d479c101def6aa21d578ea6e2bfe0bba3c667e0  docs/design/0003-decision-boundary.md
 6762324f9401d5c4149ddfbb6fc04e37982ce918cf151b4e6fb94d0df606d7e2  docs/design/0004-day-one.md
-24f39d4f59b1270586120f5fdffb56ec1dd80a3f3be8d3645583fa7ae396a31a  docs/design/0005-v0.8.0-packaging-and-version-bump.md
+ee48b1bff246e3115069d192b4718b3ca3e6c813c357b6afb06e2a27f9864087  docs/design/0005-v0.8.0-packaging-and-version-bump.md
 94cb0a1bc4ca96f7a2e084c2acdd235b89000a1d65ff36a76b536cabdff2e2c9  docs/design/0006-cwd-on-the-child-import-path.md
 465b2bc4286495212e664e613132b83d1d9bd920c0193b1490668345ebaac790  docs/design/0007-descriptor.md
 7b5b28bb063a6867579f6f7c179dc5505bb9ea9351dff158ac77df263571036b  docs/design/0008-arci-init.md
