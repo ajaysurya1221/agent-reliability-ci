@@ -1,0 +1,1282 @@
+diff --git a/examples/retry_agent/agents.py b/examples/retry_agent/agents.py
+index 6955639..5a532c5 100644
+--- a/examples/retry_agent/agents.py
++++ b/examples/retry_agent/agents.py
+@@ -1,131 +1,12 @@
+-"""Baseline, retry regression and repaired inventory agents."""
++"""Baseline, retry regression and repaired inventory agents.
++
++The implementation lives in :mod:`arci.demo.agents` so that ``arci demo`` runs from an
++installed wheel; this module re-exports it, so ``examples.retry_agent.agents:agent_b``
++and ``arci.demo.agents:agent_b`` resolve to the same function.
++"""
+ 
+ from __future__ import annotations
+ 
+-import random
+-from collections.abc import Callable
++from arci.demo.agents import Task, agent_a, agent_b, agent_c
+ 
+-from pydantic import JsonValue
+-
+-from arci.interfaces import ToolBoxProtocol, ToolFault
+-
+-Task = dict[str, JsonValue]
+-
+-
+-def _reserve_arguments(task: Task) -> dict[str, JsonValue]:
+-    return {
+-        "order_id": task["order_id"],
+-        "sku": task["sku"],
+-        "quantity": task["quantity"],
+-    }
+-
+-
+-def _succeeded(value: JsonValue, key: str) -> bool:
+-    return isinstance(value, dict) and value.get(key) is True
+-
+-
+-def _reservation_state(task: Task, tools: ToolBoxProtocol) -> bool:
+-    tools.note_model_step("inspect_reservation")
+-    state = tools.call("get_reservation", order_id=task["order_id"])
+-    needs_reservation = not _succeeded(state, "reserved")
+-    tools.note_model_step("reservation_decision", needs_reservation=needs_reservation)
+-    return not needs_reservation
+-
+-
+-def agent_a(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+-    """Baseline: inspect state and retry transient reserve and confirm faults."""
+-    del rng
+-    reserved = _reservation_state(task, tools)
+-    if not reserved:
+-        for attempt in range(3):
+-            tools.note_model_step("reserve_attempt", attempt=attempt + 1)
+-            try:
+-                reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
+-            except ToolFault:
+-                continue
+-            break
+-
+-    confirmed = False
+-    if reserved:
+-        for attempt in range(3):
+-            tools.note_model_step("confirm_attempt", attempt=attempt + 1)
+-            try:
+-                confirmed = _succeeded(
+-                    tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+-                    "confirmed",
+-                )
+-            except ToolFault:
+-                continue
+-            break
+-    tools.note_model_step("completion_decision", confirmed=confirmed)
+-    return {"success": True}
+-
+-
+-def agent_b(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+-    """Regression: a reserve timeout is treated as final before confirming."""
+-    del rng
+-    reserved = _reservation_state(task, tools)
+-    if not reserved:
+-        tools.note_model_step("reserve_attempt", attempt=1)
+-        try:
+-            reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
+-        except ToolFault:
+-            tools.note_model_step("reserve_failed_continue")
+-
+-    confirmed = False
+-    for attempt in range(3):
+-        tools.note_model_step("confirm_attempt", attempt=attempt + 1)
+-        try:
+-            confirmed = _succeeded(
+-                tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+-                "confirmed",
+-            )
+-        except ToolFault:
+-            continue
+-        break
+-    tools.note_model_step("completion_decision", confirmed=confirmed, reserved=reserved)
+-    return {"success": True}
+-
+-
+-def _with_retry(
+-    tools: ToolBoxProtocol,
+-    operation: str,
+-    call: Callable[[], JsonValue],
+-    *,
+-    attempts: int = 3,
+-) -> JsonValue:
+-    for attempt in range(attempts):
+-        tools.note_model_step(f"{operation}_attempt", attempt=attempt + 1)
+-        try:
+-            return call()
+-        except ToolFault:
+-            continue
+-    return None
+-
+-
+-def agent_c(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
+-    """Repair: share one bounded retry helper across both transient operations."""
+-    del rng
+-    reserved = _reservation_state(task, tools)
+-    if not reserved:
+-        reserved = _succeeded(
+-            _with_retry(
+-                tools,
+-                "reserve",
+-                lambda: tools.call("reserve", **_reserve_arguments(task)),
+-            ),
+-            "reserved",
+-        )
+-
+-    confirmed = False
+-    if reserved:
+-        confirmed = _succeeded(
+-            _with_retry(
+-                tools,
+-                "confirm",
+-                lambda: tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
+-            ),
+-            "confirmed",
+-        )
+-    tools.note_model_step("completion_decision", confirmed=confirmed)
+-    return {"success": True}
++__all__ = ["Task", "agent_a", "agent_b", "agent_c"]
+diff --git a/examples/retry_agent/world.py b/examples/retry_agent/world.py
+index 52e472e..67aa736 100644
+--- a/examples/retry_agent/world.py
++++ b/examples/retry_agent/world.py
+@@ -1,125 +1,32 @@
+ """Seeded inventory scenarios for the retry example.
+ 
+-Each seed independently selects two realistic conditions: 65% of customers
+-already hold a reservation for the order, while 4% of backend sessions have a
+-four-call transient ``confirm`` outage. The remaining customers need a new
+-reservation, and the remaining backend sessions confirm normally.
++The implementation lives in :mod:`arci.demo.world` so that ``arci demo`` runs from an
++installed wheel; this module re-exports it, so ``examples.retry_agent.world:make_world``
++and ``arci.demo.world:make_world`` resolve to the same objects and the same scenarios.
+ """
+ 
+ from __future__ import annotations
+ 
+-import random
+-from collections.abc import Callable, Mapping
+-from dataclasses import dataclass
++from arci.demo.world import (
++    CONFIRM_TRANSIENT_FAILURES,
++    FLAKY_CONFIRM_SHARE,
++    PREEXISTING_RESERVATION_SHARE,
++    InventoryWorld,
++    Scenario,
++    Task,
++    make_world,
++    oracle,
++    scenario_for_seed,
++)
+ 
+-from pydantic import JsonValue
+-
+-Task = dict[str, JsonValue]
+-PREEXISTING_RESERVATION_SHARE = 0.65
+-FLAKY_CONFIRM_SHARE = 0.04
+-CONFIRM_TRANSIENT_FAILURES = 4
+-
+-
+-@dataclass(frozen=True)
+-class Scenario:
+-    """Environment conditions selected independently from a trial seed."""
+-
+-    has_reservation: bool
+-    flaky_confirm: bool
+-
+-
+-def scenario_for_seed(seed: int) -> Scenario:
+-    """Return the deterministic scenario for one schedule seed."""
+-    return Scenario(
+-        has_reservation=(
+-            random.Random(f"{seed}:reservation").random() < PREEXISTING_RESERVATION_SHARE
+-        ),
+-        flaky_confirm=(random.Random(f"{seed}:backend-confirm").random() < FLAKY_CONFIRM_SHARE),
+-    )
+-
+-
+-def _integer(task: Task, key: str) -> int:
+-    value = task[key]
+-    if not isinstance(value, int) or isinstance(value, bool):
+-        raise TypeError(f"{key} must be an integer")
+-    return value
+-
+-
+-def _string(task: Task, key: str) -> str:
+-    value = task[key]
+-    if not isinstance(value, str):
+-        raise TypeError(f"{key} must be a string")
+-    return value
+-
+-
+-class InventoryWorld:
+-    def __init__(self, task: Task, seed: int) -> None:
+-        stock = _integer(task, "stock")
+-        quantity = _integer(task, "quantity")
+-        order_id = _string(task, "order_id")
+-        scenario = scenario_for_seed(seed)
+-        self._stock = stock
+-        self._reservations: dict[str, int] = {}
+-        self._confirmed: list[dict[str, JsonValue]] = []
+-        self._confirm_failures_remaining = (
+-            CONFIRM_TRANSIENT_FAILURES if scenario.flaky_confirm else 0
+-        )
+-        if scenario.has_reservation:
+-            self._stock -= quantity
+-            self._reservations[order_id] = quantity
+-        self.tools: Mapping[str, Callable[..., JsonValue]] = {
+-            "get_stock": self._get_stock,
+-            "get_reservation": self._get_reservation,
+-            "reserve": self._reserve,
+-            "confirm": self._confirm,
+-        }
+-
+-    def _get_stock(self, sku: str) -> JsonValue:
+-        return {"sku": sku, "available": self._stock}
+-
+-    def _get_reservation(self, order_id: str) -> JsonValue:
+-        quantity = self._reservations.get(order_id)
+-        return {"order_id": order_id, "reserved": quantity is not None, "quantity": quantity}
+-
+-    def _reserve(self, order_id: str, sku: str, quantity: int) -> JsonValue:
+-        existing = self._reservations.get(order_id)
+-        if existing is not None:
+-            return {"reserved": existing == quantity, "quantity": existing}
+-        if quantity <= 0 or quantity > self._stock:
+-            return {"reserved": False, "quantity": 0}
+-        self._stock -= quantity
+-        self._reservations[order_id] = quantity
+-        return {"reserved": True, "quantity": quantity, "sku": sku}
+-
+-    def _confirm(self, order_id: str, sku: str) -> JsonValue:
+-        if self._confirm_failures_remaining:
+-            self._confirm_failures_remaining -= 1
+-            raise TimeoutError("confirm backend transient timeout")
+-        quantity = self._reservations.get(order_id)
+-        if quantity is None or any(item["order_id"] == order_id for item in self._confirmed):
+-            return {"confirmed": False}
+-        self._confirmed.append({"order_id": order_id, "sku": sku, "quantity": quantity})
+-        return {"confirmed": True}
+-
+-    def snapshot(self) -> dict[str, JsonValue]:
+-        return {
+-            "stock": self._stock,
+-            "reservations": dict(self._reservations),
+-            "confirmed": list(self._confirmed),
+-        }
+-
+-
+-def make_world(task: Task, seed: int) -> InventoryWorld:
+-    return InventoryWorld(task, seed)
+-
+-
+-def oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
+-    confirmed = final_state.get("confirmed")
+-    if not isinstance(confirmed, list) or len(confirmed) != 1:
+-        return False
+-    item = confirmed[0]
+-    return isinstance(item, dict) and item == {
+-        "order_id": task["order_id"],
+-        "sku": task["sku"],
+-        "quantity": task["quantity"],
+-    }
++__all__ = [
++    "CONFIRM_TRANSIENT_FAILURES",
++    "FLAKY_CONFIRM_SHARE",
++    "PREEXISTING_RESERVATION_SHARE",
++    "InventoryWorld",
++    "Scenario",
++    "Task",
++    "make_world",
++    "oracle",
++    "scenario_for_seed",
++]
+diff --git a/plan/exec/reports/02.md b/plan/exec/reports/02.md
+new file mode 100644
+index 0000000..de91019
+--- /dev/null
++++ b/plan/exec/reports/02.md
+@@ -0,0 +1,32 @@
++REPORT 02 — Status DONE
++Changes:
++- src/arci/demo/world.py, src/arci/demo/agents.py (new): byte-identical copies of examples/retry_agent/{world,agents}.py (diffed against HEAD), imports unchanged.
++- src/arci/demo/experiment.py (new): build_manifest(n_per_arm=200, candidate="agent_b") / clean_manifest(candidate="agent_b") with arci.demo.* refs and id f"arci-demo-{candidate}-{condition_id}-{n_per_arm}"; task, condition, labels, candidate_ids, base_seed 12_000, budgets 10/10/15.0 identical to the example.
++- src/arci/demo/run.py (new): the six hero_demo steps as public functions (illustrative_run, frozen_experiment, first_divergence, shrink, replay_offline, repaired_reproducer, repaired_experiment) plus run_demo(workers, keep) -> 0/1; CLI calls go through arci.cli.main in-process (stdout/stderr captured; arci.cli imported inside arci() to avoid the import cycle); default workers min(8, os.cpu_count() or 4); tempfile.mkdtemp(prefix="arci-demo-") unless --keep; check_keep refuses a file or non-empty dir. Same step/ok/FAIL lines as hero_demo; last two lines: "All six steps held." then "Run stores: <dir>. Every count above was computed fresh on this machine, not replayed from evidence; they are expected to match the recorded run (A 192/200, B 132/200)."
++- src/arci/demo/__init__.py (new): exports run_demo.
++- src/arci/__main__.py (new, 3 lines): python -m arci == arci.
++- src/arci/cli.py: one import line (from arci.demo.run import check_keep, default_workers, run_demo) plus two "# --- demo ---" ... "# --- end demo ---" regions (add_parser at the end of _parser; dispatch before the unknown-command raise). --keep occupied -> CliError -> exit 3, one stderr line.
++- examples/retry_agent/world.py, agents.py: re-export shims (explicit names + __all__) of arci.demo.world/agents; identity holds.
++- tests/unit/demo/{__init__,test_demo}.py (new, 13 tests, ~3.5 s): seals/refs/ids/budgets/task/seeds vs the example builder and differing record_sha256 (x3 candidates + clean), unknown candidate, shim identity, -I subprocess import isolation (arci.cli + arci.demo.* load no examples./bench./tests.), `python -I -m arci demo --help` exit 0/empty stderr/"usage: arci demo", step logic on the 12-pair noisy run (steps 1,3,4,5 + C on the reproducer), failed step -> exit 1 naming the store, --keep on non-empty dir and on a file -> exit 3 with one stderr line and nothing touched, --workers 0 -> 3.
++Tests:
++- .venv/bin/pytest tests/unit/demo tests/unit/examples tests/acceptance/test_hero.py -q -> 51 passed in 86.25s
++- .venv/bin/pytest -o addopts="" -q -x tests -> 894 passed, 2 skipped in 341.47s
++- .venv/bin/ruff format --check . -> 229 files already formatted
++- .venv/bin/ruff check . -> All checks passed!
++- .venv/bin/basedpyright -> 0 errors, 0 warnings, 0 notes
++- python3 docs/assets/src/make_figures.py --check -> figures are current: hero-dark.svg, hero-light.svg, where-dark.svg, where-light.svg
++- shasum -a 256 -c FROZEN.sha256 | grep -v OK -> no output
++- .venv/bin/python -m arci.cli demo (empty scratch dir, 15-core machine, 8 workers) -> exit 0, wall 39 s, empty stderr, nothing written to cwd; last 3 lines:
++    (blank)
++    All six steps held.
++    Run stores: /var/folders/.../T/arci-demo-k2f__iuj. Every count above was computed fresh on this machine, not replayed from evidence; they are expected to match the recorded run (A 192/200, B 132/200).
++  Step 2 printed A 192/200 vs agent_b 132/200 (BLOCK) and A 192/200 vs agent_a 192/200 (PASS).
++Deviations:
++- Shims use explicit `from arci.demo.world import (...)` + __all__ instead of `import *` (ruff F403 would fire; same public names, no noqa).
++- Added one informational line per step-2 run ("passed under the fault: A x/200, <cand> y/200", read from trials.jsonl) so the final line's "counts" are visible; and a one-line header naming workers and the store dir. All ok/FAIL lines match hero_demo; failure-only guards (noisy run exit 3, no A-pass/B-fail pair, no bundle) print a FAIL line only when they trigger.
++- Final statement is split: "All six steps held." then a final line naming the store dir and the fresh-vs-recorded note.
++- The cli.py change is two marked regions (parser, dispatch) plus the import line, since parser and dispatch live in separate functions.
++Open issues:
++- Wheel install path (uv build + uvx in an empty dir) not run by me (no uv per AGENTS.md); in-process CLI calls and arci.demo.* refs mean no PYTHONPATH is needed, but the orchestrator's wheel run is the real evidence.
++- arci.cli now imports arci.demo.run (and arci.demo.experiment, arci.replay already imported) at import time; cheap, and the isolation test pins that it pulls in no examples/bench/tests.
++- examples/ollama_mcp_agent/experiment.py still references examples.retry_agent.world refs; they resolve through the shims (ollama_agent unit tests pass).
+diff --git a/src/arci/__main__.py b/src/arci/__main__.py
+new file mode 100644
+index 0000000..52274bd
+--- /dev/null
++++ b/src/arci/__main__.py
+@@ -0,0 +1,3 @@
++from arci.cli import main
++
++raise SystemExit(main())
+diff --git a/src/arci/cli.py b/src/arci/cli.py
+index 3d9c034..41986a0 100644
+--- a/src/arci/cli.py
++++ b/src/arci/cli.py
+@@ -14,6 +14,7 @@ from typing import Literal, NoReturn, Protocol, cast
+ 
+ from pydantic import JsonValue
+ 
++from arci.demo.run import check_keep, default_workers, run_demo
+ from arci.gate import decide
+ from arci.mcp_boundary import (
+     UpstreamResult,
+@@ -497,6 +498,31 @@ def _parser() -> _Parser:
+     minimize.add_argument("run_dir", metavar="RUN_DIR")
+     minimize.add_argument("trial_id", metavar="TRIAL_ID")
+     minimize.add_argument("--out", required=True, metavar="PATH")
++
++    # --- demo ---
++    demo = commands.add_parser(
++        "demo",
++        help="run the packaged six-step retry story (no clone, no model call)",
++        description=(
++            "The retry story end to end through the real run, diff, minimize and replay: "
++            "agent B drops a retry and is BLOCKed at N=200 per arm, the failure shrinks to "
++            "one fault and replays offline, and the repaired agent C passes. Every count is "
++            "computed fresh; exit 0 when all six steps hold, 1 when one does not."
++        ),
++    )
++    demo.add_argument(
++        "--workers",
++        type=_positive_int,
++        default=default_workers(),
++        metavar="N",
++        help="parallel trials (default: min(8, CPU count))",
++    )
++    demo.add_argument(
++        "--keep",
++        metavar="DIR",
++        help="write the run stores to DIR (empty or new) instead of a temporary directory",
++    )
++    # --- end demo ---
+     return parser
+ 
+ 
+@@ -562,6 +588,19 @@ def _dispatch(values: dict[str, object]) -> int:
+             cast(str, values["trial_id"]),
+             cast(str, values["out"]),
+         )
++    # --- demo ---
++    if command == "demo":
++        keep = cast(str | None, values["keep"])
++        if keep is not None:
++            try:
++                check_keep(Path(keep))
++            except ValueError as exc:
++                raise CliError(str(exc)) from None
++        return run_demo(
++            workers=cast(int, values["workers"]),
++            keep=None if keep is None else Path(keep),
++        )
++    # --- end demo ---
+     raise CliError(f"unknown command: {command}")
+ 
+ 
+diff --git a/src/arci/demo/__init__.py b/src/arci/demo/__init__.py
+new file mode 100644
+index 0000000..5aa5819
+--- /dev/null
++++ b/src/arci/demo/__init__.py
+@@ -0,0 +1,7 @@
++"""The packaged retry demo behind ``arci demo``: agents, world, manifests and the six steps."""
++
++from __future__ import annotations
++
++from arci.demo.run import run_demo
++
++__all__ = ["run_demo"]
+diff --git a/src/arci/demo/agents.py b/src/arci/demo/agents.py
+new file mode 100644
+index 0000000..6955639
+--- /dev/null
++++ b/src/arci/demo/agents.py
+@@ -0,0 +1,131 @@
++"""Baseline, retry regression and repaired inventory agents."""
++
++from __future__ import annotations
++
++import random
++from collections.abc import Callable
++
++from pydantic import JsonValue
++
++from arci.interfaces import ToolBoxProtocol, ToolFault
++
++Task = dict[str, JsonValue]
++
++
++def _reserve_arguments(task: Task) -> dict[str, JsonValue]:
++    return {
++        "order_id": task["order_id"],
++        "sku": task["sku"],
++        "quantity": task["quantity"],
++    }
++
++
++def _succeeded(value: JsonValue, key: str) -> bool:
++    return isinstance(value, dict) and value.get(key) is True
++
++
++def _reservation_state(task: Task, tools: ToolBoxProtocol) -> bool:
++    tools.note_model_step("inspect_reservation")
++    state = tools.call("get_reservation", order_id=task["order_id"])
++    needs_reservation = not _succeeded(state, "reserved")
++    tools.note_model_step("reservation_decision", needs_reservation=needs_reservation)
++    return not needs_reservation
++
++
++def agent_a(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
++    """Baseline: inspect state and retry transient reserve and confirm faults."""
++    del rng
++    reserved = _reservation_state(task, tools)
++    if not reserved:
++        for attempt in range(3):
++            tools.note_model_step("reserve_attempt", attempt=attempt + 1)
++            try:
++                reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
++            except ToolFault:
++                continue
++            break
++
++    confirmed = False
++    if reserved:
++        for attempt in range(3):
++            tools.note_model_step("confirm_attempt", attempt=attempt + 1)
++            try:
++                confirmed = _succeeded(
++                    tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
++                    "confirmed",
++                )
++            except ToolFault:
++                continue
++            break
++    tools.note_model_step("completion_decision", confirmed=confirmed)
++    return {"success": True}
++
++
++def agent_b(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
++    """Regression: a reserve timeout is treated as final before confirming."""
++    del rng
++    reserved = _reservation_state(task, tools)
++    if not reserved:
++        tools.note_model_step("reserve_attempt", attempt=1)
++        try:
++            reserved = _succeeded(tools.call("reserve", **_reserve_arguments(task)), "reserved")
++        except ToolFault:
++            tools.note_model_step("reserve_failed_continue")
++
++    confirmed = False
++    for attempt in range(3):
++        tools.note_model_step("confirm_attempt", attempt=attempt + 1)
++        try:
++            confirmed = _succeeded(
++                tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
++                "confirmed",
++            )
++        except ToolFault:
++            continue
++        break
++    tools.note_model_step("completion_decision", confirmed=confirmed, reserved=reserved)
++    return {"success": True}
++
++
++def _with_retry(
++    tools: ToolBoxProtocol,
++    operation: str,
++    call: Callable[[], JsonValue],
++    *,
++    attempts: int = 3,
++) -> JsonValue:
++    for attempt in range(attempts):
++        tools.note_model_step(f"{operation}_attempt", attempt=attempt + 1)
++        try:
++            return call()
++        except ToolFault:
++            continue
++    return None
++
++
++def agent_c(task: Task, tools: ToolBoxProtocol, rng: random.Random) -> Task:
++    """Repair: share one bounded retry helper across both transient operations."""
++    del rng
++    reserved = _reservation_state(task, tools)
++    if not reserved:
++        reserved = _succeeded(
++            _with_retry(
++                tools,
++                "reserve",
++                lambda: tools.call("reserve", **_reserve_arguments(task)),
++            ),
++            "reserved",
++        )
++
++    confirmed = False
++    if reserved:
++        confirmed = _succeeded(
++            _with_retry(
++                tools,
++                "confirm",
++                lambda: tools.call("confirm", order_id=task["order_id"], sku=task["sku"]),
++            ),
++            "confirmed",
++        )
++    tools.note_model_step("completion_decision", confirmed=confirmed)
++    return {"success": True}
+diff --git a/src/arci/demo/experiment.py b/src/arci/demo/experiment.py
+new file mode 100644
+index 0000000..49795a2
+--- /dev/null
++++ b/src/arci/demo/experiment.py
+@@ -0,0 +1,76 @@
++"""Frozen-manifest builders for the packaged retry demo (``arci demo``).
++
++The same experiment as ``examples/retry_agent/experiment.py``: the same task, condition,
++budgets and base seed, so the same trial seeds and the same counts. Only the references
++(``arci.demo.*``, importable from an installed wheel) and the ``arci-demo-`` experiment id
++prefix differ, which gives these manifests their own seals.
++"""
++
++from __future__ import annotations
++
++from arci.schema import (
++    ArmSpec,
++    Bucket,
++    Budgets,
++    Condition,
++    ContractSpec,
++    FaultSpec,
++    Manifest,
++)
++
++BASE = "arci.demo"
++CANDIDATES = ("agent_a", "agent_b", "agent_c")
++
++
++def _manifest(*, candidate: str, condition: Condition, n_per_arm: int) -> Manifest:
++    if candidate not in CANDIDATES:
++        raise ValueError(f"unknown candidate: {candidate}")
++    return Manifest.create(
++        experiment_id=f"arci-demo-{candidate}-{condition.condition_id}-{n_per_arm}",
++        task_id="confirm-inventory-order",
++        task={
++            "order_id": "order-7",
++            "sku": "widget",
++            "quantity": 2,
++            "stock": 10,
++        },
++        toolset=f"{BASE}.world:make_world",
++        contract=ContractSpec(oracle=f"{BASE}.world:oracle"),
++        baseline=ArmSpec(
++            label="agent_a", agent=f"{BASE}.agents:agent_a", candidate_id="baseline-a"
++        ),
++        candidate=ArmSpec(
++            label=candidate,
++            agent=f"{BASE}.agents:{candidate}",
++            candidate_id=f"candidate-{candidate}",
++        ),
++        conditions=(condition,),
++        n_per_arm=n_per_arm,
++        base_seed=12_000,
++        budgets=Budgets(max_tool_calls=10, max_model_steps=10, max_seconds=15.0),
++    )
++
++
++def build_manifest(n_per_arm: int = 200, candidate: str = "agent_b") -> Manifest:
++    """The frozen experiment: ``tool_timeout`` on the first ``reserve`` call."""
++    condition = Condition(
++        condition_id="reserve-timeout",
++        faults=(
++            FaultSpec(
++                name="tool_timeout",
++                bucket=Bucket.FALSIFY,
++                tool="reserve",
++                at_occurrence=0,
++            ),
++        ),
++    )
++    return _manifest(candidate=candidate, condition=condition, n_per_arm=n_per_arm)
++
++
++def clean_manifest(candidate: str = "agent_b") -> Manifest:
++    """One fault-free pair: the illustrative run that cannot tell A from B."""
++    return _manifest(
++        candidate=candidate,
++        condition=Condition(condition_id="clean"),
++        n_per_arm=1,
++    )
+diff --git a/src/arci/demo/run.py b/src/arci/demo/run.py
+new file mode 100644
+index 0000000..60c7f40
+--- /dev/null
++++ b/src/arci/demo/run.py
+@@ -0,0 +1,300 @@
++"""The retry story in six steps, through the real CLI, from an installed wheel.
++
++1. One illustrative run cannot tell agent A from agent B.
++2. The frozen experiment BLOCKs B (exit 1) and PASSes A against itself (exit 0).
++3. The paired trace diff names the first divergent step after the injected fault.
++4. Fault minimisation shrinks the failing condition to the one fault that matters.
++5. The exported bundle replays the failure offline.
++6. The repaired agent C passes the reproducer and its own frozen experiment.
++
++Every count is computed fresh by running the agents; nothing is read from recorded evidence.
++CLI steps call ``arci.cli.main`` in-process, so no ``PYTHONPATH``, repository checkout or
++``__file__`` lookup is involved: the agents are referenced as ``arci.demo.*``.
++"""
++
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import tempfile
++from dataclasses import dataclass
++from pathlib import Path
++from typing import NoReturn
++
++from arci.demo.experiment import build_manifest, clean_manifest
++from arci.replay import replay
++from arci.runner import run_trial
++from arci.schedule import build_schedule
++from arci.schema import (
++    Bucket,
++    Condition,
++    FaultSpec,
++    Manifest,
++    Outcome,
++    ReplayBundle,
++    ReplayStatus,
++    ToolMode,
++)
++
++N_PER_ARM = 200
++NOISY_N_PER_ARM = 12
++RECORDED_COUNTS = "A 192/200, B 132/200"
++
++
++class StepFailed(Exception):
++    """A demo expectation did not hold; the message is the failed expectation."""
++
++
++@dataclass(frozen=True)
++class CliResult:
++    code: int
++    stdout: str
++    stderr: str
++
++    @property
++    def last_line(self) -> str:
++        lines = [line for line in self.stdout.splitlines() if line.strip()]
++        if lines:
++            return lines[-1].strip()
++        detail = self.stderr.strip().splitlines()
++        return detail[-1] if detail else f"(no output, exit {self.code})"
++
++
++def default_workers() -> int:
++    return min(8, os.cpu_count() or 4)
++
++
++def arci(*args: str) -> CliResult:
++    """Run one ``arci`` command in-process and capture what it prints."""
++    # Deferred: arci.cli imports this module to register the demo subcommand.
++    from arci.cli import main
++
++    stdout, stderr = io.StringIO(), io.StringIO()
++    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
++        code = main(list(args))
++    return CliResult(code=code, stdout=stdout.getvalue(), stderr=stderr.getvalue())
++
++
++def step(number: int, title: str) -> None:
++    print(f"\n=== {number}. {title}", flush=True)
++
++
++def expect(condition: bool, message: str) -> None:
++    print(("  ok   " if condition else "  FAIL ") + message, flush=True)
++    if not condition:
++        raise StepFailed(message)
++
++
++def fail(message: str) -> NoReturn:
++    expect(False, message)
++    raise StepFailed(message)
++
++
++def indented(text: str) -> str:
++    return "  " + text.strip().replace("\n", "\n  ")
++
++
++def check_keep(keep: Path) -> None:
++    """Refuse a ``--keep`` path that is a file or a non-empty directory."""
++    if keep.exists() and (not keep.is_dir() or any(keep.iterdir())):
++        raise ValueError(f"--keep must name an empty or new directory: {keep}")
++
++
++def with_noise(manifest: Manifest) -> Manifest:
++    """The same experiment plus two irrelevant injected faults, for the minimiser to remove."""
++    (condition,) = manifest.conditions
++    noise = (
++        FaultSpec(name="empty_result", bucket=Bucket.BENIGN, tool="get_stock", at_occurrence=6),
++        FaultSpec(name="tool_error_once", bucket=Bucket.FALSIFY, tool="confirm", at_occurrence=9),
++    )
++    noisy = Condition(condition_id=condition.condition_id, faults=(*noise, *condition.faults))
++    data = manifest.model_dump(exclude={"record_sha256"})
++    return Manifest.create(
++        **{
++            **data,
++            "experiment_id": f"{manifest.experiment_id}-noisy",
++            "conditions": (noisy,),
++            "n_per_arm": NOISY_N_PER_ARM,
++        }
++    )
++
++
++def _write_manifest(work: Path, name: str, manifest: Manifest) -> Path:
++    path = work / f"manifest-{name}.json"
++    path.write_text(manifest.model_dump_json(), encoding="utf-8")
++    return path
++
++
++def _run(work: Path, manifest_path: Path, workers: int) -> CliResult:
++    return arci("run", str(manifest_path), "--out", str(work / "runs"), "--workers", str(workers))
++
++
++def _candidate_passes(run_dir: Path) -> tuple[int, int]:
++    trials = [
++        json.loads(line)
++        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
++        if line.strip()
++    ]
++    counts = {"baseline": 0, "candidate": 0}
++    for trial in trials:
++        if trial["outcome"] == "PASS":
++            counts[trial["arm"]] += 1
++    return counts["baseline"], counts["candidate"]
++
++
++def illustrative_run() -> None:
++    """Step 1: one clean pair passes on both arms."""
++    step(1, "One illustrative run: A and B look the same")
++    clean = clean_manifest(candidate="agent_b")
++    outcomes = [
++        run_trial(spec, lambda _event: None, clean.contract).outcome
++        for spec in build_schedule(clean)
++    ]
++    expect(
++        outcomes == [Outcome.PASS, Outcome.PASS],
++        f"pass@1, no fault: A={outcomes[0]} B={outcomes[1]}",
++    )
++
++
++def frozen_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> None:
++    """Step 2: A vs B BLOCKs, A vs A PASSes."""
++    step(2, f"The frozen experiment, N={n_per_arm} per arm, fault: tool_timeout on reserve")
++    verdicts: dict[str, int] = {}
++    for candidate in ("agent_b", "agent_a"):
++        manifest = build_manifest(n_per_arm=n_per_arm, candidate=candidate)
++        done = _run(work, _write_manifest(work, candidate, manifest), workers)
++        verdicts[candidate] = done.code
++        print(f"  {done.last_line}   [A vs {candidate}]", flush=True)
++        if done.code in (0, 1):
++            baseline, passed = _candidate_passes(work / "runs" / manifest.experiment_id)
++            print(
++                f"  passed under the fault: A {baseline}/{n_per_arm}, "
++                f"{candidate} {passed}/{n_per_arm}",
++                flush=True,
++            )
++    expect(verdicts["agent_b"] == 1, "A vs B is BLOCKED (exit 1)")
++    expect(verdicts["agent_a"] == 0, "A vs A PASSES (exit 0)")
++
++
++def first_divergence(work: Path, workers: int) -> tuple[Path, str]:
++    """Step 3: run the noisy 12-pair experiment and diff a passing and a failing trial."""
++    step(3, "Where do a passing and a failing run part ways?")
++    noisy = with_noise(build_manifest(n_per_arm=N_PER_ARM, candidate="agent_b"))
++    done = _run(work, _write_manifest(work, "noisy", noisy), workers)
++    if done.code not in (0, 1, 2):
++        fail(f"the noisy run did not complete: {done.last_line}")
++    run_dir = work / "runs" / noisy.experiment_id
++    trials = [
++        json.loads(line)
++        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
++        if line.strip()
++    ]
++    by_id = {trial["trial_id"]: trial for trial in trials}
++    failing = next(
++        (
++            trial["trial_id"]
++            for trial in trials
++            if trial["arm"] == "candidate"
++            and trial["outcome"] == "FAIL"
++            and by_id[trial["pair_id"] + ":baseline"]["outcome"] == "PASS"
++        ),
++        None,
++    )
++    if failing is None:
++        fail("no pair where A passes and B fails")
++    passing = failing.rsplit(":", 1)[0] + ":baseline"
++    diffed = arci("diff", str(run_dir), passing, failing)
++    print(indented(diffed.stdout), flush=True)
++    expect(
++        diffed.code == 0 and "tool_timeout" in diffed.stdout,
++        "the divergence sits right after the injected tool_timeout",
++    )
++    return run_dir, failing
++
++
++def shrink(work: Path, run_dir: Path, failing: str) -> ReplayBundle:
++    """Step 4: minimise the failing trial's three faults to the one that matters."""
++    step(4, "Shrink the failing condition (3 injected faults)")
++    bundle_path = work / "min.json"
++    shrunk = arci("minimize", str(run_dir), failing, "--out", str(bundle_path))
++    print(indented(shrunk.stdout or shrunk.stderr), flush=True)
++    if shrunk.code != 0 or not bundle_path.exists():
++        fail(f"the minimiser wrote no bundle (exit {shrunk.code})")
++    reduced = ReplayBundle.model_validate_json(bundle_path.read_text(encoding="utf-8"))
++    kept = [fault.name for fault in reduced.spec.condition.faults]
++    expect(
++        kept == ["tool_timeout"] and reduced.minimality == "1-minimal",
++        f"1-minimal reproducer keeps only {kept}",
++    )
++    return reduced
++
++
++def replay_offline(work: Path) -> None:
++    """Step 5: replay the reduced bundle from its recording."""
++    step(5, "Replay the reduced bundle offline")
++    replayed = arci("replay", str(work / "min.json"))
++    print(f"  {replayed.last_line}", flush=True)
++    expect(replayed.code == 0, "REPRODUCED from the recording, no live tools")
++
++
++def repaired_reproducer(reduced: ReplayBundle) -> None:
++    """Step 6, first half: agent C runs the exact reproducer live and passes."""
++    repaired_agent = build_manifest(n_per_arm=N_PER_ARM, candidate="agent_c").candidate.agent
++    data = reduced.model_dump(exclude={"record_sha256"})
++    live = reduced.spec.model_copy(
++        update={
++            "agent": repaired_agent,
++            "tool_mode": ToolMode.RECORD,
++            "recording": (),
++            "replay_final_state": None,
++        }
++    )
++    result = replay(ReplayBundle.create(**{**data, "spec": live}))
++    expect(
++        result.status is ReplayStatus.NOT_REPRODUCED and result.observed_outcome is Outcome.PASS,
++        "C passes the exact reproducer that B fails",
++    )
++
++
++def repaired_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> None:
++    """Step 6, second half: A vs C PASSes its own frozen experiment."""
++    manifest_c = build_manifest(n_per_arm=n_per_arm, candidate="agent_c")
++    done = _run(work, _write_manifest(work, "agent_c", manifest_c), workers)
++    print(f"  {done.last_line}   [A vs agent_c]", flush=True)
++    expect(done.code == 0, "A vs C PASSES its own separately frozen experiment (exit 0)")
++
++
++def run_demo(*, workers: int | None = None, keep: Path | None = None) -> int:
++    """Run all six steps; 0 when every step holds, 1 when one fails."""
++    workers = default_workers() if workers is None else workers
++    if workers < 1:
++        raise ValueError("workers must be at least 1")
++    if keep is None:
++        work = Path(tempfile.mkdtemp(prefix="arci-demo-"))
++    else:
++        check_keep(keep)
++        keep.mkdir(parents=True, exist_ok=True)
++        work = keep.resolve()
++    print(f"arci demo: the retry story, {workers} workers, run stores in {work}", flush=True)
++    try:
++        illustrative_run()
++        frozen_experiment(work, workers)
++        run_dir, failing = first_divergence(work, workers)
++        reduced = shrink(work, run_dir, failing)
++        replay_offline(work)
++        step(6, "The repair: agent C")
++        repaired_reproducer(reduced)
++        repaired_experiment(work, workers)
++    except StepFailed as failed:
++        print(f"\nA step did not hold: {failed}. Run stores: {work}", flush=True)
++        return 1
++    print("\nAll six steps held.", flush=True)
++    print(
++        f"Run stores: {work}. Every count above was computed fresh on this machine, "
++        f"not replayed from evidence; they are expected to match the recorded run "
++        f"({RECORDED_COUNTS}).",
++        flush=True,
++    )
++    return 0
+diff --git a/src/arci/demo/world.py b/src/arci/demo/world.py
+new file mode 100644
+index 0000000..52e472e
+--- /dev/null
++++ b/src/arci/demo/world.py
+@@ -0,0 +1,125 @@
++"""Seeded inventory scenarios for the retry example.
++
++Each seed independently selects two realistic conditions: 65% of customers
++already hold a reservation for the order, while 4% of backend sessions have a
++four-call transient ``confirm`` outage. The remaining customers need a new
++reservation, and the remaining backend sessions confirm normally.
++"""
++
++from __future__ import annotations
++
++import random
++from collections.abc import Callable, Mapping
++from dataclasses import dataclass
++
++from pydantic import JsonValue
++
++Task = dict[str, JsonValue]
++PREEXISTING_RESERVATION_SHARE = 0.65
++FLAKY_CONFIRM_SHARE = 0.04
++CONFIRM_TRANSIENT_FAILURES = 4
++
++
++@dataclass(frozen=True)
++class Scenario:
++    """Environment conditions selected independently from a trial seed."""
++
++    has_reservation: bool
++    flaky_confirm: bool
++
++
++def scenario_for_seed(seed: int) -> Scenario:
++    """Return the deterministic scenario for one schedule seed."""
++    return Scenario(
++        has_reservation=(
++            random.Random(f"{seed}:reservation").random() < PREEXISTING_RESERVATION_SHARE
++        ),
++        flaky_confirm=(random.Random(f"{seed}:backend-confirm").random() < FLAKY_CONFIRM_SHARE),
++    )
++
++
++def _integer(task: Task, key: str) -> int:
++    value = task[key]
++    if not isinstance(value, int) or isinstance(value, bool):
++        raise TypeError(f"{key} must be an integer")
++    return value
++
++
++def _string(task: Task, key: str) -> str:
++    value = task[key]
++    if not isinstance(value, str):
++        raise TypeError(f"{key} must be a string")
++    return value
++
++
++class InventoryWorld:
++    def __init__(self, task: Task, seed: int) -> None:
++        stock = _integer(task, "stock")
++        quantity = _integer(task, "quantity")
++        order_id = _string(task, "order_id")
++        scenario = scenario_for_seed(seed)
++        self._stock = stock
++        self._reservations: dict[str, int] = {}
++        self._confirmed: list[dict[str, JsonValue]] = []
++        self._confirm_failures_remaining = (
++            CONFIRM_TRANSIENT_FAILURES if scenario.flaky_confirm else 0
++        )
++        if scenario.has_reservation:
++            self._stock -= quantity
++            self._reservations[order_id] = quantity
++        self.tools: Mapping[str, Callable[..., JsonValue]] = {
++            "get_stock": self._get_stock,
++            "get_reservation": self._get_reservation,
++            "reserve": self._reserve,
++            "confirm": self._confirm,
++        }
++
++    def _get_stock(self, sku: str) -> JsonValue:
++        return {"sku": sku, "available": self._stock}
++
++    def _get_reservation(self, order_id: str) -> JsonValue:
++        quantity = self._reservations.get(order_id)
++        return {"order_id": order_id, "reserved": quantity is not None, "quantity": quantity}
++
++    def _reserve(self, order_id: str, sku: str, quantity: int) -> JsonValue:
++        existing = self._reservations.get(order_id)
++        if existing is not None:
++            return {"reserved": existing == quantity, "quantity": existing}
++        if quantity <= 0 or quantity > self._stock:
++            return {"reserved": False, "quantity": 0}
++        self._stock -= quantity
++        self._reservations[order_id] = quantity
++        return {"reserved": True, "quantity": quantity, "sku": sku}
++
++    def _confirm(self, order_id: str, sku: str) -> JsonValue:
++        if self._confirm_failures_remaining:
++            self._confirm_failures_remaining -= 1
++            raise TimeoutError("confirm backend transient timeout")
++        quantity = self._reservations.get(order_id)
++        if quantity is None or any(item["order_id"] == order_id for item in self._confirmed):
++            return {"confirmed": False}
++        self._confirmed.append({"order_id": order_id, "sku": sku, "quantity": quantity})
++        return {"confirmed": True}
++
++    def snapshot(self) -> dict[str, JsonValue]:
++        return {
++            "stock": self._stock,
++            "reservations": dict(self._reservations),
++            "confirmed": list(self._confirmed),
++        }
++
++
++def make_world(task: Task, seed: int) -> InventoryWorld:
++    return InventoryWorld(task, seed)
++
++
++def oracle(task: Task, final_state: dict[str, JsonValue]) -> bool:
++    confirmed = final_state.get("confirmed")
++    if not isinstance(confirmed, list) or len(confirmed) != 1:
++        return False
++    item = confirmed[0]
++    return isinstance(item, dict) and item == {
++        "order_id": task["order_id"],
++        "sku": task["sku"],
++        "quantity": task["quantity"],
++    }
+diff --git a/tests/unit/demo/__init__.py b/tests/unit/demo/__init__.py
+new file mode 100644
+index 0000000..46979af
+--- /dev/null
++++ b/tests/unit/demo/__init__.py
+@@ -0,0 +1 @@
++"""Packaged `arci demo` unit tests."""
+diff --git a/tests/unit/demo/test_demo.py b/tests/unit/demo/test_demo.py
+new file mode 100644
+index 0000000..c0c29f8
+--- /dev/null
++++ b/tests/unit/demo/test_demo.py
+@@ -0,0 +1,190 @@
++"""`arci demo`: the packaged retry story, its manifests, its isolation and its CLI edges.
++
++The full N=200 demo is not run here (CI time); the step logic is exercised with the
++12-pair noisy run, and the orchestrator runs the whole demo from a built wheel.
++"""
++
++from __future__ import annotations
++
++import subprocess
++import sys
++import textwrap
++from pathlib import Path
++
++import pytest
++
++import arci.demo.agents as demo_agents
++import arci.demo.run as demo_run
++import arci.demo.world as demo_world
++import examples.retry_agent.agents as example_agents
++import examples.retry_agent.world as example_world
++from arci.cli import main
++from arci.demo.experiment import build_manifest, clean_manifest
++from arci.schedule import build_schedule
++from examples.retry_agent import experiment as example_experiment
++
++CANDIDATES = ("agent_a", "agent_b", "agent_c")
++
++
++@pytest.mark.parametrize("candidate", CANDIDATES)
++def test_demo_manifest_is_the_example_experiment_with_its_own_refs_and_seal(
++    candidate: str,
++) -> None:
++    demo = build_manifest(n_per_arm=200, candidate=candidate)
++    example = example_experiment.build_manifest(n_per_arm=200, candidate=candidate)
++
++    assert demo.validate_seal()
++    assert demo.experiment_id == f"arci-demo-{candidate}-reserve-timeout-200"
++    assert demo.toolset == "arci.demo.world:make_world"
++    assert demo.contract.oracle == "arci.demo.world:oracle"
++    assert demo.baseline.agent == "arci.demo.agents:agent_a"
++    assert demo.baseline.candidate_id == "baseline-a"
++    assert demo.candidate.agent == f"arci.demo.agents:{candidate}"
++    assert demo.candidate.candidate_id == f"candidate-{candidate}"
++    assert demo.baseline.label == example.baseline.label
++    assert demo.candidate.label == example.candidate.label
++    assert demo.task_id == example.task_id
++    assert demo.task == example.task
++    assert demo.conditions == example.conditions
++    assert demo.budgets == example.budgets
++    assert (
++        (demo.base_seed, demo.n_per_arm) == (example.base_seed, example.n_per_arm) == (12_000, 200)
++    )
++    assert [spec.seed for spec in build_schedule(demo)] == [
++        spec.seed for spec in build_schedule(example)
++    ]
++    assert demo.record_sha256 != example.record_sha256
++
++
++def test_demo_clean_manifest_matches_the_example_clean_pair() -> None:
++    demo = clean_manifest(candidate="agent_b")
++    example = example_experiment.clean_manifest(candidate="agent_b")
++
++    assert demo.validate_seal()
++    assert demo.experiment_id == "arci-demo-agent_b-clean-1"
++    assert demo.conditions == example.conditions
++    assert demo.task == example.task
++    assert demo.n_per_arm == 1
++    assert demo.record_sha256 != example.record_sha256
++
++
++def test_unknown_candidate_is_refused() -> None:
++    with pytest.raises(ValueError, match="unknown candidate"):
++        build_manifest(candidate="agent_z")
++
++
++def test_example_modules_reexport_the_packaged_objects() -> None:
++    assert example_world.make_world is demo_world.make_world
++    assert example_world.oracle is demo_world.oracle
++    assert example_world.scenario_for_seed is demo_world.scenario_for_seed
++    assert example_world.InventoryWorld is demo_world.InventoryWorld
++    assert example_world.Scenario is demo_world.Scenario
++    assert example_world.PREEXISTING_RESERVATION_SHARE == demo_world.PREEXISTING_RESERVATION_SHARE
++    assert example_world.FLAKY_CONFIRM_SHARE == demo_world.FLAKY_CONFIRM_SHARE
++    assert example_world.CONFIRM_TRANSIENT_FAILURES == demo_world.CONFIRM_TRANSIENT_FAILURES
++    assert example_agents.agent_a is demo_agents.agent_a
++    assert example_agents.agent_b is demo_agents.agent_b
++    assert example_agents.agent_c is demo_agents.agent_c
++
++
++def test_importing_the_demo_and_cli_loads_no_examples_bench_or_tests() -> None:
++    script = textwrap.dedent(
++        """
++        import sys
++        import arci.cli
++        import arci.demo
++        import arci.demo.agents
++        import arci.demo.experiment
++        import arci.demo.run
++        import arci.demo.world
++        roots = ("examples", "bench", "tests")
++        loaded = sorted(
++            m for m in sys.modules if any(m == r or m.startswith(r + ".") for r in roots)
++        )
++        assert not loaded, loaded
++        print("ok")
++        """
++    )
++    completed = subprocess.run(
++        [sys.executable, "-I", "-c", script], capture_output=True, text=True, check=False
++    )
++    assert completed.returncode == 0, completed.stderr
++    assert completed.stdout == "ok\n"
++
++
++def test_demo_help_exits_zero_with_empty_stderr() -> None:
++    completed = subprocess.run(
++        [sys.executable, "-I", "-m", "arci", "demo", "--help"],
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    assert completed.returncode == 0
++    assert completed.stderr == ""
++    assert completed.stdout.startswith("usage: arci demo")
++
++
++def test_the_step_logic_holds_on_the_noisy_run(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    """Steps 1, 3, 4, 5 and the reproducer half of 6, without the N=200 runs."""
++    demo_run.illustrative_run()
++    run_dir, failing = demo_run.first_divergence(tmp_path, workers=4)
++    assert run_dir == tmp_path / "runs" / "arci-demo-agent_b-reserve-timeout-200-noisy"
++    assert failing.endswith(":candidate")
++    reduced = demo_run.shrink(tmp_path, run_dir, failing)
++    assert [fault.name for fault in reduced.spec.condition.faults] == ["tool_timeout"]
++    assert reduced.spec.agent == "arci.demo.agents:agent_b"
++    demo_run.replay_offline(tmp_path)
++    demo_run.repaired_reproducer(reduced)
++
++    out = capsys.readouterr().out
++    assert "FAIL" not in out
++    assert out.count("  ok   ") == 5
++    assert "after_injection: tool_timeout" in out
++    assert "  kept: tool_timeout\n" in out
++    assert "minimality: 1-minimal" in out
++    assert "REPRODUCED: failure reproduced" in out
++
++
++def test_a_failed_step_exits_one_and_names_the_store(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    def broken() -> None:
++        demo_run.fail("injected for the test")
++
++    monkeypatch.setattr(demo_run, "illustrative_run", broken)
++    keep = tmp_path / "stores"
++
++    assert main(["demo", "--keep", str(keep), "--workers", "1"]) == 1
++    out = capsys.readouterr().out
++    assert "  FAIL injected for the test" in out
++    assert f"A step did not hold: injected for the test. Run stores: {keep.resolve()}" in out
++    assert "All six steps held" not in out
++    assert keep.is_dir()
++
++
++@pytest.mark.parametrize("kind", ["non-empty directory", "file"])
++def test_keep_refuses_an_occupied_path_with_exit_three(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str
++) -> None:
++    if kind == "file":
++        keep = tmp_path / "taken"
++        keep.write_text("mine\n", encoding="utf-8")
++    else:
++        keep = tmp_path / "stores"
++        keep.mkdir()
++        (keep / "mine.txt").write_text("mine\n", encoding="utf-8")
++
++    assert main(["demo", "--keep", str(keep)]) == 3
++    captured = capsys.readouterr()
++    assert captured.out == ""
++    assert captured.err.count("\n") == 1
++    assert captured.err.startswith("error: CliError: --keep must name an empty or new directory")
++    assert sorted(path.name for path in tmp_path.rglob("*")) == sorted(
++        ["taken"] if kind == "file" else ["stores", "mine.txt"]
++    )
++
++
++def test_bad_workers_is_a_cli_error() -> None:
++    assert main(["demo", "--workers", "0"]) == 3
