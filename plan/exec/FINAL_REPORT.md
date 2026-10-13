@@ -1,7 +1,7 @@
 # FINAL_REPORT — ARCI v0.8.0 sprint (orchestrated run of 2026-10-13)
 
-<<DRAFT at 07:15Z; sections 1 (S10, S12), 4, 5, 8 and the final counts are completed at wrap-up.
-Budget clock: Task 00 commit 2026-10-13T03:42:56Z; stop-starting at 12:57:56Z; end 13:42:56Z.>>
+Budget clock: Task 00 commit 2026-10-13T03:42:56Z; stop-starting at 12:57:56Z; end 13:42:56Z. Work ended
+at about 08:35Z (4 h 50 min of the 10 h), with every lane merged and nothing in flight.
 
 Orchestrator: Claude Fable 5.1 (this session). Coders and reviewers: Claude Opus 5.5 at effort high
 (workflow subagents; model verified in every transcript). Consultant: Codex `gpt-6-astra` at xhigh,
@@ -20,10 +20,10 @@ decisions, measurements), `docs/design/0005`–`0009`.
 | S6 README first screen | merged (T11) | 191 words before the first `## `; ADR 0009; all links absolute; cold read 5/5 (AI-agent labelled) |
 | S7 Python recipe | merged (T08, T08r1) | `examples/recipes/python_agent/`, `docs/recipes/python-agent.md`, recorded outputs, 18 recipe tests |
 | S8 MCP recipe + Inspector | merged with the Inspector step recorded as blocked (T09; D-03) | `examples/recipes/mcp_agent/`, `docs/recipes/mcp-inspector.md` (Inspector 2.10.1 / SDK 1.29.0 rejects protocol 2026-07-28; verbatim) |
-| S9 TTFV harness | merged (T10, two revision rounds) | `docs/measurement/ttfv-protocol.md`, `receipt.template.json`, `receipts/README.md` |
+| S9 TTFV harness | merged (T10, two revision rounds); two maintainer-machine receipts merged (T13) | `docs/measurement/ttfv-protocol.md`, `receipt.template.json`, `receipts/` (two `ai-agent` receipts; no cold readers yet) |
 | S10 release-integrity merge | merged (T12, two rounds) | 68f7c8c on main; ADR 0005; titled re-freeze commit 5142d66; merge bar on the merge commit green (1216 tests, frozen 53/53, reproduce 0 failed) |
 | S11 install/Action matrix | merged (T07) | CI jobs wheel-smoke (Ubuntu/macOS × 3.11/3.14), windows-smoke (install/--help only), action-fixture (must BLOCK); `sprint/**` trigger |
-| S12 release | tagged; PyPI and GitHub release need the user (HUMAN_INBOX 1 and 3) | annotated tag v0.8.0 = 48e60ac (main CI green); release run 38365660814: guard+build and wheel smoke ×4 green, publish failed `invalid-publisher` (no trusted publisher registered); CI artefacts byte-identical to a local build; `gh release create` denied by the user's settings; receipts and notes on sprint/t13-docs (REVIEW 13) |
+| S12 release | tagged; PyPI and GitHub release need the user (HUMAN_INBOX 1 and 3) | annotated tag v0.8.0 = 48e60ac (main CI green); release run 38365660814: guard+build and wheel smoke ×4 green, publish failed `invalid-publisher` (no trusted publisher registered); CI artefacts byte-identical to a local build; `gh release create` denied by the user's settings; receipts, recipe titles and README availability merged (T13, REVIEW 13 two rounds) |
 
 ## 2. Deviations from the memo, with the rule that decided each
 (rules: a = the prompt, b = the memo, c = the repo's rules, d = Astra consult, e = reversibility)
@@ -43,8 +43,8 @@ decisions, measurements), `docs/design/0005`–`0009`.
 - `codex exec` runs with stdin closed and prompts in files after three consults stalled on an open stdin pipe (D-05).
 
 ## 3. Review coverage
-Product changes merged into main: 8 (T02, T02b, T06+T07, T10, T03, T04+T05, T08+T09, T11); every one carries two or more non-author reviews. Merged with one review: 0. With none: 0 (plan-only commits under `plan/exec/` are records, not product changes; one of them, the README-pins script, broke `ruff` on main for two commits and was fixed in cbd8d20).
-Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release workflow, CI), T03 (three rounds), T04+T05 (two rounds; ADR 0006/0008), T08+T09 (two rounds), T11 (two rounds), plus T12 (two rounds, in progress) and T13 <<pending>>. Astra also made the three blind bias-control proposals (E1–E3) and their tie-breaks, and CONSULT 01.
+Product changes merged into main: 10 (T02, T02b, T06+T07, T10, T03, T04+T05, T08+T09, T11, T12, T13); every one carries two or more non-author reviews. Merged with one review: 0. With none: 0 (plan-only commits under `plan/exec/` are records, not product changes; one of them, the README-pins script, broke `ruff` on main for two commits and was fixed in cbd8d20).
+Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release workflow, CI), T03 (three rounds), T04+T05 (two rounds; ADR 0006/0008), T08+T09 (two rounds), T11 (two rounds), T12 (two rounds; FROZEN/pyproject), T13 (two rounds; release). Seven of the ten merged changes had an Astra review; the three without (T02, T02b, T10) touched no mandatory area. Astra also made the three blind bias-control proposals (E1–E3) and their tie-breaks, and CONSULT 01.
 
 | Task | Author | Reviewers | Verdicts (rounds) |
 |---|---|---|---|
@@ -56,8 +56,8 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 | T04+T05 init/smoke | Opus | Fable, reviewer-subagent, Astra | r1 reviewer REVISE, Astra REVISE (2 MAJOR) → r2 reviewer ACCEPT, Astra REVISE (O_EXCL fallback) → r3 reviewer ACCEPT, Astra ACCEPT |
 | T08+T09 recipes | Opus (+ orchestrator-pasted Inspector output) | Fable, reviewer-subagent, Astra | r1 found the pasted block incomplete → T08r1 → ACCEPT, ACCEPT |
 | T11 README | Fable | reviewer-subagent, Astra | r1 Astra REVISE (relative links) → r2 ACCEPT, ACCEPT |
-| T12 release merge | Fable | reviewer-subagent, Astra | r1 REVISE, REVISE (ROADMAP claim; carried-forward bullets; lock markers) → r2 <<pending>> |
-| T13 release | Fable | reviewer-subagent, Astra | <<pending>> |
+| T12 release merge | Fable | reviewer-subagent, Astra | r1 REVISE, REVISE (ROADMAP claim; carried-forward bullets; lock markers) → r2 ACCEPT, ACCEPT |
+| T13 release, receipts | Fable | reviewer-subagent, Astra | r1 REVISE (README clause, un-stamped times, inbox command), REVISE (stale sentence) → r2 ACCEPT, ACCEPT; both scored the two interpretation answers correct |
 
 ## 4. Metrics vs the memo's targets
 | Metric | Target | Measured | Where |
@@ -72,9 +72,9 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 None of S1–S12 was cut. Reduced: S8's Inspector preflight ships as a recorded, blocked step rather than a working one (D-03); S9 shipped the protocol and maintainer-machine receipts but no cold readers (recruiting is the user's step, HUMAN_INBOX 5); S12's PyPI upload and GitHub release page wait on the user (HUMAN_INBOX 1 and 3). The budget was not the reason for any of these.
 
 ## 6. Usage
-- Opus 5.5 (workflow subagents, all `claude-opus-5-5`, effort high): 32 workflow runs, 39 agent transcripts (14 coder task dispatches incl. 7 revision rounds; 15 reviewer dispatches; 1 cold read; 1 probe; 1 read-only repo map). Output tokens 948,886; cache reads 232.4 M; cache creation 9.2 M (summed from the transcripts at 07:15Z; T12 round 2 and T13 reviews add to this; final figure at wrap-up <<>>).
+- Opus 5.5 (workflow subagents, all `claude-opus-5-5`, effort high): 34 workflow runs, 41 agent transcripts (14 coder task dispatches incl. 7 revision rounds; 17 reviewer dispatches; 1 cold read; 1 probe; 1 read-only repo map). Output tokens 996,821; cache reads 244.0 M; cache creation 10.0 M (summed from the transcripts at the end of the run).
 - Fable 5.1 (orchestrator): one session, context compacted once at ~06:45Z; wrote the plan, CONTRACT, ADRs 0005–0009, the README rewrite (T11), T12, all merges and verification runs, the recipe docs' Inspector transcript, and every plan record.
-- Astra (`gpt-6-astra`, xhigh, read-only): 20 consults so far (CONSULT 01; E1/E2/E3 proposals and tie-breaks; reviews 06-07, 03 ×3, 04-05 ×3, 08-09 ×2, 11 ×2, 12 ×2) <<+ T13>>; typical run 3–8 minutes; three early runs stalled 45 minutes on open stdin (D-05).
+- Astra (`gpt-6-astra`, xhigh, read-only): 22 consults (CONSULT 01; E1/E2/E3 proposals and tie-breaks; reviews 06-07, 03 ×3, 04-05 ×3, 08-09 ×2, 11 ×2, 12 ×2, 13 ×2); typical run 3–8 minutes; three early runs stalled 45 minutes on open stdin (D-05).
 
 ## 7. Known issues
 - `src/arci/mcp_boundary.py` reads `sys.stdout.buffer` at import (pre-existing; not hit by the demo).
