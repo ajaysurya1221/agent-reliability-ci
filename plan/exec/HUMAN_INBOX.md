@@ -36,9 +36,10 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 
 ## 6. Follow-ups the orchestrator could not finish (see FINAL_REPORT.md "Next three steps")
 
-- Cold readers: five people for the TTFV protocol (`docs/measurement/ttfv-protocol.md`), after
-  item 1, using the pilot template (F). The maintainer-machine receipts in
-  `docs/measurement/receipts/` are labelled `ai-agent` and never count.
+- Cold readers: five people for the TTFV protocol (`docs/measurement/ttfv-protocol.md`), using the
+  pilot template (F). The thirteen receipts in `docs/measurement/receipts/` (maintainer-machine runs and
+  the five-reader AI cohort) are labelled `ai-agent` and never count; the cohort did find the
+  `--task` snag and the long path to "Gate your own agent" that people would hit too.
 - Review leftovers (one follow-up branch, two reviews each): ADR 0005 names `httpcore` where the
   lock says `httpcore2` (fix at the next re-freeze); an sdist allowlist step in `release.yml`;
   `arci init` reports every non-FileExistsError from `os.link` as "hard links unsupported" (name
@@ -54,7 +55,8 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 - main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
   every later plan-only commit; T13 docs (receipts, recipe titles, availability line) merged from
   sprint/t13-docs after REVIEW 13 (two rounds, both reviewers ACCEPT); T14 (availability line
-  "published", PyPI-route receipt) merged after REVIEW 14 (two rounds).
+  "published", PyPI-route receipt) merged after REVIEW 14 (two rounds); T15 (ten AI-cohort receipts, README
+  `--task` note) merged after REVIEW 15 (three rounds), at your request after the run.
 - PyPI: published (0.8.0, attested, 08:25Z). GitHub release page: created by you at ~08:27Z with the CI files attached.
 - Nothing half-applied: every lane branch is merged; no frozen file changed outside ADR 0005's
   re-freeze; no recorded result edited; no force-push, no deleted branch/tag/release, no secret.

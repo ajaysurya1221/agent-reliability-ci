@@ -43,8 +43,8 @@ decisions, measurements), `docs/design/0005`–`0009`.
 - `codex exec` runs with stdin closed and prompts in files after three consults stalled on an open stdin pipe (D-05).
 
 ## 3. Review coverage
-Product changes merged into main: 11 (T02, T02b, T06+T07, T10, T03, T04+T05, T08+T09, T11, T12, T13, T14); every one carries two or more non-author reviews. Merged with one review: 0. With none: 0 (plan-only commits under `plan/exec/` are records, not product changes; one of them, the README-pins script, broke `ruff` on main for two commits and was fixed in cbd8d20).
-Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release workflow, CI), T03 (three rounds), T04+T05 (two rounds; ADR 0006/0008), T08+T09 (two rounds), T11 (two rounds), T12 (two rounds; FROZEN/pyproject), T13 (two rounds; release), T14 (two rounds; post-publication docs). Eight of the eleven merged changes had an Astra review; the three without (T02, T02b, T10) touched no mandatory area. Astra also made the three blind bias-control proposals (E1–E3) and their tie-breaks, and CONSULT 01.
+Product changes merged into main: 12 (T02, T02b, T06+T07, T10, T03, T04+T05, T08+T09, T11, T12, T13, T14, T15); every one carries two or more non-author reviews. Merged with one review: 0. With none: 0 (plan-only commits under `plan/exec/` are records, not product changes; one of them, the README-pins script, broke `ruff` on main for two commits and was fixed in cbd8d20).
+Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release workflow, CI), T03 (three rounds), T04+T05 (two rounds; ADR 0006/0008), T08+T09 (two rounds), T11 (two rounds), T12 (two rounds; FROZEN/pyproject), T13 (two rounds; release), T14 (two rounds; post-publication docs), T15 (three rounds; AI-cohort receipts). Nine of the twelve merged changes had an Astra review; the three without (T02, T02b, T10) touched no mandatory area. Astra also made the three blind bias-control proposals (E1–E3) and their tie-breaks, and CONSULT 01.
 
 | Task | Author | Reviewers | Verdicts (rounds) |
 |---|---|---|---|
@@ -59,6 +59,7 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 | T12 release merge | Fable | reviewer-subagent, Astra | r1 REVISE, REVISE (ROADMAP claim; carried-forward bullets; lock markers) → r2 ACCEPT, ACCEPT |
 | T13 release, receipts | Fable | reviewer-subagent, Astra | r1 REVISE (README clause, un-stamped times, inbox command), REVISE (stale sentence) → r2 ACCEPT, ACCEPT; both scored the two interpretation answers correct |
 | T14 post-publication docs | Fable | reviewer-subagent, Astra | r1 REVISE (one long README line, two receipt nits), ACCEPT → r2 ACCEPT, ACCEPT |
+| T15 AI-cohort receipts (user request after the run) | Fable | reviewer-subagent, Astra | r1 REVISE (user paths in notes; verdict enum prose; README link), REVISE (mixed re-run exits; failed-init scaffold stamps; coaching timestamp) → r2 ACCEPT, REVISE (generated names) → r3 ACCEPT, ACCEPT |
 
 ## 4. Metrics vs the memo's targets
 | Metric | Target | Measured | Where |
@@ -74,9 +75,9 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 None of S1–S12 was cut. Reduced: S8's Inspector preflight ships as a recorded, blocked step rather than a working one (D-03); S9 shipped the protocol and maintainer-machine receipts but no cold readers (recruiting is the user's step, HUMAN_INBOX 5); S12's PyPI upload and GitHub release page wait on the user (HUMAN_INBOX 1 and 3). The budget was not the reason for any of these.
 
 ## 6. Usage
-- Opus 5.5 (workflow subagents, all `claude-opus-5-5`, effort high): 36 workflow runs, 43 agent transcripts (14 coder task dispatches incl. 7 revision rounds; 19 reviewer dispatches; 1 cold read; 1 probe; 1 read-only repo map). Output tokens 1,017,287; cache reads 248.5 M; cache creation 10.3 M (summed from the transcripts at the end of the run).
+- Claude workflow subagents: 40 workflow runs, 56 agent transcripts (14 Opus 5.5 coder task dispatches incl. 7 revision rounds; 22 Opus 5.5 reviewer dispatches; 1 Opus cold read; 1 probe; 1 read-only repo map; the AI cohort: 5 readers on Opus/Sonnet/Haiku and 5 Sonnet scorers). Models seen: {'claude-opus-5-5': 2451, 'claude-sonnet-5-5': 73, 'claude-haiku-5-5': 25}. Output tokens 1,126,100; cache reads 269.0 M; cache creation 11.9 M (summed from the transcripts at the end of the run).
 - Fable 5.1 (orchestrator): one session, context compacted once at ~06:45Z; wrote the plan, CONTRACT, ADRs 0005–0009, the README rewrite (T11), T12, all merges and verification runs, the recipe docs' Inspector transcript, and every plan record.
-- Astra (`gpt-6-astra`, xhigh, read-only): 24 consults (CONSULT 01; E1/E2/E3 proposals and tie-breaks; reviews 06-07, 03 ×3, 04-05 ×3, 08-09 ×2, 11 ×2, 12 ×2, 13 ×2, 14 ×2); typical run 3–8 minutes; three early runs stalled 45 minutes on open stdin (D-05).
+- Astra (`gpt-6-astra`, xhigh, read-only): 27 consults (CONSULT 01; E1/E2/E3 proposals and tie-breaks; reviews 06-07, 03 ×3, 04-05 ×3, 08-09 ×2, 11 ×2, 12 ×2, 13 ×2, 14 ×2, 15 ×3); typical run 3–8 minutes; three early runs stalled 45 minutes on open stdin (D-05).
 
 ## 7. Known issues
 - `src/arci/mcp_boundary.py` reads `sys.stdout.buffer` at import (pre-existing; not hit by the demo).
