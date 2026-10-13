@@ -55,10 +55,32 @@ Errors are one line on stderr, exit 3, nothing written, in the CLI's existing
 module and dependencies`, `--fault tool_timeout:reserve:0: tool reserve absent from --toolset
 tests.world:make_world; choose an advertised tool`, `output arci.yaml exists; use --force to replace it`.
 
-### Settled by the tie-break consult
+### Settled by the tie-break consult (`plan/exec/consults/E1-tiebreak.md`)
 
-TBD-A success stdout · TBD-B header comment · TBD-C arm labels and candidate_id · TBD-D accepted
-fault names · TBD-E task id flag (see `plan/exec/consults/E1-tiebreak.md`; filled in below once ruled).
+- Success output is exactly one line on stdout, the next command, shell-quoted when needed:
+  `arci run arci.yaml`. stderr stays empty. (Astra's position; copyable, matches the brief.)
+- The header written at the top of the descriptor:
+
+  ```yaml
+  # arci experiment descriptor. Schema: `arci schema`.
+  # smoke design: expect INCONCLUSIVE; run arci plan before a confirmatory N
+  # Default: 8 trials per arm; this scaffold does not establish confirmatory power.
+  # Plan before trials: arci plan --help
+  # Never extend this experiment based on its verdict.
+  ```
+  (Astra's four lines plus the schema pointer; no universal "impossible below N" claim in the file,
+  because the thresholds hold for two perfect arms and a total collapse, not in general.)
+- Arm labels are `baseline` and `candidate`; `candidate_id` stays at the Manifest default. An import
+  reference does not identify an immutable code version, and the report's headings are fixed.
+- `--fault` accepts only the built-in names `tool_timeout`, `tool_error_once`, `empty_result`; a
+  custom `module:function` fault is written by hand in the descriptor.
+- No `--task-id` flag; the task id is the experiment id.
+- Repeated `--fault` flags compose one condition (K stays 1), per Astra; the orchestrator's separate
+  conditions would have taken the smoke design out of the planner's domain.
+
+Positions: Fable (two-line success output, six-line header with threshold sentence and a planning
+example, derived labels and ref-valued candidate_id, custom faults allowed, `--task-id`, one
+condition per fault). Astra (as adopted). Rule that decided: (d) the tie-break consult, which saw both.
 
 ## Not in v0.8.0
 

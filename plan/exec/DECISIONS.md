@@ -69,3 +69,13 @@ additional input from stdin..." because the harness's background shell left stdi
 Fix: every consult runs with `< /dev/null`, and long prompts live in `plan/exec/consults/<id>-prompt.md`
 ("write it to a file and point Astra at the path"). The stalled runs produced no output and were
 killed; nothing was read from them. Rule: (a).
+
+### D-06 (E1, ADR 0008): the `arci init` contract
+Independent proposals agreed on the signature, N=8, child-process validation, one-line errors and
+`arci run --out` defaulting to `runs`. The five differences went to a tie-break consult
+(plan/exec/consults/E1-tiebreak.md), which chose Astra's position on all five (single-line success
+output; a five-line header without universal threshold claims; labels baseline/candidate; built-in
+fault names only; no --task-id) and flagged a sixth: repeated --fault flags form ONE condition
+(K=1). Adopted in full. Rule: (d). Consequence: T05's notice wording must say "two perfect arms
+cannot PASS below N=42; a total collapse cannot BLOCK below N=8" (Astra's correction of the plan's
+looser sentence).
