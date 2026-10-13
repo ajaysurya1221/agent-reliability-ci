@@ -1,0 +1,588 @@
+{
+  "$defs": {
+    "ArmSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
+        "candidate_id": {
+          "default": "",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "ArmSpec",
+      "type": "object"
+    },
+    "Bucket": {
+      "description": "What a perturbation is expected to do to a correct agent.",
+      "enum": [
+        "falsify",
+        "benign",
+        "ceiling"
+      ],
+      "title": "Bucket",
+      "type": "string"
+    },
+    "Budgets": {
+      "additionalProperties": false,
+      "properties": {
+        "grader_seconds": {
+          "default": 20.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Grader Seconds",
+          "type": "number"
+        },
+        "max_model_steps": {
+          "default": 50,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Model Steps",
+          "type": "integer"
+        },
+        "max_seconds": {
+          "default": 30.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Max Seconds",
+          "type": "number"
+        },
+        "max_tool_calls": {
+          "default": 30,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        }
+      },
+      "title": "Budgets",
+      "type": "object"
+    },
+    "CommandSpec": {
+      "additionalProperties": false,
+      "description": "An agent that is any subprocess. Its tools must go through the MCP boundary.\n\n`argv` may use the placeholders {mcp_config}, {task_file}, {workdir} and {seed}; they are\nexpanded only at launch and never stored expanded, so sealed records stay path-free.\nExit status 0 means the agent claims success. Anything else is a crash.",
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Argv",
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "infra_exit_codes": {
+          "default": [
+            75
+          ],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Infra Exit Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "argv"
+      ],
+      "title": "CommandSpec",
+      "type": "object"
+    },
+    "ContractSpec": {
+      "additionalProperties": false,
+      "description": "Behaviour contract. Only invariants the tool boundary can observe are allowed.",
+      "properties": {
+        "forbidden_tools": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Tools",
+          "type": "array"
+        },
+        "max_calls_per_tool": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Max Calls Per Tool",
+          "type": "object"
+        },
+        "max_tool_calls": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tool Calls"
+        },
+        "oracle": {
+          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+          "title": "Oracle",
+          "type": "string"
+        },
+        "required_tools": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Tools",
+          "type": "array"
+        },
+        "unobservable": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unobservable",
+          "type": "array"
+        }
+      },
+      "required": [
+        "oracle"
+      ],
+      "title": "ContractSpec",
+      "type": "object"
+    },
+    "DecisionSpec": {
+      "additionalProperties": false,
+      "description": "A System One decision endpoint (TypeSafe's `POST /v1/systemone`) for command agents.\n\nThe boundary process serves it on loopback and the agent is pointed at it through\n`TYPESAFE_BASE_URL` / `TYPESAFE_API_KEY` (a per-trial token, never the real key), so an agent\nusing the official SDKs needs no code change. Every attempt the agent makes is recorded under\nthe reserved tool name `decision:systemone`, budgeted, perturbable and replayable exactly like\na tool call. `upstream` says where live answers come from: a trusted `fixture` function\n`(request, seed, occurrence) -> response body` imported in the boundary, or `http`, forwarded\nverbatim (with `model` pinned) to `base_url` with the real key taken from the HARNESS\nenvironment. Real upstream failures are harness faults (ERROR), never agent failures.",
+      "properties": {
+        "base_url": {
+          "default": "https://api.typesafe.ai",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "fixture": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fixture"
+        },
+        "max_body_bytes": {
+          "default": 262144,
+          "maximum": 1048576,
+          "minimum": 1,
+          "title": "Max Body Bytes",
+          "type": "integer"
+        },
+        "max_decisions": {
+          "default": 50,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Max Decisions",
+          "type": "integer"
+        },
+        "max_requests_per_minute": {
+          "default": 600,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Max Requests Per Minute",
+          "type": "integer"
+        },
+        "model": {
+          "default": "jev-1.13.0",
+          "title": "Model",
+          "type": "string"
+        },
+        "request_seconds": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Request Seconds",
+          "type": "number"
+        },
+        "upstream": {
+          "enum": [
+            "fixture",
+            "http"
+          ],
+          "title": "Upstream",
+          "type": "string"
+        }
+      },
+      "required": [
+        "upstream"
+      ],
+      "title": "DecisionSpec",
+      "type": "object"
+    },
+    "DescriptorCondition": {
+      "additionalProperties": false,
+      "description": "One condition, compiled to a `Condition`.\n\nGive exactly one of `id` and `condition_id` (the same key). Give at most one of `fault` (one\nmapping) and `faults` (a list, applied in order); a clean condition gives neither.",
+      "properties": {
+        "condition_id": {
+          "description": "Condition name; alias `id`; exactly one of the two.",
+          "title": "Condition Id",
+          "type": "string"
+        },
+        "fault": {
+          "$ref": "#/$defs/DescriptorFault",
+          "description": "One fault; shorthand for a one-element `faults`; not with `faults`."
+        },
+        "faults": {
+          "default": [],
+          "description": "Faults applied together, in order; not with `fault`.",
+          "items": {
+            "$ref": "#/$defs/DescriptorFault"
+          },
+          "title": "Faults",
+          "type": "array"
+        },
+        "id": {
+          "description": "Alias of `condition_id`; exactly one of the two.",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "title": "DescriptorCondition",
+      "type": "object"
+    },
+    "DescriptorFault": {
+      "additionalProperties": false,
+      "description": "One injected fault, compiled to a `FaultSpec`.\n\nShorthands: `bucket` may be omitted (it means `falsify`); `occurrence` is an alias of\n`at_occurrence`, and the two may not both be given, even with equal values. Decision faults\n(`decision_low_confidence`, `decision_unavailable`) need top-level `decisions` and\n`tool: decision:systemone`; `decision_low_confidence` accepts only the param `confidence_max`\n(a number in [0, 1]) and `decision_unavailable` accepts none.",
+      "properties": {
+        "at_occurrence": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Zero-based call count of `tool`; alias `occurrence`.",
+          "title": "At Occurrence"
+        },
+        "bucket": {
+          "$ref": "#/$defs/Bucket",
+          "default": "falsify",
+          "description": "falsify (default): a robust agent should still succeed; benign: must not change the outcome; ceiling: known unrecoverable, reported and never gated."
+        },
+        "name": {
+          "description": "A built-in fault (decision_low_confidence, decision_unavailable, empty_result, tool_error_once, tool_timeout) or a custom factory `module:function` (checked for syntax only; imported in the trial process).",
+          "title": "Name",
+          "type": "string"
+        },
+        "occurrence": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alias of `at_occurrence` (give one, not both). Zero-based call count of `tool`; null means the fault's default.",
+          "title": "Occurrence"
+        },
+        "params": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "description": "Fault parameters, for example `confidence_max`.",
+          "title": "Params",
+          "type": "object"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool to target; null means any tool.",
+          "title": "Tool"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DescriptorFault",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "McpServerSpec": {
+      "additionalProperties": false,
+      "description": "The environment, as ONE stdio MCP server owned by the harness, never by the agent.\n\nSupported subset (protocol revision 2026-07-28, stdio transport): initialize,\nnotifications/initialized, ping, tools/list and SERIAL tools/call with `resultType`\n\"complete\". Anything else the boundary cannot faithfully record or replay (task results,\nsampling, elicitation, concurrent calls) is a harness fault, not a silent pass-through.\n`argv` may use {workdir}, {seed} and {task_file}; the server also gets ARCI_WORKDIR,\nARCI_SEED and ARCI_TASK_FILE in its environment.",
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Argv",
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "name": {
+          "default": "env",
+          "title": "Name",
+          "type": "string"
+        },
+        "snapshot": {
+          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+          "title": "Snapshot",
+          "type": "string"
+        }
+      },
+      "required": [
+        "argv",
+        "snapshot"
+      ],
+      "title": "McpServerSpec",
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/v0.8.0/docs/schema/arci.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "An ARCI experiment (`arci.yaml`), compiled into a sealed `Manifest` before any trial runs.\n\nKeys are the Manifest's field names. Shorthands: top-level `oracle` stands for\n`contract: {oracle: ...}` (give exactly one of `oracle` and `contract`); an arm may be a bare\n`module:function`; a condition may use `id` for `condition_id` and `fault` for a one-element\n`faults`; a fault may use `occurrence` for `at_occurrence` and omit `bucket` (falsify). An\nalias and its full key may never both be given. Unknown keys are errors everywhere, including\n`schema_version`, `record_sha256` and `created_at`, which the loader and sealer own. Python\nexperiments need `toolset` and no `mcp_server`; command experiments need `mcp_server` and no\n`toolset`; `decisions` needs command arms. Placeholders such as `{workdir}` stay literal.\nThis schema cannot express the cross-field rules; the pydantic models are authoritative.",
+  "properties": {
+    "alpha": {
+      "default": 0.05,
+      "description": "Family-wise error rate.",
+      "maximum": 0.5,
+      "minimum": 1e-06,
+      "title": "Alpha",
+      "type": "number"
+    },
+    "base_seed": {
+      "default": 0,
+      "description": "Seed from which every trial seed derives.",
+      "title": "Base Seed",
+      "type": "integer"
+    },
+    "baseline": {
+      "description": "A python agent as a bare `module:function` string (label `<last module segment>.<function>`, empty candidate_id), or a mapping with `label`, exactly one of `agent` (module:function) or `command` (a CommandSpec), and optional `candidate_id`. Both arms are python agents (top-level `toolset`, no `mcp_server`) or both commands (`mcp_server`, no `toolset`).",
+      "oneOf": [
+        {
+          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/ArmSpec"
+        }
+      ],
+      "title": "Baseline"
+    },
+    "budgets": {
+      "$ref": "#/$defs/Budgets",
+      "description": "Per-trial budgets."
+    },
+    "candidate": {
+      "description": "A python agent as a bare `module:function` string (label `<last module segment>.<function>`, empty candidate_id), or a mapping with `label`, exactly one of `agent` (module:function) or `command` (a CommandSpec), and optional `candidate_id`. Both arms are python agents (top-level `toolset`, no `mcp_server`) or both commands (`mcp_server`, no `toolset`).",
+      "oneOf": [
+        {
+          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/ArmSpec"
+        }
+      ],
+      "title": "Candidate"
+    },
+    "conditions": {
+      "description": "At least one condition; each runs n_per_arm pairs.",
+      "items": {
+        "$ref": "#/$defs/DescriptorCondition"
+      },
+      "minItems": 1,
+      "title": "Conditions",
+      "type": "array"
+    },
+    "contract": {
+      "$ref": "#/$defs/ContractSpec",
+      "description": "The behaviour contract, including its `oracle`; give exactly one of `oracle` and `contract`. A non-empty `unobservable` is rejected."
+    },
+    "decisions": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DecisionSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Command experiments only: a System One decision endpoint. A `fixture` is required exactly when upstream is `fixture`."
+    },
+    "delta": {
+      "default": 0.1,
+      "description": "Largest tolerated drop in success rate.",
+      "exclusiveMaximum": 1,
+      "exclusiveMinimum": 0,
+      "title": "Delta",
+      "type": "number"
+    },
+    "experiment_id": {
+      "description": "Names the experiment and its run directory.",
+      "title": "Experiment Id",
+      "type": "string"
+    },
+    "fixtures_sha256": {
+      "default": "",
+      "description": "Opaque value sealed into the manifest; never computed.",
+      "title": "Fixtures Sha256",
+      "type": "string"
+    },
+    "interval_method": {
+      "default": "clopper_pearson",
+      "description": "How the bounds on the rate difference are formed.",
+      "enum": [
+        "clopper_pearson",
+        "newcombe"
+      ],
+      "title": "Interval Method",
+      "type": "string"
+    },
+    "looks": {
+      "default": [],
+      "description": "Group-sequential looks: strictly increasing, the last equal to n_per_arm; empty means one look at n_per_arm.",
+      "items": {
+        "type": "integer"
+      },
+      "title": "Looks",
+      "type": "array"
+    },
+    "mcp_server": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpServerSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Command experiments: the environment as one stdio MCP server. Not with `toolset`."
+    },
+    "n_per_arm": {
+      "default": 200,
+      "description": "Trials per arm per condition.",
+      "maximum": 10000,
+      "minimum": 1,
+      "title": "N Per Arm",
+      "type": "integer"
+    },
+    "oracle": {
+      "description": "Shorthand for `contract: {oracle: ...}`; give exactly one of `oracle` and `contract`.",
+      "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+      "title": "Oracle",
+      "type": "string"
+    },
+    "prior_runs": {
+      "default": [],
+      "description": "Every earlier experiment on the same candidate_id.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Prior Runs",
+      "type": "array"
+    },
+    "task": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "The task handed to every trial (any JSON object).",
+      "title": "Task",
+      "type": "object"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Task name; omitted or null means the experiment_id.",
+      "title": "Task Id"
+    },
+    "toolset": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Python experiments: `module:function` (task, seed) -> object with `.tools` and `.snapshot()`. Not with `mcp_server`.",
+      "title": "Toolset"
+    }
+  },
+  "required": [
+    "experiment_id",
+    "baseline",
+    "candidate",
+    "conditions"
+  ],
+  "title": "ARCI experiment descriptor",
+  "type": "object"
+}
