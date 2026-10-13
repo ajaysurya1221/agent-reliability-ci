@@ -336,7 +336,7 @@ def test_sealer_owned_keys_are_unknown(key: str) -> None:
         (_append("mcp_server: {argv: [x], snapshot: 'a:b'}\n"), "need `toolset` and no"),
         (_whole("- a list\n"), "arci.yaml: must be one YAML mapping, got list"),
         (_whole(""), "arci.yaml: must be one YAML mapping, got empty"),
-        (_whole('a: !!int "zz"\n'), "arci.yaml: invalid YAML at line 1, column 4: invalid integer"),
+        (_whole('a: !!int "zz"\n'), 'arci.yaml:a: invalid integer "zz"'),
         (_append("task: [\n"), "arci.yaml: invalid YAML at line "),
         (_append("---\nx: 1\n"), "arci.yaml: invalid YAML at line "),
         (_append("task: {when: !!timestamp 2026-10-13}\n"), "task.when: not a JSON value"),
