@@ -1,0 +1,195 @@
+name: TTFV reference machines
+
+# Times the packaged demo (`uvx --from agent-reliability-ci==0.8.0 arci demo`) on clean
+# GitHub-hosted runners: no checkout, no secrets, no telemetry, an empty uv cache for the first
+# sample. Five samples per OS: sample 1 cold, samples 2-5 warm (same uv cache). The JSON and the
+# timestamped logs are uploaded as an artifact; the orchestrator commits the JSON under
+# docs/measurement/reference-machines/. These are machine timings, not receipts, and never count
+# as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
+
+on:
+  push:
+    branches:
+      - 'sprint/t18-**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.5"
+  PACKAGE: "agent-reliability-ci==0.8.0"
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  reference:
+    name: reference machine / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Time five demo runs (sample 1 cold, samples 2-5 warm)
+        env:
+          OUT_DIR: ${{ runner.temp }}/ttfv-reference
+        run: |
+          set -u
+          stamp() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+          # Prefix each line with its UTC arrival time; a last line without a newline is kept.
+          stamp_lines() {
+            local line
+            while IFS= read -r line || [ -n "$line" ]; do
+              printf '%s %s\n' "$(stamp)" "$line"
+            done
+          }
+
+          mkdir -p "$OUT_DIR"
+          work="$(mktemp -d)"
+          # One fresh, empty uv cache: sample 1 fills it (cold), samples 2-5 reuse it (warm).
+          UV_CACHE_DIR="$(mktemp -d)"
+          export UV_CACHE_DIR
+          if [ -n "$(ls -A "$UV_CACHE_DIR")" ]; then
+            echo "::error title=ttfv-reference::the fresh uv cache $UV_CACHE_DIR is not empty"
+            exit 1
+          fi
+          cd "$work"
+          uv --version >"$OUT_DIR/uv-version.txt"
+          python -c 'import platform; print(platform.python_version())' >"$OUT_DIR/setup-python.txt"
+          : >"$OUT_DIR/samples.tsv"
+
+          for n in 1 2 3 4 5; do
+            if [ "$n" = 1 ]; then cache=cold; else cache=warm; fi
+            start="$(stamp)"
+            set +e
+            uvx --from "$PACKAGE" arci demo 2>&1 | stamp_lines >"$OUT_DIR/sample-$n.log"
+            code=${PIPESTATUS[0]}
+            set -e
+            printf '%s\t%s\t%s\t%s\n' "$n" "$cache" "$start" "$code" >>"$OUT_DIR/samples.tsv"
+            echo "sample $n ($cache): exit $code"
+          done
+
+          # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
+          if ! uvx --from "$PACKAGE" python -c 'import platform; print(platform.python_version())' \
+            >"$OUT_DIR/python.txt" 2>/dev/null; then
+            : >"$OUT_DIR/python.txt"
+          fi
+      - name: Parse the logs into reference-${{ matrix.os }}.json
+        shell: python
+        env:
+          OUT_DIR: ${{ runner.temp }}/ttfv-reference
+          OUT_JSON: reference-${{ matrix.os }}.json
+          REF_RUNNER_OS: ${{ runner.os }}
+          REF_RUNNER_ARCH: ${{ runner.arch }}
+          REF_RUNNER_LABEL: ${{ matrix.os }}
+          REF_RUN_ID: ${{ github.run_id }}
+          REF_RUN_ATTEMPT: ${{ github.run_attempt }}
+          REF_SHA: ${{ github.sha }}
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          out_dir = Path(os.environ["OUT_DIR"])
+          MARKERS = {
+              "demo_banner": "arci demo:",
+              "demo_verdict": "VERDICT:",
+              "all_steps_held": "All six steps held",
+          }
+
+
+          def text(name):
+              path = out_dir / name
+              if not path.is_file():
+                  return None
+              return path.read_text(encoding="utf-8", errors="replace").strip() or None
+
+
+          def first_stamps(log):
+              found = dict.fromkeys(MARKERS)
+              if not log.is_file():
+                  return found
+              for raw in log.read_text(encoding="utf-8", errors="replace").splitlines():
+                  stamp, _, line = raw.partition(" ")
+                  for key, marker in MARKERS.items():
+                      if found[key] is None and marker in line:
+                          found[key] = stamp
+              return found
+
+
+          samples = []
+          for row in (out_dir / "samples.tsv").read_text(encoding="utf-8").splitlines():
+              n, cache, start, code = row.split("\t")
+              log = out_dir / f"sample-{n}.log"
+              samples.append(
+                  {
+                      "sample": int(n),
+                      "uv_cache": cache,
+                      "command_start": start,
+                      **first_stamps(log),
+                      "exit_code": int(code),
+                      "log": log.name,
+                  }
+              )
+
+          env = os.environ.get
+          doc = {
+              "kind": "reference-machine timing",
+              "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
+              "package": env("PACKAGE"),
+              "command": f"uvx --from {env('PACKAGE')} arci demo",
+              "runner": {
+                  "os": env("REF_RUNNER_OS"),
+                  "arch": env("REF_RUNNER_ARCH"),
+                  "label": env("REF_RUNNER_LABEL"),
+                  "image": env("ImageOS"),
+                  "image_version": env("ImageVersion"),
+              },
+              "python": text("python.txt"),
+              "setup_python": text("setup-python.txt"),
+              "uv": text("uv-version.txt"),
+              "workflow_run": {
+                  "run_id": env("REF_RUN_ID"),
+                  "run_attempt": env("REF_RUN_ATTEMPT"),
+                  "sha": env("REF_SHA"),
+              },
+              "timestamp_resolution_seconds": 1,
+              "samples": samples,
+          }
+          out = out_dir / os.environ["OUT_JSON"]
+          out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+          print(out.read_text(encoding="utf-8"))
+      - name: Upload the JSON and the logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ttfv-reference-${{ matrix.os }}
+          path: ${{ runner.temp }}/ttfv-reference/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail if any sample did not hold
+        shell: python
+        env:
+          OUT_JSON: ${{ runner.temp }}/ttfv-reference/reference-${{ matrix.os }}.json
+        run: |
+          import json
+          import os
+          import sys
+
+          with open(os.environ["OUT_JSON"], encoding="utf-8") as f:
+              samples = json.load(f)["samples"]
+          bad = [s["sample"] for s in samples if s["exit_code"] != 0 or not s["all_steps_held"]]
+          if len(samples) != 5 or bad:
+              print(f"::error title=ttfv-reference::{len(samples)} samples; not held: {bad}")
+              sys.exit(1)
+          print("all five samples held")
