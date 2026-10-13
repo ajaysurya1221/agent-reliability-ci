@@ -86,8 +86,8 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 # Final state at the end of the run (filled by the orchestrator; see FINAL_REPORT.md)
 
 - main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
-  every later plan-only commit; T13 docs (receipts, recipe titles, availability line) <<merged from
-  sprint/t13-docs after REVIEW 13 | on branch sprint/t13-docs with its REPORT>>.
+  every later plan-only commit; T13 docs (receipts, recipe titles, availability line) merged from
+  sprint/t13-docs after REVIEW 13 (two rounds, both reviewers ACCEPT).
 - PyPI: not published (item 1). GitHub release: not created (item 3). Both are one command each.
 - Nothing half-applied: every lane branch is merged; no frozen file changed outside ADR 0005's
   re-freeze; no recorded result edited; no force-push, no deleted branch/tag/release, no secret.
@@ -169,4 +169,4 @@ expected first result is INCONCLUSIVE at the smoke size. If the whole thing take
 fifteen minutes or you get stuck, that is exactly the data I need.
 
 ---
-Final state: <<filled in by the orchestrator at the end of the run>>
+Final state: see "Final state at the end of the run" above and plan/exec/FINAL_REPORT.md.
