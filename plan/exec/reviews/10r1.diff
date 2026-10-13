@@ -1,0 +1,247 @@
+diff --git a/docs/measurement/receipt.template.json b/docs/measurement/receipt.template.json
+index 93d5f86..c944ed6 100644
+--- a/docs/measurement/receipt.template.json
++++ b/docs/measurement/receipt.template.json
+@@ -1,5 +1,5 @@
+ {
+-  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. network: yes | no. coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
++  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. facilitator: a handle only, no personal data. network: yes | no, whether the machine had internet access during the attempt; required yes for Track A and for uv tool install; checked once before the clock starts (protocol 2.7). coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
+   "schema": "arci.ttfv.receipt.v1",
+   "track": "",
+   "date": "",
+@@ -19,7 +19,7 @@
+   },
+   "network": "",
+   "package": {
+-    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel. readme_url: the README read, at a fixed commit.",
++    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel (record UV_FIND_LINKS and any UV_CACHE_DIR in notes, protocol 2.3). readme_url: the README read, at a fixed commit.",
+     "version": "",
+     "source": "",
+     "wheel_sha256": "",
+@@ -58,7 +58,7 @@
+     "total": null
+   },
+   "outcome": {
+-    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR as printed (Track A: the verdict for agent B). store_validated, decision_sha256, init_attempts, descriptor_hand_edited: Track B only (protocol 4.3 and 4.6). interpretation_correct is scored with the key in protocol 5.3.",
++    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR as printed (Track A: the verdict for agent B). store_validated, decision_sha256, init_attempts, descriptor_hand_edited, trials_started: Track B only (protocol 4.3 and 4.6). trials_started: runs/<id>/trials.jsonl exists and is non-empty. interpretation_correct is scored with the key in protocol 5.3.",
+     "completed": null,
+     "verdict": "",
+     "exit_code": null,
+@@ -66,11 +66,12 @@
+     "decision_sha256": "",
+     "init_attempts": null,
+     "descriptor_hand_edited": null,
++    "trials_started": null,
+     "interpretation_answer": "",
+     "interpretation_correct": null
+   },
+   "comprehension": {
+-    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader.",
++    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader and is a handle only, no personal data.",
+     "answered_on": "",
+     "scorer": "",
+     "answers": {
+diff --git a/docs/measurement/receipts/README.md b/docs/measurement/receipts/README.md
+index 3825505..3bda12f 100644
+--- a/docs/measurement/receipts/README.md
++++ b/docs/measurement/receipts/README.md
+@@ -10,7 +10,7 @@ only place these measurements live.
+ - **Failures are kept.** An attempt that stalled, errored, was abandoned or was coached is
+   committed like a successful one, with what went wrong in `failures` or `coaching_events`.
+   Receipts are never edited after merge except to fix a transcription error, stated in the PR.
+-- **No personal data** beyond a public handle. No names, emails, hostnames, usernames in paths or
++- **No personal data** beyond a public handle, for the reader, the facilitator and the scorer. No names, emails, hostnames, usernames in paths or
+   machine serials; trim paths in pasted errors to the part after your project directory.
+ - **Contributing:** fork, add your file here, open a PR titled `receipt: <handle> <track>`. The
+   maintainer checks the file parses and follows the template; it is merged whatever it shows.
+diff --git a/docs/measurement/ttfv-protocol.md b/docs/measurement/ttfv-protocol.md
+index 40da675..c418cf2 100644
+--- a/docs/measurement/ttfv-protocol.md
++++ b/docs/measurement/ttfv-protocol.md
+@@ -26,8 +26,13 @@ Protocol only; no receipt collected yet. [Template](receipt.template.json), [rec
+    `agent-reliability-ci`. Record whether the uv cache already held the package (`uv_cache`: `cold`
+    if run with a fresh `UV_CACHE_DIR`, else `warm`).
+ 3. The package under test is published (PyPI) or a named wheel; record its version or wheel
+-   sha256. The README read is the one for that version, and its URL at a fixed commit is recorded.
+-   It must show both first-screen commands; if it does not, do not start.
++   sha256. The README read is the one for that version, and its URL at a fixed commit is recorded
++   in `package.readme_url`. It must show both first-screen commands; if it does not, do not start.
++   For a wheel, the README commands must resolve to it without coaching: before the clock starts,
++   the facilitator sets `UV_FIND_LINKS=<directory containing the wheel>` (and, for a cold cache,
++   `UV_CACHE_DIR=<fresh empty directory>`) in the reader's shell, says nothing about it, and
++   records both values in `notes`. `package.source` is then `wheel` and `package.wheel_sha256` is
++   filled.
+ 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
+ 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
+    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
+@@ -36,6 +41,8 @@ Protocol only; no receipt collected yet. [Template](receipt.template.json), [rec
+    writes them during the attempt, set `refs_preexisting: false` and keep the time in the total.
+ 6. The facilitator stamps each milestone as ISO 8601 with a timezone (e.g. `date -u
+    +%Y-%m-%dT%H:%M:%SZ` in a second terminal), to a few seconds; `notes` says how.
++7. `network` records whether the machine had internet access during the attempt. It must be `yes`
++   for Track A and for `uv tool install`, and is checked once before the clock starts.
+ 
+ ## 3. Track A, packaged demo
+ 
+@@ -53,8 +60,13 @@ The reader follows the README to run `uvx --from agent-reliability-ci arci demo`
+ Durations: `install` = `command_start` → `demo_banner`; `run` = `demo_banner` → `all_steps_held`;
+ `interpretation` = `all_steps_held` → `interpretation_answered`; `total` = `readme_opened` →
+ `all_steps_held`; `scaffold`, `agent_execution` and `outcome.store_validated` are null (the demo
+-checks its own stores). Track A's total excludes the interpretation span, which is recorded beside
+-it. A step that does not hold (exit 1) ends the attempt as a failure.
++checks its own stores). A step that does not hold (exit 1) ends the attempt as a failure.
++
++Deviation from the memo: the memo's time-to-first-verdict runs to an interpreted verdict, but
++Track A's `total` stops at `all_steps_held`, because the demo prints several verdicts and the
++interpretation question comes after the command exits. So the demo target is compared with the
++install-and-run time. Section 8 reports, beside it, the memo-definition figure `readme_opened` →
++`interpretation_answered`, in which a wrong interpretation counts as a failure.
+ 
+ ## 4. Track B, own fast agent
+ 
+@@ -68,6 +80,11 @@ uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.
+ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the first output of
+ `arci init`, and `descriptor_written` and `run_start` at the first output of `arci run`.
+ 
++`run_start` and `verdict_printed` refer to the `arci run` invocation that printed the first
++`PASS`, `BLOCK` or `INCONCLUSIVE` verdict line. An `ERROR` line is never stamped as
++`verdict_printed`; it goes to `failures`, and so does a retry refused with
++`run directory is not empty`.
++
+ | Milestone (`timestamps.*`) | When it is stamped |
+ |---|---|
+ | `readme_opened` | The README is on screen. **Clock starts.** |
+@@ -75,8 +92,8 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the
+ | `install_done` | The install returns and `arci` is on `PATH`. |
+ | `scaffold_start` | Enter on the `arci init ...` that produces the descriptor used for the run. |
+ | `descriptor_written` | `arci init` exits 0 and `arci.yaml` exists. |
+-| `run_start` | Enter on `arci run arci.yaml`. |
+-| `verdict_printed` | The terminal shows `VERDICT: <X> (exit <n>)`. |
++| `run_start` | Enter on the `arci run arci.yaml` that printed the first valid verdict. |
++| `verdict_printed` | That invocation shows `VERDICT: <X> (exit <n>)` with X not `ERROR`. |
+ | `store_validated` | The facilitator's check in 4.3 completes. |
+ | `interpretation_answered` | The reader answers the question in 5.3. **Clock stops.** |
+ 
+@@ -86,7 +103,7 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the
+    continue; if no valid verdict follows, the attempt failed.
+ 2. The clock stops only when all three hold: the verdict line is on screen; the run store exists
+    with `manifest.json`, `trials.jsonl` and `decision.json` (at `runs/<experiment_id>/` unless
+-   the descriptor names another directory); and the reader has answered "what does this verdict
++   `--out` names another directory); and the reader has answered "what does this verdict
+    mean?" correctly by the key in 5.3. A wrong answer is recorded and the attempt counts as a
+    failure for TTFV.
+ 3. Store check, run by the facilitator right after the verdict line, inside the clock:
+@@ -103,32 +120,37 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the
+    subtracted from `total`.
+ 6. `outcome.init_attempts` counts `arci init` invocations. `descriptor_hand_edited` is true if the
+    reader edited `arci.yaml` by hand before the run that produced the verdict. Re-running
+-   `arci init` with corrected flags is not hand editing.
++   `arci init` with corrected flags is not hand editing. `outcome.trials_started` is true if
++   `runs/<id>/trials.jsonl` exists and is non-empty after the attempt.
+ 
+ ## 5. Comprehension
+ 
+-1. Asked in writing once per reader, after the last milestone of the first track they complete;
+-   a second-track receipt sets `comprehension.answered_on` to the first receipt's file name and
+-   leaves the rest as in the template. The README may stay open. Answers are in the reader's own words.
++1. Asked in writing once per reader, after the last milestone of the first track they complete,
++   or at the end of the attempt if they complete no track (they are still asked all five and
++   count in the "k of n readers" denominator); a second-track receipt sets
++   `comprehension.answered_on` to the first receipt's file name and leaves the rest as in the
++   template. The README may stay open. Answers are in the reader's own words.
+ 2. Scoring: a scorer other than the reader marks each answer correct only if it contains every key
+-   element below (paraphrase is fine; a wrong extra claim, such as "PASS means the agent is
+-   reliable", makes it incorrect). `all_correct` is true only when all five are correct.
++   element marked required below; optional elements are not needed (paraphrase is fine; a wrong
++   extra claim, such as "PASS means the agent is reliable", makes it incorrect). `all_correct` is
++   true only when all five are correct.
+ 
+-| # | Question | Key elements (all required) |
++| # | Question | Key elements (all required unless marked optional) |
+ |---|---|---|
+-| q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict (PASS, BLOCK, INCONCLUSIVE or ERROR) usable as a CI gate. |
+-| q2 | Who is it for? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
++| q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict usable as a CI gate, naming at least PASS and BLOCK (required); naming all four, PASS, BLOCK, INCONCLUSIVE and ERROR (optional). |
++| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
+ | q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) not shown to be worse by more than the allowed drop (`delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
+-| q4 | What does it not do? Name two. | Two distinct items from: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
++| q4 | What does it not do? Name two. | Two distinct items, each a limit stated in the README version under test (`package.readme_url`) under "What it does not do" or in the first-screen boundary sentence. For example: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
+ | q5 | What are the first three commands for your own agent? | In order: install the `agent-reliability-ci` package (for example `uv tool install agent-reliability-ci`); `arci init <id>` with `--baseline`, `--candidate`, `--toolset`, `--oracle`; `arci run arci.yaml`. |
+ 
+ 3. The interpretation question, "What does this verdict mean?", is asked once per attempt (Track
+-   A: about the `BLOCK` line for agent B). Correct iff, for the verdict shown: **PASS** meets q3's
+-   key; **BLOCK** says the candidate is worse than the baseline by more than the allowed drop (or
+-   broke a hard invariant) under these conditions; **INCONCLUSIVE** says there is not enough
+-   evidence either way, with no regression and no pass claimed (a larger run planned with
+-   `arci plan` would be needed); **ERROR** says the experiment is invalid and says nothing about
+-   the agents.
++   A: about the `BLOCK` line for agent B). Correct iff, for the verdict shown, the answer has every
++   required element: **PASS** meets q3's key; **BLOCK** says the candidate is worse than the
++   baseline by more than the allowed drop (required), "or broke a hard invariant" (optional), and
++   that this holds under these conditions, on this experiment (required); **INCONCLUSIVE** says
++   there is not enough evidence either way, with no regression and no pass claimed (required),
++   and that a larger run planned with `arci plan` would be needed (optional); **ERROR** says the
++   experiment is invalid and says nothing about the agents (required).
+ 
+ ## 6. Facilitation without coaching
+ 
+@@ -152,7 +174,8 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the
+    `{"at", "milestone", "what"}` with the first line of any error verbatim. Failed attempts are
+    kept and contributed like successful ones.
+ 3. Path: `docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json`, the date of the attempt.
+-   No personal data beyond the handle.
++   No personal data beyond the handle; `facilitator` and `comprehension.scorer` are handles only,
++   with no personal data.
+ 
+ ## 8. Reporting
+ 
+@@ -166,6 +189,9 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the
+    cold-read metric as k of n readers with `all_correct: true`.
+ 5. Report `agent_execution` beside Track B totals (never subtracted), and Track A's
+    interpretation correctness (k of n) beside Track A totals.
++6. Beside Track A's `total`, report the memo-definition figure `readme_opened` →
++   `interpretation_answered` with the same ranking rules, where a wrong interpretation
++   (`interpretation_correct: false`) counts as a failure.
+ 
+ ## 9. Kill criteria these receipts feed
+ 
+@@ -173,8 +199,8 @@ From the memo's "Adoption plan":
+ 
+ 1. `arci init`: if fewer than 7 of 10 cold users produce a runnable descriptor without syntax
+    surgery by 2026-11-12, replace the interface rather than adding options. A Track B receipt
+-   counts as runnable without syntax surgery when `arci run` started trials on the `arci.yaml`
+-   that `arci init` wrote and `descriptor_hand_edited` is false.
++   counts as runnable without syntax surgery when `outcome.descriptor_hand_edited` is false AND
++   `outcome.trials_started` is true.
+ 2. Cookbook: if a recipe cannot get a fresh user to a valid verdict within its stated time
+    budget, fix or remove it before adding more recipes. Receipts with `project.kind: sample`
+    name the recipe in `project.description`.
+diff --git a/plan/exec/reports/10r1.md b/plan/exec/reports/10r1.md
+new file mode 100644
+index 0000000..426de29
+--- /dev/null
++++ b/plan/exec/reports/10r1.md
+@@ -0,0 +1,23 @@
++REPORT 10r1 — Status DONE
++
++Changes (docs/measurement/ttfv-protocol.md, receipt.template.json, receipts/README.md)
++1. q2 now asks "Who is it for, and what must their agent expose for ARCI to test it?"; (a) and (b) kept.
++2. q4: correct if each of two items is a limit stated in the README under test (package.readme_url) under "What it does not do" or in the first-screen boundary sentence; old list kept as "For example: ...".
++3. Store location: "unless `--out` names another directory".
++4. §4: run_start / verdict_printed refer to the `arci run` invocation that printed the first PASS, BLOCK or INCONCLUSIVE line; an ERROR line is never verdict_printed and goes to failures, as does a retry refused with "run directory is not empty". Milestone table rows updated to match.
++5. Precondition 3: wheel attempts set UV_FIND_LINKS=<wheel dir> (and UV_CACHE_DIR for a cold cache) in the reader's shell before the clock, unannounced, recorded in notes; package.source "wheel", wheel_sha256 filled. Template package._comment points to this.
++6. Required/optional marking: table header "all required unless marked optional"; q1(c) PASS+BLOCK+CI gate required, all four optional; interpretation key: BLOCK "or broke a hard invariant" optional, "under these conditions, on this experiment" required; INCONCLUSIVE "arci plan" clause optional; §5.2 scoring text says optional elements are not needed.
++7. §3 states the deviation (Track A total stops at all_steps_held); §8.6 reports beside it readme_opened -> interpretation_answered with a wrong interpretation as a failure.
++8. §5.1: a reader who completes no track is still asked all five and counts in the "k of n readers" denominator.
++9. outcome.trials_started added to template (trials.jsonl exists and non-empty); defined in §4.6; §9.1 kill criterion = descriptor_hand_edited false AND trials_started true.
++10. Handle-only/no-personal-data notes for facilitator (template top _comment, §7.3), comprehension.scorer (template comment, §7.3), receipts README; network defined as precondition 2.7 and in the template _comment.
++
++Tests
++- python3 -c "import json; json.load(open('docs/measurement/receipt.template.json'))" -> OK
++- git status --short: only the three docs files modified, plus this report.
++
++Deviations
++- Facilitator note placed in the template's top-level _comment rather than a new sibling key, to avoid adding a non-data key.
++
++Open issues
++- In this branch `arci run` still has `--out` as required (src/arci/cli.py:419) and `arci init` / `arci run arci.yaml` do not exist yet; the protocol targets the release that ships them with `--out` defaulting to `runs`, per the brief. Confirm that default when that work lands.

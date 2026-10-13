@@ -1,0 +1,770 @@
+diff --git a/.github/scripts/wheel_smoke.sh b/.github/scripts/wheel_smoke.sh
+new file mode 100755
+index 0000000..f50e3f7
+--- /dev/null
++++ b/.github/scripts/wheel_smoke.sh
+@@ -0,0 +1,90 @@
++#!/usr/bin/env bash
++# Smoke-test one built arci wheel: a fresh venv, the wheel and its declared dependencies only,
++# then the CLI from a fresh empty directory.
++#
++#   PYTHON=python3 bash .github/scripts/wheel_smoke.sh dist/agent_reliability_ci-X.Y.Z-py3-none-any.whl
++#
++# Shared by release.yml (smoke job) and ci.yml (wheel-smoke job). POSIX hosts only (Linux, macOS):
++# no GNU-only flags, no `timeout`, nothing beyond bash 3.2.
++set -euo pipefail
++
++if [ "$#" -ne 1 ]; then
++  echo "usage: PYTHON=python3 $0 WHEEL (got $# arguments)" >&2
++  exit 64
++fi
++if [ ! -f "$1" ]; then
++  echo "wheel_smoke: no such wheel: $1" >&2
++  exit 64
++fi
++# Absolute, so a relative $PYTHON (.venv/bin/python) still resolves after the cd below.
++python="$("${PYTHON:-python3}" -c 'import sys; print(sys.executable)')"
++wheel="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
++
++tmpbase=${TMPDIR:-/tmp}
++root="$(mktemp -d "${tmpbase%/}/arci-wheel-smoke.XXXXXX")"
++root="$(cd "$root" && pwd -P)"
++trap 'rm -rf "$root"' EXIT
++venv="$root/venv"
++work="$root/empty"
++mkdir "$work" "$root/tmp"
++: >"$root/timings"
++
++now() {
++  "$python" -c 'import time; print(f"{time.time():.3f}")'
++}
++
++fail() {
++  echo "wheel_smoke: FAILED: $*" >&2
++  exit 1
++}
++
++record() { # record LABEL START END
++  awk -v l="$1" -v s="$2" -v e="$3" 'BEGIN { printf "%8.2fs  %s\n", e - s, l }' >>"$root/timings"
++}
++
++# timed LABEL COMMAND...: run one external command; fail naming LABEL if it exits non-zero.
++timed() {
++  local label=$1 start
++  shift
++  echo "wheel_smoke: $label"
++  start=$(now)
++  "$@" || fail "$label (exit $?)"
++  record "$label" "$start" "$(now)"
++}
++
++echo "wheel_smoke: wheel $wheel"
++echo "wheel_smoke: python $python $("$python" -c 'import sys; print(sys.version.split()[0])')"
++
++timed "create a fresh venv" "$python" -m venv "$venv"
++timed "pip install the wheel" "$venv/bin/python" -m pip install \
++  --disable-pip-version-check --no-input --quiet "$wheel"
++
++cd "$work"
++PATH="$venv/bin:$PATH"
++export PATH
++
++[ "$(command -v arci)" = "$venv/bin/arci" ] || fail "arci resolves to $(command -v arci), not the venv"
++located="$(python -c 'import arci, os; print(os.path.realpath(arci.__file__))')"
++case "$located" in
++  "$venv"/*) echo "wheel_smoke: arci $(python -c 'import arci; print(arci.__version__)') imported from $located" ;;
++  *) fail "arci imported from $located, not from the installed wheel" ;;
++esac
++
++timed "arci --help" arci --help
++timed "python -m arci --help" python -m arci --help
++
++# The demo's run stores go to a temp dir under $root (removed on exit), never to the cwd.
++echo "wheel_smoke: arci demo --workers 4"
++start=$(now)
++if ! TMPDIR="$root/tmp" arci demo --workers 4 | tee "$root/demo.log"; then
++  fail "arci demo --workers 4 exited non-zero"
++fi
++record "arci demo --workers 4" "$start" "$(now)"
++grep -qx 'All six steps held.' "$root/demo.log" || fail "arci demo did not print 'All six steps held.'"
++
++leftover="$(ls -A "$work")"
++[ -z "$leftover" ] || fail "the working directory is not empty after the demo: $leftover"
++
++echo "wheel_smoke: timings"
++cat "$root/timings"
++echo "wheel_smoke: OK"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 5f45b62..5e9efa8 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -4,6 +4,7 @@ on:
+   push:
+     branches:
+       - main
++      - "sprint/**"
+   pull_request:
+     branches:
+       - main
+@@ -111,3 +112,96 @@ jobs:
+           .venv/bin/pytest -p no:cacheprovider \
+             tests/unit/stats \
+             tests/unit/examples/test_guardrail_results.py
++
++  wheel-smoke:
++    name: wheel smoke / ${{ matrix.os }} / Python ${{ matrix.python-version }}
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 20
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest]
++        python-version: ["3.11", "3.14"]
++    steps:
++      - name: Check out source
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          persist-credentials: false
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: ${{ matrix.python-version }}
++      - name: Install uv
++        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
++      - name: Build the wheel and the sdist
++        run: uv build --no-sources
++      - name: Smoke-test the built wheel from an empty directory
++        env:
++          PYTHON: python
++        run: bash .github/scripts/wheel_smoke.sh dist/*.whl
++
++  windows-smoke:
++    name: windows / Python 3.12 / install/--help only; execution unsupported
++    runs-on: windows-latest
++    timeout-minutes: 15
++    defaults:
++      run:
++        shell: bash
++    steps:
++      - name: Check out source
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          persist-credentials: false
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: "3.12"
++      - name: Install uv
++        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
++      - name: Build the wheel and the sdist
++        run: uv build --no-sources
++      - name: Create a fresh virtual environment
++        run: python -m venv .smoke-venv
++      - name: Install the built wheel into it
++        run: .smoke-venv/Scripts/python -m pip install --disable-pip-version-check dist/*.whl
++      - name: Import arci and its CLI from an empty directory
++        run: |
++          venv="$PWD/.smoke-venv"
++          cd "$(mktemp -d)"
++          "$venv/Scripts/python" -c "import arci, arci.cli; print(arci.__version__, arci.__file__)"
++      - name: Print the CLI help from an empty directory
++        run: |
++          venv="$PWD/.smoke-venv"
++          cd "$(mktemp -d)"
++          "$venv/Scripts/arci" --help
++
++  action-fixture:
++    name: action fixture / A vs B must BLOCK
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    steps:
++      - name: Check out source
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          persist-credentials: false
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: "3.12"
++      - name: Run the Action on the committed A-vs-B fixture
++        id: gate
++        continue-on-error: true
++        uses: ./
++        with:
++          manifest: examples/action_fixture/manifest.json
++          workers: "4"
++      - name: Assert the gate blocked and wrote its Markdown report
++        env:
++          VERDICT: ${{ steps.gate.outputs.verdict }}
++          OUTCOME: ${{ steps.gate.outcome }}
++        run: |
++          echo "verdict=$VERDICT outcome=$OUTCOME"
++          test "$VERDICT" = BLOCK
++          test "$OUTCOME" = failure
++          test -f arci-report.md
++          grep -q "VERDICT: BLOCK" arci-report.md
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+new file mode 100644
+index 0000000..4f6ab8c
+--- /dev/null
++++ b/.github/workflows/release.yml
+@@ -0,0 +1,154 @@
++name: Release
++
++# A version tag builds the wheel and the sdist once, smoke-tests that exact wheel on Linux and
++# macOS, then publishes those same files to PyPI through trusted publishing (no token), with
++# attestations. PyPI versions are immutable: the guard refuses any tag that is not
++# "v" + the version in pyproject.toml and src/arci/__init__.py. See docs/RELEASING.md.
++
++on:
++  push:
++    tags:
++      - "v*"
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: release-${{ github.ref }}
++  cancel-in-progress: false
++
++env:
++  UV_VERSION: "0.12.5"
++
++jobs:
++  build:
++    name: guard and build
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - name: Check out source
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          persist-credentials: false
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: "3.12"
++      - name: Install uv
++        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
++      - name: Refuse to build unless the tag is v plus the package version
++        env:
++          REF_TYPE: ${{ github.ref_type }}
++          REF_NAME: ${{ github.ref_name }}
++        run: |
++          python - <<'PY'
++          import ast
++          import os
++          import pathlib
++          import sys
++          import tomllib
++
++          ref_type, tag = os.environ["REF_TYPE"], os.environ["REF_NAME"]
++          project = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
++          module = None
++          for node in ast.parse(pathlib.Path("src/arci/__init__.py").read_text()).body:
++              if (
++                  isinstance(node, ast.Assign)
++                  and any(isinstance(t, ast.Name) and t.id == "__version__" for t in node.targets)
++                  and isinstance(node.value, ast.Constant)
++              ):
++                  module = node.value.value
++          if ref_type != "tag":
++              problem = f"releases build only from a tag, not from {ref_type} {tag!r}"
++          elif tag != f"v{project}":
++              problem = f"tag {tag!r} is not 'v' + pyproject.toml version {project!r}"
++          elif module != project:
++              problem = f"src/arci/__init__.py __version__ {module!r} != pyproject.toml version {project!r}"
++          else:
++              problem = None
++          if problem:
++              print(f"::error title=release guard::{problem}")
++              sys.exit(1)
++          print(f"release guard: tag {tag} = v{project} = arci.__version__")
++          PY
++      - name: Build the wheel and the sdist
++        run: uv build --no-sources
++      - name: List the wheel contents
++        run: python -m zipfile -l dist/*.whl
++      - name: Write SHA256SUMS to dist and to the job summary
++        run: |
++          cd dist
++          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS"
++          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
++          {
++            echo "### SHA256SUMS"
++            echo
++            echo '```'
++            cat SHA256SUMS
++            echo '```'
++          } >> "$GITHUB_STEP_SUMMARY"
++          cat SHA256SUMS
++      - name: Upload dist
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: dist
++          path: dist/
++          if-no-files-found: error
++
++  smoke:
++    name: wheel smoke / ${{ matrix.os }} / Python ${{ matrix.python-version }}
++    needs: build
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 20
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest]
++        python-version: ["3.11", "3.14"]
++    steps:
++      - name: Check out source
++        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
++        with:
++          persist-credentials: false
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: ${{ matrix.python-version }}
++      - name: Download dist
++        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
++        with:
++          name: dist
++          path: dist
++      - name: Smoke-test the built wheel from an empty directory
++        env:
++          PYTHON: python
++        run: bash .github/scripts/wheel_smoke.sh dist/*.whl
++
++  publish:
++    name: publish to PyPI
++    needs: [build, smoke]
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    environment:
++      name: pypi
++      url: https://pypi.org/p/agent-reliability-ci
++    permissions:
++      id-token: write
++    steps:
++      - name: Download dist
++        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
++        with:
++          name: dist
++          path: dist
++      - name: Verify the checksums and keep only the wheel and the sdist
++        run: |
++          cd dist
++          sha256sum -c SHA256SUMS
++          rm SHA256SUMS
++          ls -l
++      - name: Publish to PyPI with attestations
++        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
++        with:
++          attestations: true
++          skip-existing: false
+diff --git a/.gitignore b/.gitignore
+index 35d0223..b72671a 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -9,3 +9,4 @@ build/
+ .DS_Store
+ runs/
+ .env
++node_modules/
+diff --git a/docs/RELEASING.md b/docs/RELEASING.md
+new file mode 100644
+index 0000000..c560875
+--- /dev/null
++++ b/docs/RELEASING.md
+@@ -0,0 +1,67 @@
++# Releasing
++
++How a version of `agent-reliability-ci` reaches PyPI. PyPI versions are immutable: a version
++number, once uploaded, can never be uploaded again, even after a deletion.
++
++## 1. Bump the version (one commit)
++
++`pyproject.toml` and `uv.lock` are frozen, so the bump is a re-freeze:
++
++1. Add a design record under `docs/design/` that names the new version and why it is cut.
++2. Set the version in `pyproject.toml` (`[project].version`) and in `src/arci/__init__.py`
++   (`__version__`) to the same `X.Y.Z`; regenerate `uv.lock` with `uv lock`.
++3. Move the CHANGELOG `Unreleased` entries under `vX.Y.Z (YYYY-MM-DD)`.
++4. Recompute `FROZEN.sha256` for the files the bump touched (`pyproject.toml`, `uv.lock`, the new
++   design record) and check that every other hash is unchanged:
++   `shasum -a 256 -c FROZEN.sha256`.
++5. Commit on `main` (for example `release: vX.Y.Z`) and wait for CI to be green, including the
++   `wheel-smoke` jobs.
++
++## 2. Tag
++
++```sh
++git tag -a vX.Y.Z -m "vX.Y.Z"
++git push origin vX.Y.Z
++```
++
++The tag must be exactly `v` + the version in `pyproject.toml`.
++
++## 3. What `.github/workflows/release.yml` does
++
++- **build** (Ubuntu, Python 3.12): the guard fails the job unless the ref is a tag equal to
++  `v` + `[project].version` and `arci.__version__` equals that version. Then
++  `uv build --no-sources` writes the wheel and the sdist to `dist/`, the wheel contents are
++  listed, and `dist/SHA256SUMS` is written and copied into the job summary. `dist/` is uploaded
++  as the artifact `dist`.
++- **smoke** (Ubuntu and macOS, Python 3.11 and 3.14): installs that exact wheel into a fresh
++  venv and runs `arci --help`, `python -m arci --help` and `arci demo --workers 4` from an
++  empty directory (`.github/scripts/wheel_smoke.sh`, the same script CI runs).
++- **publish** (environment `pypi`): re-checks `SHA256SUMS`, removes it from `dist/`, and uploads
++  the wheel and the sdist with `pypa/gh-action-pypi-publish` through trusted publishing (OIDC,
++  no token) with attestations. It runs only if build and every smoke job passed.
++
++`workflow_dispatch` exists for re-runs; started from a branch, the guard stops it at build.
++
++## 4. Verify
++
++Download the wheel and the sdist from PyPI into one directory with `SHA256SUMS` (in the run's
++`dist` artifact, and printed in the build job's summary), then:
++
++```sh
++shasum -a 256 -c SHA256SUMS
++uvx --from agent-reliability-ci==X.Y.Z arci demo
++```
++
++The demo must end with `All six steps held.`
++
++## When the publish job fails
++
++- **Trusted publisher missing** (the job fails at the OIDC token exchange): on PyPI, register the
++  publisher for project `agent-reliability-ci`: owner `ajaysurya1221`, repository
++  `agent-reliability-ci`, workflow `release.yml`, environment `pypi`. Then re-run only the
++  failed publish job from the same workflow run. Nothing was uploaded, so the version is free.
++- **Any failure after an upload started:** check PyPI for which files of `X.Y.Z` exist. Never
++  re-upload or rebuild a version that PyPI already has; fix forward with `X.Y.(Z+1)` through
++  the steps above.
++- **Guard or smoke failure:** nothing was published. Fix on `main`; if the tag points at the
++  wrong commit and nothing was uploaded, delete the tag and tag again.
+diff --git a/examples/action_fixture/README.md b/examples/action_fixture/README.md
+new file mode 100644
+index 0000000..731d762
+--- /dev/null
++++ b/examples/action_fixture/README.md
+@@ -0,0 +1,3 @@
++`manifest.json` is the sealed manifest CI's `action-fixture` job passes to the composite Action (`uses: ./`).
++Regenerate it with `python examples/action_fixture/build_manifest.py`; a unit test fails if the committed file is stale.
++It is the packaged demo's A-vs-B experiment (`arci.demo.*` refs, 200 trials per arm) and is expected to BLOCK.
+diff --git a/examples/action_fixture/__init__.py b/examples/action_fixture/__init__.py
+new file mode 100644
+index 0000000..3c1d7f4
+--- /dev/null
++++ b/examples/action_fixture/__init__.py
+@@ -0,0 +1 @@
++"""The sealed manifest that CI's action-fixture job feeds to the composite Action."""
+diff --git a/examples/action_fixture/build_manifest.py b/examples/action_fixture/build_manifest.py
+new file mode 100644
+index 0000000..299ae29
+--- /dev/null
++++ b/examples/action_fixture/build_manifest.py
+@@ -0,0 +1,36 @@
++"""Regenerate ``manifest.json``: the packaged demo's A-vs-B experiment, 200 trials per arm.
++
++    python examples/action_fixture/build_manifest.py
++
++Deterministic: ``created_at`` stays empty, as the builder leaves it, so a regeneration is
++byte-identical to the committed file (checked by ``tests/unit/examples/test_action_fixture.py``).
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++from arci.demo.experiment import build_manifest
++
++MANIFEST = Path(__file__).resolve().parent / "manifest.json"
++N_PER_ARM = 200
++CANDIDATE = "agent_b"
++
++
++def render() -> str:
++    """The fixture's exact bytes, as text."""
++    return build_manifest(n_per_arm=N_PER_ARM, candidate=CANDIDATE).model_dump_json(indent=2) + "\n"
++
++
++def write(path: Path = MANIFEST) -> Path:
++    path.write_text(render(), encoding="utf-8")
++    return path
++
++
++def main() -> int:
++    print(f"wrote {write()}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/examples/action_fixture/manifest.json b/examples/action_fixture/manifest.json
+new file mode 100644
+index 0000000..5574a8f
+--- /dev/null
++++ b/examples/action_fixture/manifest.json
+@@ -0,0 +1,64 @@
++{
++  "record_sha256": "f1bf62842b697506b6a5c8600aca078ade58205c35b7731fbe2ac57161fe8fa3",
++  "schema_version": "arci/0.5",
++  "experiment_id": "arci-demo-agent_b-reserve-timeout-200",
++  "created_at": "",
++  "task_id": "confirm-inventory-order",
++  "task": {
++    "order_id": "order-7",
++    "sku": "widget",
++    "quantity": 2,
++    "stock": 10
++  },
++  "toolset": "arci.demo.world:make_world",
++  "mcp_server": null,
++  "decisions": null,
++  "contract": {
++    "oracle": "arci.demo.world:oracle",
++    "max_tool_calls": null,
++    "forbidden_tools": [],
++    "required_tools": [],
++    "max_calls_per_tool": {},
++    "unobservable": []
++  },
++  "baseline": {
++    "label": "agent_a",
++    "agent": "arci.demo.agents:agent_a",
++    "command": null,
++    "candidate_id": "baseline-a"
++  },
++  "candidate": {
++    "label": "agent_b",
++    "agent": "arci.demo.agents:agent_b",
++    "command": null,
++    "candidate_id": "candidate-agent_b"
++  },
++  "conditions": [
++    {
++      "condition_id": "reserve-timeout",
++      "faults": [
++        {
++          "name": "tool_timeout",
++          "bucket": "falsify",
++          "tool": "reserve",
++          "at_occurrence": 0,
++          "params": {}
++        }
++      ]
++    }
++  ],
++  "alpha": 0.05,
++  "delta": 0.1,
++  "n_per_arm": 200,
++  "interval_method": "clopper_pearson",
++  "looks": [],
++  "base_seed": 12000,
++  "budgets": {
++    "max_tool_calls": 10,
++    "max_model_steps": 10,
++    "max_seconds": 15.0,
++    "grader_seconds": 20.0
++  },
++  "fixtures_sha256": "",
++  "prior_runs": []
++}
+diff --git a/plan/exec/reports/06.md b/plan/exec/reports/06.md
+new file mode 100644
+index 0000000..f2ba1a0
+--- /dev/null
++++ b/plan/exec/reports/06.md
+@@ -0,0 +1,74 @@
++# REPORT 06 — Status DONE
++
++Publishable package pipeline (release workflow, shared wheel smoke script, releasing doc).
++
++## Changes
++
++- `.github/workflows/release.yml` (new). `on: push: tags: ["v*"]` + `workflow_dispatch`;
++  top-level `permissions: contents: read`; `concurrency` per ref, no cancel; `UV_VERSION: "0.12.5"`.
++  - `build` (ubuntu, py3.12, 15 min): checkout (`persist-credentials: false`), setup-python, pip-install uv
++    (ci.yml style), **guard** (inline Python, `tomllib` + `ast`; refs via env, no `${{ }}` in the
++    script): fails with one `::error title=release guard::...` line unless `ref_type == tag`, tag ==
++    `v` + `[project].version`, and `src/arci/__init__.py` `__version__` == that version; then
++    `uv build --no-sources`, `python -m zipfile -l dist/*.whl`, `sha256sum` of `dist/*` into
++    `dist/SHA256SUMS` and the job summary, upload `dist/` as artifact `dist` (`if-no-files-found: error`).
++  - `smoke` (needs build; ubuntu/macos x 3.11/3.14, `fail-fast: false`, 20 min): checkout, setup-python,
++    download `dist`, `PYTHON=python bash .github/scripts/wheel_smoke.sh dist/*.whl`.
++  - `publish` (needs [build, smoke]; ubuntu, 15 min; `environment: {name: pypi, url: https://pypi.org/p/agent-reliability-ci}`;
++    job `permissions: id-token: write` only): download `dist`, `sha256sum -c SHA256SUMS` then
++    `rm SHA256SUMS`, `pypa/gh-action-pypi-publish@dc37677b… # v1.14.2` with `attestations: true`,
++    `skip-existing: false` (both explicit; `verify-metadata` left at its default true = the twine-check step).
++  - All actions pinned to the orchestrator's SHAs with `# vX.Y.Z` comments.
++- `.github/scripts/wheel_smoke.sh` (new; shared with TASK 07). `set -euo pipefail`, bash 3.2 safe, no
++  GNU-only flags, no `timeout`. Takes exactly one WHEEL arg; `$PYTHON` (default python3) resolved to an
++  absolute `sys.executable`. Fresh venv under a `mktemp -d` root (removed on exit), `pip install` of the
++  wheel only, `cd` into an empty dir, checks `arci` resolves to the venv and `arci` imports from the
++  venv's site-packages, runs `arci --help`, `python -m arci --help`, `arci demo --workers 4` (exit 0,
++  `grep -qx 'All six steps held.'`, demo `TMPDIR` pointed under the root), fails if the cwd is not
++  empty afterwards, prints timings.
++- `docs/RELEASING.md` (new, 67 lines): bump (design record, version in pyproject + `__init__`, `uv lock`,
++  CHANGELOG, re-freeze), tag, what release.yml does, verify (`shasum -a 256 -c SHA256SUMS`,
++  `uvx --from agent-reliability-ci==X.Y.Z arci demo`), missing trusted publisher (register, re-run the
++  publish job), never re-upload a version.
++- `.gitignore`: `node_modules/` appended.
++
++## Tests
++
++- `actionlint .github/workflows/release.yml` -> exit 0, no output.
++- `shellcheck .github/scripts/wheel_smoke.sh` -> exit 0, no output.
++- Guard exercised locally (step script extracted from the YAML, run with bash):
++  `tag v0.7.0` -> 0 `release guard: tag v0.7.0 = v0.7.0 = arci.__version__`;
++  `tag v0.7.1` -> 1 `::error title=release guard::tag 'v0.7.1' is not 'v' + pyproject.toml version '0.7.0'`;
++  `branch main` -> 1 `...releases build only from a tag, not from branch 'main'`; `tag 0.7.0` -> 1.
++- `PYTHON=.venv/bin/python bash .github/scripts/wheel_smoke.sh .../dist-02-1791864304/agent_reliability_ci-0.7.0-py3-none-any.whl` -> exit 0:
++  ```
++  All six steps held.
++  wheel_smoke: timings
++      0.86s  create a fresh venv
++      0.92s  pip install the wheel
++      0.67s  arci --help
++      0.09s  python -m arci --help
++     58.96s  arci demo --workers 4
++  wheel_smoke: OK
++  ```
++- `ruff format --check .` 246 files already formatted; `ruff check .` All checks passed!;
++  `basedpyright` 0 errors, 0 warnings, 0 notes; `shasum -a 256 -c FROZEN.sha256 | grep -v OK` no output.
++
++## Deviations
++
++- Guard and build are one job (`build`, step "Refuse to build unless the tag is v plus the package version"),
++  as the dispatch specified ("guard+build"), not a separate `guard` job.
++- The guard also refuses non-tag refs, so a `workflow_dispatch` from a branch stops at build (a dispatch
++  started on a tag ref works). Reason: no path to PyPI without a matching tag.
++- publish verifies `SHA256SUMS` before removing it (addition; catches an artifact altered between jobs).
++- `chmod +x` on the script was denied by the sandbox; it is committed 0644 and always invoked as
++  `bash .github/scripts/wheel_smoke.sh`. The orchestrator may set the bit (`git update-index --chmod=+x`).
++
++## Open issues
++
++- Locally the smoke's `pip install` resolved pydantic/pyyaml through pip (index or pip cache); it is not
++  an offline-isolated install. In CI it uses PyPI, as intended.
++- release.yml cannot be exercised end to end without a tag; the publish job and the trusted publisher are
++  untested until the first tag. If the pending publisher is missing, publish fails at OIDC (expected; see
++  docs/RELEASING.md).
++- `arci schema` smoke step is deferred to T07-after-T03, per the brief.
+diff --git a/plan/exec/reports/07.md b/plan/exec/reports/07.md
+new file mode 100644
+index 0000000..e98d1ca
+--- /dev/null
++++ b/plan/exec/reports/07.md
+@@ -0,0 +1,62 @@
++# REPORT 07 — Status DONE (pending the CI run on sprint/package, which the orchestrator owns)
++
++Install and Action matrix in CI.
++
++## Changes
++
++- `.github/workflows/ci.yml`: `on.push.branches` gains `"sprint/**"`. Existing `check` and `stats-macos`
++  jobs and all existing pins untouched. New jobs (pins as ci.yml, `persist-credentials: false`,
++  `fail-fast: false`, job timeouts):
++  - `wheel-smoke` (ubuntu/macos x 3.11/3.14, 20 min): install uv, `uv build --no-sources`,
++    `PYTHON=python bash .github/scripts/wheel_smoke.sh dist/*.whl` (same script as release.yml).
++  - `windows-smoke`, name `windows / Python 3.12 / install/--help only; execution unsupported`
++    (windows-latest, 15 min, `defaults.run.shell: bash`): install uv, `uv build --no-sources`,
++    `python -m venv .smoke-venv`, pip-install `dist/*.whl` into it, then from a `mktemp -d` dir
++    `python -c "import arci, arci.cli"` and `arci --help` via the venv's `Scripts/` (POSIX-form `$PWD`
++    paths, no backslash paths).
++  - `action-fixture` (ubuntu, py3.12, 20 min): `uses: ./` with `id: gate`, `continue-on-error: true`,
++    `manifest: examples/action_fixture/manifest.json`, `workers: "4"`; then asserts
++    `steps.gate.outputs.verdict == BLOCK`, `steps.gate.outcome == failure`, `arci-report.md` exists and
++    contains `VERDICT: BLOCK` (values passed through env).
++- `examples/action_fixture/`: `__init__.py`; `build_manifest.py` (`render()`, `write(path)`, `main()`;
++  `build_manifest(n_per_arm=200, candidate="agent_b").model_dump_json(indent=2) + "\n"`);
++  `manifest.json` (generated, `created_at: ""`, experiment `arci-demo-agent_b-reserve-timeout-200`,
++  all refs `arci.demo.*`); `README.md` (3 lines).
++- `tests/unit/examples/test_action_fixture.py`: regeneration byte-identical; seal validates and equals
++  the builder's manifest; N=200, A vs B, every ref `arci.demo.*`, no MCP/decisions.
++- `.github/scripts/wheel_smoke.sh`: created under TASK 06 (see 06.md).
++- No `src/arci` change: no module-level POSIX reference blocks `import arci.cli` (see below).
++
++## Tests
++
++- `actionlint .github/workflows/release.yml .github/workflows/ci.yml` -> exit 0, no output.
++- `shellcheck .github/scripts/wheel_smoke.sh` -> exit 0, no output.
++- `.venv/bin/pytest tests/unit/examples/test_action_fixture.py tests/unit/cli -q` -> all dots
++  (`-o addopts="" -q`: `40 passed in 19.23s`).
++- Fixture verdict, locally: `.venv/bin/arci run examples/action_fixture/manifest.json --out <scratch> --workers 4`
++  -> exit 1, last line `VERDICT: BLOCK (exit 1)`.
++- Wheel smoke against the orchestrator's 0.7.0 wheel: exit 0, `All six steps held.`, `wheel_smoke: OK`
++  (timings in 06.md).
++- `ruff format --check .` 246 files already formatted; `ruff check .` All checks passed!;
++  `basedpyright` 0 errors, 0 warnings, 0 notes; `shasum -a 256 -c FROZEN.sha256 | grep -v OK` no output.
++- Windows import check (simulated, macOS): AST scan of `src/arci` found no module-level use of
++  `os.killpg`/`AF_UNIX`/`SIGKILL`/`setsid`/`getpgid` or `fcntl`/`resource`/`termios`/`pwd`/`grp`
++  imports (all inside functions). With those names deleted and modules blocked after stdlib import,
++  every `arci.*` module (except `__main__`) imported and `arci.cli.main(["--help"])` exited 0.
++
++## Deviations
++
++- Brief said to assert the Markdown report reached `$GITHUB_STEP_SUMMARY`; that file is per step and not
++  readable from a later step, so the job asserts `arci-report.md` (which the Action `tee`s and then
++  appends to the summary), per the dispatch.
++- Also asserts `steps.gate.outcome == failure` (addition: BLOCK must fail the step).
++- No CHANGELOG entry: no POSIX guard was needed, and CHANGELOG is not in my file list.
++
++## Open issues
++
++- Windows is not testable here; the import check above is a simulation on macOS, not Windows. The CI run
++  is the real evidence.
++- Composite-action outputs after a failing inner step: `verdict` is written to `GITHUB_OUTPUT` before
++  `exit 1`; I expect `steps.gate.outputs.verdict` to be populated, but this is confirmed only by the CI run.
++- "Done when" also requires a green CI run on `sprint/package` showing all new jobs: not runnable by me
++  (no git push, no network).
+diff --git a/tests/unit/examples/test_action_fixture.py b/tests/unit/examples/test_action_fixture.py
+new file mode 100644
+index 0000000..386408e
+--- /dev/null
++++ b/tests/unit/examples/test_action_fixture.py
+@@ -0,0 +1,41 @@
++"""The committed Action fixture is current, sealed, and built only from packaged refs."""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++from arci.demo.experiment import build_manifest
++from arci.schema import Manifest
++from examples.action_fixture.build_manifest import MANIFEST, render, write
++
++
++def test_regenerating_the_fixture_is_byte_identical(tmp_path: Path) -> None:
++    regenerated = write(tmp_path / "manifest.json")
++    assert regenerated.read_bytes() == MANIFEST.read_bytes(), (
++        "examples/action_fixture/manifest.json is stale: "
++        "run python examples/action_fixture/build_manifest.py"
++    )
++    assert render().encode("utf-8") == MANIFEST.read_bytes()
++
++
++def test_the_fixture_seal_validates() -> None:
++    manifest = Manifest.model_validate_json(MANIFEST.read_text(encoding="utf-8"))
++    assert manifest.validate_seal()
++    assert manifest.created_at == ""
++    assert manifest == build_manifest(n_per_arm=200, candidate="agent_b")
++
++
++def test_the_fixture_is_the_demo_a_vs_b_experiment_with_packaged_refs() -> None:
++    manifest = Manifest.model_validate_json(MANIFEST.read_text(encoding="utf-8"))
++    assert manifest.n_per_arm == 200
++    assert manifest.baseline.label == "agent_a"
++    assert manifest.candidate.label == "agent_b"
++    refs = [
++        manifest.toolset,
++        manifest.contract.oracle,
++        manifest.baseline.agent,
++        manifest.candidate.agent,
++    ]
++    assert all(ref is not None and ref.startswith("arci.demo.") for ref in refs), refs
++    assert manifest.mcp_server is None
++    assert manifest.decisions is None
