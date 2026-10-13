@@ -1,52 +1,50 @@
-# agent-reliability-ci
+# Did this change make your agent less reliable?
 
-**Did removing a retry break your agent?**
+ARCI (agent-reliability-ci) runs your baseline and candidate repeatedly under the same predeclared
+tasks and injected tool faults, grades each run with an independent success check, returns `PASS`,
+`BLOCK`, `INCONCLUSIVE` or `ERROR` with an exit code, and can replay a recorded failure offline.
 
-One clean run passes both versions. A transient tool timeout exposes the difference.
-ARCI (agent-reliability-ci) freezes a repeated experiment, gates the change and exports a
-replayable failure.
+Try it without cloning (seeded fixture, no model call):
 
-**Recorded fixture: 200 trials per arm; timeout on `reserve`.**
-Baseline: **192/200**. Retry removed: **132/200**. Verdict: **BLOCK (exit 1)**.
-[Recorded results](docs/results/retry-demo-n200.md) · [Trace, reduction and replay](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt)
+```bash
+uvx --from agent-reliability-ci arci demo
+```
 
-**Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
-**Availability:** main adds the planner (`arci plan`), opt-in pass^k reporting
-(`arci report --pass-k`) and portability fixes beyond v0.7.0; no PyPI package.
+Replace these example references with your project's importable Python functions:
 
-**Evidence:** [18 archived decisions re-derived](docs/reports/ci-gate-2026-10-06/REPORT.md) · [Frozen contracts](FROZEN.sha256)
-[Design records](docs/design/) · [CI and macOS statistics checks](.github/workflows/ci.yml)
+```bash
+uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed && arci run arci.yaml
+```
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img src="docs/assets/hero-light.svg" alt="arci, agent-reliability-ci: Did this change make the agent less reliable, and what broke? A frozen experiment, an exact verdict with its uncertainty, and a failure case you can replay offline. Seeded retry demo, 200 trials per arm, timeout on the first reserve call: A 192/200, B 132/200; bounds on the difference minus 0.405 to minus 0.183 against a margin of minus 0.10; VERDICT BLOCK, exit 1; 3 injected faults reduced to 1, 1-minimal; offline replay REPRODUCED. B is A with one retry removed. Source: docs/results/retry-demo-n200.md.">
-</picture>
+`baseline + candidate → same predeclared tasks/faults → repeated trials → verdict → minimise/replay`
 
-Re-derived means each archived `decision.json` regenerates byte for byte from its committed
-inputs, whatever its verdict: reproducing a BLOCK, INCONCLUSIVE or ERROR counts, and no archived
-run is turned green ([reproduction recipe](docs/reports/ci-gate-2026-10-06/reproduction/README.md),
-[CITATION.cff](CITATION.cff)).
+**PASS means only this:** for this predeclared experiment, the evidence supports that any reliability
+drop from baseline to candidate is smaller than the allowed drop. It is **not** a claim of absolute
+reliability.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.7.0)
-[![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](pyproject.toml)
-[Security policy](SECURITY.md)
+A small first run will often be **INCONCLUSIVE**. That is a valid result; use `arci plan` before
+choosing a larger confirmatory run.
+
+ARCI observes calls that cross its tool boundary. It is not a sandbox, it does not replay model
+inference, and trace divergence shows where runs differ, not why.
 
 ## Try the offline demo
 
-Python 3.11+, POSIX and uv. Installation needs network; the fixture makes no model calls.
+Python 3.11+, POSIX and [uv](https://docs.astral.sh/uv/). Installation needs network; the fixture makes
+no model calls.
+
 ```bash
-git clone https://github.com/ajaysurya1221/agent-reliability-ci
-cd agent-reliability-ci
-uv sync && .venv/bin/python examples/retry_agent/hero_demo.py
+uvx --from agent-reliability-ci arci demo
 ```
 
-`just demo` runs the same script (the `just` recipes need `just` and zsh; the `.venv/bin/...`
-commands need neither). It takes six steps through the real CLI and the Python API, each trial in a
-fresh process with a separate grader process. Runtime depends on the machine and current load. Lines
-from one run:
+`arci demo` runs a packaged copy of the seeded inventory fixture (`arci.demo`): the same world, agents,
+seeds and sample size as the recorded run below, so it computes **192/200** baseline successes and
+**132/200** retry-removed successes fresh on your machine and says whether they matched the recorded
+run. It is a reproduction, not the recorded evidence. The six steps go through the real CLI and the
+Python API, each trial in a fresh process with a separate grader process. Runtime depends on the
+machine and current load (measured: 38 s on a 15-core laptop with 8 workers; about 70 s through `uvx`
+including environment creation; CI runners are slower). `just demo` runs the checkout script
+`examples/retry_agent/hero_demo.py`, the same six steps. Lines from the recorded run:
 
 ```text
 === 2. The frozen experiment, N=200 per arm, fault: tool_timeout on reserve
@@ -77,15 +75,33 @@ Agent B is not rigged with dice. It is agent A with the retry around `reserve` r
 refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
 failure rate comes from the environment. Reservations already exist with configured probability
 65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`; shares set in
-[world.py](examples/retry_agent/world.py), counts asserted in
+[world.py](src/arci/demo/world.py), counts asserted in
 [test_retry_example.py](tests/unit/examples/test_retry_example.py)), and in those the missing retry
 never matters. That is exactly why one run hides it.
+
+### Recorded result and evidence
+
+**Recorded fixture: 200 trials per arm; timeout on `reserve`.**
+Baseline: **192/200**. Retry removed: **132/200**. Verdict: **BLOCK (exit 1)**.
+[Recorded results](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/retry-demo-n200.md) · [Trace, reduction and replay](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt)
+
+**Evidence:** [18 archived decisions re-derived](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md) · [Frozen contracts](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/FROZEN.sha256) · [Design records](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/design) · [CI and macOS statistics checks](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/.github/workflows/ci.yml)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/hero-dark.svg">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/hero-light.svg" alt="arci, agent-reliability-ci: Did this change make the agent less reliable, and what broke? A frozen experiment, an exact verdict with its uncertainty, and a failure case you can replay offline. Seeded retry demo, 200 trials per arm, timeout on the first reserve call: A 192/200, B 132/200; bounds on the difference minus 0.405 to minus 0.183 against a margin of minus 0.10; VERDICT BLOCK, exit 1; 3 injected faults reduced to 1, 1-minimal; offline replay REPRODUCED. B is A with one retry removed. Source: docs/results/retry-demo-n200.md.">
+</picture>
+
+Re-derived means each archived `decision.json` regenerates byte for byte from its committed
+inputs, whatever its verdict: reproducing a BLOCK, INCONCLUSIVE or ERROR counts, and no archived
+run is turned green ([reproduction recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/reproduction/README.md),
+[CITATION.cff](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CITATION.cff)).
 
 > **Review a retry-policy change before merging**
 >
 > In the recorded inventory-reservation fixture, the candidate loses its retry after a timeout. ARCI reports BLOCK, locates the trace divergence, reduces three injected faults to one, and reproduces the failure offline. The repaired candidate passes the reproducer and its own separately frozen experiment.
 >
-> Use the example’s manifest builder as the starting point for your agent. Define the oracle, fault conditions, margin and sample size before running. A small experiment may remain INCONCLUSIVE.
+> Scaffold your own experiment with `arci init` (below), or start from the example’s manifest builder. Define the oracle, fault conditions, margin and sample size before running. A small experiment may remain INCONCLUSIVE.
 
 Manifest builder: [examples/retry_agent/experiment.py](examples/retry_agent/experiment.py).
 Recorded run: [hero-demo-2026-10-05.txt](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt).
@@ -108,8 +124,8 @@ leaving the denominator. `arci replay` uses its own codes: 0 reproduced, 1 not r
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/where-dark.svg">
-  <img src="docs/assets/where-light.svg" alt="Where arci sits. Before the run, a frozen manifest declares the baseline and candidate, oracle, faults, seeds, N and the decision rule. In CI, the recorded trials (seeded trials per arm, injected tool faults, sealed boundary records) feed the arci gate, which computes exact Clopper-Pearson bounds on the difference against a frozen margin and returns PASS, BLOCK, INCONCLUSIVE or ERROR with exit 0, 1, 2 or 3; merge on PASS, while BLOCK and ERROR fail the job and INCONCLUSIVE fails by default. A separate branch reads the same records for any verdict: trace comparison (the first divergent step between a passing and a failing trial), fault reduction (ddmin over injected faults, same failure fingerprint) and offline replay of the recorded boundary calls, not fresh model inference.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/where-dark.svg">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/where-light.svg" alt="Where arci sits. Before the run, a frozen manifest declares the baseline and candidate, oracle, faults, seeds, N and the decision rule. In CI, the recorded trials (seeded trials per arm, injected tool faults, sealed boundary records) feed the arci gate, which computes exact Clopper-Pearson bounds on the difference against a frozen margin and returns PASS, BLOCK, INCONCLUSIVE or ERROR with exit 0, 1, 2 or 3; merge on PASS, while BLOCK and ERROR fail the job and INCONCLUSIVE fails by default. A separate branch reads the same records for any verdict: trace comparison (the first divergent step between a passing and a failing trial), fault reduction (ddmin over injected faults, same failure fingerprint) and offline replay of the recorded boundary calls, not fresh model inference.">
 </picture>
 
 In words: the manifest (task, toolset, oracle, contract, both arms, fault conditions, `alpha`,
@@ -234,6 +250,43 @@ PASS / BLOCK / INCONCLUSIVE:
 
 ## Gate your own agent
 
+Scaffold one experiment from four references, then run it:
+
+```bash
+uv tool install agent-reliability-ci
+arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed
+arci run arci.yaml
+```
+
+`arci init` imports the four references once (in a child process, as a trial would), checks that every
+fault names a tool the toolset provides, and writes `arci.yaml`: a thin, schema-checked descriptor that
+`arci run` seals into the same JSON manifest the Python builder produces. The scaffold is a **smoke
+design** (8 trials per arm): under the default rule two perfect arms cannot PASS below N=42 and a
+total collapse cannot BLOCK below N=8, so expect INCONCLUSIVE, then plan a confirmatory N with
+`arci plan` before spending trials. A descriptor looks like this:
+
+```yaml
+experiment_id: checkout-retry
+task: {order_id: "order-7"}
+toolset: tests.world:make_world
+oracle: tests.world:passed
+baseline: app.v1:run
+candidate: app.v2:run
+conditions:
+  - id: reserve-timeout
+    fault: {name: tool_timeout, tool: reserve, occurrence: 0}
+alpha: 0.05
+delta: 0.10
+n_per_arm: 8
+```
+
+Every key is a field of the sealed manifest with the same default; `arci schema` prints the JSON
+Schema, and [docs/DESCRIPTOR.md](docs/DESCRIPTOR.md) has the key reference, command-agent experiments
+and the YAML quoting rule. The toolset is `(task, seed) -> object with .tools and .snapshot()`, the
+oracle `(task, final_state) -> bool`, and each agent a plain function `agent(task, tools, rng) -> dict`.
+
+### Advanced: the Python manifest builder
+
 A manifest is a sealed JSON document built in Python. The retry example's builder,
 [examples/retry_agent/experiment.py](examples/retry_agent/experiment.py), is the template; its shape:
 
@@ -275,9 +328,12 @@ replace `toolset` with `mcp_server` and the arms' `agent` with `command`, as
 [docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) shows.
 
 ```bash
+arci init NAME --baseline M:F --candidate M:F --toolset M:F --oracle M:F   # write arci.yaml (smoke N=8)
+arci schema                                        # the descriptor's JSON Schema, generated from code
+arci demo                                          # the packaged six-step retry story, no clone
 arci plan --help                                   # verdict probabilities of a design, before any trial
 arci preflight manifest.json                       # live decision upstreams: key, model, smoke call
-arci run manifest.json --out runs --workers 8      # run + gate; exit code is the verdict
+arci run arci.yaml --workers 8                     # run + gate; exit code is the verdict (--out runs)
 arci gate runs/<experiment> --junit junit.xml --markdown report.md
 arci report runs/<experiment>                      # gate, failure clusters, tokens, estimated cost
 arci diff runs/<experiment> <passing_trial> <failing_trial>    # --all-steps to include annotations
@@ -314,9 +370,9 @@ This assumes your agent's repository is checked out and installed, and that you 
 you have verified. The report lands in the job summary (a start-up failure shows only in the step's
 stderr). `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it unless you set
 `allow-inconclusive: "true"`. The `verdict` output (`PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR`) is
-there for steps that run after the gate. This repository's own CI runs the test suite and
-re-derives the archived decisions; it does not run the Action itself.
-
+there for steps that run after the gate. This repository's own CI runs the test suite,
+re-derives the archived decisions, smoke-tests the built wheel on Linux and macOS, and runs the Action
+on a committed fixture that must BLOCK.
 ## What it does not do
 
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
@@ -343,9 +399,15 @@ re-derives the archived decisions; it does not run the Action itself.
   tickets. Live answers are sampled, so live minimisation is reported as `reduced`, never
   `1-minimal`, and a decision model's confidence never enters a verdict except through the agent's
   actions.
+- **Reference validation executes user code.** `arci init` validates Python references by importing
+  them, and calls the toolset factory once, in a child process; import-time code runs.
+- **Declaring a fault does not guarantee injection.** A fault names a tool; if the agent never calls
+  that tool at that occurrence, the condition runs clean and nothing says so. Inspect the recorded
+  calls to confirm injection.
 - Command agents get one stdio MCP server (revision 2026-07-28), serial tool calls, no HTTP
   transport, no concurrent decisions.
-- No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only; Windows is untested.
+- No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only: on Windows the package
+  installs and `arci --help` runs, but experiments are unsupported.
 
 **Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
 
@@ -365,7 +427,6 @@ canonical JSON hashing helpers in `src/arci/hashing.py` and the self-sealing dec
 `src/arci/schema.py`, both attributed source adaptation inside the frozen manifest, not a dependency.
 ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing
 here claims adoption, performance or superiority.
-
 ## Roadmap
 
 Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
@@ -397,3 +458,17 @@ and tests on Python 3.11 and 3.14, with separate macOS statistics checks. See
 records live in [docs/design](docs/design/), the changelog in [CHANGELOG.md](CHANGELOG.md).
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for adapted code.
+
+### Availability and project status
+
+**Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`),
+`arci init`, the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability
+fixes beyond v0.7.0; the v0.8.0 release and the PyPI package follow this sprint. **Boundary:** PASS means
+relative non-inferiority, not absolute reliability. This is not a sandbox.
+
+[![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.7.0)
+[![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
+[Security policy](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/SECURITY.md)
