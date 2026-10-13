@@ -10,6 +10,12 @@ uvx --from agent-reliability-ci arci demo            # the recorded retry story,
 uv tool install agent-reliability-ci                  # the arci command
 ```
 
+PyPI status at release time: the release workflow built the wheel and the sdist, smoke-tested the
+wheel on Ubuntu and macOS (Python 3.11 and 3.14) from an empty directory, and then failed at the
+publish step because PyPI has no trusted publisher registered for this repository yet. Until the
+maintainer registers it and re-runs the publish job, install from the files attached to this
+release (checksums below): `uvx --from <wheel URL or path> arci demo`.
+
 ## What is new
 
 - **PyPI package and release pipeline.** A version tag builds the wheel and sdist once, smoke-tests
@@ -74,6 +80,16 @@ not do" in the README and `docs/TRUST_MODEL.md`.
 ## Verify
 
 ```bash
-shasum -a 256 -c SHA256SUMS
-uvx --from agent-reliability-ci==0.8.0 arci demo
+shasum -a 256 -c SHA256SUMS                                   # the attached files
+uvx --from agent_reliability_ci-0.8.0-py3-none-any.whl arci demo   # or, once on PyPI: uvx --from agent-reliability-ci==0.8.0 arci demo
 ```
+
+Built by release workflow run 38365660814 from tag `v0.8.0` (commit 48e60ac): 
+
+```text
+10ddc6823b446edd745d7904c5ab24a2fa098a0b9313ccc2df1b3277c4212899  agent_reliability_ci-0.8.0-py3-none-any.whl
+99476b7b8923724eeb6392f7fa37ba4189c6fc5bb40d2ce9f10d7b3d578a9a01  agent_reliability_ci-0.8.0.tar.gz
+```
+
+The same bytes come out of `uv build --no-sources` on a clean checkout of that commit (verified on the
+maintainer's machine: identical checksums). Wheel built by hatchling 1.32.4, Metadata-Version 2.5.
