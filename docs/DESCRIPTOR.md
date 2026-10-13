@@ -109,8 +109,10 @@ stay what they look like:
   null (`null`, `~`, empty) and merge keys (`<<`) follow YAML 1.1.
 
 The result must be JSON: `!!set`, `!!omap`, `!!pairs`, `!!binary`, `!!timestamp` and custom tags,
-`.nan`/`.inf`, non-string keys (write `"1":`), self-containing aliases and nesting deeper than 100
-levels are errors. Numbers are strict at every level: `n_per_arm: true`, `base_seed: "7"`,
+`.nan`/`.inf`, an integer too large to seal (more than Python's integer string limit, 4300
+decimal digits by default; `0x1` followed by 3600 zeros is one), non-string keys (write `"1":`),
+self-containing aliases and nesting deeper than 100 levels are errors. Depth counts every use of
+an alias: a value shared through `&a`/`*a` is as deep as the deepest place it is used. Numbers are strict at every level: `n_per_arm: true`, `base_seed: "7"`,
 `alpha: "0.05"` and `n_per_arm: 6.0` are errors (`max_seconds: 15` is fine). Quote strings that
 could read as numbers or null (`"1.0"`, `"null"`), as `arci init` does; other YAML readers
 (`load_contract`, other tools) keep YAML 1.1, so quoting also keeps a file portable.
@@ -122,7 +124,9 @@ line on stderr naming the file, the source path (the keys you wrote, aliases inc
 zero-based indices) and the problem. A YAML-level problem (syntax, a repeated key, a value
 refused above) is reported where it first occurs in the file. Otherwise every key is checked and
 the reported error is the first by **sorted** source path, not file order: segment by segment,
-indices numerically and keys by character code, so `aaa` beats `oracle` beats `zzz`.
+indices numerically and keys by character code, so `aaa` beats `oracle` beats `zzz`. Every
+independent problem counts: a condition with both `id`/`condition_id` and `fault`/`faults`
+reports `conditions[0].fault`, which sorts before `conditions[0].id`.
 
 ```text
 error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"

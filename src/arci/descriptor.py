@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, cast
@@ -188,15 +189,29 @@ DescriptorLoader.add_implicit_resolver(
 DescriptorLoader.add_implicit_resolver(_FLOAT_TAG, re.compile(FLOAT_PATTERN), list("-+0123456789."))
 
 
+def _too_large() -> str:
+    limit = sys.get_int_max_str_digits()
+    return f"integer too large to seal: more than {limit} decimal digits"
+
+
 def _int_value(text: str) -> int:
+    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit."""
     digits = text.replace("_", "")
     sign = -1 if digits.startswith("-") else 1
     digits = digits[1:] if digits[:1] in "+-" else digits
     base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
+    body = digits[2:] if base != 10 else digits
     try:
-        return sign * int(digits[2:] if base != 10 else digits, base)
+        value = sign * int(body, base)
     except ValueError:
+        if base == 10 and body.isascii() and body.isdigit():  # only the digit limit refuses it
+            raise ValueError(_too_large()) from None
         raise ValueError(f"invalid integer {_quote(text)}") from None
+    try:
+        str(value)  # a 0x/0o/0b literal converts freely; writing it in decimal may not
+    except ValueError:
+        raise ValueError(_too_large()) from None
+    return value
 
 
 _NON_FINITE = {".inf": math.inf, "+.inf": math.inf, "-.inf": -math.inf, ".nan": math.nan}
@@ -289,24 +304,37 @@ def _check_key(loader: DescriptorLoader, key_node: yaml.Node, path: SourcePath) 
 
 
 def _check_node(
-    loader: DescriptorLoader, node: yaml.Node, path: SourcePath, active: set[int], done: set[int]
-) -> None:
+    loader: DescriptorLoader,
+    node: yaml.Node,
+    path: SourcePath,
+    active: set[int],
+    heights: dict[int, int],
+) -> int:
     """Walk the composed node graph before anything is constructed; the first problem raises.
 
     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
     boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
     `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
     intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
-    mapping is a repeated key like any other. A node reached twice through an alias is checked once.
+    mapping is a repeated key like any other.
+
+    Returns the node's height (levels of nesting below it; a scalar or an empty collection is 0).
+    A node reached twice through an alias is walked once and its height cached by node identity;
+    every later use still checks that its own path plus that height stays within `MAX_DEPTH`, so a
+    chain of shared aliases cannot nest deeper than the limit.
     """
     if id(node) in active:
         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
-    if id(node) in done:
-        return
+    known = heights.get(id(node))
+    if known is not None:
+        if len(path) + known > MAX_DEPTH:
+            raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
+        return known
     if len(path) > MAX_DEPTH:
         raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
     _check_tag(node, path)
     active.add(id(node))
+    height = 0
     if isinstance(node, yaml.ScalarNode):
         _check_scalar(node, path)
     elif isinstance(node, yaml.MappingNode):
@@ -322,7 +350,7 @@ def _check_node(
                         f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
                     )
                 merged = True
-                _check_node(loader, value_node, path, active, done)
+                height = max(height, _check_node(loader, value_node, path, active, heights))
                 continue
             key = _check_key(loader, key_node, path)
             if key in keys:
@@ -333,12 +361,14 @@ def _check_node(
                     f"{mark.column + 1}; give each key once",
                 )
             keys.add(key)
-            _check_node(loader, value_node, (*path, key), active, done)
+            below = _check_node(loader, value_node, (*path, key), active, heights)
+            height = max(height, 1 + below)
     elif isinstance(node, yaml.SequenceNode):
         for index, item in enumerate(cast(list[yaml.Node], node.value)):
-            _check_node(loader, item, (*path, index), active, done)
+            height = max(height, 1 + _check_node(loader, item, (*path, index), active, heights))
     active.discard(id(node))
-    done.add(id(node))
+    heights[id(node)] = height
+    return height
 
 
 def parse_yaml(text: str) -> object:
@@ -353,7 +383,7 @@ def parse_yaml(text: str) -> object:
         node = loader.get_single_node()
         if node is None:
             return None
-        _check_node(loader, node, (), set(), set())
+        _check_node(loader, node, (), set(), {})
         return loader.construct_document(node)
     except RecursionError:
         raise _SourceError((), f"nested more than {MAX_DEPTH} levels deep") from None
@@ -373,45 +403,48 @@ def _both(alias: str, name: str) -> str:
     return f"{_quote(alias)} and {_quote(name)} are the same key; give one, not both"
 
 
-def _fault_rule(given: Mapping[str, object]) -> Problem | None:
+def _fault_rule(given: Mapping[str, object]) -> list[Problem]:
     if "occurrence" in given and "at_occurrence" in given:
-        return ("occurrence",), _both("occurrence", "at_occurrence")
-    return None
+        return [(("occurrence",), _both("occurrence", "at_occurrence"))]
+    return []
 
 
-def _condition_rule(given: Mapping[str, object]) -> Problem | None:
+def _condition_rule(given: Mapping[str, object]) -> list[Problem]:
+    """Both independent rules are checked: the condition id, and `fault`/`faults`."""
+    found: list[Problem] = []
     if "id" in given and "condition_id" in given:
-        return ("id",), _both("id", "condition_id")
-    if "id" not in given and "condition_id" not in given:
-        return ("id",), 'missing required key "id" (or "condition_id")'
-    key = "id" if "id" in given else "condition_id"
-    if given[key] is None:
-        return (key,), "must be a string"
+        found.append((("id",), _both("id", "condition_id")))
+    elif "id" not in given and "condition_id" not in given:
+        found.append((("id",), 'missing required key "id" (or "condition_id")'))
+    else:
+        key = "id" if "id" in given else "condition_id"
+        if given[key] is None:
+            found.append(((key,), "must be a string"))
     if "fault" in given and "faults" in given:
-        return ("fault",), '"fault" and "faults" both given; give one, not both'
-    if "fault" in given and given["fault"] is None:
-        return ("fault",), "must be a mapping; omit it for a clean condition"
-    return None
+        found.append((("fault",), '"fault" and "faults" both given; give one, not both'))
+    elif "fault" in given and given["fault"] is None:
+        found.append((("fault",), "must be a mapping; omit it for a clean condition"))
+    return found
 
 
-def _contract_rule(given: Mapping[str, object]) -> Problem | None:
+def _contract_rule(given: Mapping[str, object]) -> list[Problem]:
     if "oracle" in given and "contract" in given:
-        return ("oracle",), '"oracle" and "contract" both given; give one, not both'
+        return [(("oracle",), '"oracle" and "contract" both given; give one, not both')]
     if "oracle" not in given and "contract" not in given:
-        return ("oracle",), 'missing required key "oracle" (or "contract")'
+        return [(("oracle",), 'missing required key "oracle" (or "contract")')]
     key = "oracle" if "oracle" in given else "contract"
     if given[key] is None:
-        return (key,), "must not be null"
-    return None
+        return [((key,), "must not be null")]
+    return []
 
 
 def _given(model: BaseModel) -> dict[str, object]:
     return {name: getattr(model, name) for name in model.model_fields_set}
 
 
-def _raise(problem: Problem | None) -> None:
-    if problem is not None:
-        raise _PathError(*problem)
+def _raise(problems: Sequence[Problem]) -> None:
+    if problems:
+        raise _PathError(*first_problem(problems))
 
 
 def _mapping(value: object) -> dict[str, object] | None:
@@ -427,12 +460,11 @@ def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
     found: list[Problem] = []
 
     def check(
-        rule: Callable[[Mapping[str, object]], Problem | None], at: SourcePath, value: object
+        rule: Callable[[Mapping[str, object]], list[Problem]], at: SourcePath, value: object
     ) -> None:
         given = _mapping(value)
-        problem = rule(given) if given is not None else None
-        if problem is not None:
-            found.append(((*at, *problem[0]), problem[1]))
+        for path, message in rule(given) if given is not None else []:
+            found.append(((*at, *path), message))
 
     check(_contract_rule, (), data)
     for index, condition in enumerate(_items(data.get("conditions"))):
@@ -713,7 +745,7 @@ class Descriptor(_Model):
         except ValidationError as exc:
             path, message = first_problem(validation_problems(exc, None))
             raise DescriptorError(message, path) from None
-        except (ValueError, TypeError) as exc:  # e.g. a value the seal (hash_record) refuses
+        except (ValueError, TypeError, RecursionError) as exc:  # e.g. what hash_record refuses
             raise DescriptorError(f"cannot seal the manifest: {exc}") from None
 
 
@@ -853,6 +885,8 @@ def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
         raise DescriptorError(f"invalid YAML{where}: {exc.problem}", (), source) from None
     except yaml.YAMLError as exc:
         raise DescriptorError(f"invalid YAML: {exc}", (), source) from None
+    except (ValueError, TypeError, RecursionError) as exc:  # defence in depth: never bare
+        raise DescriptorError(f"invalid YAML: {exc}", (), source) from None
     if not isinstance(data, dict):
         kind = "empty" if data is None else type(data).__name__
         raise DescriptorError(f"must be one YAML mapping, got {kind}", (), source)
@@ -870,7 +904,11 @@ def _validate(data: dict[str, object], source: str) -> Descriptor:
     """
     problems = shorthand_problems(data)
     try:
-        descriptor = Descriptor.model_validate_json(json.dumps(data, allow_nan=False), strict=True)
+        text = json.dumps(data, allow_nan=False)
+    except (ValueError, TypeError, RecursionError) as exc:  # parse_yaml already refuses these
+        raise DescriptorError(f"not a JSON value: {exc}", (), source) from None
+    try:
+        descriptor = Descriptor.model_validate_json(text, strict=True)
     except ValidationError as exc:
         problems += validation_problems(exc, data)
     else:
