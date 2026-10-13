@@ -42,3 +42,7 @@ command_start → "All six steps held", 1 s resolution; package agent-reliabilit
   target by about 2×; it meets it only on the maintainer's 15-core machine (73–80 s). Either the
   target names a machine class or the demo on hosted runners must do less work (fewer trials per
   arm, or fewer of the six steps); that is a planning decision for the next run, not a workflow fix.
+- Record-keeping: the run-38451606669 JSON files use the T18r1 schema (no `timeout_reason` on the
+  budget-cut warm samples) and fail the final validator, so they are not committed under
+  `docs/measurement/reference-machines/`; their cold values are recorded above and in the
+  scratchpad only. The run of the final workflow (2684e24) provides the committed files.
