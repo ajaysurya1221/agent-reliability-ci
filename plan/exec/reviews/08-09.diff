@@ -1,0 +1,1352 @@
+diff --git a/docs/recipes/mcp-inspector.md b/docs/recipes/mcp-inspector.md
+new file mode 100644
+index 0000000..1d1c941
+--- /dev/null
++++ b/docs/recipes/mcp-inspector.md
+@@ -0,0 +1,149 @@
++# Gate an MCP agent: Inspector for discovery, ARCI for repeated faulted trials
++
++Your agent is a program that talks to its tools over MCP. Two tools answer two different questions:
++
++- **MCP Inspector** asks: does this server start, speak the protocol and list the tools I expect?
++- **ARCI** asks: across repeated trials with injected tool faults, is the candidate agent less
++  reliable than the baseline, and what did a failing trial do?
++
++The runnable tree is [examples/recipes/mcp_agent](../../examples/recipes/mcp_agent):
++`world.py` (a Python toolset with `fetch` and `store`, served over stdio by
++`arci.mcp_toolset_server`, the "bridge"), `agent.py` (a scripted stdlib MCP client, variants
++`retry` and `fragile`), `arci.yaml`, `mcp.inspector.json` and `task.json`. A test
++(`tests/unit/recipes/test_mcp_agent.py`) runs the manual preflight and the commands below from a
++copy of the tree.
++
++## Setup
++
++Copy the tree out of the clone and use an environment where `python` and `arci` both come from an
++install of agent-reliability-ci (the bridge imports `arci`; `arci.yaml` and `mcp.inspector.json`
++say `python`, resolved on `PATH`):
++
++```bash
++cp -R examples/recipes/mcp_agent mcp-recipe && cd mcp-recipe
++python -m venv .venv && . .venv/bin/activate && pip install agent-reliability-ci
++```
++
++Before the PyPI release, activate the clone's `uv sync` environment instead. A `python` without
++arci fails every trial as a harness ERROR.
++
++## Step 1: Inspector preflight against the raw bridge
++
++```bash
++npx @modelcontextprotocol/inspector --cli --config mcp.inspector.json --server env --method tools/list
++```
++
++`mcp.inspector.json` starts the bridge directly (seed 0, `--task-file task.json`,
++`"env": {"PYTHONPATH": "."}` so `world` imports from this directory). The Inspector connects,
++initializes and lists the tools (its `tools/call` method calls one). It talks to the **raw** server: ARCI's boundary is not in the path, so nothing it
++sees is recorded, budgeted or fault-injected.
++
++Recorded on the orchestrator's machine:
++
++```text
++<<Inspector result recorded by the orchestrator on 2026-10-13>>
++```
++
++The bridge speaks MCP revision `2026-07-28` (the boundary's supported subset,
++[ADR 0002](../design/0002-out-of-process-boundary.md)). Inspector 2.10.1, on TypeScript SDK 1.29.0,
++rejects that version during `initialize`, so on that date **step 1 is blocked by the Inspector
++SDK's version check**, not by the server. The manual preflight below checks the same three things
++and works today. This recipe does not change the bridge's version handling.
++
++### Manual preflight (no Node, standard library only)
++
++This sends `initialize`, the `notifications/initialized` notification, `tools/list` and one
++`tools/call` over a pipe to the server that `mcp.inspector.json` describes, launched with the
++current interpreter:
++
++```bash
++python - <<'EOF'
++import json, os, subprocess, sys
++
++entry = json.load(open("mcp.inspector.json"))["mcpServers"]["env"]
++messages = [
++    {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2026-07-28",
++     "capabilities": {}, "clientInfo": {"name": "preflight", "version": "1"}}},
++    {"jsonrpc": "2.0", "method": "notifications/initialized"},
++    {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
++    {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
++     "params": {"name": "fetch", "arguments": {"key": "answer"}}},
++]
++done = subprocess.run([sys.executable, *entry["args"]], env={**os.environ, **entry["env"]},
++                      input="".join(json.dumps(m) + "\n" for m in messages),
++                      capture_output=True, text=True, timeout=30, check=False)
++for line in done.stdout.splitlines():
++    print(line)
++print("server exit", done.returncode, done.stderr.strip())
++EOF
++```
++
++Expect three reply lines and `server exit 0`: `initialize` answers protocol `2026-07-28`,
++`tools/list` names `fetch` and `store` with input schemas, and the call returns
++`"isError": true` with `TimeoutError: upstream transient timeout`. Seed 0 is one of the world's
++flaky upstreams (30% of seeds fail the first real `fetch`), so this error comes from the
++environment itself, not from ARCI; the raw bridge never injects faults.
++
++## Step 2: repeated, faulted trials through the boundary
++
++```bash
++arci run arci.yaml
++```
++
++`arci.yaml` is written by hand: `arci init` scaffolds Python arms only. Both arms are commands:
++`python -P -m agent ... --variant retry` (baseline) and `--variant fragile` (candidate), with
++`mcp_server` running the same bridge per trial (`{workdir}`, `{seed}`, `{task_file}` expanded at
++launch) and `arci.mcp_toolset_server:snapshot` reading its final state for the oracle
++`world:passed`. One condition, `tool_error_once` on `fetch` at occurrence 0, makes the first
++`fetch` of every trial return `isError: true` at the boundary. `agent` and `world` import because
++`arci run` appends the current directory to every child's import path (ADR 0006).
++
++Expect `VERDICT: BLOCK (exit 1)` even though the stderr notice calls 8 trials per arm a smoke
++design: `fragile` gives up on the injected error in every trial (0/8) while `retry` recovers (8/8),
++and a total collapse is the one result N=8 can decide. A smaller drop would be INCONCLUSIVE here.
++
++## Step 3: look at a failing trial
++
++```bash
++arci diff runs/mcp-fetch-retry fetch-error:00000:baseline fetch-error:00000:candidate
++arci minimize runs/mcp-fetch-retry fetch-error:00000:candidate --out min.json
++arci bundle runs/mcp-fetch-retry fetch-error:00000:candidate --out bundle.json --root . --include agent.py --include world.py
++arci replay bundle.json
++```
++
++`diff` shows the divergence after `tool_error_once`: `retry` calls `fetch` again, `fragile` ends.
++`replay` serves the recorded MCP exchanges (initialize, tools/list and every tools/call) to a fresh
++run of the scripted agent, never starting the server, and exits 0 when the failure reproduces.
++That works because the client is scripted; a live model that calls differently is INVALID.
++
++## What each one checks
++
++| Question | Inspector or manual preflight (raw bridge) | `arci run` (through the boundary) |
++|---|---|---|
++| Server starts, `initialize` succeeds | yes (blocked on the Inspector SDK's version check today) | yes, every trial |
++| Tools listed with schemas | yes | yes, recorded |
++| One `tools/call` routes and returns | yes | yes, every call recorded |
++| Fault injection (`tool_error_once`, `tool_timeout`, `empty_result`) | no | yes |
++| Tool-call budget, deadline | no | yes |
++| Repeated seeded trials, oracle on final state, verdict | no | yes |
++| diff, minimize, bundle, offline replay | no | yes |
++
++## What the raw-server preflight does not cover
++
++A clean preflight is necessary, not sufficient. It never exercises what only the boundary does:
++
++- **fault injection**: the raw server is never perturbed, so the agent's handling of injected
++  errors, timeouts and empty results is untested;
++- **budgets**: `max_tool_calls` and the trial deadline exist only in the boundary;
++- **the one-connection rule**: the boundary accepts exactly one MCP connection per trial; an agent
++  that opens a second one is a harness ERROR there, which a preflight's own session cannot reveal;
++- **reserved tool names**: a server advertising a tool named `rpc:...` or `decision:...` is a
++  harness fault under ARCI;
++- **the 1 MiB line limit**: a JSON-RPC line over 1 MiB, from the agent or the server, is a harness
++  fault at the boundary;
++- **the -32603 mapping**: a tool that returns non-JSON makes the bridge answer JSON-RPC error
++  -32603, which the boundary treats as a broken environment (harness ERROR), not as the agent's
++  failure; a raw client just sees an error reply.
++
++Neither tool makes the agent safe: ARCI observes calls that cross its boundary, it is not a
++sandbox, and an agent can bypass MCP entirely ([docs/REAL_AGENTS.md](../REAL_AGENTS.md)).
+diff --git a/docs/recipes/python-agent.md b/docs/recipes/python-agent.md
+new file mode 100644
+index 0000000..3b52028
+--- /dev/null
++++ b/docs/recipes/python-agent.md
+@@ -0,0 +1,132 @@
++# Gate a retry-policy change in ten minutes
++
++You changed an agent: a teammate removed a "pointless" retry around a flaky tool. Every unit test
++still passes, because a unit test calls the tool once and the tool works. This recipe asks the
++question the unit tests cannot: when the tool fails transiently, is the new version less reliable
++than the old one, by more than you are willing to accept?
++
++The runnable tree is [examples/recipes/python_agent](../../examples/recipes/python_agent); its
++[README](../../examples/recipes/python_agent/README.md) is the short version of this page. A test
++(`tests/unit/recipes/test_python_agent.py`) runs the README's commands from a copy of the tree.
++
++## What you bring
++
++Four Python functions, referenced as `module:function`:
++
++- the **baseline** agent, `app.v1:run`, and the **candidate**, `app.v2:run`. Both have the plain
++  agent signature `run(task, tools, rng) -> dict`: they get the task, a tool box whose `call`
++  goes through ARCI's boundary, and a seeded random generator. v1 confirms the order; if it is not
++  held yet it calls `reserve` up to three times, then confirms again. v2 is v1 with the loop gone.
++- a **toolset factory**, `tests.world:make_world(task, seed)`, which builds a fresh world per trial:
++  an object with a `tools` mapping (`reserve`, `confirm`) and a `snapshot()` of its final state.
++  The world is seeded: 75% of seeds start with the order already held, and 20% have a reserve
++  backend that times out twice before it works. These shares are invented for the recipe.
++- an **oracle**, `tests.world:passed(task, final_state)`, which decides success from the world's
++  final state alone: the order in the task is confirmed. The agent's own claim is never the grade.
++
++No gate or statistics code is copied into the tree; it is the agent, the world and the oracle.
++
++## Step 1: scaffold and smoke-run
++
++From a copy of the tree with the committed `arci.yaml` removed (`arci init` writes that same file
++and never overwrites one without `--force`):
++
++```bash
++cp -R examples/recipes/python_agent checkout && cd checkout && rm arci.yaml
++uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 && arci run arci.yaml
++```
++
++This is the README's first-screen command plus two flags for this tree: the task data and one
++fault. Before any PyPI release, use the `arci` from a clone's `uv sync` environment instead of
++`uv tool install`.
++
++`arci init` validates before it writes. In one child process (the current directory on its
++import path), it imports the four references, calls `make_world` once with the task and seed 0,
++and checks that the fault's tool, `reserve`, is one the world offers. A typo fails here with one
++line on stderr and exit 3, not after a hundred trials. It never calls the agents or the oracle.
++
++`--fault tool_timeout:reserve:0` makes the first `reserve` call of every trial time out at the
++tool boundary, in both arms. Both arms get the same seeds, so they face the same worlds.
++
++## Step 2: read the smoke verdict
++
++`arci init` writes 8 trials per arm, a smoke design, and `arci run` says so on stderr before the
++first trial. Expect:
++
++```text
++VERDICT: INCONCLUSIVE (exit 2)
++```
++
++Why INCONCLUSIVE: the gate compares exact (Clopper-Pearson) bounds on the two success rates with
++an allowed drop of delta 0.10 at alpha 0.05. At N=8 two perfect arms cannot PASS (that needs
++N=42) and only a total collapse, 8/8 against 0/8, can BLOCK. v2 still confirms every order that
++arrived held, so it never collapses completely, and the bounds on the difference cross the margin.
++INCONCLUSIVE is a valid result: it claims neither a regression nor safety. It says that this N
++cannot tell, and CI stays non-green.
++
++## Step 3: plan the confirmatory run, then run it once
++
++Plan from the rates you believe, not from the smoke result. If v1 is about 0.95 and v2 about
++0.75 under the fault:
++
++```bash
++arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
++```
++
++The planner enumerates every pair of success counts on its grid and reports the smallest N per arm
++with P(BLOCK) >= 0.8: 400. These are probabilities under your assumptions, not observed power.
++
++Write that design as a new experiment before running any of it:
++
++```bash
++arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 --n 400 --out confirm.yaml
++```
++
++Append `base_seed: 1000` (fresh seeds, disjoint from the smoke run's) and
++`prior_runs: ["checkout-retry"]` (the report then lists the smoke run as an earlier run on this
++candidate) to `confirm.yaml`, then:
++
++```bash
++arci run confirm.yaml
++```
++
++Evaluate it once at N=400. Growing N because a verdict disappointed you is outcome-dependent
++extension; the descriptor's header says never to do it, and
++[docs/STATISTICS.md](../STATISTICS.md) explains why.
++
++## Step 4: look at one failure
++
++In the smoke run, pair 0 has v1 passing and v2 failing:
++
++```bash
++arci diff runs/checkout-retry faults:00000:baseline faults:00000:candidate
++arci minimize runs/checkout-retry faults:00000:candidate --out min.json
++arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/v2.py --include tests/world.py
++arci replay bundle.json
++```
++
++- `diff` reports the first divergence: after the injected `tool_timeout`, v1 calls `reserve` again
++  and v2 returns its result.
++- `minimize` removes faults while the failure persists; with one fault the answer is that fault,
++  1-minimal.
++- `bundle` packs the trial, its recording and the named source files into one JSON file;
++  `replay` re-runs it offline against the recording and exits 0 when the failure reproduces.
++
++## Recorded run
++
++The orchestrator's machine, one smoke run and one confirmatory run, with wall-clock times:
++
++<<recorded run>>
++
++## What this does not show
++
++- **PASS is relative.** It would mean that, for this predeclared experiment, any drop from v1 to v2
++  is smaller than delta. It never says either version is reliable.
++- **A fault only fires on a call.** A trial whose order was already held never calls `reserve`, so
++  the timeout never fires there; a fault on a tool your agent never calls silently never fires.
++- **The world is a fixture.** Its shares are invented, and a verdict here is about this world, this
++  task and this fault, not about your production backend.
++- **Not a sandbox.** ARCI observes the calls that cross its tool boundary. `arci init` and
++  `arci run` import and execute your code with your permissions.
++- **Import path.** The current directory is appended to the child's import path (ADR 0006), so an
++  installed top-level package called `app` or `tests` takes precedence over the tree's.
+diff --git a/examples/recipes/mcp_agent/README.md b/examples/recipes/mcp_agent/README.md
+new file mode 100644
+index 0000000..b089428
+--- /dev/null
++++ b/examples/recipes/mcp_agent/README.md
+@@ -0,0 +1,36 @@
++# Recipe: an MCP command agent, Inspector preflight, then ARCI
++
++A scripted MCP client (`agent.py`) in two variants: `retry` retries a failed `fetch` up to three
++times, `fragile` gives up on the first error. ARCI runs both as command agents against the same
++seeded environment, with the first `fetch` of every trial failing at its boundary. The walkthrough,
++including what the Inspector and ARCI each check, is
++[docs/recipes/mcp-inspector.md](../../../docs/recipes/mcp-inspector.md).
++
++| File | What it is |
++|---|---|
++| `world.py` | `make_world(task, seed)`: tools `fetch(key)` (30% of seeds fail the first real call transiently) and `store(key, value)`; `snapshot()`; `passed(task, final_state)`: the stored value equals the upstream's |
++| `agent.py` | stdlib newline-delimited JSON-RPC stdio client: one session, `initialize` (protocol `2026-07-28`), `notifications/initialized`, `tools/list`, `fetch`, `store`; exit 0 done, 1 gave up, 75 infrastructure |
++| `arci.yaml` | written by hand (`arci init` scaffolds Python arms only): two command arms, `mcp_server` = the bridge `arci.mcp_toolset_server --toolset world:make_world`, one condition `tool_error_once` on `fetch` at occurrence 0, 8 trials per arm |
++| `mcp.inspector.json` | an Inspector `--config` file that starts the same bridge directly (seed 0, `task.json`, `PYTHONPATH=.`) |
++| `task.json` | the task, `{"key": "answer"}` |
++
++Run from a copy of this directory, with an environment active whose `python` and `arci` come from
++an install of agent-reliability-ci (`arci.yaml` and `mcp.inspector.json` say `python`; write an
++absolute interpreter path if yours differs):
++
++```bash
++cp -R examples/recipes/mcp_agent mcp-recipe && cd mcp-recipe
++npx @modelcontextprotocol/inspector --cli --config mcp.inspector.json --server env --method tools/list
++arci run arci.yaml
++arci diff runs/mcp-fetch-retry fetch-error:00000:baseline fetch-error:00000:candidate
++```
++
++Expect `VERDICT: BLOCK (exit 1)`: `fragile` fails all 8 trials, `retry` passes all 8, and a total
++collapse is the one result 8 trials per arm can decide. The Inspector step was blocked on
++2026-10-13 by the Inspector SDK's protocol-version check; the doc has a stdlib manual preflight
++that drives the same server over a pipe.
++
++The agent runs as `python -P -m agent` because command agents start in a temporary trial
++directory: `agent` and `world` import from this directory only because `arci run` appends the
++current directory to every child's import path (ADR 0006). Not a sandbox: ARCI sees only what
++crosses its MCP boundary.
+diff --git a/examples/recipes/mcp_agent/agent.py b/examples/recipes/mcp_agent/agent.py
+new file mode 100644
+index 0000000..5871728
+--- /dev/null
++++ b/examples/recipes/mcp_agent/agent.py
+@@ -0,0 +1,107 @@
++"""A scripted MCP agent: one stdio session, newline-delimited JSON-RPC, standard library only.
++
++    python -P -m agent --mcp-config FILE --task-file FILE --variant retry|fragile
++
++It starts the one server in the config, initializes, lists tools, fetches the task's key and
++stores the value. `retry` retries a failed fetch up to 3 times; `fragile` gives up on the first
++error. Exit 0: done (the agent's claim of success); 1: gave up; 75: infrastructure problem.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import subprocess
++from pathlib import Path
++from typing import Any
++
++RETRIES = {"retry": 3, "fragile": 0}
++INFRA = 75  # EX_TEMPFAIL: the trial is a harness ERROR, not the agent's failure
++
++
++class Session:
++    """One server process and one connection; one request in flight at a time."""
++
++    def __init__(self, config_path: str) -> None:
++        (entry,) = json.loads(Path(config_path).read_text("utf-8"))["mcpServers"].values()
++        self.proc = subprocess.Popen(
++            [entry["command"], *entry.get("args", [])],
++            stdin=subprocess.PIPE,
++            stdout=subprocess.PIPE,
++            env={**os.environ, **entry.get("env", {})},
++            text=True,
++        )
++        self.last_id = 0
++
++    def send(self, method: str, params: dict[str, Any], *, notify: bool = False) -> Any:
++        assert self.proc.stdin is not None and self.proc.stdout is not None
++        message: dict[str, Any] = {"jsonrpc": "2.0", "method": method, "params": params}
++        if not notify:
++            self.last_id += 1
++            message["id"] = self.last_id
++        self.proc.stdin.write(json.dumps(message) + "\n")
++        self.proc.stdin.flush()
++        while not notify:
++            line = self.proc.stdout.readline()
++            if not line:
++                raise ConnectionError("the MCP server closed the session")
++            reply: Any = json.loads(line)
++            if reply.get("id") == self.last_id:
++                return reply
++        return None
++
++    def call(self, name: str, **arguments: str) -> Any:
++        """The tool's JSON value, or None for an error result."""
++        result: Any = self.send("tools/call", {"name": name, "arguments": arguments}).get("result")
++        if not isinstance(result, dict) or result.get("isError") or not result.get("content"):
++            return None
++        return json.loads(result["content"][0]["text"])
++
++    def close(self) -> None:
++        try:
++            assert self.proc.stdin is not None
++            self.proc.stdin.close()
++            self.proc.wait(timeout=10)
++        except (OSError, subprocess.TimeoutExpired):
++            self.proc.kill()
++
++
++def work(session: Session, key: str, retries: int) -> bool:
++    client = {"name": "recipe-agent", "version": "1"}
++    init = {"protocolVersion": "2026-07-28", "capabilities": {}, "clientInfo": client}
++    session.send("initialize", init)
++    session.send("notifications/initialized", {}, notify=True)
++    listed: Any = session.send("tools/list", {})["result"]["tools"]
++    if {"fetch", "store"} - {tool["name"] for tool in listed}:
++        raise ConnectionError("the server does not offer fetch and store")
++    for _attempt in range(1 + retries):
++        fetched = session.call("fetch", key=key)
++        if isinstance(fetched, dict) and isinstance(fetched.get("value"), str):
++            stored = session.call("store", key=key, value=fetched["value"])
++            return isinstance(stored, dict) and stored.get("stored") is True
++    return False
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--mcp-config", required=True)
++    parser.add_argument("--task-file", required=True)
++    parser.add_argument("--variant", choices=sorted(RETRIES), required=True)
++    args = parser.parse_args()
++    try:
++        key = str(json.loads(Path(args.task_file).read_text("utf-8"))["key"])
++        session = Session(args.mcp_config)
++    except (OSError, ValueError, KeyError, TypeError):
++        return INFRA
++    try:
++        done = work(session, key, RETRIES[args.variant])
++    except (OSError, ValueError, KeyError, TypeError, AttributeError):
++        return INFRA
++    finally:
++        session.close()
++    return 0 if done else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/examples/recipes/mcp_agent/arci.yaml b/examples/recipes/mcp_agent/arci.yaml
+new file mode 100644
+index 0000000..59bf8aa
+--- /dev/null
++++ b/examples/recipes/mcp_agent/arci.yaml
+@@ -0,0 +1,25 @@
++# arci experiment descriptor. Schema: `arci schema`.
++# Written by hand: `arci init` scaffolds Python arms only (ADR 0008); see docs/DESCRIPTOR.md,
++# "Command experiments". "python" is resolved on PATH and must be an interpreter with
++# agent-reliability-ci installed (the bridge imports arci); otherwise write an absolute path.
++# smoke design: 8 trials per arm; run arci plan before a confirmatory N.
++# Never extend this experiment based on its verdict.
++experiment_id: "mcp-fetch-retry"
++task: {"key": "answer"}
++oracle: "world:passed"
++baseline:
++  label: "retry"
++  command:
++    argv: ["python", "-P", "-m", "agent", "--mcp-config", "{mcp_config}", "--task-file", "{task_file}", "--variant", "retry"]
++candidate:
++  label: "fragile"
++  command:
++    argv: ["python", "-P", "-m", "agent", "--mcp-config", "{mcp_config}", "--task-file", "{task_file}", "--variant", "fragile"]
++mcp_server:
++  name: "env"
++  argv: ["python", "-P", "-m", "arci.mcp_toolset_server", "--toolset", "world:make_world", "--workdir", "{workdir}", "--seed", "{seed}", "--task-file", "{task_file}"]
++  snapshot: "arci.mcp_toolset_server:snapshot"
++conditions:
++  - id: "fetch-error"
++    fault: {name: "tool_error_once", tool: "fetch", occurrence: 0}
++n_per_arm: 8
+diff --git a/examples/recipes/mcp_agent/mcp.inspector.json b/examples/recipes/mcp_agent/mcp.inspector.json
+new file mode 100644
+index 0000000..33ce4d1
+--- /dev/null
++++ b/examples/recipes/mcp_agent/mcp.inspector.json
+@@ -0,0 +1,21 @@
++{
++  "mcpServers": {
++    "env": {
++      "command": "python",
++      "args": [
++        "-P",
++        "-m",
++        "arci.mcp_toolset_server",
++        "--toolset",
++        "world:make_world",
++        "--workdir",
++        "preflight-state",
++        "--seed",
++        "0",
++        "--task-file",
++        "task.json"
++      ],
++      "env": {"PYTHONPATH": "."}
++    }
++  }
++}
+diff --git a/examples/recipes/mcp_agent/task.json b/examples/recipes/mcp_agent/task.json
+new file mode 100644
+index 0000000..a16533a
+--- /dev/null
++++ b/examples/recipes/mcp_agent/task.json
+@@ -0,0 +1 @@
++{"key": "answer"}
+diff --git a/examples/recipes/mcp_agent/world.py b/examples/recipes/mcp_agent/world.py
+new file mode 100644
+index 0000000..3142f58
+--- /dev/null
++++ b/examples/recipes/mcp_agent/world.py
+@@ -0,0 +1,54 @@
++"""The environment the MCP agent works in, served by `arci.mcp_toolset_server`.
++
++`fetch(key)` reads a value from a seeded upstream: 30% of seeds fail the first real call
++transiently. `store(key, value)` writes it. The oracle checks the stored value against the
++upstream's; it never reads the agent's claim.
++"""
++
++from __future__ import annotations
++
++import random
++from collections.abc import Callable, Mapping
++
++from pydantic import JsonValue
++
++FLAKY_SHARE = 0.30
++
++
++class World:
++    def __init__(self, task: dict[str, JsonValue], seed: int) -> None:
++        self._key = str(task["key"])
++        self._upstream = f"v{random.Random(f'{seed}:value').randrange(1000, 10000)}"
++        self._flaky = random.Random(f"{seed}:fetch").random() < FLAKY_SHARE
++        self._stored: dict[str, JsonValue] = {}
++        self.tools: Mapping[str, Callable[..., JsonValue]] = {
++            "fetch": self.fetch,
++            "store": self.store,
++        }
++
++    def fetch(self, key: str) -> JsonValue:
++        """Read the upstream value for a key."""
++        if self._flaky:
++            self._flaky = False
++            raise TimeoutError("upstream transient timeout")
++        return {"key": key, "value": self._upstream if key == self._key else None}
++
++    def store(self, key: str, value: str) -> JsonValue:
++        """Write a value under a key."""
++        self._stored[key] = value
++        return {"key": key, "stored": True}
++
++    def snapshot(self) -> dict[str, JsonValue]:
++        return {"key": self._key, "upstream": self._upstream, "stored": dict(self._stored)}
++
++
++def make_world(task: dict[str, JsonValue], seed: int) -> World:
++    return World(task, seed)
++
++
++def passed(task: dict[str, JsonValue], final_state: dict[str, JsonValue]) -> bool:
++    stored = final_state.get("stored")
++    upstream = final_state.get("upstream")
++    return (
++        isinstance(stored, dict) and upstream is not None and stored == {str(task["key"]): upstream}
++    )
+diff --git a/examples/recipes/python_agent/README.md b/examples/recipes/python_agent/README.md
+new file mode 100644
+index 0000000..77aab0f
+--- /dev/null
++++ b/examples/recipes/python_agent/README.md
+@@ -0,0 +1,108 @@
++# Recipe: gate a retry-policy change in ten minutes
++
++`app/v1.py` reserves an order with a bounded retry; `app/v2.py` is the same agent with the retry
++removed. This recipe asks ARCI whether v2 is less reliable than v1 when the first `reserve` call
++times out. The narrative version is [docs/recipes/python-agent.md](../../../docs/recipes/python-agent.md).
++
++## Run it
++
++From a clone of this repository, copy the tree out (the committed `arci.yaml` is exactly the file
++the next command writes, so remove it from the copy; `arci init` never overwrites without `--force`):
++
++```bash
++cp -R examples/recipes/python_agent checkout && cd checkout && rm arci.yaml
++```
++
++Then the README's first-screen command, with this tree's task and fault added:
++
++```bash
++uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 && arci run arci.yaml
++```
++
++Until `agent-reliability-ci` is on PyPI, skip `uv tool install` and use the `arci` of the clone's
++environment (`uv sync`, then `../.venv/bin/arci` from the copy if you made it inside the clone).
++
++`arci init` imports the four references in a child process (with the current directory on its
++import path), calls `make_world` once with the task and seed 0, checks that `reserve` is one of its
++tools, and writes `arci.yaml`. `arci run arci.yaml` runs 8 trials per arm under the one fault
++condition and stores them in `runs/checkout-retry/`.
++
++## The files
++
++| File | What it is |
++|---|---|
++| `app/v1.py` | `run(task, tools, rng)`: confirm; if the order is not held, `reserve` (up to 3 attempts), then confirm again |
++| `app/v2.py` | the same with the retry removed: the first `reserve` fault ends the attempt |
++| `tests/world.py` | `make_world(task, seed)`: tools `reserve` and `confirm`; 75% of seeds start with the order held, 20% have a reserve backend that times out twice; `passed(task, final_state)`: the order is confirmed |
++| `arci.yaml` | what `arci init` writes for the command above (a test regenerates it and compares bytes) |
++
++The oracle reads only the world's final state, never the agent's own claim. The fault
++`tool_timeout` on `reserve` at occurrence 0 makes the first `reserve` call of every trial time out.
++
++## What the smoke verdict means
++
++Expect `VERDICT: INCONCLUSIVE (exit 2)` and two stderr lines that say so. Eight trials per arm is a
++smoke design: under the default rule (alpha 0.05, delta 0.10, Clopper-Pearson) two perfect arms
++cannot PASS below N=42, and only a total collapse can BLOCK at N=8. Here v2 still confirms every
++order that arrived held (two of the eight seeds 0-7, so expect 8/8 against 2/8), so it does not
++collapse to 0/8, and the interval on the difference crosses the margin. INCONCLUSIVE claims no regression and no safety; it says this N cannot tell.
++
++## Choose a confirmatory N before running it
++
++State the rates you expect (here: v1 about 0.95, v2 about 0.75 under the fault) and ask for the
++smallest N that BLOCKs with probability at least 0.8:
++
++```bash
++arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
++```
++
++The planner answers 400 per arm. Write that design as a new experiment before any of its trials:
++
++```bash
++arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 --n 400 --out confirm.yaml
++```
++
++and append these two lines to `confirm.yaml`, so its seeds do not reuse the smoke run's and its
++report lists the smoke run as an earlier run on this candidate:
++
++```yaml
++base_seed: 1000
++prior_runs: ["checkout-retry"]
++```
++
++```bash
++arci run confirm.yaml
++```
++
++Evaluate once at that N. Never grow N because a verdict disappointed you; that is the extension the
++header of `arci.yaml` forbids.
++
++## Look at a failing trial
++
++At N=8, pair 0 has v1 passing and v2 failing:
++
++```bash
++arci diff runs/checkout-retry faults:00000:baseline faults:00000:candidate
++arci minimize runs/checkout-retry faults:00000:candidate --out min.json
++arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/v2.py --include tests/world.py
++arci replay bundle.json
++```
++
++`diff` names the first divergence (v1 calls `reserve` again, v2 returns) and the injected fault
++before it; `minimize` shows the one fault is needed; `replay` re-runs the bundle offline from its
++recording and exits 0 when the failure reproduces.
++
++## Recorded run
++
++<<recorded run>>
++
++## What this does not show
++
++PASS would mean relative non-inferiority for this predeclared experiment (any drop from v1 to v2 is
++smaller than delta), not that either version is reliable. The fault only fires when an agent calls
++`reserve`: a trial whose order was already held never sees it, and a fault on a tool the agent
++never calls silently never fires. The world is a seeded fixture, not your production backend, and
++its 75% and 20% shares are made up. ARCI observes the calls that cross its tool boundary; it is not
++a sandbox, and `arci init` and `arci run` import and run this code with your permissions. The
++current directory is appended to the child's import path, so an installed top-level `tests`
++package would shadow this tree's `tests`.
+diff --git a/examples/recipes/python_agent/app/__init__.py b/examples/recipes/python_agent/app/__init__.py
+new file mode 100644
+index 0000000..23ff746
+--- /dev/null
++++ b/examples/recipes/python_agent/app/__init__.py
+@@ -0,0 +1 @@
++"""The checkout agent: v1 (bounded retry) and v2 (retry removed)."""
+diff --git a/examples/recipes/python_agent/app/v1.py b/examples/recipes/python_agent/app/v1.py
+new file mode 100644
+index 0000000..80b045b
+--- /dev/null
++++ b/examples/recipes/python_agent/app/v1.py
+@@ -0,0 +1,31 @@
++"""Baseline: confirm the order, reserving it first when needed, with a bounded retry on reserve."""
++
++from __future__ import annotations
++
++import random
++
++from pydantic import JsonValue
++
++from arci.interfaces import ToolBoxProtocol, ToolFault
++
++RESERVE_ATTEMPTS = 3
++
++
++def _confirmed(value: JsonValue) -> bool:
++    return isinstance(value, dict) and value.get("confirmed") is True
++
++
++def run(
++    task: dict[str, JsonValue], tools: ToolBoxProtocol, rng: random.Random
++) -> dict[str, JsonValue]:
++    del rng
++    order_id = task["order_id"]
++    if _confirmed(tools.call("confirm", order_id=order_id)):
++        return {"confirmed": True}  # the order was already held
++    for _attempt in range(RESERVE_ATTEMPTS):
++        try:
++            tools.call("reserve", order_id=order_id)
++        except ToolFault:
++            continue  # transient: try again, at most RESERVE_ATTEMPTS times in all
++        break
++    return {"confirmed": _confirmed(tools.call("confirm", order_id=order_id))}
+diff --git a/examples/recipes/python_agent/app/v2.py b/examples/recipes/python_agent/app/v2.py
+new file mode 100644
+index 0000000..8f45026
+--- /dev/null
++++ b/examples/recipes/python_agent/app/v2.py
+@@ -0,0 +1,27 @@
++"""Candidate: v1 with the retry removed; one transient reserve fault loses the order."""
++
++from __future__ import annotations
++
++import random
++
++from pydantic import JsonValue
++
++from arci.interfaces import ToolBoxProtocol, ToolFault
++
++
++def _confirmed(value: JsonValue) -> bool:
++    return isinstance(value, dict) and value.get("confirmed") is True
++
++
++def run(
++    task: dict[str, JsonValue], tools: ToolBoxProtocol, rng: random.Random
++) -> dict[str, JsonValue]:
++    del rng
++    order_id = task["order_id"]
++    if _confirmed(tools.call("confirm", order_id=order_id)):
++        return {"confirmed": True}  # the order was already held
++    try:
++        tools.call("reserve", order_id=order_id)
++    except ToolFault:
++        return {"confirmed": False}  # gives up on the first fault
++    return {"confirmed": _confirmed(tools.call("confirm", order_id=order_id))}
+diff --git a/examples/recipes/python_agent/arci.yaml b/examples/recipes/python_agent/arci.yaml
+new file mode 100644
+index 0000000..77904f1
+--- /dev/null
++++ b/examples/recipes/python_agent/arci.yaml
+@@ -0,0 +1,23 @@
++# arci experiment descriptor. Schema: `arci schema`.
++# smoke design: expect INCONCLUSIVE; run arci plan before a confirmatory N
++# Default: 8 trials per arm; this scaffold does not establish confirmatory power.
++# Plan before trials: arci plan --help
++# Never extend this experiment based on its verdict.
++experiment_id: "checkout-retry"
++task: {"order_id": "order-7"}
++toolset: "tests.world:make_world"
++oracle: "tests.world:passed"
++baseline:
++  label: "baseline"
++  agent: "app.v1:run"
++candidate:
++  label: "candidate"
++  agent: "app.v2:run"
++conditions:
++  - id: "faults"
++    faults:
++      - name: "tool_timeout"
++        bucket: "falsify"
++        tool: "reserve"
++        occurrence: 0
++n_per_arm: 8
+diff --git a/examples/recipes/python_agent/tests/__init__.py b/examples/recipes/python_agent/tests/__init__.py
+new file mode 100644
+index 0000000..b65e5c6
+--- /dev/null
++++ b/examples/recipes/python_agent/tests/__init__.py
+@@ -0,0 +1 @@
++"""The checkout agent's test world (a toolset factory and an independent oracle)."""
+diff --git a/examples/recipes/python_agent/tests/world.py b/examples/recipes/python_agent/tests/world.py
+new file mode 100644
+index 0000000..dc6ed87
+--- /dev/null
++++ b/examples/recipes/python_agent/tests/world.py
+@@ -0,0 +1,51 @@
++"""Two tools. `confirm` succeeds only for a held order; `reserve` places the hold.
++
++Per seed: 75% of orders arrive already held, and 20% of reserve backends fail twice before
++they work. The oracle reads only the final state.
++"""
++
++from __future__ import annotations
++
++import random
++from collections.abc import Callable, Mapping
++
++from pydantic import JsonValue
++
++HELD_SHARE = 0.75
++FLAKY_SHARE = 0.20
++FLAKY_FAILURES = 2
++
++
++class World:
++    def __init__(self, task: dict[str, JsonValue], seed: int) -> None:
++        self._order_id = str(task["order_id"])
++        self._held = random.Random(f"{seed}:held").random() < HELD_SHARE
++        flaky = random.Random(f"{seed}:reserve").random() < FLAKY_SHARE
++        self._failures_left = FLAKY_FAILURES if flaky else 0
++        self._confirmed = False
++        self.tools: Mapping[str, Callable[..., JsonValue]] = {
++            "reserve": self._reserve,
++            "confirm": self._confirm,
++        }
++
++    def _reserve(self, order_id: str) -> JsonValue:
++        if self._failures_left:
++            self._failures_left -= 1
++            raise TimeoutError("reserve backend transient timeout")
++        self._held = self._held or order_id == self._order_id
++        return {"order_id": order_id, "held": self._held}
++
++    def _confirm(self, order_id: str) -> JsonValue:
++        self._confirmed = self._confirmed or (self._held and order_id == self._order_id)
++        return {"order_id": order_id, "confirmed": self._confirmed}
++
++    def snapshot(self) -> dict[str, JsonValue]:
++        return {"order_id": self._order_id, "held": self._held, "confirmed": self._confirmed}
++
++
++def make_world(task: dict[str, JsonValue], seed: int) -> World:
++    return World(task, seed)
++
++
++def passed(task: dict[str, JsonValue], final_state: dict[str, JsonValue]) -> bool:
++    return final_state.get("order_id") == task["order_id"] and final_state.get("confirmed") is True
+diff --git a/plan/exec/reports/08.md b/plan/exec/reports/08.md
+new file mode 100644
+index 0000000..c39794a
+--- /dev/null
++++ b/plan/exec/reports/08.md
+@@ -0,0 +1,32 @@
++# REPORT 08 — Status DONE
++
++Python-agent recipe, "Gate a retry-policy change in ten minutes". Coder: Claude Opus 5.5 (high), worktree `wt-recipes` (branch sprint/recipes at fcd79ce). No git state changed; nothing under `src/arci/**` or any frozen file touched.
++
++## Changes
++- `examples/recipes/python_agent/`: `app/__init__.py`, `app/v1.py` (`run(task, tools, rng)`: confirm; if the order is not held, `reserve` with up to 3 attempts, then confirm), `app/v2.py` (the same without the retry loop), `tests/__init__.py`, `tests/world.py` (51 lines, fully typed: tools `reserve` and `confirm`; per seed, 75% of orders start held and 20% of reserve backends time out twice; `passed` = the task's order is confirmed in the final state), `arci.yaml` (generated by the exact `arci init` command below; the test regenerates it and compares bytes), `README.md` (108 lines).
++- `docs/recipes/python-agent.md` (132 lines): the narrative; one `<<recorded run>>` placeholder for the orchestrator (smoke run + confirmatory run + wall times).
++- `tests/unit/recipes/__init__.py`, `tests/unit/recipes/test_python_agent.py` (5 tests).
++- Design of the world: v2 survives the injected `tool_timeout:reserve:0` only when the order arrived held (it never calls `reserve` then), so the candidate drops without collapsing; v1 fails only when it must reserve on a twice-failing backend (0.25 x 0.20 = 0.05). Expected rates 0.95 / 0.75 match the README's `arci plan` command. Not a copy of `arci.demo.world` (two tools, no stock, no confirm outage).
++
++## Tests
++- `.venv/bin/pytest tests/unit/recipes -q` -> `9 passed in 28.45s` (5 of them T08). Slowest: `test_plan_then_the_confirmatory_descriptor` 17.8 s (`arci plan` exact enumeration to N=400); the module fixture (init + run) about 2.5 s.
++- `.venv/bin/ruff format --check .` -> `315 files already formatted`; `.venv/bin/ruff check .` -> `All checks passed!`; `.venv/bin/basedpyright` -> `0 errors, 0 warnings, 0 notes`; `shasum -a 256 -c FROZEN.sha256 | grep -v OK` -> nothing.
++- Also green: `.venv/bin/pytest tests/unit/recipes tests/unit/docs tests/unit/init -q`.
++- Real end-to-end from a tmp copy (console script `.venv/bin/arci`, PYTHONPATH unset, committed `arci.yaml` removed):
++  - `arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0` -> exit 0, stdout `arci run arci.yaml`, stderr empty; `cmp` with the committed `arci.yaml`: identical.
++  - `arci run arci.yaml` -> exit 2, last stdout `VERDICT: INCONCLUSIVE (exit 2)`, baseline 8/8, candidate 2/8, wall 1.7 s; stderr = the SMOKE DESIGN line and `INCONCLUSIVE at n_per_arm=8 is the expected smoke result; choose a confirmatory N with arci plan before re-running.`
++  - `arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK` -> smallest tested N meeting P(BLOCK) >= 0.8: 400.
++  - Confirmatory (init `checkout-retry-n400 ... --n 400 --out confirm.yaml` + `base_seed: 1000`, `prior_runs: ["checkout-retry"]`): `arci run confirm.yaml` -> `VERDICT: BLOCK (exit 1)`, baseline 390/400, candidate 296/400, bounds [-0.3018, -0.1633], wall 1:29.5 on this machine (coder's run; not pasted into the docs, which cite only the orchestrator's recorded run).
++  - diff / minimize / bundle / replay on `faults:00000:candidate`: all exit 0; replay `REPRODUCED` (also from a different directory, without the checkout).
++
++## Deviations
++- The test runs `arci run arci.yaml` exactly as the README writes it (the memo's command), not `... --workers 4`: `--workers` defaults to 4 (`src/arci/cli.py`, `run` parser), so it is the same run, and (c) requires the README's commands to be the ones the test runs.
++- The README adds a setup line (`cp -R examples/recipes/python_agent checkout && cd checkout && rm arci.yaml`): the committed `arci.yaml` is exactly what `arci init` writes, and init refuses an existing file without `--force`, so running the memo command in an unmodified tree would exit 3. The test emulates those three commands (copytree, cwd, unlink) and asserts they are the README's first three.
++- Test (c) is stronger than asked: it pins the full ordered list of README bash commands, runs every `arci` command except `arci run confirm.yaml` (800 trials, about 90 s; the confirm descriptor is still written by the README's command, extended with the README's yaml block, and compiled/seal-checked), and skips `uv tool install` (network).
++- The confirmatory run uses a new experiment id with `base_seed: 1000` and `prior_runs` added by hand (README yaml block), so its seeds are disjoint from the smoke run's and the report lists the smoke run; init has no flags for either.
++
++## Open issues
++- `uv tool install agent-reliability-ci` in the README only works after the PyPI release; the README says to use the clone's environment until then.
++- `test_plan_then_the_confirmatory_descriptor` spends ~18 s in `arci plan`; under 60 s here, but the slowest recipe test on a slow CI runner.
++- The smoke realization (seeds 0-7: 2 of 8 orders held) is far from the 75% share; the README states 8/8 vs 2/8 and the test pins it, so a change to seeding in arci would fail the test loudly rather than silently change the story.
++- The README (`tests`) and the doc (`app` or `tests`) note that an installed top-level package of that name would shadow the tree's (cwd is appended, ADR 0006).
+diff --git a/plan/exec/reports/09.md b/plan/exec/reports/09.md
+new file mode 100644
+index 0000000..b3981ab
+--- /dev/null
++++ b/plan/exec/reports/09.md
+@@ -0,0 +1,32 @@
++# REPORT 09 — Status DONE
++
++MCP command-agent recipe + Inspector preflight note. Coder: Claude Opus 5.5 (high), worktree `wt-recipes`. No git state changed; no `src/arci/**` or frozen file touched; no network, no npx.
++
++## Changes
++- `examples/recipes/mcp_agent/`:
++  - `world.py` (54 lines, typed): `make_world(task, seed)` with `fetch(key)` (30% of seeds raise a transient `TimeoutError` on the first real call) and `store(key, value)`; `snapshot()` = key, upstream value, stored map; `passed(task, final_state)` = stored == {key: upstream}.
++  - `agent.py` (stdlib only, ~75 code lines after ruff format): reads `--mcp-config`/`--task-file`, starts the ONE configured server command, sends `initialize` (protocolVersion `2026-07-28`), `notifications/initialized`, `tools/list`, then `fetch` (variant `retry`: up to 3 retries; `fragile`: none) and `store`; one session, no second connection; exit 0 done, 1 gave up, 75 infrastructure (config/task unreadable, server gone, malformed replies, tools missing).
++  - `arci.yaml` (hand-written per ADR 0007, commented why): command arms `python -P -m agent ... --variant retry|fragile`, `mcp_server` = `python -P -m arci.mcp_toolset_server --toolset world:make_world --workdir {workdir} --seed {seed} --task-file {task_file}`, snapshot `arci.mcp_toolset_server:snapshot`, oracle `world:passed`, one condition `fetch-error` = `tool_error_once` on `fetch` occurrence 0, `n_per_arm: 8`. Agent runs as `-m agent` because command agents start in the trial dir (docs/REAL_AGENTS.md); `agent`/`world` resolve through the ADR 0006 cwd rule.
++  - `mcp.inspector.json` (`mcpServers.env`: `python -P -m arci.mcp_toolset_server ... --workdir preflight-state --seed 0 --task-file task.json`, `"env": {"PYTHONPATH": "."}`), `task.json` (`{"key": "answer"}`), `README.md`.
++- `docs/recipes/mcp-inspector.md` (149 lines): setup, step 1 Inspector CLI command and what it checks (raw bridge, never the boundary), the marked block `<<Inspector result recorded by the orchestrator on 2026-10-13>>`, the outcome written as "blocked by the Inspector SDK's version check" (Inspector 2.10.1 / TS SDK 1.29.0 rejects `2026-07-28`), the stdlib manual preflight (`python - <<'EOF'` that reads `mcp.inspector.json` and sends initialize, the initialized notification, tools/list, one tools/call over a pipe), step 2 `arci run arci.yaml`, step 3 diff/minimize/bundle/replay, the "what each one checks" table, and the list the raw preflight does not cover (fault injection, budgets, one-connection rule, reserved names, 1 MiB line limit, -32603 mapping).
++- `tests/unit/recipes/test_mcp_agent.py` (4 tests).
++
++## Tests
++- `.venv/bin/pytest tests/unit/recipes -q` -> `9 passed in 28.45s` (4 of them T09; module fixture run ~2.3 s, preflight 0.14 s, diff..replay 1.6 s).
++- `ruff format --check .` -> `315 files already formatted`; `ruff check .` -> `All checks passed!`; `basedpyright` -> `0 errors, 0 warnings, 0 notes`; `shasum -a 256 -c FROZEN.sha256 | grep -v OK` -> nothing.
++- Test (a): the doc's heredoc is extracted and run with `sys.executable -` in a tmp copy (cwd = copy); asserts protocolVersion `2026-07-28`, tools `["fetch", "store"]` with schemas, and the call result `isError: true`, `TimeoutError: upstream transient timeout` (seed 0 is a flaky upstream: the environment's own error, documented as such), server exit 0.
++- Test (b): `python -P -m arci.cli run arci.yaml` from a tmp copy whose three `argv: ["python",` lists are rewritten to `sys.executable` (asserted count 3; documented in the test docstring), PYTHONPATH unset -> **exit 1, BLOCK** (not 2): baseline `retry` 8/8, candidate `fragile` 0/8; stderr is exactly the SMOKE DESIGN line (no INCONCLUSIVE follow-up); sealed manifest == compiled descriptor; 16 sealed trials, no ERROR; every trial of both arms has a non-empty recording with `fetch` calls; decision sealed, verdict BLOCK.
++- Extra: the doc's bash commands are pinned as an ordered list; diff/minimize/bundle/replay run on `fetch-error:00000:candidate` (all exit 0, replay `REPRODUCED`, also from another directory without the checkout).
++- Real end-to-end from a tmp copy (console script `.venv/bin/arci`, PYTHONPATH unset, argv[0] rewritten): `arci run arci.yaml` -> exit 1, last stdout `VERDICT: BLOCK (exit 1)`, Successes 8 | 0, wall 2.1 s; stderr: `SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under the default rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: ...`.
++
++## Deviations
++- Verdict at N=8 is BLOCK (exit 1), not INCONCLUSIVE: with `tool_error_once` on `fetch` at occurrence 0 and a `fragile` client that gives up on the first error (both as specified), every candidate trial fails, a total collapse, which N=8 decides. The doc and README say so and explain that the stderr notice's "expect INCONCLUSIVE" is generic. Getting exit 2 would need a candidate that sometimes survives (a different occurrence or a non-"give up" variant), which the brief fixed otherwise. PLAN.md's older "N=3, exit 2" acceptance was superseded by the dispatch's `n_per_arm 8`.
++- `agent.py` is ~75 code lines (~107 with docstring) after ruff format, above the brief's ~60.
++- The manual preflight also sends `notifications/initialized` (three requests plus the notification), so it is a well-formed MCP session; the bridge ignores the notification.
++- The preflight launches the server described by `mcp.inspector.json` with `sys.executable` in place of its `"python"`, so the doc and the Inspector config cannot drift apart; the test asserts the config's `env` is `{"PYTHONPATH": "."}`.
++- The doc's setup suggests `python -m venv .venv && . .venv/bin/activate && pip install agent-reliability-ci` because the committed `python` must have arci importable (the bridge); a `uv tool install` interpreter is isolated. Before PyPI, the clone's environment is used instead (stated).
++
++## Open issues
++- Step 1 is blocked today by Inspector 2.10.1's protocol-version check (known result; the orchestrator pastes the verbatim output into the marked block). Changing the bridge's version handling is out of scope.
++- `minimize` on the command trial reports `minimality: original` (the Python recipe's reports `1-minimal`); the doc does not claim 1-minimality for this recipe.
++- The committed `arci.yaml` relies on `python` on PATH having arci installed; otherwise every trial is a harness ERROR (documented in the file header, README and doc).
+diff --git a/tests/unit/recipes/__init__.py b/tests/unit/recipes/__init__.py
+new file mode 100644
+index 0000000..9a8e47c
+--- /dev/null
++++ b/tests/unit/recipes/__init__.py
+@@ -0,0 +1 @@
++"""Recipe tests: each recipe tree run from a tmp copy, as its README says."""
+diff --git a/tests/unit/recipes/test_mcp_agent.py b/tests/unit/recipes/test_mcp_agent.py
+new file mode 100644
+index 0000000..e7ab783
+--- /dev/null
++++ b/tests/unit/recipes/test_mcp_agent.py
+@@ -0,0 +1,199 @@
++"""The MCP command-agent recipe (examples/recipes/mcp_agent) and docs/recipes/mcp-inspector.md.
++
++Everything runs from a tmp copy of the tree with the copy as the working directory, never from this
++repository (the recipe's `world` and `agent` modules resolve through the current directory).
++The committed `arci.yaml` says `python`, resolved on PATH; the copy's three argv lists are rewritten
++to start with `sys.executable` instead, so the trials use this environment's interpreter, which has
++arci installed. No network and no npx: the Inspector step itself is the orchestrator's.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import re
++import shlex
++import shutil
++import subprocess
++import sys
++from collections.abc import Iterator
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Any
++
++import pytest
++
++from arci.cli import smoke_notice
++from arci.descriptor import compile_descriptor
++from arci.schema import GateDecision, Manifest, Outcome, TrialEnvelope, Verdict
++
++ROOT = Path(__file__).resolve().parents[3]
++RECIPE = ROOT / "examples" / "recipes" / "mcp_agent"
++DOC = ROOT / "docs" / "recipes" / "mcp-inspector.md"
++PYTHON_ARGV = 'argv: ["python",'
++RUN = "arci run arci.yaml"
++DIAGNOSE = (
++    "arci diff runs/mcp-fetch-retry fetch-error:00000:baseline fetch-error:00000:candidate",
++    "arci minimize runs/mcp-fetch-retry fetch-error:00000:candidate --out min.json",
++    "arci bundle runs/mcp-fetch-retry fetch-error:00000:candidate --out bundle.json --root ."
++    " --include agent.py --include world.py",
++    "arci replay bundle.json",
++)
++INSPECTOR = (
++    "npx @modelcontextprotocol/inspector --cli --config mcp.inspector.json --server env"
++    " --method tools/list"
++)
++DOC_COMMANDS = (
++    "cp -R examples/recipes/mcp_agent mcp-recipe",
++    "cd mcp-recipe",
++    "python -m venv .venv",
++    ". .venv/bin/activate",
++    "pip install agent-reliability-ci",
++    INSPECTOR,
++    "python - <<'EOF'",
++    RUN,
++    *DIAGNOSE,
++)
++
++
++def _doc() -> str:
++    return DOC.read_text(encoding="utf-8")
++
++
++def doc_commands() -> tuple[str, ...]:
++    """The first line of every command in the doc's bash blocks, split on `&&`."""
++    commands: list[str] = []
++    for block in re.findall(r"^```bash\n(.*?)^```$", _doc(), flags=re.MULTILINE | re.DOTALL):
++        heredoc = False
++        for line in block.splitlines():
++            if heredoc:
++                heredoc = line != "EOF"
++                continue
++            heredoc = line.endswith("<<'EOF'")
++            commands += [part.strip() for part in line.split(" && ") if part.strip()]
++    return tuple(commands)
++
++
++def preflight_script() -> str:
++    (script,) = re.findall(r"^python - <<'EOF'\n(.*?)^EOF$", _doc(), flags=re.MULTILINE | re.DOTALL)
++    return script
++
++
++def _env(**extra: str) -> dict[str, str]:
++    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
++    return {**env, **extra}
++
++
++def arci(command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
++    argv = shlex.split(command)
++    assert argv[0] == "arci", command
++    return subprocess.run(
++        [sys.executable, "-P", "-m", "arci.cli", *argv[1:]],
++        cwd=cwd,
++        env=_env(),
++        capture_output=True,
++        text=True,
++        timeout=120,
++        check=False,
++    )
++
++
++def _copy(parent: Path) -> Path:
++    copy = parent / "mcp-recipe"
++    shutil.copytree(RECIPE, copy, ignore=shutil.ignore_patterns("__pycache__", "runs"))
++    descriptor = copy / "arci.yaml"
++    text = descriptor.read_text(encoding="utf-8")
++    assert text.count(PYTHON_ARGV) == 3  # baseline, candidate and mcp_server
++    descriptor.write_text(
++        text.replace(PYTHON_ARGV, f"argv: [{json.dumps(sys.executable)},"), encoding="utf-8"
++    )
++    return copy
++
++
++@dataclass(frozen=True)
++class Run:
++    copy: Path
++    done: subprocess.CompletedProcess[str]
++
++
++@pytest.fixture(scope="module")
++def run(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Run]:
++    copy = _copy(tmp_path_factory.mktemp("mcp"))
++    yield Run(copy=copy, done=arci(RUN, copy))
++
++
++def test_the_doc_commands_are_the_ones_these_tests_run() -> None:
++    assert doc_commands() == DOC_COMMANDS
++    assert "<<Inspector result recorded by the orchestrator on 2026-10-13>>" in _doc()
++    readme = (RECIPE / "README.md").read_text(encoding="utf-8")
++    for command in (INSPECTOR, RUN, DIAGNOSE[0]):
++        assert command in readme.splitlines()
++
++
++def test_the_manual_preflight_drives_the_raw_bridge(tmp_path: Path) -> None:
++    copy = _copy(tmp_path)
++    config: Any = json.loads((copy / "mcp.inspector.json").read_text(encoding="utf-8"))
++    assert config["mcpServers"]["env"]["env"] == {"PYTHONPATH": "."}
++    done = subprocess.run(
++        [sys.executable, "-"],
++        input=preflight_script(),
++        cwd=copy,
++        env=_env(),
++        capture_output=True,
++        text=True,
++        timeout=60,
++        check=True,
++    )
++    *replies, last = done.stdout.splitlines()
++    assert last == "server exit 0 "
++    initialize, listed, called = (json.loads(line) for line in replies)
++    assert initialize["result"]["protocolVersion"] == "2026-07-28"
++    assert [tool["name"] for tool in listed["result"]["tools"]] == ["fetch", "store"]
++    assert listed["result"]["tools"][0]["inputSchema"]["required"] == ["key"]
++    # Seed 0 is a flaky upstream: the environment's own error, not an injected one.
++    assert called["id"] == 3
++    assert called["result"] == {
++        "resultType": "complete",
++        "content": [{"type": "text", "text": "TimeoutError: upstream transient timeout"}],
++        "isError": True,
++    }
++    state = json.loads((copy / "preflight-state" / "state.json").read_text(encoding="utf-8"))
++    assert state["stored"] == {}
++
++
++def test_the_faulted_run_blocks_with_a_sealed_store(run: Run) -> None:
++    done = run.done
++    # fragile fails all 8 trials under the injected error and retry passes all 8: a total
++    # collapse, the one result a smoke design of 8 per arm can decide.
++    assert done.returncode == 1, done.stderr[-2000:]
++    assert done.stdout.strip().splitlines()[-1] == "VERDICT: BLOCK (exit 1)"
++    manifest = compile_descriptor(run.copy / "arci.yaml")
++    assert done.stderr == f"{smoke_notice(manifest)}\n"
++    run_dir = run.copy / "runs" / "mcp-fetch-retry"
++    stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
++    assert stored.validate_seal() and stored == manifest
++    trials = [
++        TrialEnvelope.model_validate_json(line)
++        for line in (run_dir / "trials.jsonl").read_text("utf-8").splitlines()
++    ]
++    assert len(trials) == 16 and all(trial.validate_seal() for trial in trials)
++    for arm, passes in (("baseline", 8), ("candidate", 0)):
++        mine = [trial for trial in trials if trial.arm == arm]
++        assert sum(trial.outcome is Outcome.PASS for trial in mine) == passes
++        assert all(trial.outcome is not Outcome.ERROR for trial in mine)
++        assert all(trial.recording for trial in mine)
++        fetches = [r for trial in mine for r in trial.recording if r.tool == "fetch"]
++        assert fetches, arm
++    decision = GateDecision.model_validate_json((run_dir / "decision.json").read_text("utf-8"))
++    assert decision.validate_seal() and decision.verdict is Verdict.BLOCK
++
++
++def test_diff_minimize_bundle_and_replay(run: Run) -> None:
++    assert run.done.returncode == 1
++    diff, minimize, bundle, replay = (arci(command, run.copy) for command in DIAGNOSE)
++    for done in (diff, minimize, bundle, replay):
++        assert done.returncode == 0, done.stderr[-2000:]
++    assert "after_injection: tool_error_once" in diff.stdout
++    assert 'left: tool_start tool="fetch"' in diff.stdout
++    assert "kept: tool_error_once" in minimize.stdout
++    assert replay.stdout.startswith("REPRODUCED")
+diff --git a/tests/unit/recipes/test_python_agent.py b/tests/unit/recipes/test_python_agent.py
+new file mode 100644
+index 0000000..6e0d90b
+--- /dev/null
++++ b/tests/unit/recipes/test_python_agent.py
+@@ -0,0 +1,201 @@
++"""The Python-agent recipe (examples/recipes/python_agent), driven by its own README.
++
++Every command comes out of the README's ```bash blocks: the list is pinned below, so a README
++edit that adds, drops or changes a command fails here, and each `arci` command is run as
++`python -P -m arci.cli` with a tmp copy of the tree as its working directory and no PYTHONPATH (the
++console script's situation; ADR 0006 puts the copy on the child's import path). Nothing here imports
++the recipe in-process: its `tests` package would collide with this repository's.
++
++Not run here: `uv tool install` (network; the test uses this environment's arci) and
++`arci run confirm.yaml` (800 trials; the orchestrator records that run). The confirmatory
++descriptor is still written by the README's command and compiled.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import re
++import shlex
++import shutil
++import subprocess
++import sys
++from collections.abc import Iterator
++from dataclasses import dataclass
++from pathlib import Path
++
++import pytest
++
++from arci.cli import smoke_followup, smoke_notice
++from arci.descriptor import compile_descriptor
++from arci.schema import GateDecision, Manifest, Outcome, TrialEnvelope, Verdict
++
++ROOT = Path(__file__).resolve().parents[3]
++RECIPE = ROOT / "examples" / "recipes" / "python_agent"
++README = RECIPE / "README.md"
++COMMITTED = RECIPE / "arci.yaml"
++
++INIT = (
++    "arci init checkout-retry --baseline app.v1:run --candidate app.v2:run"
++    " --toolset tests.world:make_world --oracle tests.world:passed"
++    ' --task \'{"order_id": "order-7"}\' --fault tool_timeout:reserve:0'
++)
++CONFIRM_INIT = (
++    "arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run"
++    " --toolset tests.world:make_world --oracle tests.world:passed"
++    ' --task \'{"order_id": "order-7"}\' --fault tool_timeout:reserve:0'
++    " --n 400 --out confirm.yaml"
++)
++SMOKE_RUN = "arci run arci.yaml"
++PLAN = "arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK"
++CONFIRM_RUN = "arci run confirm.yaml"
++FAILING = "faults:00000:candidate"
++DIAGNOSE = (
++    f"arci diff runs/checkout-retry faults:00000:baseline {FAILING}",
++    f"arci minimize runs/checkout-retry {FAILING} --out min.json",
++    f"arci bundle runs/checkout-retry {FAILING} --out bundle.json --root ."
++    " --include app/v2.py --include tests/world.py",
++    "arci replay bundle.json",
++)
++SETUP = (
++    "cp -R examples/recipes/python_agent checkout",
++    "cd checkout",
++    "rm arci.yaml",
++)
++INSTALL = "uv tool install agent-reliability-ci"
++README_COMMANDS = (
++    *SETUP,
++    INSTALL,
++    INIT,
++    SMOKE_RUN,
++    PLAN,
++    CONFIRM_INIT,
++    CONFIRM_RUN,
++    *DIAGNOSE,
++)
++
++
++def _blocks(language: str) -> list[str]:
++    text = README.read_text(encoding="utf-8")
++    return re.findall(rf"^```{language}\n(.*?)^```$", text, flags=re.MULTILINE | re.DOTALL)
++
++
++def readme_commands() -> tuple[str, ...]:
++    """Every command in the README's bash blocks, in order, split on `&&`."""
++    commands: list[str] = []
++    for block in _blocks("bash"):
++        for line in block.splitlines():
++            if line.strip() and not line.lstrip().startswith("#"):
++                commands += [part.strip() for part in line.split(" && ")]
++    return tuple(commands)
++
++
++def arci(command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
++    """Run one README `arci ...` command as the console script would, from `cwd`."""
++    argv = shlex.split(command)
++    assert argv[0] == "arci", command
++    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
++    return subprocess.run(
++        [sys.executable, "-P", "-m", "arci.cli", *argv[1:]],
++        cwd=cwd,
++        env=env,
++        capture_output=True,
++        text=True,
++        timeout=120,
++        check=False,
++    )
++
++
++@dataclass(frozen=True)
++class Smoke:
++    copy: Path
++    init: subprocess.CompletedProcess[str]
++    run: subprocess.CompletedProcess[str]
++
++
++@pytest.fixture(scope="module")
++def smoke(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Smoke]:
++    """The README's setup, then its first-screen command, once for the module."""
++    commands = readme_commands()
++    assert commands[: len(SETUP)] == SETUP
++    copy = tmp_path_factory.mktemp("recipe") / "checkout"  # cp -R ... checkout && cd checkout
++    shutil.copytree(RECIPE, copy, ignore=shutil.ignore_patterns("__pycache__", "runs"))
++    (copy / "arci.yaml").unlink()  # rm arci.yaml
++    init = arci(INIT, copy)
++    run = arci(SMOKE_RUN, copy)
++    yield Smoke(copy=copy, init=init, run=run)
++
++
++def test_the_readme_commands_are_the_ones_these_tests_run() -> None:
++    assert readme_commands() == README_COMMANDS
++    first_screen = f"{INSTALL} && {INIT} && {SMOKE_RUN}"
++    assert first_screen in README.read_text(encoding="utf-8").splitlines()
++    assert "<<recorded run>>" in README.read_text(encoding="utf-8")
++
++
++def test_init_writes_the_committed_descriptor_byte_for_byte(smoke: Smoke) -> None:
++    assert smoke.init.returncode == 0, smoke.init.stderr
++    assert smoke.init.stdout == f"{SMOKE_RUN}\n"
++    assert smoke.init.stderr == ""
++    assert (smoke.copy / "arci.yaml").read_bytes() == COMMITTED.read_bytes()
++
++
++def test_the_smoke_run_is_inconclusive_with_a_sealed_store(smoke: Smoke) -> None:
++    done = smoke.run
++    # v1 survives the injected timeout; v2 loses every order that was not already held, but at
++    # N=8 the interval on the difference still crosses the margin.
++    assert done.returncode == 2, done.stderr[-2000:]
++    assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
++    manifest = compile_descriptor(COMMITTED)
++    assert done.stderr == f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\n"
++    run_dir = smoke.copy / "runs" / "checkout-retry"
++    stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
++    assert stored.validate_seal()
++    assert stored == manifest
++    trials = [
++        TrialEnvelope.model_validate_json(line)
++        for line in (run_dir / "trials.jsonl").read_text("utf-8").splitlines()
++    ]
++    assert len(trials) == 16 and all(trial.validate_seal() for trial in trials)
++    by_arm = {
++        arm: sum(t.outcome is Outcome.PASS for t in trials if t.arm == arm)
++        for arm in ("baseline", "candidate")
++    }
++    assert (by_arm["baseline"], by_arm["candidate"]) == (8, 2)  # a drop, not a total collapse
++    decision = GateDecision.model_validate_json((run_dir / "decision.json").read_text("utf-8"))
++    assert decision.validate_seal()
++    assert decision.verdict is Verdict.INCONCLUSIVE
++
++
++def test_plan_then_the_confirmatory_descriptor(smoke: Smoke) -> None:
++    planned = arci(PLAN, smoke.copy)
++    assert planned.returncode == 0, planned.stderr
++    assert "smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 " in planned.stdout
++    written = arci(CONFIRM_INIT, smoke.copy)
++    assert written.returncode == 0, written.stderr
++    assert written.stdout == f"{CONFIRM_RUN}\n"
++    (addition,) = _blocks("yaml")
++    with (smoke.copy / "confirm.yaml").open("a", encoding="utf-8") as handle:
++        handle.write(addition)
++    manifest = compile_descriptor(smoke.copy / "confirm.yaml")
++    assert manifest.validate_seal()
++    assert (manifest.experiment_id, manifest.n_per_arm) == ("checkout-retry-n400", 400)
++    assert (manifest.base_seed, manifest.prior_runs) == (1000, ("checkout-retry",))
++    smoke_manifest = compile_descriptor(COMMITTED)
++    assert manifest.conditions == smoke_manifest.conditions
++    assert (manifest.baseline, manifest.candidate) == (
++        smoke_manifest.baseline,
++        smoke_manifest.candidate,
++    )
++
++
++def test_diff_minimize_bundle_and_replay_a_failing_trial(smoke: Smoke) -> None:
++    assert smoke.run.returncode == 2
++    diff, minimize, bundle, replay = (arci(command, smoke.copy) for command in DIAGNOSE)
++    for done in (diff, minimize, bundle, replay):
++        assert done.returncode == 0, done.stderr[-2000:]
++    assert "after_injection: tool_timeout" in diff.stdout
++    assert 'left: tool_start tool="reserve"' in diff.stdout
++    assert "kept: tool_timeout" in minimize.stdout
++    assert json.loads((smoke.copy / "min.json").read_text("utf-8"))
++    assert replay.stdout.startswith("REPRODUCED")
