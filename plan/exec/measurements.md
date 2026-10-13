@@ -37,3 +37,16 @@
   `docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-demo.json`. Memo target: p50 ≤ 2 min,
   p95 ≤ 3 min (all three samples under 1:20; cold readers not measured). The earlier 1:12 figure
   (pre-release wheel, 06:xxZ) is consistent.
+
+## Packaged demo TTFV, Track A from PyPI (the README's exact command; maintainer-machine run; AI-agent labelled)
+
+- After publication (08:25Z): `uvx --from agent-reliability-ci arci demo` from an empty directory,
+  default workers. Cold uv cache (fresh UV_CACHE_DIR): install 3 s, run 73 s, total 76 s (exit 0).
+  Warm cache: install 2 s, run 97 s, total 99 s (exit 0; other processes active on the machine, not
+  controlled). Installed-version check (protocol 2.3): `0.8.0 0.8.0`. Receipt:
+  `docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-pypi-demo.json`. Memo target
+  p50 ≤ 2 min, p95 ≤ 3 min: all five Track A samples today are between 1:12 and 1:39; none is a
+  cold-reader measurement.
+- PyPI provenance: both files carry one PEP 740 attestation each (publisher GitHub
+  ajaysurya1221/agent-reliability-ci, workflow release.yml, environment pypi), checked through
+  https://pypi.org/integrity/… at 08:26Z.
