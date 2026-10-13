@@ -59,7 +59,7 @@ release (checksums below): `uvx --from <wheel URL or path> arci demo`.
 
 - Seeded retry demo, 2026-09-23: 192/200 vs 132/200, bounds [-0.405, -0.183], BLOCK.
 - Jev day one, 2026-10-03: 200/200 vs 0/200, BLOCK; minimised failure replays REPRODUCED.
-- Guardrail, 2026-10-05: 200/200 vs 130/200, BLOCK; `guardrail-live-b-ask-provider_down-50` (38/50,
+- Guardrail, 2026-10-05: 200/200 vs 130/200, BLOCK; `guardrail-live-b-ask-provider_down-50` (50/50 vs 38/50,
   bounds [-0.4016, -0.0348]) INCONCLUSIVE, kept as is.
 - Local model, N=400: 376/400 vs 308/400, INCONCLUSIVE by 0.008, not re-run.
 
