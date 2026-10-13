@@ -140,4 +140,8 @@ once an MCP pilot or the MCP post commits to it (tie-break F2; rule e).
 
 Consequence now: HUMAN_INBOX drafts C and E stay on hold; the recipe's Inspector step stays
 "blocked" with today's versions added to the record.
+Astra round 2 (CONSULT run2-D2 round 2): AGREE with the corrected architecture; ADR 0011 must also
+ensure the compatibility mode cannot activate through inherited environment variables, because the
+boundary's server environment inherits the parent's (`src/arci/mcp_boundary.py` ~line 772): the mode
+must be an explicit argv flag the bridge is started with, never an environment variable.
 

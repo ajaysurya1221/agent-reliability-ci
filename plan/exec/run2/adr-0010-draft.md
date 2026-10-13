@@ -1,7 +1,8 @@
 # 0010 (DRAFT, not under docs/design until accepted): the imported-session record (memo D2)
 
-Status: draft v2 by the orchestrator (Claude Fable 5.1), run 2, 2026-10-13; v1 reviewed by Astra
-(CONSULT run2-D2/D11: REVISE), v2 incorporates every point. Becomes
+Status: draft v3 by the orchestrator (Claude Fable 5.1), run 2, 2026-10-13; v1 and v2 reviewed by
+Astra (CONSULT run2-D2/D11 and run2-D2 round 2: REVISE on purity and ordering), v3 incorporates
+every point. Becomes
 `docs/design/0010-imported-session-record.md` plus a re-freeze only when accepted and when D3 (the
 first importer) is scheduled. No code in this run.
 
@@ -35,16 +36,28 @@ a scheduled trial. Separately, "unsupported or incomplete semantics stay explici
    rewritten), `original_ids` (trace/session/span ids verbatim). `raw_sha256` covers the raw bytes
    only (Astra Q3); the raw file is stored beside the record. `importer` (`arci` version, importer
    name, importer version, configuration used) and the normalised content are bound by the record
-   seal (`record_sha256`), so the parse is reproducible: same raw bytes + same importer + same
-   configuration → same seal. `imported_at` is **volatile** (excluded from the digest payload, like
-   other volatile fields in `schema.py`), so the transformation stays pure and two imports of the
-   same bytes seal identically. The record is deeply immutable: all containers are tuples, models
-   are frozen (`Model` config), and the only mutation path is "import again".
+   seal (`record_sha256`), so the parse is reproducible. **The import is a pure function of its
+   stated inputs**: `(raw_bytes, importer_configuration, provenance_inputs)` where
+   `provenance_inputs` = `{obtained_from, producer, producer_version, imported_at}` are supplied
+   explicitly by the caller (the CLI fills `imported_at` from the clock *before* calling the pure
+   function and records what it passed). Identical bytes imported with identical inputs seal
+   identically; a different `obtained_from` or `imported_at` is a different stated input and
+   therefore a different record, by design, and `arci diff --imported` compares records by
+   `raw_sha256` + importer when asked whether two records are "the same import". Nothing in the
+   record is volatile. The record is deeply immutable: models are frozen (`Model` config), every
+   sequence is a tuple, and JSON values are preserved recursively with objects and arrays kept
+   distinct (an empty object and an empty array are different values; the canonical JSON used by
+   the seal already preserves this), so re-serialising a record reproduces the source structure.
 3. **Completeness and capabilities, stated conservatively.** `completeness`: `complete | partial
    | unknown` with a reason. `capabilities` are computed over **all** relevant calls, not any
    (`has_tool_calls`, `has_tool_args`, `has_tool_results`, `has_model_io`, `has_timestamps`,
-   `has_outcome`), plus `ordering: "total" | "partial" | "none"` (total only when every call has a
-   source-given monotonic order key; partial when only parent/child or per-span order is known).
+   `has_outcome`), plus `ordering: "total" | "partial" | "none"`. `total` requires a
+   **source-defined, globally comparable execution-order key** on every call (for example start
+   timestamps from one clock, or a sequence number the producer documents as execution order); an
+   export position or file order is never such a key. `partial` keeps the evidence: `order_edges`
+   (pairs of call ids the source orders, e.g. parent-before-child, or same-span sequence) and
+   `order_domains` (sets of calls comparable among themselves), and nothing else is claimed. `none`
+   means the importer found no order evidence.
    `unsupported`: a list of `{path, reason, source_ref}` for every span/field the importer saw and
    could not map (including attributes of unknown semantic-convention version). Nothing is
    inferred silently.
@@ -55,7 +68,8 @@ a scheduled trial. Separately, "unsupported or incomplete semantics stay explici
    value) is distinct from a JSON `null` result (the source says the result was null).
    `source_outcome` (what the producer reported: success/error) is separate from ARCI's oracle-
    graded outcome and is never written into an `Outcome` field. `ordinal` is the position in the
-   source's own order and never implies observed execution order unless `ordering == "total"`.
+   source's export order and never implies observed execution order; execution order is only what
+   `ordering`, `order_edges` and `order_domains` state.
    `events: tuple[ImportedEvent, ...]` reuse `EventKind` names only where the source states them
    and carry the same `Provenance`; there is no `trial_index`, `seed`, `occurrence`,
    `fingerprint`, manifest reference or verdict anywhere in the record.
