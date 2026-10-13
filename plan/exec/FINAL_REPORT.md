@@ -1,7 +1,7 @@
 # FINAL_REPORT — ARCI v0.8.0 sprint (orchestrated run of 2026-10-13)
 
-Budget clock: Task 00 commit 2026-10-13T03:42:56Z; stop-starting at 12:57:56Z; end 13:42:56Z. Work ended
-at 09:14Z (about 5 h 15 min of the 10 h), with every lane merged and nothing in flight.
+Budget clock: Task 00 commit 2026-10-13T03:42:56Z; stop-starting at 12:57:56Z; end 13:42:56Z. The sprint's work ended at 09:14Z (5 h 32 min of the 10 h) with every lane merged and nothing in
+flight; the user then asked for the AI-cohort TTFV pass, which ran from 12:05Z and merged at 13:21Z.
 
 Orchestrator: Claude Fable 5.1 (this session). Coders and reviewers: Claude Opus 5.5 at effort high
 (workflow subagents; model verified in every transcript). Consultant: Codex `gpt-6-astra` at xhigh,
@@ -69,7 +69,7 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 | Cold read of the README (Opus subagent, no context; AI-agent labelled) | ≥ 4/5 | 5/5, BLOCK interpretation correct (plan/exec/cold-read-2026-10-13.json) | plan/exec/measurements.md |
 | AI-cohort TTFV pass (five context-free readers: 2 Opus, 2 Sonnet, 1 Haiku; after the run, at the user's request; never cold readers) | memo: ≥ 80 % all five correct; own agent ≤ 10 min | 5/5 readers all five correct, both interpretations correct; demo 73–75 s; own-agent scaffold→validated verdict under 15 s each after one failed `arci init` (missing `--task`) per reader | docs/measurement/receipts/2026-10-13-ai-reader-*.json; plan/exec/measurements.md |
 | Installed-package smoke on CI | green | green: wheel smoke on Ubuntu and macOS × Python 3.11/3.14 from an empty directory (release run 38365660814); Windows install/--help job green on main CI | release workflow; .github/workflows/ci.yml |
-| Merge bar on the released commit | green | green: isolated `just check` 1216 passed/2 skipped, `just frozen` 53 OK, `uv lock --check`, figures, schema, `reproduce.py --check` 0 failed, at 68f7c8c (tag v0.8.0 = 48e60ac, same tree + plan records); main CI run 38363108519 success on the tagged commit and run 38372707567 success on the final head ef6031c | plan/exec/STATUS.md (V rows) |
+| Merge bar on the released commit | green | green: isolated `just check` 1216 passed/2 skipped, `just frozen` 53 OK, `uv lock --check`, figures, schema, `reproduce.py --check` 0 failed, at 68f7c8c (tag v0.8.0 = 48e60ac, same tree + plan records); main CI run 38363108519 success on the tagged commit and run 38372707567 success on the final release head ef6031c, and run 38401562552 success on 8c48a25 after the user-requested AI-cohort pass | plan/exec/STATUS.md (V rows) |
 
 ## 5. Cuts and why
 None of S1–S12 was cut. Reduced: S8's Inspector preflight ships as a recorded, blocked step rather than a working one (D-03); S9 shipped the protocol and maintainer-machine receipts but no cold readers (recruiting is the user's step, HUMAN_INBOX 5); S12's PyPI upload and GitHub release page wait on the user (HUMAN_INBOX 1 and 3). The budget was not the reason for any of these.
