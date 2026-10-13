@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "env": {
+      "command": "python",
+      "args": [
+        "-P",
+        "-m",
+        "arci.mcp_toolset_server",
+        "--toolset",
+        "world:make_world",
+        "--workdir",
+        "preflight-state",
+        "--seed",
+        "0",
+        "--task-file",
+        "task.json"
+      ],
+      "env": {"PYTHONPATH": "."}
+    }
+  }
+}

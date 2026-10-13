@@ -1,0 +1,23 @@
+# arci experiment descriptor. Schema: `arci schema`.
+# smoke design: expect INCONCLUSIVE; run arci plan before a confirmatory N
+# Default: 8 trials per arm; this scaffold does not establish confirmatory power.
+# Plan before trials: arci plan --help
+# Never extend this experiment based on its verdict.
+experiment_id: "checkout-retry"
+task: {"order_id": "order-7"}
+toolset: "tests.world:make_world"
+oracle: "tests.world:passed"
+baseline:
+  label: "baseline"
+  agent: "app.v1:run"
+candidate:
+  label: "candidate"
+  agent: "app.v2:run"
+conditions:
+  - id: "faults"
+    faults:
+      - name: "tool_timeout"
+        bucket: "falsify"
+        tool: "reserve"
+        occurrence: 0
+n_per_arm: 8
