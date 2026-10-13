@@ -101,3 +101,12 @@ keep the two commands verbatim as the memo and ADR 0009 fixed them (a repeated c
 valid first verdict and the smoke notice still fires), and say below the fold that `--fault
 tool_timeout:reserve` adds a fault and that the YAML shown is hand-written. Rule: (b) the memo's
 commands are fixed; (e) a sentence is reversible, a changed first-screen command is a new decision.
+
+### D-10 (T04r1 → T04r2): the orchestrator's O_EXCL fallback contradicted ADR 0008
+The T04r1 brief asked for an O_CREAT|O_EXCL fallback when hard links are unsupported. Astra showed it
+breaks the ADR's atomic-publication promise (a destination visible before its bytes are complete) and
+that its cleanup can delete a competitor. Decision: no fallback. Without `--force`, `os.link` is the
+only publication path; any failure other than FileExistsError is reported as
+`output <path>: cannot publish atomically here (hard links unsupported); choose another directory or
+pass --force`, nothing is written, staging is removed. With `--force`, `os.replace` stays (atomic).
+Rule: (c) the design record wins over an orchestrator brief; (d) Astra's finding.
