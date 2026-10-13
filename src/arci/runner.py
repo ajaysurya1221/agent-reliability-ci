@@ -122,7 +122,8 @@ def _pythonpath(extra: Sequence[str]) -> str:
     ADR 0006: the current directory is appended when it is not already present, so a project's
     own modules resolve under the `arci` console script (whose `sys.path` lacks it) exactly as
     under `python -m arci.cli`. Appended, never prepended: installed packages and replay's bundle
-    directory keep precedence.
+    directory keep precedence, except that a regular package found later on the path supersedes
+    namespace-package portions found earlier, bundle portions included (amended ADR 0006).
     """
     try:
         cwd = os.getcwd()

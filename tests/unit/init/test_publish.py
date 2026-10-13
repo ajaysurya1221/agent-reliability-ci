@@ -70,15 +70,18 @@ def _ordinary_mode() -> int:
 # --- 1b: without --force, publication fails closed --------------------------------------------
 
 
-def test_without_links_an_exclusive_create_publishes_the_verified_bytes(
+NO_LINKS_LINE = (
+    f"{PREFIX}output arci.yaml: cannot publish atomically here (hard links unsupported); "
+    "choose another directory or pass --force\n"
+)
+
+
+def test_without_links_nothing_is_published(
     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(os, "link", _no_links)
-    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
-    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
-    published = workdir / "arci.yaml"
-    assert compile_descriptor(published).experiment_id == "exp"
-    assert stat.S_IMODE(published.stat().st_mode) == _ordinary_mode()
+    assert _init(capsys) == (3, "", NO_LINKS_LINE)
+    assert set(workdir.iterdir()) == set()  # no destination, no staged file
 
 
 def test_without_links_a_destination_that_appears_before_publication_survives(
@@ -96,12 +99,20 @@ def test_without_links_a_destination_that_appears_before_publication_survives(
 
     monkeypatch.setattr(init_module, "_check_output", check_then_race)
     monkeypatch.setattr(os, "link", _no_links)
-    code, out, err = _init(capsys)
+    assert _init(capsys) == (3, "", NO_LINKS_LINE)
     assert len(calls) == 2
-    assert (code, out) == (3, "")
-    assert err == f"{PREFIX}output arci.yaml exists; use --force to replace it\n"
     assert (workdir / "arci.yaml").read_bytes() == competitor
     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
+
+
+def test_with_force_and_no_links_the_rename_still_publishes(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (workdir / "arci.yaml").write_bytes(b"old\n")
+    monkeypatch.setattr(os, "link", _no_links)
+    assert _init(capsys, "--force") == (0, "arci run arci.yaml\n", "")
+    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
+    assert compile_descriptor(workdir / "arci.yaml").experiment_id == "exp"
 
 
 def test_with_links_a_destination_that_appears_before_publication_survives(
@@ -124,19 +135,58 @@ def test_with_links_a_destination_that_appears_before_publication_survives(
     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
 
 
-def test_a_failed_exclusive_write_removes_only_what_it_created(
+# --- 2b: durability ---------------------------------------------------------------------------
+
+
+def _is_directory(fd: int) -> bool:
+    return stat.S_ISDIR(os.fstat(fd).st_mode)
+
+
+def test_the_staged_file_and_the_directory_are_fsynced(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    real_fsync = os.fsync
+    synced: list[str] = []
+
+    def recording_fsync(fd: int) -> None:
+        synced.append("dir" if _is_directory(fd) else "file")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", recording_fsync)
+    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
+    assert synced == ["file", "dir"]
+    published = workdir / "arci.yaml"
+    assert stat.S_IMODE(published.stat().st_mode) == _ordinary_mode()
+
+
+def test_a_failed_staged_fsync_writes_nothing(
     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     def failing_fsync(fd: int) -> None:
         del fd
         raise OSError(errno.EIO, os.strerror(errno.EIO))
 
-    monkeypatch.setattr(os, "link", _no_links)
     monkeypatch.setattr(os, "fsync", failing_fsync)
     code, out, err = _init(capsys)
     assert (code, out) == (3, "")
     assert err == f"{PREFIX}output arci.yaml: cannot write: {os.strerror(errno.EIO)}\n"
-    assert set(workdir.iterdir()) == set()  # the partial destination and the staged file are gone
+    assert set(workdir.iterdir()) == set()  # no destination, no staged file
+
+
+def test_a_failed_directory_fsync_is_ignored(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    real_fsync = os.fsync
+
+    def directory_fsync_fails(fd: int) -> None:
+        if _is_directory(fd):
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", directory_fsync_fails)
+    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
+    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
+    assert compile_descriptor(workdir / "arci.yaml").experiment_id == "exp"
 
 
 # --- 1c: an unwritable output directory -----------------------------------------------------------

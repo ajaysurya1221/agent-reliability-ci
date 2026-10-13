@@ -9,9 +9,10 @@ names it advertises; explicit fault tools are checked against them. Agents, the 
 and `snapshot` are never called, and this process never imports a reference (AGENT_SEMANTICS).
 
 The descriptor is rendered with every string value double-quoted, staged beside the destination,
-re-loaded through the descriptor loader and seal-checked, then published: with `--force` by an
-atomic rename; without it by a hard link or, where links are unsupported, an exclusive create, so
-an existing file is never replaced. Errors are `InitError`, one line, with nothing written.
+re-loaded through the descriptor loader and seal-checked, then published atomically: with `--force`
+by a rename; without it by a hard link only, so an existing file is never replaced and, where hard
+links are unsupported, nothing is published (DECISIONS D-10). Errors are `InitError`, one line,
+with nothing written.
 """
 
 from __future__ import annotations
@@ -602,38 +603,22 @@ def _exists(request: InitRequest) -> InitError:
     return InitError(f"output {_show(request.out_text)} exists; use --force to replace it")
 
 
-def _create_exclusive(dest: Path, data: bytes) -> None:
-    """Publish `data` at `dest` only if nothing is there; remove only what this call created.
-
-    For file systems without hard links. `O_EXCL` fails on any existing entry, a symlink
-    included, so an existing file is never replaced.
-    """
-    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
-    created: os.stat_result | None = None
-    try:
+def _fsync_directory(directory: Path) -> None:
+    """Make a published entry durable where the platform allows; errors are ignored."""
+    with contextlib.suppress(OSError):
+        fd = os.open(directory, os.O_RDONLY)
         try:
-            created = os.fstat(fd)
-            view = memoryview(data)
-            while view:
-                view = view[os.write(fd, view) :]
             os.fsync(fd)
         finally:
             os.close(fd)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            now = os.lstat(dest)
-            # The entry is removed only while it is still the file this call created.
-            if created is None or (now.st_dev, now.st_ino) == (created.st_dev, created.st_ino):
-                os.unlink(dest)
-        raise
 
 
 def publish(request: InitRequest, text: str) -> None:
-    """Stage beside the destination, verify, then publish. Nothing is left on error.
+    """Stage beside the destination, verify, then publish atomically. Nothing is left on error.
 
-    With --force the staged file replaces the destination atomically. Without it the publication
-    fails closed: a hard link refuses an existing destination, and where hard links are
-    unsupported an exclusive create does; neither ever falls back to a replacing rename.
+    The staged bytes are fsynced first. With --force the staged file replaces the destination by a
+    rename. Without it the only publication is a hard link, which refuses an existing destination;
+    where hard links are unsupported nothing is published (no copy, no replacing rename).
     """
     staged: Path | None = None
     try:
@@ -648,8 +633,10 @@ def publish(request: InitRequest, text: str) -> None:
             raise
         with handle:
             handle.write(text)
-        # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
-        os.chmod(staged, 0o666 & ~_umask())
+            handle.flush()
+            # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
+            os.fchmod(handle.fileno(), 0o666 & ~_umask())
+            os.fsync(handle.fileno())
         _verify(request, staged)
         # Re-checked at the last moment: a directory or symlink is never replaced, and without
         # --force a file that appeared meanwhile is not replaced either.
@@ -662,12 +649,11 @@ def publish(request: InitRequest, text: str) -> None:
             except FileExistsError:
                 raise _exists(request) from None
             except OSError:
-                # No hard links here (EOPNOTSUPP, EPERM, ...): create exclusively instead; never
-                # fall back to a rename, which would replace a file that appeared meanwhile.
-                try:
-                    _create_exclusive(request.out, staged.read_bytes())
-                except FileExistsError:
-                    raise _exists(request) from None
+                raise InitError(
+                    f"output {_show(request.out_text)}: cannot publish atomically here "
+                    "(hard links unsupported); choose another directory or pass --force"
+                ) from None
+        _fsync_directory(request.out.parent)
     except OSError as exc:
         raise InitError(
             f"output {_show(request.out_text)}: cannot write: {exc.strerror or type(exc).__name__}"

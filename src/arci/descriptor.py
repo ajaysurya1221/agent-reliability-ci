@@ -18,6 +18,7 @@ import math
 import re
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, cast
 
@@ -156,6 +157,10 @@ _DROPPED_TAGS = frozenset(
 _INT_FORMS = (("0x", 16), ("0o", 8), ("0b", 2))
 # Deepest nesting of mappings and lists (strict JSON validation itself stops at 200 levels).
 MAX_DEPTH = 100
+# Most values that alias re-uses may add to the document once expanded ("billion laughs").
+MAX_ALIAS_NODES = 100_000
+
+INT_PATTERN = r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"
 
 # A float is written with a `.`: `1.5`, `-0.25`, `2.`, `.5`, `1.0e+3` (an exponent needs its
 # sign, as in YAML 1.1). YAML 1.1's base-60 form (`1:30.5`) and underscores are dropped, so those
@@ -173,7 +178,21 @@ class DescriptorLoader(yaml.SafeLoader):
     floats follow `FLOAT_PATTERN`; timestamps stay strings. Null and merge keys are the
     SafeLoader's YAML 1.1 behaviour. `yes`, `no`, `on`, `off`, dates and `1:30.5` are therefore
     strings. `parse_yaml` also refuses every tag but str, int, float, bool, null, map and seq.
+    Explicit `!!int` and `!!float` scalars must be written in the implicit forms (no underscores,
+    no padding), and an explicit `!!null` only as an empty value, `null` or `~`.
     """
+
+    def __init__(self, stream: str) -> None:
+        super().__init__(stream)
+        # Scalars whose tag the file wrote (`!!null x`), by node identity; see `_check_scalar`.
+        self.explicit: set[int] = set()
+
+    def compose_scalar_node(self, anchor: dict[Any, yaml.Node]) -> yaml.ScalarNode:
+        tag = self.peek_event().tag
+        node = super().compose_scalar_node(anchor)
+        if tag is not None and tag != "!":
+            self.explicit.add(id(node))
+        return node
 
 
 DescriptorLoader.yaml_implicit_resolvers = {
@@ -183,7 +202,7 @@ DescriptorLoader.yaml_implicit_resolvers = {
 DescriptorLoader.add_implicit_resolver(_BOOL_TAG, re.compile(r"^(?:true|false)$"), list("tf"))
 DescriptorLoader.add_implicit_resolver(
     _INT_TAG,
-    re.compile(r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"),
+    re.compile(INT_PATTERN),
     list("-+0123456789"),
 )
 DescriptorLoader.add_implicit_resolver(_FLOAT_TAG, re.compile(FLOAT_PATTERN), list("-+0123456789."))
@@ -195,8 +214,14 @@ def _too_large() -> str:
 
 
 def _int_value(text: str) -> int:
-    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit."""
-    digits = text.replace("_", "")
+    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit.
+
+    Only the implicit forms (`INT_PATTERN`), also under an explicit `!!int`: no underscores, no
+    padding.
+    """
+    if not re.fullmatch(INT_PATTERN, text):
+        raise ValueError(f"invalid integer {_quote(text)}")
+    digits = text
     sign = -1 if digits.startswith("-") else 1
     digits = digits[1:] if digits[:1] in "+-" else digits
     base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
@@ -218,7 +243,16 @@ _NON_FINITE = {".inf": math.inf, "+.inf": math.inf, "-.inf": -math.inf, ".nan": 
 
 
 def _float_value(text: str) -> float:
-    lowered = text.replace("_", "").lower()
+    """Only `FLOAT_PATTERN` or a decimal integer (`!!float 1`): no underscores, no padding."""
+    if not re.fullmatch(FLOAT_PATTERN, text) and not re.fullmatch(r"[-+]?[0-9]+", text):
+        try:
+            spelled = float(text)  # `!!float inf`: reported as non-finite by `_check_scalar`
+        except ValueError:
+            spelled = 0.0
+        if math.isfinite(spelled):
+            raise ValueError(f"invalid number {_quote(text)}")
+        return spelled
+    lowered = text.lower()
     try:
         return _NON_FINITE[lowered] if lowered in _NON_FINITE else float(lowered)
     except ValueError:
@@ -284,7 +318,28 @@ def _check_tag(node: yaml.Node, path: SourcePath) -> None:
         )
 
 
-def _check_scalar(node: yaml.ScalarNode, path: SourcePath) -> None:
+_SURROGATE = re.compile("[\ud800-\udfff]")
+_EXPLICIT_NULLS = frozenset({"", "null", "~"})
+
+
+def _check_text(text: str, path: SourcePath) -> None:
+    """A lone surrogate (from a `\\uD800` escape) is not text JSON or UTF-8 can carry."""
+    found = _SURROGATE.search(text)
+    if found:
+        raise _SourceError(
+            path,
+            f"lone surrogate U+{ord(found.group()):04X} is not valid text; write the character "
+            "itself or a \\U escape of its code point",
+        )
+
+
+def _check_scalar(loader: DescriptorLoader, node: yaml.ScalarNode, path: SourcePath) -> None:
+    value_text = str(node.value)
+    _check_text(value_text, path)
+    if node.tag == _NULL_TAG and id(node) in loader.explicit:
+        if value_text not in _EXPLICIT_NULLS:
+            raise _SourceError(path, f"invalid null {_quote(value_text)}; write null, ~ or nothing")
+        return
     convert = _SCALAR_VALUES.get(node.tag)
     if convert is None:
         return
@@ -300,43 +355,60 @@ def _check_key(loader: DescriptorLoader, key_node: yaml.Node, path: SourcePath) 
     if not isinstance(key_node, yaml.ScalarNode) or key_node.tag != _STR_TAG:
         shown = key_node.value if isinstance(key_node, yaml.ScalarNode) else "a collection"
         raise _SourceError(path, f"key {shown} is not a string; quote it")
-    return str(loader.construct_scalar(key_node))
+    key = str(loader.construct_scalar(key_node))
+    _check_text(key, (*path, key))
+    return key
 
 
-def _check_node(
-    loader: DescriptorLoader,
-    node: yaml.Node,
-    path: SourcePath,
-    active: set[int],
-    heights: dict[int, int],
-) -> int:
+@dataclass
+class _Walk:
+    """`_check_node`'s state: the nodes being walked, and per node its height and expanded size."""
+
+    active: set[int] = field(default_factory=set[int])
+    heights: dict[int, int] = field(default_factory=dict[int, int])
+    sizes: dict[int, int] = field(default_factory=dict[int, int])
+    reused: int = 0  # values that alias re-use has added so far
+
+
+def _check_node(loader: DescriptorLoader, node: yaml.Node, path: SourcePath, walk: _Walk) -> int:
     """Walk the composed node graph before anything is constructed; the first problem raises.
 
     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
-    boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
-    `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
+    boolean, an explicit `!!null` with a value, a lone surrogate in a string or key, a non-string
+    key, a repeated key, a self-referencing alias, nesting deeper than `MAX_DEPTH`, more than
+    `MAX_ALIAS_NODES` values added by re-using aliased nodes.
+
+    Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
     intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
     mapping is a repeated key like any other.
 
     Returns the node's height (levels of nesting below it; a scalar or an empty collection is 0).
     A node reached twice through an alias is walked once and its height cached by node identity;
     every later use still checks that its own path plus that height stays within `MAX_DEPTH`, so a
-    chain of shared aliases cannot nest deeper than the limit.
+    chain of shared aliases cannot nest deeper than the limit. Each such use also adds the node's
+    expanded size (values below it, itself included) to `walk.reused`, which may not pass
+    `MAX_ALIAS_NODES`.
     """
-    if id(node) in active:
+    if id(node) in walk.active:
         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
-    known = heights.get(id(node))
+    known = walk.heights.get(id(node))
     if known is not None:
         if len(path) + known > MAX_DEPTH:
             raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
+        walk.reused += walk.sizes[id(node)]
+        if walk.reused > MAX_ALIAS_NODES:
+            raise _SourceError(
+                path, f"aliases expand to more than {MAX_ALIAS_NODES} values; write less reuse"
+            )
         return known
     if len(path) > MAX_DEPTH:
         raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
     _check_tag(node, path)
-    active.add(id(node))
+    walk.active.add(id(node))
     height = 0
+    size = 1
     if isinstance(node, yaml.ScalarNode):
-        _check_scalar(node, path)
+        _check_scalar(loader, node, path)
     elif isinstance(node, yaml.MappingNode):
         keys: set[str] = set()
         merged = False
@@ -350,7 +422,8 @@ def _check_node(
                         f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
                     )
                 merged = True
-                height = max(height, _check_node(loader, value_node, path, active, heights))
+                height = max(height, _check_node(loader, value_node, path, walk))
+                size += walk.sizes[id(value_node)]
                 continue
             key = _check_key(loader, key_node, path)
             if key in keys:
@@ -361,13 +434,16 @@ def _check_node(
                     f"{mark.column + 1}; give each key once",
                 )
             keys.add(key)
-            below = _check_node(loader, value_node, (*path, key), active, heights)
+            below = _check_node(loader, value_node, (*path, key), walk)
             height = max(height, 1 + below)
+            size += 1 + walk.sizes[id(value_node)]  # the key and its value
     elif isinstance(node, yaml.SequenceNode):
         for index, item in enumerate(cast(list[yaml.Node], node.value)):
-            height = max(height, 1 + _check_node(loader, item, (*path, index), active, heights))
-    active.discard(id(node))
-    heights[id(node)] = height
+            height = max(height, 1 + _check_node(loader, item, (*path, index), walk))
+            size += walk.sizes[id(item)]
+    walk.active.discard(id(node))
+    walk.heights[id(node)] = height
+    walk.sizes[id(node)] = size
     return height
 
 
@@ -383,7 +459,7 @@ def parse_yaml(text: str) -> object:
         node = loader.get_single_node()
         if node is None:
             return None
-        _check_node(loader, node, (), set(), {})
+        _check_node(loader, node, (), _Walk())
         return loader.construct_document(node)
     except RecursionError:
         raise _SourceError((), f"nested more than {MAX_DEPTH} levels deep") from None
