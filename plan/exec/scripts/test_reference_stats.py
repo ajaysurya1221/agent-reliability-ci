@@ -146,9 +146,9 @@ def test_workflow_design_values() -> None:
     assert env["SAMPLE_TIMEOUT_S"] == "600"
     assert env["TIMING_BUDGET_S"] == "2400"
     assert (env["RESERVE_S"], env["PROBE_TIMEOUT_S"], env["PROBE_MIN_LEFT_S"]) == (
-        "300",
+        "420",
         "120",
-        "180",
+        "420",
     )
     job = workflow()["jobs"]["reference"]
     assert job["timeout-minutes"] == 40
@@ -161,19 +161,22 @@ def test_workflow_design_values() -> None:
     job_s, reserve = int(env["JOB_TIMEOUT_S"]), int(env["RESERVE_S"])
     sample_s, probe = int(env["SAMPLE_TIMEOUT_S"]), int(env["PROBE_TIMEOUT_S"])
     # The loop budget is min(TIMING_BUDGET_S, job - elapsed - reserve): the reserve is always
-    # left, and in a 40-minute job the 2400 s ceiling never binds (the loop gets at most 2100 s).
+    # left, and in a 40-minute job the 2400 s ceiling never binds (the loop gets at most 1980 s).
     assert job_s - reserve < int(env["TIMING_BUDGET_S"])
-    # What the bounds do NOT guarantee: seven samples at their full 600 s limit (4200 s > 2100 s).
+    # What the bounds do NOT guarantee: seven samples at their full 600 s limit (4200 s > 1980 s).
     # A sample the loop cannot give its full limit is cut off (timeout_reason "budget").
     assert job_s - reserve - 600 < 7 * sample_s
     # What they do guarantee: seven samples of the measured ~225 s (run 38451606669: 213-227 s on
-    # both runners), the probe and the reserve fit when setup takes under 6 minutes.
-    assert 6 * 60 + 7 * 225 + probe + reserve <= job_s
-    # The reserve covers the probe, which only runs with PROBE_MIN_LEFT_S left, and the JSON,
-    # upload and final check steps, whose bounds fit inside it.
-    assert probe < int(env["PROBE_MIN_LEFT_S"]) <= reserve
+    # both runners), the probe and the reserve fit when setup takes under 4 minutes.
+    assert 4 * 60 + 7 * 225 + probe + reserve <= job_s
+    # The reserve covers everything after sampling COMBINED: the probe (which only runs with
+    # PROBE_MIN_LEFT_S left, itself at least the reserve), the parse, upload and final-check
+    # steps at their full timeouts, and 60 s of headroom for cleanup and the reader join.
     after = ("Parse the logs", "Upload the JSON", "Fail if any sample")
-    assert sum(60 * step(name)["timeout-minutes"] for name in after) <= reserve
+    after_s = sum(60 * step(name)["timeout-minutes"] for name in after)
+    assert probe + after_s + 60 <= reserve
+    assert probe < int(env["PROBE_MIN_LEFT_S"]) <= reserve
+    assert int(env["PROBE_MIN_LEFT_S"]) >= probe + after_s + 60
     # The timing step's own timeout is only a backstop: the step ends by job time
     # job - reserve + probe (+ the kill/join of a last sample), well inside it, and the job
     # timeout still comes first.
@@ -241,9 +244,9 @@ def test_workflow_steps_dry_run(tmp_path: Path) -> None:
     assert doc["design"]["sample_timeout_seconds"] == int(SAMPLE_TIMEOUT_S)
     design = doc["design"]
     assert design["job_start"] == int(env["JOB_START"])
-    assert design["job_timeout_seconds"] == 2400 and design["reserve_seconds"] == 300
+    assert design["job_timeout_seconds"] == 2400 and design["reserve_seconds"] == 420
     # The job just started: the loop gets the 40 minutes less the 300 s reserve.
-    assert 2100 - 5 <= design["budget_seconds_used"] <= 2100
+    assert 1980 - 5 <= design["budget_seconds_used"] <= 1980
     assert design["timing_budget_seconds"] == 2400
     assert design["python_probe"] == "ran"
     assert isinstance(design["sampling_seconds"], int)
@@ -283,7 +286,7 @@ def test_workflow_steps_dry_run(tmp_path: Path) -> None:
 
 def test_workflow_budget_used_up(tmp_path: Path) -> None:
     """2300 s into the 2400 s job: below the reserve, so no sample starts and the probe (only
-    100 s left, under 180) is skipped; every sample is recorded as not started (timed out by the
+    100 s left, under 420) is skipped; every sample is recorded as not started (timed out by the
     budget), the JSON still comes.
     """
     env = fake_env(tmp_path, JOB_START=job_start_ago(2300))
@@ -315,13 +318,13 @@ def test_workflow_budget_used_up(tmp_path: Path) -> None:
 
 
 def test_workflow_budget_shrunk_by_setup(tmp_path: Path) -> None:
-    """1500 s into the job (a slow setup), the loop gets 2400 - 1500 - 300 = 600 s, not 2100."""
+    """1500 s into the job (a slow setup), the loop gets 2400 - 1500 - 420 = 480 s, not 1980."""
     env = fake_env(tmp_path, JOB_START=job_start_ago(1500), FAKE_HANG_AT="0")
     done = run_step("Time the demo", tmp_path, env)
     assert done.returncode == 0, done.stderr
     assert run_step("Parse the logs", tmp_path, env).returncode == 0
     doc = json.loads((Path(env["OUT_DIR"]) / "reference-test.json").read_text())
-    assert 590 <= doc["design"]["budget_seconds_used"] <= 600
+    assert 470 <= doc["design"]["budget_seconds_used"] <= 480
     assert doc["design"]["seconds_before_sampling"] >= 1500
     assert doc["design"]["python_probe"] == "ran"
     samples = doc["samples"]
@@ -330,11 +333,11 @@ def test_workflow_budget_shrunk_by_setup(tmp_path: Path) -> None:
 
 
 def test_workflow_budget_cut_off(tmp_path: Path) -> None:
-    """2096 s into the job the loop gets about 4 s (2400 - 2096 - 300). Samples 1-6 take
+    """1976 s into the job the loop gets about 4 s (2400 - 1976 - 420). Samples 1-6 take
     milliseconds; sample 7 hangs and is killed at the loop deadline, well before its 5 s
     per-sample limit: recorded as cut off by the budget, not as a hang."""
     env = fake_env(
-        tmp_path, JOB_START=job_start_ago(2096), SAMPLE_TIMEOUT_S=SAMPLE_TIMEOUT_S, FAKE_HANG_AT="7"
+        tmp_path, JOB_START=job_start_ago(1976), SAMPLE_TIMEOUT_S=SAMPLE_TIMEOUT_S, FAKE_HANG_AT="7"
     )
     out_dir = Path(env["OUT_DIR"])
     done = run_step("Time the demo", tmp_path, env)

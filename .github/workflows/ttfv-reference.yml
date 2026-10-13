@@ -30,23 +30,23 @@ env:
   # timeouts (setup-python 5 min, uv install 5 min). When the timing step starts it gives the
   # sampling loop
   #     budget = min(TIMING_BUDGET_S, JOB_TIMEOUT_S - (now - job_start) - RESERVE_S)
-  # so RESERVE_S (300 s) is always left after sampling for the Python probe, the JSON, the upload
+  # so RESERVE_S (420 s) is always left after sampling for the Python probe, the JSON, the upload
   # and the final check, however long setup took. TIMING_BUDGET_S (2400 s) is only a ceiling: in a
-  # 40-minute job the remaining time is always smaller, so the loop gets 2100 s minus the setup
+  # 40-minute job the remaining time is always smaller, so the loop gets 1980 s minus the setup
   # time. Each sample is bounded by min(SAMPLE_TIMEOUT_S, time left in the loop): a hang killed at
   # SAMPLE_TIMEOUT_S is recorded with timeout_reason "sample", a sample cut short by the loop
   # deadline with "budget", and a sample with under a second left is not started (timed out,
-  # "budget"). What this guarantees: not seven 600 s samples (7 x 600 = 4200 s > 2100 s), but
+  # "budget"). What this guarantees: not seven 600 s samples (7 x 600 = 4200 s > 1980 s), but
   # seven samples of the measured ~225 s (1575 s) plus the 120 s probe and the 300 s reserve fit
-  # when setup takes under 6 minutes (360 + 1575 + 120 + 300 = 2355 s <= 2400 s). After sampling,
+  # when setup takes under 4 minutes (360 + 1575 + 120 + 300 = 2355 s <= 2400 s). After sampling,
   # the probe (PROBE_TIMEOUT_S) runs only if at least PROBE_MIN_LEFT_S remain before the job
   # deadline, else it is recorded as skipped. The step timeouts are backstops behind this.
   JOB_TIMEOUT_S: "2400"
-  RESERVE_S: "300"
+  RESERVE_S: "420"
   SAMPLE_TIMEOUT_S: "600"
   TIMING_BUDGET_S: "2400"
   PROBE_TIMEOUT_S: "120"
-  PROBE_MIN_LEFT_S: "180"
+  PROBE_MIN_LEFT_S: "420"
 
 jobs:
   reference:

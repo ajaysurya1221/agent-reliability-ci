@@ -94,18 +94,20 @@ The job is killed at 40 minutes (`timeout-minutes: 40`, 2400 s), and the JSON mu
 before that. The first step records the job's start (`date +%s`); setup-python and the uv
 install each have a 5-minute step timeout. When the timing step starts, the sampling loop gets
 
-    budget = min(TIMING_BUDGET_S, 2400 − (now − job_start) − 300)
+    budget = min(TIMING_BUDGET_S, 2400 − (now − job_start) − 420)
 
-so a 300 s reserve is always left after sampling for the Python probe, the JSON, the upload and
+so a 420 s reserve is always left after sampling for the Python probe (120 s), the parse (60 s), the
+upload (120 s), the final check (60 s) and 60 s of headroom for cleanup and the reader join, i.e.
 the final check, however long setup took. `TIMING_BUDGET_S` is 2400 s, a ceiling that never
-binds in a 40-minute job: the loop gets 2100 s less the setup time. The 120 s probe runs only if at
-least 180 s remain before the job deadline, else it is recorded as skipped. The JSON's `design`
+binds in a 40-minute job: the loop gets 1980 s less the setup time. The 120 s probe runs only if at
+least 420 s remain before the job deadline (the whole reserve, so the steps after it still fit),
+else it is recorded as skipped. The JSON's `design`
 block records `job_start`, `reserve_seconds` and `budget_seconds_used`.
 
 What this does and does not guarantee: seven samples at their full 600 s limit (4200 s) cannot fit
-in 2100 s, so a slow enough run ends with samples cut off by the budget or not started, recorded
+in 1980 s, so a slow enough run ends with samples cut off by the budget or not started, recorded
 as such and failing the job. Seven samples of the measured ~225 s (1575 s), the probe and the
-reserve fit when setup takes under 6 minutes (360 + 1575 + 120 + 300 = 2355 s ≤ 2400 s).
+reserve fit when setup takes under 4 minutes (240 + 1575 + 120 + 420 = 2355 s ≤ 2400 s).
 
 ## Not receipts
 
