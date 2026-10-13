@@ -70,7 +70,27 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 
 ## 6. Follow-ups the orchestrator could not finish (see FINAL_REPORT.md "Next three steps")
 
----
+- Cold readers: five people for the TTFV protocol (`docs/measurement/ttfv-protocol.md`), after
+  item 1, using the pilot template (F). The maintainer-machine receipts in
+  `docs/measurement/receipts/` are labelled `ai-agent` and never count.
+- Review leftovers (one follow-up branch, two reviews each): ADR 0005 names `httpcore` where the
+  lock says `httpcore2` (fix at the next re-freeze); an sdist allowlist step in `release.yml`;
+  `arci init` reports every non-FileExistsError from `os.link` as "hard links unsupported" (name
+  the errno); macOS `fsync` is not `F_FULLFSYNC`; dead signed-prefix branches in
+  `descriptor._int_value`; `trials_started`/Track A version check in the protocol; a required
+  reviewer on the `pypi` environment if you want a human gate on publishing.
+- MCP Inspector: the bridge answers protocol `2026-07-28` and never negotiates; Inspector 2.10.1
+  (TS SDK 1.29.0) rejects it. Making the recipe's step 1 work needs either a newer Inspector SDK or
+  a negotiation change in `src/arci/mcp_boundary.py` (design record + Astra review).
+
+# Final state at the end of the run (filled by the orchestrator; see FINAL_REPORT.md)
+
+- main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
+  every later plan-only commit; T13 docs (receipts, recipe titles, availability line) <<merged from
+  sprint/t13-docs after REVIEW 13 | on branch sprint/t13-docs with its REPORT>>.
+- PyPI: not published (item 1). GitHub release: not created (item 3). Both are one command each.
+- Nothing half-applied: every lane branch is merged; no frozen file changed outside ADR 0005's
+  re-freeze; no recorded result edited; no force-push, no deleted branch/tag/release, no secret.
 
 # Drafts
 
