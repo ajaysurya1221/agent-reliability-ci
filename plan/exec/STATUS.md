@@ -11,3 +11,4 @@ Budget clock start (Task 00 commit): 2026-10-13T03:42:56Z. Hard stop for startin
 | 06+07 | IN REVIEW | Fable ACCEPT, reviewer-subagent ACCEPT, Astra running | 43b220b on sprint/package (main merged in; CI re-running) | coder 9 min; first CI run: windows-smoke, action-fixture (BLOCK), macOS/Ubuntu wheel-smoke 3.11 green; `pypi` environment restricted to tags v* |
 | 10 | MERGED | Fable ACCEPT, reviewer-subagent ACCEPT (round 2) | 961bae7 (merged 04:37Z) | coder 5 min + two revision rounds (1.5 + 1.2 min); docs only |
 | 03 | IN PROGRESS | — | — | descriptor coder dispatched 04:35Z (wf_d2adc577-837); E2 ruling dropped into the worktree 04:36Z |
+| 11 | DRAFTED | — (reviews after T03/T04 merge) | sprint/readme (committed) | Fable-authored per ADR 0009; first screen 191 words; figure check passes; merge after `arci init` lands |
