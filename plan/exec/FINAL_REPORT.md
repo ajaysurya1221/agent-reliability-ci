@@ -21,7 +21,7 @@ decisions, measurements), `docs/design/0005`–`0009`.
 | S7 Python recipe | merged (T08, T08r1) | `examples/recipes/python_agent/`, `docs/recipes/python-agent.md`, recorded outputs, 18 recipe tests |
 | S8 MCP recipe + Inspector | merged with the Inspector step recorded as blocked (T09; D-03) | `examples/recipes/mcp_agent/`, `docs/recipes/mcp-inspector.md` (Inspector 2.10.1 / SDK 1.29.0 rejects protocol 2026-07-28; verbatim) |
 | S9 TTFV harness | merged (T10, two revision rounds) | `docs/measurement/ttfv-protocol.md`, `receipt.template.json`, `receipts/README.md` |
-| S10 release-integrity merge | <<state>> | T12 (round 2 in review at 07:15Z), ADR 0005, titled re-freeze commit |
+| S10 release-integrity merge | merged (T12, two rounds) | 68f7c8c on main; ADR 0005; titled re-freeze commit 5142d66; merge bar on the merge commit green (1216 tests, frozen 53/53, reproduce 0 failed) |
 | S11 install/Action matrix | merged (T07) | CI jobs wheel-smoke (Ubuntu/macOS × 3.11/3.14), windows-smoke (install/--help only), action-fixture (must BLOCK); `sprint/**` trigger |
 | S12 release | <<state>> | tag v0.8.0, GitHub release, PyPI |
 
@@ -62,11 +62,11 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 ## 4. Metrics vs the memo's targets
 | Metric | Target | Measured | Where |
 |---|---|---|---|
-| Packaged demo TTFV | p50 ≤ 2 min | <<>> | plan/exec/measurements.md, docs/measurement/receipts |
-| Own-agent TTFV (sample tree) | ≤ 10 min | <<>> | |
+| Packaged demo TTFV | p50 ≤ 2 min, p95 ≤ 3 min | 80 s cold uv cache (9 s install + 71 s run), 72 s and 73 s warm; `uvx --from <0.8.0 wheel> arci demo`, empty dir, maintainer machine (15-core M5 Pro); AI-agent labelled, not cold readers | plan/exec/measurements.md; docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-demo.json |
+| Own-agent TTFV (sample tree) | p50 ≤ 10 min (cold users) | 3 s from scaffold start to a validated INCONCLUSIVE (install 0 s from a local wheel, init 1 s, run 2 s); tool path only, no reading or reference writing; AI-agent labelled | docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-own-agent.json |
 | Cold read of the README (Opus subagent, no context; AI-agent labelled) | ≥ 4/5 | 5/5, BLOCK interpretation correct (plan/exec/cold-read-2026-10-13.json) | plan/exec/measurements.md |
 | Installed-package smoke on CI | green | <<>> | release workflow |
-| Merge bar on the released commit | green | <<>> | |
+| Merge bar on the released commit | green | green: isolated `just check` 1216 passed/2 skipped, `just frozen` 53 OK, `uv lock --check`, figures, schema, `reproduce.py --check` 0 failed, at 68f7c8c (tag v0.8.0 = 48e60ac, same tree + plan records); main CI run 38363108519 success | plan/exec/STATUS.md (V rows) |
 
 ## 5. Cuts and why
 <<>>
