@@ -1,0 +1,107 @@
+{
+  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. facilitator: a handle only, no personal data. network: yes | no, whether the machine had internet access during the attempt; required yes for Track A and for uv tool install; checked once before the clock starts (protocol 2.7). coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
+  "schema": "arci.ttfv.receipt.v1",
+  "track": "demo",
+  "date": "2026-10-13",
+  "reader": {
+    "_comment": "handle: a public handle, no other personal data. kind: cold | maintainer | ai-agent; only cold receipts without coaching events count toward cold-reader metrics.",
+    "handle": "ai-reader-2-opus",
+    "kind": "ai-agent"
+  },
+  "facilitator": "claude-fable-orchestrator",
+  "machine": {
+    "_comment": "os and cpu as reported by the system (e.g. uname -sr, CPU model and core count); python and uv are `python3 --version` and `uv --version`. uv_cache: cold (fresh UV_CACHE_DIR) or warm.",
+    "os": "Darwin 27.0.0 (macOS, arm64)",
+    "cpu": "Apple M5 Pro, 15 cores",
+    "python": "Python 3.14.6",
+    "uv": "uv 0.12.5",
+    "uv_cache": "warm"
+  },
+  "network": "yes",
+  "package": {
+    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel (record UV_FIND_LINKS and any UV_CACHE_DIR in notes, protocol 2.3). readme_url: the README read, at a fixed commit.",
+    "version": "0.8.0",
+    "source": "pypi",
+    "wheel_sha256": "",
+    "readme_url": "https://github.com/ajaysurya1221/agent-reliability-ci/blob/718ce95/README.md"
+  },
+  "project": {
+    "_comment": "Track B only; null for demo. kind: own | sample. description: what the agent is, or which recipe the sample tree came from. refs_preexisting: baseline, candidate, toolset and oracle were importable before the clock started. workers: worker count of the run.",
+    "kind": null,
+    "description": null,
+    "refs_preexisting": null,
+    "workers": null
+  },
+  "timestamps": {
+    "_comment": "ISO 8601 with timezone, e.g. 2026-10-20T09:15:02Z. Track A uses readme_opened, command_start, demo_banner, demo_verdict, all_steps_held, interpretation_answered. Track B uses readme_opened, install_start, install_done, scaffold_start, descriptor_written, run_start, verdict_printed, store_validated, interpretation_answered. Leave the others null.",
+    "readme_opened": "2026-10-13T12:09:49Z",
+    "command_start": "2026-10-13T12:09:52Z",
+    "demo_banner": "2026-10-13T12:09:53Z",
+    "demo_verdict": "2026-10-13T12:10:16Z",
+    "all_steps_held": "2026-10-13T12:11:05Z",
+    "install_start": null,
+    "install_done": null,
+    "scaffold_start": null,
+    "descriptor_written": null,
+    "run_start": null,
+    "verdict_printed": null,
+    "store_validated": null,
+    "interpretation_answered": null
+  },
+  "durations_seconds": {
+    "_comment": "Whole seconds derived from the timestamps as the protocol defines per track (sections 3 and 4). agent_execution is Track B only: the sum of usage.wall_seconds over trials.jsonl in the run store (protocol 4.2), never subtracted from total.",
+    "install": 1,
+    "scaffold": null,
+    "run": 72,
+    "agent_execution": null,
+    "interpretation": null,
+    "total": 76
+  },
+  "outcome": {
+    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR; Track B: the verdict stamped as verdict_printed; ERROR if none; Track A: the verdict for agent B. store_validated, decision_sha256, init_attempts, descriptor_hand_edited, trials_started: Track B only (protocol 4.3 and 4.6). descriptor_hand_edited: arci.yaml edited by hand before the run that produced the verdict, or, with no valid verdict, before any arci run that started trials. trials_started: trials.jsonl in the run store (protocol 4.2) exists and is non-empty. interpretation_correct is scored with the key in protocol 5.3.",
+    "completed": true,
+    "verdict": "VERDICT: BLOCK (exit 1)   [A vs agent_b]  (A 192/200, agent_b 132/200, matches the recorded run)",
+    "exit_code": 0,
+    "store_validated": null,
+    "decision_sha256": "",
+    "init_attempts": null,
+    "descriptor_hand_edited": null,
+    "trials_started": null,
+    "interpretation_answer": "Under a timeout fault on the first reserve call, with 200 trials per arm, agent B (A with the retry removed) succeeded 132/200 vs A's 192/200, and the upper confidence bound on the drop was worse than the 0.10 margin, so ARCI is confident B is meaningfully less reliable than A and the gate fails (exit 1). It is a relative verdict about this experiment, not a statement about either agent's absolute quality.",
+    "interpretation_correct": true
+  },
+  "comprehension": {
+    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader and is a handle only, no personal data. q2_who_for keeps its name for schema stability; it holds the whole q2 answer (who it is for and what the agent must expose).",
+    "answered_on": "",
+    "scorer": "scorer-reader-2-opus (Claude sonnet) + orchestrator check",
+    "answers": {
+      "q1_what_is_it": "ARCI is a CI-style regression gate for LLM/tool-using agents: it runs a baseline and a candidate version many times under the same pre-declared tasks and injected tool faults, grades each trial with a separate oracle over the final environment state, and returns PASS/BLOCK/INCONCLUSIVE/ERROR as an exit code (0/1/2/3). It can also diff a passing and failing trace, shrink the injected faults, and replay a recorded failure offline.",
+      "q2_who_for": "People who build agents and want to know whether a change (prompt, code, retry logic) made the agent less reliable before merging. The agent must route its tool calls through ARCI's boundary: either a Python function agent(task, tools, rng) -> dict calling tools.call(...), with a toolset factory (task, seed) -> object with .tools and .snapshot() and an oracle (task, final_state) -> bool, or a command agent that speaks MCP over stdio.",
+      "q3_pass_means": "PASS means only that, for this pre-declared experiment (task, faults, N, alpha, delta), the statistical lower bound on candidate-minus-baseline success rate is above -delta, i.e. any reliability drop is smaller than the allowed margin. It says nothing about absolute reliability.",
+      "q4_does_not_do": "It is not a sandbox or security boundary (agents are assumed buggy, not hostile). It only sees calls that cross its tool boundary (direct file/network/subprocess access is invisible), and it replays recorded boundary calls, not model inference, so a live-model bundle usually replays INVALID. Also: declaring a fault does not guarantee it was injected.",
+      "q5_first_three_commands": "1) uv tool install agent-reliability-ci  2) arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed  3) arci run arci.yaml. (In my case the install had to be `uv venv` + `uv pip install`, and init also needed `--task '{\"order_id\": \"order-7\"}'`.)"
+    },
+    "scores": {
+      "q1_what_is_it": true,
+      "q2_who_for": true,
+      "q3_pass_means": true,
+      "q4_does_not_do": true,
+      "q5_first_three_commands": true
+    },
+    "all_correct": true
+  },
+  "coaching_events": [
+    {
+      "at": "pre-attempt",
+      "what": "Facilitator prompt stated, before the clock, that this harness blocks `uv tool install` and that uvx or a uv venv are alternatives; it also prescribed the timestamping wrapper and the milestone names. No explanation of ARCI was given."
+    }
+  ],
+  "notes": "Command used: cd $(mktemp -d) [= /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/tmp.pTQ0d6X8eP]; uvx --from agent-reliability-ci arci demo 2>&1 | while IFS= read -r l; do printf '%s %s\\n' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$l\"; done | tee demo.log; echo \"exit: ${PIPESTATUS[0]}\". Log: /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/tmp.pTQ0d6X8eP/demo.log. interpretation_answered not stamped (answers given after both tracks). AI-agent reader (Claude opus via the Workflow tool, persona: an ML engineer who builds LLM agents with tool calls and evaluates them with ad-hoc scripts); self-stamped milestones with `date -u` under the facilitator's wrapper; machine shared with the orchestrator session (not controlled). Never counted as a cold reader. Files read: /Users/ajay/Developer/agent-reliability-ci/README.md, /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/tmp.GKnjX92zoc/arci.yaml (generated by arci init), directory listing only of the copied sample project (app/__init__.py, v1.py, v2.py, tests/__init__.py, world.py, README.md were not opened). Confusions: The README's 'Gate your own agent' commands do not mention --task, but the sample toolset needs a task with order_id; init failed with KeyError: 'order_id' until I guessed --task '{\"order_id\": \"order-7\"}' from the hand-written YAML example. A first-timer would not know which task keys their own toolset expects to be required here. | The README one-liner chains `uv tool install ... && arci init ... && arci run ...`, which assumes arci lands on PATH; with any other install route (venv) I had to call .venv/bin/arci. | Without --fault the scaffold runs a 'clean' condition only, so the run did not actually exercise v1 vs v2 under the retry-relevant fault; both arms were 8/8. It was unclear from the README whether I was supposed to add --fault tool_timeout:reserve for the 'checkout-retry' example; I followed the commands as written. | The README is long and dense (Jev decision endpoint, calibration audit, evalopt independence) before reaching 'Gate your own agent'; the part I needed was near the bottom. | Track A wrapper uses ${PIPESTATUS[0]}, which is empty under zsh (this machine's shell), so the first demo run printed 'exit: ' with no code; I re-ran the demo under bash to get the exit code. | The venv was created with CPython 3.13.12 although the task said 3.14 is on PATH; uv picked it on its own. Not a problem, just unexpected.. Reader notes: Timings: demo 12:09:52Z -> 12:11:05Z (~73 s, including uvx env resolution; first output after ~1 s, so the package was apparently already cached); rerun 75 s. Own-agent path: install 1 s (packages resolved from uv cache in 1 ms, so this is not a cold-network install), scaffold 6 s including one failure and retry, run 2 s. Total README-open to own verdict ~107 s. Demo counts matched recorded run (A 192/200, B 132/200, A-vs-A 192/200, C PASS). Decision.json sha256 unchanged after `arci gate`, and gate reproduced INCONCLUSIVE (exit 2). Machine state: load average 8.46 / 5.99 / 3.79 at 12:12:59Z, consistent with other agents running in parallel; no lingering arci/pytest processes found by ps at that moment. The uv cache was warm (installs took milliseconds), so install timing is not representative of a true first visitor. I did not open any docs/ file, the sample project's own README, or its source files; I did not read the generated store files beyond listing and hashing. I did not run arci plan or add a fault, so my own run says nothing about v1 vs v2 under a timeout. Scorer rationale: All five answers contain every required element, so nothing is missing.\n\n- q1: The answer compares baseline and candidate, runs both many times under the same pre-declared tasks and injected faults, and returns PASS/BLOCK/INCONCLUSIVE/ERROR as an exit code usable in CI.\n- q2: It names people changing an agent who want to know about a reliability regression before merging. It names both integration routes: the Python function agent(task, tools, rng) and the MCP-over-stdio command.\n- q3: It says PASS is relative to the baseline, and that the lower bound on candidate-minus-baseline is above -delta. It limits this to the pre-declared experiment and says it is not a claim of absolute reliability.\n- q4: It gives at least two distinct README limits: not a sandbox or security boundary, only calls across its tool boundary are seen, and boundary calls are replayed, not model inference.\n- q5: The three commands are in order: uv tool install agent-reliability-ci, then arci init with --baseline/--candidate/--toolset/--oracle, then arci run arci.yaml. The extra note about a venv workaround and --task is a caveat, not a wrong claim.\n- Demo-block interpretation (BLOCK): The candidate is meaningfully worse than the baseline by more than the 0.10 margin. The answer frames this as a relative verdict about this experiment, not absolute quality. The upper-bound wording is loose but not wrong.\n- Own-run interpretation (INCONCLUSIVE): The answer says there is not enough evidence either way, with no regression claimed and no pass claimed. It also mentions arci plan for a larger run. This matches the verdict line INCONCLUSIVE (exit 2).",
+  "failures": [
+    {
+      "at": "2026-10-13T12:11:05Z",
+      "milestone": "demo exit code",
+      "what": "Wrapper printed \"exit: \" with no value because ${PIPESTATUS[0]} is not set in zsh. Re-ran `uvx --from agent-reliability-ci arci demo` under bash -c from 2026-10-13T12:11:44Z to 2026-10-13T12:12:59Z (log demo2.log in the same temp dir): exit 0."
+    }
+  ]
+}

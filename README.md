@@ -264,7 +264,9 @@ design** (8 trials per arm): under the default rule two perfect arms cannot PASS
 total collapse cannot BLOCK below N=8, so expect INCONCLUSIVE, then plan a confirmatory N with
 `arci plan` before spending trials. Without `--fault` the scaffold writes one clean condition (no
 injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `reserve` call, and `--task '{...}'`
-sets the task. A hand-written descriptor with one fault looks like this:
+sets the task. `arci init` calls your toolset factory once with that task, so a factory that reads
+task data fails without it: the sample project's `make_world` needs `--task '{"order_id": "order-7"}'`,
+and the error message names the flag. A hand-written descriptor with one fault looks like this:
 
 ```yaml
 experiment_id: checkout-retry
