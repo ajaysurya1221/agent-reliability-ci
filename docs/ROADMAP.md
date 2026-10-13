@@ -3,7 +3,8 @@
 v0.1 proved one thing: a measured regression becomes an executable, reduced failure case, for
 Python agents. v0.2 extends that to any program that speaks MCP over stdio. v0.5 adds System One
 decisions made by command agents, and v0.6 makes the documented Jev workflow ready for day one, and
-v0.7.0 runs it against Jev and publishes an intent-routing calibration audit.
+v0.7.0 runs it against Jev and publishes an intent-routing calibration audit, and v0.8.0 makes
+the first experiment a ten-minute job: PyPI, `arci demo`, `arci.yaml` and `arci init`.
 
 ## Done in v0.2
 
@@ -39,11 +40,14 @@ the decision model is published in [results/jev-calibration](results/jev-calibra
 (protocol: `bench/jev_calibration/PROTOCOL.md`). The gateway route, provider rate limits under load
 and billed spend remain unverified.
 
-## On main, not yet released
+## Done in v0.8.0
 
-`arci plan` (PASS/BLOCK/INCONCLUSIVE probabilities of a fixed-sample Clopper-Pearson design) and
-opt-in `arci report --pass-k`, plus platform-portability fixes. These are not in the v0.7.0 tag; see
-the Unreleased section of [CHANGELOG.md](../CHANGELOG.md).
+The onboarding release: the PyPI package and `uvx --from agent-reliability-ci arci demo`, the
+`arci.yaml` descriptor with its generated JSON Schema, `arci init`, the smoke-design notice, the
+current directory on the child import path, the CI install matrix and release workflow, the
+measurement protocol, and the README's first screen. Also released: `arci plan`, opt-in
+`arci report --pass-k` and the platform-portability fixes that had been on `main` since v0.7.0.
+See [CHANGELOG.md](../CHANGELOG.md).
 
 ## Next, most valuable first
 
