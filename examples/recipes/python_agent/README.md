@@ -22,8 +22,8 @@ Then the README's first-screen command, with this tree's task and fault added:
 uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 && arci run arci.yaml
 ```
 
-Until `agent-reliability-ci` is on PyPI, skip `uv tool install` and use the `arci` of the clone's
-environment (`uv sync`, then `../.venv/bin/arci` from the copy if you made it inside the clone).
+`agent-reliability-ci` has been on PyPI since v0.8.0. From a clone instead, use the clone's `arci`
+(`uv sync`, then `../.venv/bin/arci` from the copy if you made it inside the clone).
 
 `arci init` imports the four references in a child process (with the current directory on its
 import path), calls `make_world` once with the task and seed 0, checks that `reserve` is one of its
