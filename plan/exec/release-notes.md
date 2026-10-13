@@ -38,6 +38,12 @@ uv tool install agent-reliability-ci                  # the arci command
   unsupported on Windows), and an Action fixture that must BLOCK.
 - **Measurement protocol.** `docs/measurement/`: time-to-first-verdict and cold-read protocol with a
   receipt template; failed attempts are kept; no telemetry.
+- **Recipes.** `examples/recipes/python_agent` (a blank project: four references, `arci init`, the
+  smoke run, `arci plan`, the confirmatory run, then `diff`, `minimize`, `replay`; `docs/recipes/python-agent.md`)
+  and `examples/recipes/mcp_agent` (a stdlib JSON-RPC client against the MCP toolset bridge with a
+  hand-written command-arm descriptor; `docs/recipes/mcp-inspector.md`). The Inspector preflight in
+  that recipe is recorded as blocked on 2026-10-13: Inspector 2.10.1 (TypeScript SDK 1.29.0) rejects
+  the bridge's protocol revision `2026-07-28`; the ARCI steps run without it.
 - **README.** The first screen is the question, one sentence, two commands, what PASS means, what a
   small run means, and the boundary (design record 0009).
 - Also in this version, from `main` since v0.7.0: `arci plan`, opt-in `arci report --pass-k`, the
