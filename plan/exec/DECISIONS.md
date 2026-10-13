@@ -110,3 +110,29 @@ only publication path; any failure other than FileExistsError is reported as
 `output <path>: cannot publish atomically here (hard links unsupported); choose another directory or
 pass --force`, nothing is written, staging is removed. With `--force`, `os.replace` stays (atomic).
 Rule: (c) the design record wins over an orchestrator brief; (d) Astra's finding.
+
+### D-11 (run 2, T19): MCP Inspector compatibility check (2 h cap; result: still blocked, negotiation is a bridge-only design change)
+
+Facts (2026-10-13 ~18:20Z, read-only probes of npm): `@modelcontextprotocol/sdk` latest 1.32.1
+(2026-10-05) and the v2 split package `@modelcontextprotocol/core` 2.2.0 (which Inspector 2.10.1,
+2026-10-08, depends on) both define `LATEST_PROTOCOL_VERSION = '2025-11-25'` and support only
+2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05, 2024-10-07. No released client library supports the
+bridge's revision 2026-07-28, so every Inspector release rejects the bridge at `initialize`
+("Server's protocol version is not supported"), as D-03 recorded. The bridge
+(`src/arci/mcp_toolset_server.py`, not frozen) answers `initialize` with its constant regardless of
+the client's requested version, i.e. it does not negotiate at all.
+
+What a fix would be: the bridge answers a foreign client's `initialize` with the client's requested
+revision when that revision is in a small allowlist the bridge's subset can serve honestly
+(2025-11-25, 2025-06-18: initialize, initialized, ping, tools/list, serial tools/call), and omits
+revision-specific fields (`resultType`) in those replies; ARCI's own boundary keeps speaking
+2026-07-28 to the bridge in trials, so no recorded run, seal or replay changes. Frozen touches: ADR
+0002 line 36 and `schema.py:276` document the boundary's revision and stay true; AGENT_SEMANTICS
+needs a sentence only if it states the bridge's revision. It is a design change (what the bridge
+promises to third-party clients), not a one-line fix → ADR 0011 + Astra review, scheduled with the
+next engineering run, not this one (rule e: the check is done; the implementation is reversible and
+waits for an MCP pilot or the MCP post, per the tie-break F2).
+
+Consequence now: HUMAN_INBOX drafts C and E stay on hold; the recipe's Inspector step stays
+"blocked" with today's versions added to the record.
+
