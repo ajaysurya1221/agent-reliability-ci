@@ -1,8 +1,8 @@
 # 0010 (DRAFT, not under docs/design until accepted): the imported-session record (memo D2)
 
-Status: draft v3 by the orchestrator (Claude Fable 5.1), run 2, 2026-10-13; v1 and v2 reviewed by
-Astra (CONSULT run2-D2/D11 and run2-D2 round 2: REVISE on purity and ordering), v3 incorporates
-every point. Becomes
+Status: draft v3, ACCEPTED as the design for the memo's D2 by Astra (CONSULT run2-D2 round 3,
+2026-10-13 18:24Z) after two REVISE rounds; written by the orchestrator (Claude Fable 5.1). Implementation,
+the fixture tests and the move to `docs/design/` with a re-freeze are D3 work. Becomes
 `docs/design/0010-imported-session-record.md` plus a re-freeze only when accepted and when D3 (the
 first importer) is scheduled. No code in this run.
 
@@ -84,8 +84,8 @@ a scheduled trial. Separately, "unsupported or incomplete semantics stay explici
 
 ## Consequences
 
-- One importer model for D3–D6: each importer is a pure function raw bytes + configuration →
-  `ImportedSession`, with a versioned fixture test. Fixtures are genuine producer output (an
+- One importer model for D3–D6: each importer is a pure function `(raw_bytes, importer_configuration,
+  provenance_inputs)` → `ImportedSession`, with a versioned fixture test. Fixtures are genuine producer output (an
   instrumentation replaying its own recorded cassettes through a genuine OTLP exporter qualifies;
   hand-written or reconstructed spans do not), pinned by instrumentation, cassette and exporter
   versions, with the capture command and the exported bytes' sha256 in the test (Astra, point 2).
