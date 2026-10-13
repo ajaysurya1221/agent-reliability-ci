@@ -33,7 +33,8 @@ arci init EXPERIMENT_ID --baseline REF --candidate REF --toolset REF --oracle RE
   INCONCLUSIVE or ERROR; 8 is the smallest design in which a collapse still decides, and it is still
   labelled a smoke design. Everything else keeps the `Manifest` defaults (alpha 0.05, delta 0.10,
   budgets, base seed 0, Clopper-Pearson, one look).
-- `--out` defaults to `arci.yaml`; an existing regular file is replaced only with `--force`; a
+- `--out` defaults to `arci.yaml` and must end in `.yaml` or `.yml` (`arci run` reads any other
+  suffix as a sealed JSON manifest); an existing regular file is replaced only with `--force`; a
   directory or symlink is never replaced. The file is staged beside the destination, re-loaded through
   the descriptor loader, seal-checked, and published atomically.
 - `arci run` accepts the descriptor directly and its `--out` now defaults to `runs`, so the
@@ -53,7 +54,8 @@ reference (AGENT_SEMANTICS).
 Errors are one line on stderr, exit 3, nothing written, in the CLI's existing
 `error: CliError: init: ...` form, for example `--baseline app.v1:run: module not importable; check
 module and dependencies`, `--fault tool_timeout:reserve:0: tool reserve absent from --toolset
-tests.world:make_world; choose an advertised tool`, `output arci.yaml exists; use --force to replace it`.
+tests.world:make_world; choose an advertised tool (confirm, get_stock)` (the advertised names are
+appended, at most twenty), `output arci.yaml exists; use --force to replace it`.
 
 ### Settled by the tie-break consult (`plan/exec/consults/E1-tiebreak.md`)
 
@@ -69,7 +71,10 @@ tests.world:make_world; choose an advertised tool`, `output arci.yaml exists; us
   # Never extend this experiment based on its verdict.
   ```
   (Astra's four lines plus the schema pointer; no universal "impossible below N" claim in the file,
-  because the thresholds hold for two perfect arms and a total collapse, not in general.)
+  because the thresholds hold for two perfect arms and a total collapse, not in general.) When
+  `--n` is 100 or more the design is not a smoke design, and lines 2–3 read
+  `# design: N trials per arm, chosen by you; plan it with arci plan` and `# This file was written by
+  arci init; re-run init or edit to change the design.` instead (amended 2026-10-13 after review).
 - Arm labels are `baseline` and `candidate`; `candidate_id` stays at the Manifest default. An import
   reference does not identify an immutable code version, and the report's headings are fixed.
 - `--fault` accepts only the built-in names `tool_timeout`, `tool_error_once`, `empty_result`; a
