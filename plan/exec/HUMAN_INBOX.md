@@ -50,6 +50,28 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
   (TS SDK 1.29.0) rejects it. Making the recipe's step 1 work needs either a newer Inspector SDK or
   a negotiation change in `src/arci/mcp_boundary.py` (design record + Astra review).
 
+# Run 2 (2026-10-13 18:12Z → 2026-10-14; plan/exec/run2/) — what needs you
+
+## R2-1. Decide the demo-size question raised by the reference machines (planning decision, ~10 minutes of thought)
+Measured on clean GitHub-hosted runners (five cold samples each, `uvx --from agent-reliability-ci==0.8.0 arci demo`):
+ubuntu-latest p50 224 s, macos-latest p50 213 s (plan/exec/run2/measurements.md). The memo's target is
+"p50 ≤ 2 min, p95 ≤ 3 min on clean reference machines". The package resolve is 1–2 s; the time is the
+demo's own computation (two 200-trial-per-arm experiments, diff, minimise, replay, the repaired agent's
+experiment). Your options, for the next run to execute: (a) say the target applies to a developer
+machine class and record hosted-runner numbers as a separate line; (b) make the hosted-runner demo do
+less (fewer trials per arm for the demo only, with the counts then no longer matching the recorded
+192/200 vs 132/200 story); (c) keep both and change the target. Nothing was changed in the demo.
+
+## R2-2. Still waiting on you from run 1 (unchanged)
+Posting (drafts B–F) and recruiting five cold readers (template F). Until then every dated adoption
+metric in the memo stays "unmeasured"; the AI cohort and the reference machines do not count.
+
+## R2-3. Nothing else
+No command to run, no setting to change. Run 2 merged T16 (code leftovers), T17 (protocol and
+scripts) and T18 (reference-machine timing workflow, see FINAL_REPORT.md for its state), recorded
+decision D-11 (Inspector: no SDK supports revision 2026-07-28; a bridge compatibility mode is ADR 0011
+for the next run) and the accepted design for the memo's D2 (plan/exec/run2/adr-0010-draft.md).
+
 # Final state at the end of the run (filled by the orchestrator; see FINAL_REPORT.md)
 
 - main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
