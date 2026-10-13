@@ -4,7 +4,9 @@
 
 It starts the one server in the config, initializes, lists tools, fetches the task's key and
 stores the value. `retry` retries a failed fetch up to 3 times; `fragile` gives up on the first
-error. Exit 0: done (the agent's claim of success); 1: gave up; 75: infrastructure problem.
+error. Exit 0: done (the agent's claim of success); 1: gave up; 75: infrastructure problem (the
+server is missing or closes, `initialize` fails or answers another protocol version, or a tool
+result is not `complete`).
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 RETRIES = {"retry": 3, "fragile": 0}
+PROTOCOL = "2026-07-28"
 INFRA = 75  # EX_TEMPFAIL: the trial is a harness ERROR, not the agent's failure
 
 
@@ -54,6 +57,8 @@ class Session:
     def call(self, name: str, **arguments: str) -> Any:
         """The tool's JSON value, or None for an error result."""
         result: Any = self.send("tools/call", {"name": name, "arguments": arguments}).get("result")
+        if isinstance(result, dict) and result.get("resultType", "complete") != "complete":
+            raise ConnectionError(f"tools/call {name}: resultType {result['resultType']!r}")
         if not isinstance(result, dict) or result.get("isError") or not result.get("content"):
             return None
         return json.loads(result["content"][0]["text"])
@@ -69,8 +74,10 @@ class Session:
 
 def work(session: Session, key: str, retries: int) -> bool:
     client = {"name": "recipe-agent", "version": "1"}
-    init = {"protocolVersion": "2026-07-28", "capabilities": {}, "clientInfo": client}
-    session.send("initialize", init)
+    init = {"protocolVersion": PROTOCOL, "capabilities": {}, "clientInfo": client}
+    initialized: Any = session.send("initialize", init)
+    if "error" in initialized or initialized.get("result", {}).get("protocolVersion") != PROTOCOL:
+        raise ConnectionError(f"initialize failed or answered another protocol: {initialized}")
     session.send("notifications/initialized", {}, notify=True)
     listed: Any = session.send("tools/list", {})["result"]["tools"]
     if {"fetch", "store"} - {tool["name"] for tool in listed}:

@@ -7,8 +7,14 @@ console script's situation; ADR 0006 puts the copy on the child's import path). 
 the recipe in-process: its `tests` package would collide with this repository's.
 
 Not run here: `uv tool install` (network; the test uses this environment's arci) and
-`arci run confirm.yaml` (800 trials; the orchestrator records that run). The confirmatory
-descriptor is still written by the README's command and compiled.
+`arci run confirm.yaml` (800 trials, about 80 s; the README's recorded run shows it). The
+confirmatory descriptor is still written by the README's command and compiled.
+
+The bundle names `app/__init__.py` and `tests/__init__.py` so that its `app` and `tests` are
+regular packages: replay puts the bundle directory first on the import path, and a regular package
+there shadows the working tree's. Without the two `__init__.py` files the bundled directories are
+only namespace portions, the working tree's regular packages win, and replay runs the tree's
+current sources instead of the bundled ones; two tests below show both cases.
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ from arci.schema import GateDecision, Manifest, Outcome, TrialEnvelope, Verdict
 ROOT = Path(__file__).resolve().parents[3]
 RECIPE = ROOT / "examples" / "recipes" / "python_agent"
 README = RECIPE / "README.md"
+DOC = ROOT / "docs" / "recipes" / "python-agent.md"
 COMMITTED = RECIPE / "arci.yaml"
 
 INIT = (
@@ -54,7 +61,8 @@ DIAGNOSE = (
     f"arci diff runs/checkout-retry faults:00000:baseline {FAILING}",
     f"arci minimize runs/checkout-retry {FAILING} --out min.json",
     f"arci bundle runs/checkout-retry {FAILING} --out bundle.json --root ."
-    " --include app/v2.py --include tests/world.py",
+    " --include app/__init__.py --include app/v2.py --include tests/__init__.py"
+    " --include tests/world.py",
     "arci replay bundle.json",
 )
 SETUP = (
@@ -130,7 +138,45 @@ def test_the_readme_commands_are_the_ones_these_tests_run() -> None:
     assert readme_commands() == README_COMMANDS
     first_screen = f"{INSTALL} && {INIT} && {SMOKE_RUN}"
     assert first_screen in README.read_text(encoding="utf-8").splitlines()
-    assert "Recorded by the orchestrator on 2026-10-13" in README.read_text(encoding="utf-8")
+
+
+RECORDED_LABEL = (
+    "Recorded on the maintainer's machine during the v0.8.0 sprint (2026-10-13; 15-core Apple"
+    " Silicon Mac; ARCI at the sprint's descriptor lane)"
+)
+
+
+def _recorded_blocks(path: Path) -> list[str]:
+    """The ```text blocks of the "Recorded run" section, in order."""
+    text = path.read_text(encoding="utf-8")
+    section = text.split("\n## Recorded run\n", 1)[1].split("\n## What this does not show", 1)[0]
+    assert " ".join(section.split()).count(RECORDED_LABEL) == 1, path
+    return re.findall(r"^```text\n(.*?)^```$", section, flags=re.MULTILINE | re.DOTALL)
+
+
+@pytest.mark.parametrize("path", [README, DOC], ids=["readme", "doc"])
+def test_the_recorded_run_sections(path: Path) -> None:
+    init, smoke_run, plan, confirm = _recorded_blocks(path)
+    assert init.splitlines() == [f"$ {INIT}", SMOKE_RUN]
+    assert smoke_run.startswith(f"$ /usr/bin/time -p {SMOKE_RUN}\n")
+    manifest = compile_descriptor(COMMITTED)  # the notices as this ARCI prints them, verbatim
+    assert smoke_notice(manifest) in smoke_run.splitlines()
+    assert smoke_followup(manifest) in smoke_run.splitlines()
+    assert "## Condition: faults" in smoke_run
+    assert "| Successes | 8 | 2 |" in smoke_run
+    assert any(line.startswith("real ") for line in smoke_run.splitlines())  # wall time
+    assert "VERDICT: INCONCLUSIVE (exit 2)" in smoke_run
+    assert plan.startswith(f"$ {PLAN}\n")
+    assert "smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 " in plan
+    assert "| 400 | 800 | 0.000 | 0.828 | 0.172 | yes |" in plan
+    assert "No pairing:" in plan
+    assert confirm.startswith(f"$ {CONFIRM_INIT}\n")
+    assert "base_seed: 1000" in confirm and 'prior_runs: ["checkout-retry"]' in confirm
+    assert "## Condition: faults" in confirm and "| n | 400 | 400 |" in confirm
+    assert "VERDICT: BLOCK (exit 1)" in confirm
+    earlier = confirm.split("## Earlier runs on this candidate", 1)[1].split("\n[...]", 1)[0]
+    assert "- `checkout-retry`" in earlier.splitlines()
+    assert any(line.startswith("real ") for line in confirm.splitlines())
 
 
 def test_init_writes_the_committed_descriptor_byte_for_byte(smoke: Smoke) -> None:
@@ -199,3 +245,59 @@ def test_diff_minimize_bundle_and_replay_a_failing_trial(smoke: Smoke) -> None:
     assert "kept: tool_timeout" in minimize.stdout
     assert json.loads((smoke.copy / "min.json").read_text("utf-8"))
     assert replay.stdout.startswith("REPRODUCED")
+
+
+GIVE_UP = 'return {"confirmed": False}  # gives up on the first fault'
+BARE_BUNDLE = (
+    f"arci bundle runs/checkout-retry {FAILING} --out bare.json --root ."
+    " --include app/v2.py --include tests/world.py"
+)
+
+
+@dataclass(frozen=True)
+class Edited:
+    copy: Path
+    bundled: subprocess.CompletedProcess[str]
+    bare: subprocess.CompletedProcess[str]
+
+
+@pytest.fixture(scope="module")
+def edited(smoke: Smoke, tmp_path_factory: pytest.TempPathFactory) -> Iterator[Edited]:
+    """Bundle the failing trial twice, then change the working tree under both bundles.
+
+    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. The
+    edits would each turn the failure into something else if they ran: v2 raises instead of
+    returning after the fault (same tool calls, so no recording miss, but a crash), and the oracle
+    passes every final state. (v1's body is not used as the edit: its second `reserve` call is not
+    in the recording, so replay would report INVALID, exit 3, whichever sources ran.)
+    """
+    copy = tmp_path_factory.mktemp("edited") / "checkout"
+    shutil.copytree(smoke.copy, copy, ignore=shutil.ignore_patterns("__pycache__"))
+    for command in (DIAGNOSE[2], BARE_BUNDLE):
+        done = arci(command, copy)
+        assert done.returncode == 0, done.stderr[-2000:]
+    v2 = copy / "app" / "v2.py"
+    source = v2.read_text(encoding="utf-8")
+    assert source.count(GIVE_UP) == 1
+    v2.write_text(source.replace(GIVE_UP, 'raise RuntimeError("the working tree")'), "utf-8")
+    with (copy / "tests" / "world.py").open("a", encoding="utf-8") as handle:
+        handle.write(
+            "\n\ndef passed(task: object, final_state: object) -> bool:\n    return True\n"
+        )
+    yield Edited(
+        copy=copy,
+        bundled=arci("arci replay bundle.json", copy),
+        bare=arci("arci replay bare.json", copy),
+    )
+
+
+def test_replay_runs_the_bundled_sources_not_the_working_tree(edited: Edited) -> None:
+    assert edited.bundled.returncode == 0, edited.bundled.stdout + edited.bundled.stderr[-2000:]
+    assert edited.bundled.stdout.startswith("REPRODUCED")
+
+
+def test_without_the_init_files_replay_runs_the_edited_tree(edited: Edited) -> None:
+    # The control: the bundle's bare `app/` and `tests/` are namespace portions, so the working
+    # tree's regular packages win and the edited sources run; the failure does not reproduce.
+    assert edited.bare.returncode == 1, edited.bare.stdout + edited.bare.stderr[-2000:]
+    assert edited.bare.stdout.startswith("NOT_REPRODUCED")

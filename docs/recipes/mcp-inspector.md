@@ -35,8 +35,9 @@ npx @modelcontextprotocol/inspector --cli --config mcp.inspector.json --server e
 
 `mcp.inspector.json` starts the bridge directly (seed 0, `--task-file task.json`,
 `"env": {"PYTHONPATH": "."}` so `world` imports from this directory). The Inspector connects,
-initializes and lists the tools (its `tools/call` method calls one). It talks to the **raw** server: ARCI's boundary is not in the path, so nothing it
-sees is recorded, budgeted or fault-injected.
+initializes and lists the tools (its `tools/call` method calls one). It talks to the **raw**
+server: ARCI's boundary is not in the path, so nothing it sees is recorded, budgeted or
+fault-injected.
 
 Recorded on the orchestrator's machine:
 
@@ -125,7 +126,7 @@ That works because the client is scripted; a live model that calls differently i
 
 | Question | Inspector or manual preflight (raw bridge) | `arci run` (through the boundary) |
 |---|---|---|
-| Server starts, `initialize` succeeds | yes (blocked on the Inspector SDK's version check today) | yes, every trial |
+| Server starts and initializes | yes (the Inspector is blocked today, above) | yes, every trial |
 | Tools listed with schemas | yes | yes, recorded |
 | One `tools/call` routes and returns | yes | yes, every call recorded |
 | Fault injection (`tool_error_once`, `tool_timeout`, `empty_result`) | no | yes |

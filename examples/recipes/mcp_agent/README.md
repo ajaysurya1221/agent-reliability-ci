@@ -9,7 +9,7 @@ including what the Inspector and ARCI each check, is
 | File | What it is |
 |---|---|
 | `world.py` | `make_world(task, seed)`: tools `fetch(key)` (30% of seeds fail the first real call transiently) and `store(key, value)`; `snapshot()`; `passed(task, final_state)`: the stored value equals the upstream's |
-| `agent.py` | stdlib newline-delimited JSON-RPC stdio client: one session, `initialize` (protocol `2026-07-28`), `notifications/initialized`, `tools/list`, `fetch`, `store`; exit 0 done, 1 gave up, 75 infrastructure |
+| `agent.py` | stdlib newline-delimited JSON-RPC stdio client: one session, `initialize` (protocol `2026-07-28`), `notifications/initialized`, `tools/list`, `fetch`, `store`; exit 0 done, 1 gave up, 75 infrastructure (including an `initialize` error, another protocol version or a tool result that is not `complete`) |
 | `arci.yaml` | written by hand (`arci init` scaffolds Python arms only): two command arms, `mcp_server` = the bridge `arci.mcp_toolset_server --toolset world:make_world`, one condition `tool_error_once` on `fetch` at occurrence 0, 8 trials per arm |
 | `mcp.inspector.json` | an Inspector `--config` file that starts the same bridge directly (seed 0, `task.json`, `PYTHONPATH=.`) |
 | `task.json` | the task, `{"key": "answer"}` |

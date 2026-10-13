@@ -197,3 +197,61 @@ def test_diff_minimize_bundle_and_replay(run: Run) -> None:
     assert 'left: tool_start tool="fetch"' in diff.stdout
     assert "kept: tool_error_once" in minimize.stdout
     assert replay.stdout.startswith("REPRODUCED")
+
+
+FAKE_SERVER = """
+import json, sys
+
+mode = sys.argv[1]
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request["method"]
+    if "id" not in request:
+        continue
+    if method == "initialize":
+        version = "2025-11-25" if mode == "old-protocol" else "2026-07-28"
+        reply = {"result": {"protocolVersion": version, "capabilities": {}}}
+        if mode == "init-error":
+            reply = {"error": {"code": -32602, "message": "unsupported"}}
+    elif method == "tools/list":
+        reply = {"result": {"tools": [{"name": "fetch"}, {"name": "store"}]}}
+    else:
+        value = {"value": "42"} if request["params"]["name"] == "fetch" else {"stored": True}
+        reply = {"result": {"content": [{"type": "text", "text": json.dumps(value)}]}}
+        if mode != "no-result-type":
+            reply["result"]["resultType"] = "incomplete" if mode == "incomplete" else "complete"
+    print(json.dumps({"jsonrpc": "2.0", "id": request["id"], **reply}), flush=True)
+"""
+
+
+@pytest.mark.parametrize(
+    ("mode", "exit_code"),
+    [
+        ("ok", 0),
+        ("no-result-type", 0),
+        ("init-error", 75),
+        ("old-protocol", 75),
+        ("incomplete", 75),
+    ],
+)
+def test_the_agent_checks_initialize_and_result_type(
+    tmp_path: Path, mode: str, exit_code: int
+) -> None:
+    """A fake stdio server: an `initialize` error, another protocol or a result that is not
+    `complete` is an infrastructure problem (75), never the agent's success or failure."""
+    (tmp_path / "fake_server.py").write_text(FAKE_SERVER, encoding="utf-8")
+    server = {"command": sys.executable, "args": ["-P", "fake_server.py", mode], "env": {}}
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"mcpServers": {"fake": server}}), encoding="utf-8")
+    shutil.copy(RECIPE / "task.json", tmp_path / "task.json")
+    argv = ["--mcp-config", str(config), "--task-file", "task.json", "--variant", "fragile"]
+    done = subprocess.run(
+        [sys.executable, str(RECIPE / "agent.py"), *argv],
+        cwd=tmp_path,
+        env=_env(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert done.returncode == exit_code, done.stderr[-2000:]
