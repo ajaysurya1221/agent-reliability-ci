@@ -30,13 +30,16 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   `--out` now defaults to `runs`. `arci schema` prints the JSON Schema generated from the model;
   the bytes are committed at `docs/schema/arci.schema.json` and tested for staleness. Pydantic is
   authoritative; the YAML loader resolves only `true`/`false` as booleans and decimal, `0x`, `0o`,
-  `0b` as integers, so `yes`, `on` and `010` stay what you wrote.
+  `0b` as integers, so `yes` and `on` stay strings and `010` is ten, not octal eight; explicit
+  `!!int`, `!!float` and `!!null` tags accept only those same forms, and alias expansion is capped.
 - **Added:** `arci init EXPERIMENT_ID --baseline --candidate --toolset --oracle [...]`
   (`docs/design/0008-arci-init.md`): validates the four references in a child process with the
   runner's import rule (the toolset factory is called once; agents and the oracle are only imported),
   checks every `--fault` tool against the toolset's tools, and writes a smoke-design descriptor
   (`n_per_arm` 8, the smallest N at which a total collapse can still BLOCK under the default rule;
-  two perfect arms cannot PASS below N=42). One line on stderr and exit 3 on the first problem.
+  two perfect arms cannot PASS below N=42). One line on stderr and exit 3 on the first problem. The
+  file is published atomically (a hard link, or a rename with `--force`); without `--force` an
+  existing file is never replaced.
 - **Added:** a smoke-design notice on stderr from `arci run` when a gating condition has fewer than
   100 trials per arm, pointing at `arci plan`. stdout, reports, decisions and stores are unchanged.
 - **Changed:** the runner appends the current directory to every child's import path
@@ -55,7 +58,15 @@ decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
   the recorded result, the figure and the badges moved below the fold; "What it does not do" gains two
   items (reference validation imports your code; a fault naming a tool the agent never calls silently
   never fires). Links from the old first screen are absolute so the PyPI page renders them.
-- **Documentation:** <<PENDING T08/T09: recipes shipped or listed as not shipped>>
+- **Documentation:** two recipes, each a runnable tree under `examples/recipes/` with a narrative in
+  `docs/recipes/` and a test that runs it at smoke N from a copied directory without `PYTHONPATH`:
+  `python_agent` (a blank project with `app/v1.py`, `app/v2.py` and `tests/world.py`; `arci init`,
+  the smoke run, `arci plan`, the confirmatory run, then `diff`, `minimize` and `replay`, with the
+  recorded output) and `mcp_agent` (a stdlib newline-JSON-RPC client against
+  `arci.mcp_toolset_server`, a hand-written command-arm descriptor and an Inspector preflight). The
+  Inspector step is recorded as blocked on 2026-10-13: Inspector 2.10.1 (TypeScript SDK 1.29.0)
+  rejects the bridge's protocol revision `2026-07-28` at `initialize`; the recipe keeps the verbatim
+  result and the ARCI steps run without it.
 - Everything that was already on `main` and unreleased is in this version:
   - **Documentation:** the README opens with the recorded retry result (200 trials per arm,
   192/200 vs 132/200, BLOCK), its boundary and availability, links to the evidence, and the

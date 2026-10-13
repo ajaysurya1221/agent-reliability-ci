@@ -6,9 +6,9 @@ d99e291089d2c8f70721ef745566b89ef164e9e6f0c593c510fcebf2dd86ee9c  docs/TRUST_MOD
 46d9eb3fa62a6117444d34a30d479c101def6aa21d578ea6e2bfe0bba3c667e0  docs/design/0003-decision-boundary.md
 6762324f9401d5c4149ddfbb6fc04e37982ce918cf151b4e6fb94d0df606d7e2  docs/design/0004-day-one.md
 24f39d4f59b1270586120f5fdffb56ec1dd80a3f3be8d3645583fa7ae396a31a  docs/design/0005-v0.8.0-packaging-and-version-bump.md
-241f50ed6298c871a5aca9ba7c5d016ab3d1d79921e8eed7b94d29f68c299cf6  docs/design/0006-cwd-on-the-child-import-path.md
+94cb0a1bc4ca96f7a2e084c2acdd235b89000a1d65ff36a76b536cabdff2e2c9  docs/design/0006-cwd-on-the-child-import-path.md
 465b2bc4286495212e664e613132b83d1d9bd920c0193b1490668345ebaac790  docs/design/0007-descriptor.md
-70fc922271e9264c60690ca0a1f9d633e374af2ca4cc988f9c2d911d026c85ff  docs/design/0008-arci-init.md
+7b5b28bb063a6867579f6f7c179dc5505bb9ea9351dff158ac77df263571036b  docs/design/0008-arci-init.md
 d71f66d30d6e8f00931193609286e20c8d084a103a5087b7073a9b2bdc3fc8fb  docs/design/0009-readme-first-screen.md
 817b9d79f80e30581caf0c2d0da989848b1c9b8fb7ec5e514681ec45856d22ff  docs/design/jev-research-2026-09-22.md
 4e020e2c69f08c7076f0b82a1e85c8989172d05a2d35b7bc5a8ed8277803776d  justfile

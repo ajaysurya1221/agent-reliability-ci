@@ -351,15 +351,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in pass^k
-reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; see the
-Unreleased section of [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
+This example pins `v0.8.0`, the released feature set (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==0.8.0`). See
+[CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v0.7.0
+- uses: ajaysurya1221/agent-reliability-ci@v0.8.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -462,13 +462,13 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`),
-`arci init`, the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability
-fixes beyond v0.7.0; the v0.8.0 release and the PyPI package follow this sprint. **Boundary:** PASS means
+**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it adds the
+packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the planner
+(`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over v0.7.0. **Boundary:** PASS means
 relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.7.0)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0)
 [![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
