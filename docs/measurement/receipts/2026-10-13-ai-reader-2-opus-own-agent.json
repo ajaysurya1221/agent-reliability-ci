@@ -101,7 +101,7 @@
     {
       "at": "2026-10-13T12:11:16Z",
       "milestone": "install",
-      "what": "`uv tool install agent-reliability-ci` was blocked by the harness: \"Permission to use Bash with command cd /var/folders/.../<tmp>; date -u ...; uv tool install agent-reliability-ci; ... has been denied.\" (timestamp taken right after the denial; the denied command's own date never ran). Chose route: uv venv .venv + uv pip install --python .venv/bin/python agent-reliability-ci, then .venv/bin/arci."
+      "what": "`uv tool install agent-reliability-ci` was blocked by the harness: \"Permission to use Bash with command cd <tmp>; date -u ...; uv tool install agent-reliability-ci; ... has been denied.\" (timestamp taken right after the denial; the denied command's own date never ran). Chose route: uv venv .venv + uv pip install --python .venv/bin/python agent-reliability-ci, then .venv/bin/arci."
     },
     {
       "at": "2026-10-13T12:11:25Z",
