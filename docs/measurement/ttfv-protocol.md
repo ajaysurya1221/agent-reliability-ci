@@ -1,6 +1,6 @@
 # Time-to-first-verdict and cold-read protocol
 
-Protocol only; no receipt collected yet. [Template](receipt.template.json), [receipts](receipts/README.md).
+Protocol; no cold-reader receipt yet (the receipts committed so far are maintainer-machine runs labelled `ai-agent`). [Template](receipt.template.json), [receipts](receipts/README.md).
 
 ## 1. Purpose and limits
 

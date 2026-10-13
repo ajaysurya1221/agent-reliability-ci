@@ -352,7 +352,7 @@ schema); re-run the experiment rather than trust an unreadable store.
 ### GitHub Actions
 
 This example pins `v0.8.0`, the released feature set (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==0.8.0`). See
+release workflow publishes the same code to PyPI as `agent-reliability-ci==0.8.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
@@ -462,10 +462,14 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it
-adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the
-planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over
-v0.7.0. **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a
+**Availability:** v0.8.0 is the current release: the tag `v0.8.0`, which the Action example above
+uses. The release workflow builds the wheel and the sdist from that tag and publishes them to PyPI as
+`agent-reliability-ci`; at the time of this commit that publication and the GitHub release page were
+still pending, and the built files with their checksums are in
+[release workflow run 38365660814](https://github.com/ajaysurya1221/agent-reliability-ci/actions/runs/38365660814).
+It adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`,
+the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes
+over v0.7.0. **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a
 sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
