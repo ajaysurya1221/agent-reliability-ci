@@ -1,9 +1,12 @@
 name: TTFV reference machines
 
 # Times the packaged demo (`uvx --from agent-reliability-ci==0.8.0 arci demo`) on clean
-# GitHub-hosted runners: no checkout, no secrets, no telemetry, an empty uv cache for the first
-# sample. Five samples per OS: sample 1 cold, samples 2-5 warm (same uv cache). The JSON and the
-# timestamped logs are uploaded as an artifact; the orchestrator commits the JSON under
+# GitHub-hosted runners: no checkout, no secrets, no telemetry. Per OS: five cold samples, each
+# with its own fresh, empty uv cache (the case the memo target is about: a first-time user), then
+# two warm samples that reuse the cache the last cold sample filled. Every sample is bounded
+# (SAMPLE_TIMEOUT_S, and the whole loop by TIMING_BUDGET_S, inside the 25-minute job); a sample
+# that hits the bound is killed, kept, and recorded as timed out. The JSON and the timestamped logs
+# are uploaded as an artifact; the orchestrator commits the JSON under
 # docs/measurement/reference-machines/. These are machine timings, not receipts, and never count
 # as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
 
@@ -20,6 +23,13 @@ env:
   UV_VERSION: "0.12.5"
   PACKAGE: "agent-reliability-ci==0.8.0"
   UV_NO_PROGRESS: "1"
+  COLD_SAMPLES: "5"
+  WARM_SAMPLES: "2"
+  # Per-sample bound, and a bound on the whole sampling loop that leaves the 25-minute job time
+  # for setup, the JSON and the upload. A sample the loop has no time left for is recorded as
+  # timed out and not started.
+  SAMPLE_TIMEOUT_S: "600"
+  TIMING_BUDGET_S: "1200"
 
 jobs:
   reference:
@@ -40,51 +50,146 @@ jobs:
           python-version: "3.12"
       - name: Install uv
         run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
-      - name: Time five demo runs (sample 1 cold, samples 2-5 warm)
+      - name: Time the demo (five cold samples, then two warm)
+        shell: python
         env:
           OUT_DIR: ${{ runner.temp }}/ttfv-reference
         run: |
-          set -u
-          stamp() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-          # Prefix each line with its UTC arrival time; a last line without a newline is kept.
-          stamp_lines() {
-            local line
-            while IFS= read -r line || [ -n "$line" ]; do
-              printf '%s %s\n' "$(stamp)" "$line"
-            done
-          }
+          import datetime as dt
+          import json
+          import os
+          import platform
+          import signal
+          import subprocess
+          import sys
+          import tempfile
+          import threading
+          import time
+          from pathlib import Path
 
-          mkdir -p "$OUT_DIR"
-          work="$(mktemp -d)"
-          # One fresh, empty uv cache: sample 1 fills it (cold), samples 2-5 reuse it (warm).
-          UV_CACHE_DIR="$(mktemp -d)"
-          export UV_CACHE_DIR
-          if [ -n "$(ls -A "$UV_CACHE_DIR")" ]; then
-            echo "::error title=ttfv-reference::the fresh uv cache $UV_CACHE_DIR is not empty"
-            exit 1
-          fi
-          cd "$work"
-          uv --version >"$OUT_DIR/uv-version.txt"
-          python -c 'import platform; print(platform.python_version())' >"$OUT_DIR/setup-python.txt"
-          : >"$OUT_DIR/samples.tsv"
+          PACKAGE = os.environ["PACKAGE"]
+          OUT_DIR = Path(os.environ["OUT_DIR"])
+          COLD = int(os.environ["COLD_SAMPLES"])
+          WARM = int(os.environ["WARM_SAMPLES"])
+          SAMPLE_TIMEOUT = float(os.environ["SAMPLE_TIMEOUT_S"])
+          DEADLINE = time.monotonic() + float(os.environ["TIMING_BUDGET_S"])
+          assert COLD >= 1 and WARM >= 0
 
-          for n in 1 2 3 4 5; do
-            if [ "$n" = 1 ]; then cache=cold; else cache=warm; fi
-            start="$(stamp)"
-            set +e
-            uvx --from "$PACKAGE" arci demo 2>&1 | stamp_lines >"$OUT_DIR/sample-$n.log"
-            code=${PIPESTATUS[0]}
-            set -e
-            printf '%s\t%s\t%s\t%s\n' "$n" "$cache" "$start" "$code" >>"$OUT_DIR/samples.tsv"
-            echo "sample $n ($cache): exit $code"
-          done
+
+          def stamp():
+              return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+          def kill_group(pid):
+              try:
+                  os.killpg(pid, signal.SIGKILL)
+              except (ProcessLookupError, PermissionError):
+                  pass
+
+
+          def run(cmd, log_path, env, cwd, timeout):
+              """Run cmd, prefixing each output line with its UTC arrival time; kill it at timeout.
+
+              Returns (exit code or None, timed_out). A last line without a newline is kept.
+              """
+              with log_path.open("w", encoding="utf-8") as log:
+                  proc = subprocess.Popen(
+                      cmd,
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      env=env,
+                      cwd=cwd,
+                      start_new_session=True,
+                  )
+                  assert proc.stdout is not None
+                  stdout = proc.stdout
+
+                  def pump():
+                      for raw in stdout:
+                          line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                          log.write(f"{stamp()} {line}\n")
+                          log.flush()
+
+                  reader = threading.Thread(target=pump, daemon=True)
+                  reader.start()
+                  try:
+                      code, timed_out = proc.wait(timeout=timeout), False
+                  except subprocess.TimeoutExpired:
+                      kill_group(proc.pid)
+                      proc.wait()
+                      code, timed_out = None, True
+                  kill_group(proc.pid)  # stragglers holding the pipe open
+                  reader.join(timeout=10)
+                  if timed_out:
+                      log.write(f"{stamp()} [ttfv-reference] killed after {timeout:g} s\n")
+              return code, timed_out
+
+
+          OUT_DIR.mkdir(parents=True, exist_ok=True)
+          work = Path(tempfile.mkdtemp(prefix="ttfv-work-"))  # empty, no checkout
+          uv_version = subprocess.run(["uv", "--version"], capture_output=True, text=True)
+          (OUT_DIR / "uv-version.txt").write_text(uv_version.stdout, encoding="utf-8")
+          (OUT_DIR / "setup-python.txt").write_text(platform.python_version() + "\n", encoding="utf-8")
+
+          rows = OUT_DIR / "samples.jsonl"
+          rows.write_text("", encoding="utf-8")
+          warm_cache = None
+          for n in range(1, COLD + WARM + 1):
+              kind = "cold" if n <= COLD else "warm"
+              if kind == "cold":
+                  # A new, empty uv cache per cold sample; the last one becomes the warm cache.
+                  cache = Path(tempfile.mkdtemp(prefix="uv-cache-"))
+                  warm_cache = cache
+              else:
+                  cache = warm_cache
+              entries = len(os.listdir(cache))
+              if kind == "cold" and entries:
+                  print(f"::error title=ttfv-reference::fresh uv cache {cache} is not empty")
+                  sys.exit(1)
+              env = {**os.environ, "UV_CACHE_DIR": str(cache)}
+              log = OUT_DIR / f"sample-{n}.log"
+              timeout = min(SAMPLE_TIMEOUT, DEADLINE - time.monotonic())
+              start = stamp()
+              if timeout < 1:
+                  log.write_text(f"{start} [ttfv-reference] not started: timing budget used up\n")
+                  code, timed_out, started, timeout = None, True, False, 0.0
+              else:
+                  cmd = ["uvx", "--from", PACKAGE, "arci", "demo"]
+                  code, timed_out = run(cmd, log, env, work, timeout)
+                  started = True
+              record = {
+                  "sample": n,
+                  "uv_cache": kind,
+                  "uv_cache_entries_at_start": entries,
+                  "command_start": start,
+                  "started": started,
+                  "exit_code": code,
+                  "timed_out": timed_out,
+                  "timeout_seconds": round(timeout),
+              }
+              # Appended per sample, so a later crash or a cancelled job keeps what was measured.
+              with rows.open("a", encoding="utf-8") as f:
+                  f.write(json.dumps(record) + "\n")
+              state = f"timed out after {timeout:g} s" if timed_out else f"exit {code}"
+              print(f"sample {n} ({kind}): {state}", flush=True)
 
           # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
-          if ! uvx --from "$PACKAGE" python -c 'import platform; print(platform.python_version())' \
-            >"$OUT_DIR/python.txt" 2>/dev/null; then
-            : >"$OUT_DIR/python.txt"
-          fi
+          probe = ["uvx", "--from", PACKAGE, "python", "-c", "import platform; print(platform.python_version())"]
+          try:
+              done = subprocess.run(
+                  probe,
+                  capture_output=True,
+                  text=True,
+                  env={**os.environ, "UV_CACHE_DIR": str(warm_cache)},
+                  cwd=work,
+                  timeout=120,
+              )
+              python = done.stdout if done.returncode == 0 else ""
+          except subprocess.TimeoutExpired:
+              python = ""
+          (OUT_DIR / "python.txt").write_text(python, encoding="utf-8")
       - name: Parse the logs into reference-${{ matrix.os }}.json
+        if: always()
         shell: python
         env:
           OUT_DIR: ${{ runner.temp }}/ttfv-reference
@@ -101,6 +206,7 @@ jobs:
           from pathlib import Path
 
           out_dir = Path(os.environ["OUT_DIR"])
+          out_dir.mkdir(parents=True, exist_ok=True)
           MARKERS = {
               "demo_banner": "arci demo:",
               "demo_verdict": "VERDICT:",
@@ -127,18 +233,26 @@ jobs:
               return found
 
 
+          rows = out_dir / "samples.jsonl"
           samples = []
-          for row in (out_dir / "samples.tsv").read_text(encoding="utf-8").splitlines():
-              n, cache, start, code = row.split("\t")
-              log = out_dir / f"sample-{n}.log"
+          for row in rows.read_text(encoding="utf-8").splitlines() if rows.is_file() else []:
+              record = json.loads(row)
+              log = out_dir / f"sample-{record['sample']}.log"
+              stamps = first_stamps(log)
+              if record["timed_out"]:
+                  stamps["all_steps_held"] = None  # killed: never counts as held
               samples.append(
                   {
-                      "sample": int(n),
-                      "uv_cache": cache,
-                      "command_start": start,
-                      **first_stamps(log),
-                      "exit_code": int(code),
+                      "sample": record["sample"],
+                      "uv_cache": record["uv_cache"],
+                      "command_start": record["command_start"],
+                      **stamps,
+                      "exit_code": record["exit_code"],
                       "log": log.name,
+                      "timed_out": record["timed_out"],
+                      "started": record["started"],
+                      "timeout_seconds": record["timeout_seconds"],
+                      "uv_cache_entries_at_start": record["uv_cache_entries_at_start"],
                   }
               )
 
@@ -164,6 +278,14 @@ jobs:
                   "sha": env("REF_SHA"),
               },
               "timestamp_resolution_seconds": 1,
+              "design": {
+                  "cold_samples": int(env("COLD_SAMPLES", "0")),
+                  "warm_samples": int(env("WARM_SAMPLES", "0")),
+                  "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
+                  "warm": "warm samples reuse the cache the last cold sample filled",
+                  "sample_timeout_seconds": int(env("SAMPLE_TIMEOUT_S", "0")),
+                  "timing_budget_seconds": int(env("TIMING_BUDGET_S", "0")),
+              },
               "samples": samples,
           }
           out = out_dir / os.environ["OUT_JSON"]
@@ -188,8 +310,17 @@ jobs:
 
           with open(os.environ["OUT_JSON"], encoding="utf-8") as f:
               samples = json.load(f)["samples"]
-          bad = [s["sample"] for s in samples if s["exit_code"] != 0 or not s["all_steps_held"]]
-          if len(samples) != 5 or bad:
-              print(f"::error title=ttfv-reference::{len(samples)} samples; not held: {bad}")
+          expected = int(os.environ["COLD_SAMPLES"]) + int(os.environ["WARM_SAMPLES"])
+          bad = [
+              s["sample"]
+              for s in samples
+              if s["timed_out"] or s["exit_code"] != 0 or not s["all_steps_held"]
+          ]
+          timed_out = [s["sample"] for s in samples if s["timed_out"]]
+          if len(samples) != expected or bad:
+              print(
+                  f"::error title=ttfv-reference::{len(samples)} of {expected} samples; "
+                  f"not held: {bad}; timed out: {timed_out}"
+              )
               sys.exit(1)
-          print("all five samples held")
+          print(f"all {expected} samples held")
