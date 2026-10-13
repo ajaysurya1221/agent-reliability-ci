@@ -14,8 +14,9 @@ the model and field descriptions state them.
 from __future__ import annotations
 
 import json
+import math
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, cast
 
@@ -138,20 +139,39 @@ def bare_arm_label(ref: str) -> str:
     return f"{module.rpartition('.')[2]}.{function}"
 
 
-_BOOL_TAG = "tag:yaml.org,2002:bool"
+_STR_TAG = "tag:yaml.org,2002:str"
 _INT_TAG = "tag:yaml.org,2002:int"
+_FLOAT_TAG = "tag:yaml.org,2002:float"
+_BOOL_TAG = "tag:yaml.org,2002:bool"
+_NULL_TAG = "tag:yaml.org,2002:null"
+_MAP_TAG = "tag:yaml.org,2002:map"
+_SEQ_TAG = "tag:yaml.org,2002:seq"
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+_YAML_PREFIX = "tag:yaml.org,2002:"
+_SCALAR_TAGS = frozenset({_STR_TAG, _INT_TAG, _FLOAT_TAG, _BOOL_TAG, _NULL_TAG})
 _DROPPED_TAGS = frozenset(
-    {_BOOL_TAG, _INT_TAG, "tag:yaml.org,2002:timestamp", "tag:yaml.org,2002:value"}
+    {_BOOL_TAG, _INT_TAG, _FLOAT_TAG, "tag:yaml.org,2002:timestamp", "tag:yaml.org,2002:value"}
 )
 _INT_FORMS = (("0x", 16), ("0o", 8), ("0b", 2))
+# Deepest nesting of mappings and lists (strict JSON validation itself stops at 200 levels).
+MAX_DEPTH = 100
+
+# A float is written with a `.`: `1.5`, `-0.25`, `2.`, `.5`, `1.0e+3` (an exponent needs its
+# sign, as in YAML 1.1). YAML 1.1's base-60 form (`1:30.5`) and underscores are dropped, so those
+# stay strings; `.inf` and `.nan` resolve to floats only to be rejected as non-finite.
+FLOAT_PATTERN = (
+    r"^(?:[-+]?[0-9]+\.[0-9]*(?:[eE][-+][0-9]+)?|\.[0-9]+(?:[eE][-+][0-9]+)?"
+    r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$"
+)
 
 
 class DescriptorLoader(yaml.SafeLoader):
     """Ruling 3: a SafeLoader with its OWN resolver tables (the global SafeLoader is untouched).
 
     Booleans are only `true` and `false`; integers are decimal (`010` is 10), `0x`, `0o` or `0b`;
-    timestamps stay strings. Everything else is the SafeLoader's YAML 1.1 behaviour (null, floats,
-    merge keys). `yes`, `no`, `on`, `off` and dates are therefore strings.
+    floats follow `FLOAT_PATTERN`; timestamps stay strings. Null and merge keys are the
+    SafeLoader's YAML 1.1 behaviour. `yes`, `no`, `on`, `off`, dates and `1:30.5` are therefore
+    strings. `parse_yaml` also refuses every tag but str, int, float, bool, null, map and seq.
     """
 
 
@@ -165,29 +185,62 @@ DescriptorLoader.add_implicit_resolver(
     re.compile(r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"),
     list("-+0123456789"),
 )
+DescriptorLoader.add_implicit_resolver(_FLOAT_TAG, re.compile(FLOAT_PATTERN), list("-+0123456789."))
 
 
-def _construct_int(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> int:
-    text = str(loader.construct_scalar(node)).replace("_", "")
-    sign = -1 if text.startswith("-") else 1
-    digits = text[1:] if text[:1] in "+-" else text
+def _int_value(text: str) -> int:
+    digits = text.replace("_", "")
+    sign = -1 if digits.startswith("-") else 1
+    digits = digits[1:] if digits[:1] in "+-" else digits
     base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
     try:
         return sign * int(digits[2:] if base != 10 else digits, base)
     except ValueError:
-        raise yaml.constructor.ConstructorError(
-            None, None, f"invalid integer {text!r}", node.start_mark
-        ) from None
+        raise ValueError(f"invalid integer {_quote(text)}") from None
 
 
-DescriptorLoader.add_constructor(_INT_TAG, _construct_int)
+_NON_FINITE = {".inf": math.inf, "+.inf": math.inf, "-.inf": -math.inf, ".nan": math.nan}
 
 
-_MERGE_TAG = "tag:yaml.org,2002:merge"
+def _float_value(text: str) -> float:
+    lowered = text.replace("_", "").lower()
+    try:
+        return _NON_FINITE[lowered] if lowered in _NON_FINITE else float(lowered)
+    except ValueError:
+        raise ValueError(f"invalid number {_quote(text)}") from None
 
 
-class _DuplicateKeyError(yaml.YAMLError):
-    """A mapping repeats a key. PyYAML's default (the last value wins) would hide it."""
+def _bool_value(text: str) -> bool:
+    if text in ("true", "false"):
+        return text == "true"
+    raise ValueError(f"invalid boolean {_quote(text)}; write true or false")
+
+
+_SCALAR_VALUES: dict[str, Callable[[str], object]] = {
+    _INT_TAG: _int_value,
+    _FLOAT_TAG: _float_value,
+    _BOOL_TAG: _bool_value,
+}
+
+
+def _constructor(
+    convert: Callable[[str], object],
+) -> Callable[[yaml.SafeLoader, yaml.ScalarNode], object]:
+    def construct(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> object:
+        try:
+            return convert(str(loader.construct_scalar(node)))
+        except ValueError as exc:
+            raise yaml.constructor.ConstructorError(None, None, str(exc), node.start_mark) from None
+
+    return construct
+
+
+for _tag, _convert in _SCALAR_VALUES.items():
+    DescriptorLoader.add_constructor(_tag, _constructor(_convert))
+
+
+class _SourceError(yaml.YAMLError):
+    """A problem the YAML layer finds at a source path (PyYAML itself would accept it)."""
 
     def __init__(self, path: SourcePath, message: str) -> None:
         self.path = path
@@ -195,58 +248,201 @@ class _DuplicateKeyError(yaml.YAMLError):
         super().__init__(message)
 
 
-def _path_segment(key: object) -> str | int:
-    return key if isinstance(key, str | int) and not isinstance(key, bool) else str(key)
+def _short_tag(tag: str) -> str:
+    return "!!" + tag.removeprefix(_YAML_PREFIX) if tag.startswith(_YAML_PREFIX) else tag
 
 
-def _reject_duplicate_keys(
-    loader: DescriptorLoader, node: yaml.Node, path: SourcePath, seen: set[int]
-) -> None:
-    """Walk the composed node graph; the first repeated mapping key raises, with its path.
+def _check_tag(node: yaml.Node, path: SourcePath) -> None:
+    """Only JSON shapes: plain mappings, lists and scalars. `!!set`, `!!omap`, `!!pairs`,
+    `!!binary`, `!!timestamp` and every custom tag are refused before anything is built."""
+    if isinstance(node, yaml.ScalarNode):
+        allowed = node.tag in _SCALAR_TAGS
+    elif isinstance(node, yaml.MappingNode):
+        allowed = node.tag == _MAP_TAG
+    else:
+        allowed = node.tag == _SEQ_TAG
+    if not allowed:
+        raise _SourceError(
+            path,
+            f"not a JSON value: YAML tag {_short_tag(node.tag)} is not allowed; use a mapping, "
+            "a list, a number, true/false, null or a quoted string",
+        )
 
-    A merge key (`<<`) is not a duplicate: keys it brings in may be overridden, as YAML intends.
-    Anchored nodes are visited once, so recursive aliases terminate.
-    """
-    if id(node) in seen:
+
+def _check_scalar(node: yaml.ScalarNode, path: SourcePath) -> None:
+    convert = _SCALAR_VALUES.get(node.tag)
+    if convert is None:
         return
-    seen.add(id(node))
-    if isinstance(node, yaml.MappingNode):
-        keys: set[object] = set()
+    try:
+        value = convert(str(node.value))
+    except ValueError as exc:
+        raise _SourceError(path, str(exc)) from None
+    if isinstance(value, float) and not math.isfinite(value):
+        raise _SourceError(path, f"not a finite number: {node.value}; JSON has no NaN or infinity")
+
+
+def _check_key(loader: DescriptorLoader, key_node: yaml.Node, path: SourcePath) -> str:
+    if not isinstance(key_node, yaml.ScalarNode) or key_node.tag != _STR_TAG:
+        shown = key_node.value if isinstance(key_node, yaml.ScalarNode) else "a collection"
+        raise _SourceError(path, f"key {shown} is not a string; quote it")
+    return str(loader.construct_scalar(key_node))
+
+
+def _check_node(
+    loader: DescriptorLoader, node: yaml.Node, path: SourcePath, active: set[int], done: set[int]
+) -> None:
+    """Walk the composed node graph before anything is constructed; the first problem raises.
+
+    Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
+    boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
+    `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
+    intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
+    mapping is a repeated key like any other. A node reached twice through an alias is checked once.
+    """
+    if id(node) in active:
+        raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
+    if id(node) in done:
+        return
+    if len(path) > MAX_DEPTH:
+        raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
+    _check_tag(node, path)
+    active.add(id(node))
+    if isinstance(node, yaml.ScalarNode):
+        _check_scalar(node, path)
+    elif isinstance(node, yaml.MappingNode):
+        keys: set[str] = set()
+        merged = False
         for key_node, value_node in cast(list[tuple[yaml.Node, yaml.Node]], node.value):
             if key_node.tag == _MERGE_TAG:
-                _reject_duplicate_keys(loader, value_node, path, seen)
+                if merged:
+                    mark = key_node.start_mark
+                    raise _SourceError(
+                        path,
+                        f"duplicate merge key {_quote('<<')} at line {mark.line + 1}, column "
+                        f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
+                    )
+                merged = True
+                _check_node(loader, value_node, path, active, done)
                 continue
-            key = loader.construct_object(key_node, deep=True)
-            try:
-                repeated = key in keys
-                keys.add(key)
-            except TypeError:  # an unhashable key: the constructor reports it
-                continue
-            segment = _path_segment(key)
-            if repeated:
+            key = _check_key(loader, key_node, path)
+            if key in keys:
                 mark = key_node.start_mark
-                raise _DuplicateKeyError(
-                    (*path, segment),
+                raise _SourceError(
+                    (*path, key),
                     f"duplicate key {_quote(key)} at line {mark.line + 1}, column "
                     f"{mark.column + 1}; give each key once",
                 )
-            _reject_duplicate_keys(loader, value_node, (*path, segment), seen)
+            keys.add(key)
+            _check_node(loader, value_node, (*path, key), active, done)
     elif isinstance(node, yaml.SequenceNode):
         for index, item in enumerate(cast(list[yaml.Node], node.value)):
-            _reject_duplicate_keys(loader, item, (*path, index), seen)
+            _check_node(loader, item, (*path, index), active, done)
+    active.discard(id(node))
+    done.add(id(node))
 
 
 def parse_yaml(text: str) -> object:
-    """Ruling 3: one YAML document through `DescriptorLoader`; repeated keys are rejected."""
+    """Ruling 3: one YAML document through `DescriptorLoader`, checked by `_check_node` first.
+
+    What comes back is plain JSON: dicts with string keys, lists, strings, ints, finite floats,
+    booleans and None, with no cycles. Raises `yaml.YAMLError` (a `_SourceError` with a path for
+    the checks above).
+    """
     loader = DescriptorLoader(text)  # a SafeLoader subclass: safe
     try:
         node = loader.get_single_node()
         if node is None:
             return None
-        _reject_duplicate_keys(loader, node, (), set())
+        _check_node(loader, node, (), set(), set())
         return loader.construct_document(node)
+    except RecursionError:
+        raise _SourceError((), f"nested more than {MAX_DEPTH} levels deep") from None
     finally:
         loader.dispose()
+
+
+# --- the shorthand rules -----------------------------------------------------------------------
+# One function per model, over the keys the input gave: the models' after-validators apply them to
+# a validated model, and `shorthand_problems` applies them to the raw input, so that a conflict is
+# reported together with the field errors (see `loads_descriptor`).
+
+Problem = tuple[SourcePath, str]
+
+
+def _both(alias: str, name: str) -> str:
+    return f"{_quote(alias)} and {_quote(name)} are the same key; give one, not both"
+
+
+def _fault_rule(given: Mapping[str, object]) -> Problem | None:
+    if "occurrence" in given and "at_occurrence" in given:
+        return ("occurrence",), _both("occurrence", "at_occurrence")
+    return None
+
+
+def _condition_rule(given: Mapping[str, object]) -> Problem | None:
+    if "id" in given and "condition_id" in given:
+        return ("id",), _both("id", "condition_id")
+    if "id" not in given and "condition_id" not in given:
+        return ("id",), 'missing required key "id" (or "condition_id")'
+    key = "id" if "id" in given else "condition_id"
+    if given[key] is None:
+        return (key,), "must be a string"
+    if "fault" in given and "faults" in given:
+        return ("fault",), '"fault" and "faults" both given; give one, not both'
+    if "fault" in given and given["fault"] is None:
+        return ("fault",), "must be a mapping; omit it for a clean condition"
+    return None
+
+
+def _contract_rule(given: Mapping[str, object]) -> Problem | None:
+    if "oracle" in given and "contract" in given:
+        return ("oracle",), '"oracle" and "contract" both given; give one, not both'
+    if "oracle" not in given and "contract" not in given:
+        return ("oracle",), 'missing required key "oracle" (or "contract")'
+    key = "oracle" if "oracle" in given else "contract"
+    if given[key] is None:
+        return (key,), "must not be null"
+    return None
+
+
+def _given(model: BaseModel) -> dict[str, object]:
+    return {name: getattr(model, name) for name in model.model_fields_set}
+
+
+def _raise(problem: Problem | None) -> None:
+    if problem is not None:
+        raise _PathError(*problem)
+
+
+def _mapping(value: object) -> dict[str, object] | None:
+    return cast(dict[str, object], value) if isinstance(value, dict) else None
+
+
+def _items(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
+
+
+def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
+    """Every alias conflict and one-of rule broken anywhere in the raw input, with its path."""
+    found: list[Problem] = []
+
+    def check(
+        rule: Callable[[Mapping[str, object]], Problem | None], at: SourcePath, value: object
+    ) -> None:
+        given = _mapping(value)
+        problem = rule(given) if given is not None else None
+        if problem is not None:
+            found.append(((*at, *problem[0]), problem[1]))
+
+    check(_contract_rule, (), data)
+    for index, condition in enumerate(_items(data.get("conditions"))):
+        at: SourcePath = ("conditions", index)
+        check(_condition_rule, at, condition)
+        given = _mapping(condition) or {}
+        check(_fault_rule, (*at, "fault"), given.get("fault"))
+        for position, fault in enumerate(_items(given.get("faults"))):
+            check(_fault_rule, (*at, "faults", position), fault)
+    return found
 
 
 # --- the models -------------------------------------------------------------------------------
@@ -313,8 +509,7 @@ class DescriptorFault(_Model):
 
     @model_validator(mode="after")
     def _one_occurrence_key(self) -> Self:
-        if {"occurrence", "at_occurrence"} <= self.model_fields_set:
-            raise _PathError(("occurrence",), _both("occurrence", "at_occurrence"))
+        _raise(_fault_rule(_given(self)))
         return self
 
     def to_fault_spec(self) -> FaultSpec:
@@ -326,10 +521,6 @@ class DescriptorFault(_Model):
             at_occurrence=self.occurrence if given else self.at_occurrence,
             params=dict(self.params),
         )
-
-
-def _both(alias: str, name: str) -> str:
-    return f"{_quote(alias)} and {_quote(name)} are the same key; give one, not both"
 
 
 class DescriptorCondition(_Model):
@@ -360,18 +551,7 @@ class DescriptorCondition(_Model):
 
     @model_validator(mode="after")
     def _one_of_each(self) -> Self:
-        given = self.model_fields_set
-        if {"id", "condition_id"} <= given:
-            raise _PathError(("id",), _both("id", "condition_id"))
-        if not {"id", "condition_id"} & given:
-            raise _PathError(("id",), 'missing required key "id" (or "condition_id")')
-        key = "id" if "id" in given else "condition_id"
-        if getattr(self, key) is None:
-            raise _PathError((key,), "must be a string")
-        if {"fault", "faults"} <= given:
-            raise _PathError(("fault",), '"fault" and "faults" both given; give one, not both')
-        if "fault" in given and self.fault is None:
-            raise _PathError(("fault",), "must be a mapping; omit it for a clean condition")
+        _raise(_condition_rule(_given(self)))
         return self
 
     def to_condition(self) -> Condition:
@@ -490,14 +670,7 @@ class Descriptor(_Model):
 
     @model_validator(mode="after")
     def _one_contract(self) -> Self:
-        given = self.model_fields_set
-        if {"oracle", "contract"} <= given:
-            raise _PathError(("oracle",), '"oracle" and "contract" both given; give one, not both')
-        if not {"oracle", "contract"} & given:
-            raise _PathError(("oracle",), 'missing required key "oracle" (or "contract")')
-        key = "oracle" if "oracle" in given else "contract"
-        if getattr(self, key) is None:
-            raise _PathError((key,), "must not be null")
+        _raise(_contract_rule(_given(self)))
         if self.contract is not None:
             try:
                 validate_contract(self.contract)
@@ -538,8 +711,10 @@ class Descriptor(_Model):
                 prior_runs=self.prior_runs,
             )
         except ValidationError as exc:
-            path, message = _first_error(exc, None)
+            path, message = first_problem(validation_problems(exc, None))
             raise DescriptorError(message, path) from None
+        except (ValueError, TypeError) as exc:  # e.g. a value the seal (hash_record) refuses
+            raise DescriptorError(f"cannot seal the manifest: {exc}") from None
 
 
 def _arm(value: str | ArmSpec) -> ArmSpec:
@@ -557,17 +732,53 @@ def _has(node: object, segment: str | int) -> bool:
     return isinstance(node, list) and isinstance(segment, int) and 0 <= segment < len(node)
 
 
-def _source_path(loc: Sequence[str | int], data: object, keep_last: bool) -> SourcePath:
-    """Map a pydantic `loc` onto the keys present in the input, dropping union tags."""
+_ARM_FIELDS = frozenset({"baseline", "candidate"})
+_ARM_TAGS = frozenset({_REF_TAG, _ARM_TAG})
+
+
+def _json_root(path: SourcePath) -> bool:
+    """`task` and a fault's `params` are `dict[str, JsonValue]`; below them every value is JSON."""
+    return path == ("task",) or (len(path) > 2 and path[0] == "conditions" and path[-1] == "params")
+
+
+def _json_tag(node: object) -> str | None:
+    return "dict" if isinstance(node, dict) else "list" if isinstance(node, list) else None
+
+
+def source_path(loc: Sequence[str | int], data: object, keep_last: bool = False) -> SourcePath:
+    """Map a pydantic `loc` onto the input by walking `data` key by key and index by index.
+
+    Pydantic adds synthetic segments that are not keys: the arm union's tag right after
+    `baseline`/`candidate` (`module:function` or `arm mapping`), and, below `task` and `params`,
+    a `dict`/`list` tag after every JSON container. Those positions are known from the models, so
+    a user key spelled like a tag is still a key. Other segments the input lacks (`[key]`) are
+    dropped; with `keep_last` the last one (a missing key) is kept.
+    """
     path: list[str | int] = []
     node: Any = data
+    arm_tag = False  # the next segment is the arm union's tag
+    json_tag = False  # the next segment is a JsonValue container tag
+    in_json = False
     for index, segment in enumerate(loc):
+        if arm_tag and segment in _ARM_TAGS:
+            arm_tag = False
+            continue
+        if json_tag and segment == _json_tag(node):
+            json_tag = False
+            continue
+        arm_tag = json_tag = False
         if _has(node, segment):
             path.append(segment)
             node = node[segment]
+            arm_tag = len(path) == 1 and segment in _ARM_FIELDS
+            json_tag = in_json
+            in_json = in_json or _json_root(tuple(path))
         elif keep_last and index == len(loc) - 1:
             path.append(segment)
     return tuple(path)
+
+
+_TYPE_ERRORS = frozenset({"int_type", "float_type", "bool_type", "string_type"})
 
 
 def _message(error: Any) -> str:
@@ -582,6 +793,11 @@ def _message(error: Any) -> str:
         return f"invalid reference {_quote(error['input'])}; expected module:function"
     if kind == "invalid-json-value":
         return "not a JSON value (dates, binary and sets are not JSON; quote the value)"
+    if kind in {"model_type", "model_attributes_type", "dict_type"}:
+        return "must be a mapping"
+    if kind in _TYPE_ERRORS:
+        # Strict: a quoted number is a string and true/false are not numbers.
+        return f"{error['msg']}, got {json.dumps(error['input'], ensure_ascii=False)}"
     if kind == "value_error" and "error" in context:
         return str(context["error"])
     return str(error["msg"])
@@ -591,29 +807,31 @@ def _sort_key(path: SourcePath) -> tuple[tuple[int, int, str], ...]:
     return tuple((0, s, "") if isinstance(s, int) else (1, 0, str(s)) for s in path)
 
 
-def _first_error(exc: ValidationError, data: object) -> tuple[SourcePath, str]:
+def validation_problems(exc: ValidationError, data: object) -> list[Problem]:
+    """Every pydantic error as (source path, message); `data` None keeps the model's own loc."""
     found: list[tuple[SourcePath, str, str]] = []
     for error in exc.errors():
         if data is None:
             path: SourcePath = tuple(error["loc"])
         else:
-            path = _source_path(error["loc"], data, keep_last=error["type"] == "missing")
+            path = source_path(error["loc"], data, keep_last=error["type"] == "missing")
         cause = (error.get("ctx") or {}).get("error")
         if isinstance(cause, _PathError):
             found.append(((*path, *cause.path), cause.message, error["type"]))
         else:
             found.append((path, _message(error), error["type"]))
     # A list whose items failed is also reported as too short; the item error is the cause.
-    kept = [
-        item
-        for item in found
-        if item[2] != "too_short"
-        or not any(
-            len(other[0]) > len(item[0]) and other[0][: len(item[0])] == item[0] for other in found
-        )
+    return [
+        (path, message)
+        for path, message, kind in found
+        if kind != "too_short"
+        or not any(len(other[0]) > len(path) and other[0][: len(path)] == path for other in found)
     ]
-    path, message, _ = min(kept, key=lambda item: (_sort_key(item[0]), item[1]))
-    return path, message
+
+
+def first_problem(problems: Sequence[Problem]) -> Problem:
+    """The reported error: the first by SORTED source path (indices numerically), not file order."""
+    return min(problems, key=lambda item: (_sort_key(item[0]), item[1]))
 
 
 # --- loading ----------------------------------------------------------------------------------
@@ -627,7 +845,7 @@ def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
     """Parse one YAML document and validate it. Raises `DescriptorError`."""
     try:
         data = parse_yaml(text)
-    except _DuplicateKeyError as exc:
+    except _SourceError as exc:
         raise DescriptorError(exc.message, exc.path, source) from None
     except yaml.MarkedYAMLError as exc:
         mark = exc.problem_mark
@@ -638,11 +856,28 @@ def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
     if not isinstance(data, dict):
         kind = "empty" if data is None else type(data).__name__
         raise DescriptorError(f"must be one YAML mapping, got {kind}", (), source)
+    return _validate(cast(dict[str, object], data), source)
+
+
+def _validate(data: dict[str, object], source: str) -> Descriptor:
+    """Strict JSON validation; every problem is collected and the first by sorted path raised.
+
+    The input is parsed JSON (see `parse_yaml`), validated in pydantic's strict JSON mode: lists
+    become tuples and strings become enum members as in JSON, but true/false never become numbers
+    and a quoted number is never a number, at every level. The shorthand rules are checked on the
+    raw input too, so that, for example, `oracle` with `contract` is reported even when an
+    unknown key elsewhere stops the after-validators from running.
+    """
+    problems = shorthand_problems(data)
     try:
-        return Descriptor.model_validate(data)
+        descriptor = Descriptor.model_validate_json(json.dumps(data, allow_nan=False), strict=True)
     except ValidationError as exc:
-        path, message = _first_error(exc, data)
-        raise DescriptorError(message, path, source) from None
+        problems += validation_problems(exc, data)
+    else:
+        if not problems:
+            return descriptor
+    path, message = first_problem(problems)
+    raise DescriptorError(message, path, source)
 
 
 def load_descriptor(path: str | Path) -> Descriptor:

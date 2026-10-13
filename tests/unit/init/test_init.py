@@ -215,7 +215,8 @@ def test_force_replaces_an_existing_regular_file(project: Path) -> None:
     [
         (
             ("--baseline", "app.v9:run"),
-            "--baseline app.v9:run: module not importable; check module and dependencies",
+            "--baseline app.v9:run: module not importable; importing app.v9 raised "
+            "ModuleNotFoundError: No module named 'app.v9'; check module and dependencies",
         ),
         (
             ("--candidate", "app.v2:runn"),
@@ -232,7 +233,8 @@ def test_force_replaces_an_existing_regular_file(project: Path) -> None:
         ),
         (
             ("--toolset", "tests.nowhere:make_world"),
-            "--toolset tests.nowhere:make_world: module not importable; check module and "
+            "--toolset tests.nowhere:make_world: module not importable; importing tests.nowhere "
+            "raised ModuleNotFoundError: No module named 'tests.nowhere'; check module and "
             "dependencies",
         ),
     ],
@@ -378,7 +380,23 @@ def _main(
         ),
         (
             [*INIT, "--fault", "tool_timeout:reserve:-1"],
-            "--fault tool_timeout:reserve:-1: occurrence -1 must be a non-negative integer",
+            "--fault tool_timeout:reserve:-1: occurrence -1 must be an integer from 0 to "
+            "1000000000",
+        ),
+        (
+            [*INIT, "--fault", "tool_timeout:reserve:1000000001"],
+            "--fault tool_timeout:reserve:1000000001: occurrence 1000000001 must be an integer "
+            "from 0 to 1000000000",
+        ),
+        (
+            [*INIT, "--fault", "tool_timeout:reserve:" + "9" * 5000],
+            f"--fault tool_timeout:reserve:{'9' * 5000}: occurrence {'9' * 5000} must be an "
+            "integer from 0 to 1000000000",
+        ),
+        ([*INIT, "--n", "9" * 5000], f"--n must be an integer from 1 to 10000, got {'9' * 5000}"),
+        (
+            ["init", "e" * 201, *REFS],
+            "experiment id has 201 characters; at most 200 (it names the run directory)",
         ),
         (
             [*INIT, "--out", "no/such/dir/arci.yaml"],

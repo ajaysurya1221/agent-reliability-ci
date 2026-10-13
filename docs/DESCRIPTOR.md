@@ -1,17 +1,15 @@
 # The `arci.yaml` descriptor
 
 `arci.yaml` describes one experiment. `arci run arci.yaml` loads it, compiles it into the frozen
-`Manifest`, seals it with `Manifest.create` (exactly as a Python builder does) and runs it; the run
-store is unchanged, so `runs/<experiment_id>/manifest.json` is the sealed manifest JSON. The
-descriptor is a thin deserialisation layer: no decision logic lives in it, and every rule the
-`Manifest` enforces is enforced by the `Manifest`. The Python builder (`Manifest.create` in your own
+`Manifest`, seals it with `Manifest.create` (as a Python builder does) and runs it;
+`runs/<experiment_id>/manifest.json` is the sealed manifest. No decision logic lives in this thin
+layer: the `Manifest` enforces its own rules. A Python builder (`Manifest.create` in your own
 script, as in `examples/`) remains the advanced path for anything the file cannot say.
 
 **Pydantic is authoritative.** `arci schema` prints `Descriptor.model_json_schema()` (two-space
-indent, sorted keys). The committed copy, [`docs/schema/arci.schema.json`](schema/arci.schema.json),
-is pinned under the locked pydantic and a test fails when it is stale. JSON Schema cannot express
-the cross-field rules below (one-of pairs, the experiment kind, decision faults); the models
-check them and their descriptions state them.
+indent, sorted keys); a test keeps [`docs/schema/arci.schema.json`](schema/arci.schema.json) fresh
+under the locked pydantic. JSON Schema cannot express the cross-field rules below (one-of pairs,
+the experiment kind, decision faults); the models check them and their descriptions state them.
 
 For editor completion, write the schema beside the descriptor and point at it from a comment:
 
@@ -99,27 +97,32 @@ exactly when `upstream: fixture`. Placeholders `{mcp_config}`, `{task_file}`, `{
 
 ## How the file is parsed
 
-The descriptor loader reads one YAML document with its own SafeLoader subclass (the global
-`yaml.SafeLoader` and `contracts.load_contract`, which keeps plain `yaml.safe_load`, are
-untouched). It departs from YAML 1.1 coercion so that values stay what they look like:
+The loader reads one YAML document with its own SafeLoader subclass (the global `yaml.SafeLoader`
+and `contracts.load_contract`, which keeps plain `yaml.safe_load`, are untouched), so that values
+stay what they look like:
 
 - booleans are only `true` and `false`; `yes`, `no`, `on`, `off`, `True` stay strings;
-- integers are decimal (`010` is 10, not octal 8), `0x1f`, `0o10` (8) or `0b101`; `1_000` and
-  `1:30` stay strings;
-- dates and timestamps (`2026-10-13`) stay strings;
-- null (`null`, `~`, empty), floats (with a `.`) and merge keys follow YAML 1.1.
+- integers are decimal (`010` is 10, not octal 8), `0x1f`, `0o10` (8) or `0b101`;
+- a float has a `.`: an optional sign, digits, `.` and optional digits (`1.5`, `-0.25`, `2.`) or
+  `.` and digits (`.5`), then an optional exponent with its sign (`1.0e+3`, `5.0e-2`);
+- anything else is a string: `1_000`, `1:30`, `1e3`, `1.0e3`, `-.5`, base-60 `1:30.5`, dates;
+  null (`null`, `~`, empty) and merge keys (`<<`) follow YAML 1.1.
 
-Quote any string that could still read as a number or null (`"1.0"`, `"null"`); `arci init`
-quotes every string it writes. Values in `task` and `params` must be JSON.
-Other YAML that ARCI reads (a contract file through `load_contract`) and other YAML tools keep
-YAML 1.1, where `yes`/`no`/`on`/`off` are booleans and `010` is 8: quoting keeps a file portable.
+The result must be JSON: `!!set`, `!!omap`, `!!pairs`, `!!binary`, `!!timestamp` and custom tags,
+`.nan`/`.inf`, non-string keys (write `"1":`), self-containing aliases and nesting deeper than 100
+levels are errors. Numbers are strict at every level: `n_per_arm: true`, `base_seed: "7"`,
+`alpha: "0.05"` and `n_per_arm: 6.0` are errors (`max_seconds: 15` is fine). Quote strings that
+could read as numbers or null (`"1.0"`, `"null"`), as `arci init` does; other YAML readers
+(`load_contract`, other tools) keep YAML 1.1, so quoting also keeps a file portable.
 
 ## Errors
 
 A descriptor that does not load stops `arci run` before any trial: exit 3, empty stdout, one
-line on stderr naming the file, the source path (with the keys you wrote, aliases included, and
-zero-based indices) and the problem. When several things are wrong, the first by source path is
-reported.
+line on stderr naming the file, the source path (the keys you wrote, aliases included, and
+zero-based indices) and the problem. A YAML-level problem (syntax, a repeated key, a value
+refused above) is reported where it first occurs in the file. Otherwise every key is checked and
+the reported error is the first by **sorted** source path, not file order: segment by segment,
+indices numerically and keys by character code, so `aaa` beats `oracle` beats `zzz`.
 
 ```text
 error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"
@@ -127,8 +130,7 @@ error: CliError: descriptor arci.yaml:baseline: invalid reference "pkg/run"; exp
 error: CliError: descriptor arci.yaml:conditions[0].fault.name: unknown fault "tool_timout"; expected one of ...
 ```
 
-Library callers get `arci.descriptor.DescriptorError` (a `ValueError`) from
-`compile_descriptor(path)`.
+Library calls (`compile_descriptor`, `loads_descriptor`) raise only `DescriptorError`.
 
 ## Example: the retry demo
 
