@@ -117,15 +117,34 @@ def _drain_after_exit(
 
 
 def _pythonpath(extra: Sequence[str]) -> str:
+    """The child `PYTHONPATH`: `extra` first, then the parent's `sys.path` and `PYTHONPATH`.
+
+    ADR 0006: the current directory is appended when it is not already present, so a project's
+    own modules resolve under the `arci` console script (whose `sys.path` lacks it) exactly as
+    under `python -m arci.cli`. Appended, never prepended: installed packages and replay's bundle
+    directory keep precedence, except that a regular package found later on the path supersedes
+    namespace-package portions found earlier, bundle portions included (amended ADR 0006).
+    """
+    try:
+        cwd = os.getcwd()
+    except OSError:  # the current directory was removed; nothing to append
+        cwd = ""
     paths = [*extra]
     for entry in sys.path:
-        resolved = os.getcwd() if entry == "" else entry
+        resolved = cwd if entry == "" else entry
         if resolved and resolved not in paths:
             paths.append(resolved)
     existing = os.environ.get("PYTHONPATH")
     if existing:
         paths.extend(part for part in existing.split(os.pathsep) if part not in paths)
+    if cwd and cwd not in paths:
+        paths.append(cwd)
     return os.pathsep.join(paths)
+
+
+def child_pythonpath(extra: Sequence[str] = ()) -> str:
+    """`_pythonpath` for `arci init`, whose reference check is a child built like the runner's."""
+    return _pythonpath(extra)
 
 
 def _kill_group(process: subprocess.Popen[bytes]) -> None:

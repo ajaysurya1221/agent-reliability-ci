@@ -1,0 +1,610 @@
+diff --git a/src/arci/descriptor.py b/src/arci/descriptor.py
+index 766d173..a171032 100644
+--- a/src/arci/descriptor.py
++++ b/src/arci/descriptor.py
+@@ -18,6 +18,7 @@ import math
+ import re
+ import sys
+ from collections.abc import Callable, Mapping, Sequence
++from dataclasses import dataclass, field
+ from pathlib import Path
+ from typing import Annotated, Any, Literal, Self, cast
+ 
+@@ -156,6 +157,10 @@ _DROPPED_TAGS = frozenset(
+ _INT_FORMS = (("0x", 16), ("0o", 8), ("0b", 2))
+ # Deepest nesting of mappings and lists (strict JSON validation itself stops at 200 levels).
+ MAX_DEPTH = 100
++# Most values that alias re-uses may add to the document once expanded ("billion laughs").
++MAX_ALIAS_NODES = 100_000
++
++INT_PATTERN = r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"
+ 
+ # A float is written with a `.`: `1.5`, `-0.25`, `2.`, `.5`, `1.0e+3` (an exponent needs its
+ # sign, as in YAML 1.1). YAML 1.1's base-60 form (`1:30.5`) and underscores are dropped, so those
+@@ -173,8 +178,22 @@ class DescriptorLoader(yaml.SafeLoader):
+     floats follow `FLOAT_PATTERN`; timestamps stay strings. Null and merge keys are the
+     SafeLoader's YAML 1.1 behaviour. `yes`, `no`, `on`, `off`, dates and `1:30.5` are therefore
+     strings. `parse_yaml` also refuses every tag but str, int, float, bool, null, map and seq.
++    Explicit `!!int` and `!!float` scalars must be written in the implicit forms (no underscores,
++    no padding), and an explicit `!!null` only as an empty value, `null` or `~`.
+     """
+ 
++    def __init__(self, stream: str) -> None:
++        super().__init__(stream)
++        # Scalars whose tag the file wrote (`!!null x`), by node identity; see `_check_scalar`.
++        self.explicit: set[int] = set()
++
++    def compose_scalar_node(self, anchor: dict[Any, yaml.Node]) -> yaml.ScalarNode:
++        tag = self.peek_event().tag
++        node = super().compose_scalar_node(anchor)
++        if tag is not None and tag != "!":
++            self.explicit.add(id(node))
++        return node
++
+ 
+ DescriptorLoader.yaml_implicit_resolvers = {
+     first: [(tag, regexp) for tag, regexp in resolvers if tag not in _DROPPED_TAGS]
+@@ -183,7 +202,7 @@ DescriptorLoader.yaml_implicit_resolvers = {
+ DescriptorLoader.add_implicit_resolver(_BOOL_TAG, re.compile(r"^(?:true|false)$"), list("tf"))
+ DescriptorLoader.add_implicit_resolver(
+     _INT_TAG,
+-    re.compile(r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"),
++    re.compile(INT_PATTERN),
+     list("-+0123456789"),
+ )
+ DescriptorLoader.add_implicit_resolver(_FLOAT_TAG, re.compile(FLOAT_PATTERN), list("-+0123456789."))
+@@ -195,8 +214,14 @@ def _too_large() -> str:
+ 
+ 
+ def _int_value(text: str) -> int:
+-    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit."""
+-    digits = text.replace("_", "")
++    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit.
++
++    Only the implicit forms (`INT_PATTERN`), also under an explicit `!!int`: no underscores, no
++    padding.
++    """
++    if not re.fullmatch(INT_PATTERN, text):
++        raise ValueError(f"invalid integer {_quote(text)}")
++    digits = text
+     sign = -1 if digits.startswith("-") else 1
+     digits = digits[1:] if digits[:1] in "+-" else digits
+     base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
+@@ -218,7 +243,16 @@ _NON_FINITE = {".inf": math.inf, "+.inf": math.inf, "-.inf": -math.inf, ".nan":
+ 
+ 
+ def _float_value(text: str) -> float:
+-    lowered = text.replace("_", "").lower()
++    """Only `FLOAT_PATTERN` or a decimal integer (`!!float 1`): no underscores, no padding."""
++    if not re.fullmatch(FLOAT_PATTERN, text) and not re.fullmatch(r"[-+]?[0-9]+", text):
++        try:
++            spelled = float(text)  # `!!float inf`: reported as non-finite by `_check_scalar`
++        except ValueError:
++            spelled = 0.0
++        if math.isfinite(spelled):
++            raise ValueError(f"invalid number {_quote(text)}")
++        return spelled
++    lowered = text.lower()
+     try:
+         return _NON_FINITE[lowered] if lowered in _NON_FINITE else float(lowered)
+     except ValueError:
+@@ -284,7 +318,28 @@ def _check_tag(node: yaml.Node, path: SourcePath) -> None:
+         )
+ 
+ 
+-def _check_scalar(node: yaml.ScalarNode, path: SourcePath) -> None:
++_SURROGATE = re.compile("[\ud800-\udfff]")
++_EXPLICIT_NULLS = frozenset({"", "null", "~"})
++
++
++def _check_text(text: str, path: SourcePath) -> None:
++    """A lone surrogate (from a `\\uD800` escape) is not text JSON or UTF-8 can carry."""
++    found = _SURROGATE.search(text)
++    if found:
++        raise _SourceError(
++            path,
++            f"lone surrogate U+{ord(found.group()):04X} is not valid text; write the character "
++            "itself or a \\U escape of its code point",
++        )
++
++
++def _check_scalar(loader: DescriptorLoader, node: yaml.ScalarNode, path: SourcePath) -> None:
++    value_text = str(node.value)
++    _check_text(value_text, path)
++    if node.tag == _NULL_TAG and id(node) in loader.explicit:
++        if value_text not in _EXPLICIT_NULLS:
++            raise _SourceError(path, f"invalid null {_quote(value_text)}; write null, ~ or nothing")
++        return
+     convert = _SCALAR_VALUES.get(node.tag)
+     if convert is None:
+         return
+@@ -300,43 +355,60 @@ def _check_key(loader: DescriptorLoader, key_node: yaml.Node, path: SourcePath)
+     if not isinstance(key_node, yaml.ScalarNode) or key_node.tag != _STR_TAG:
+         shown = key_node.value if isinstance(key_node, yaml.ScalarNode) else "a collection"
+         raise _SourceError(path, f"key {shown} is not a string; quote it")
+-    return str(loader.construct_scalar(key_node))
++    key = str(loader.construct_scalar(key_node))
++    _check_text(key, (*path, key))
++    return key
+ 
+ 
+-def _check_node(
+-    loader: DescriptorLoader,
+-    node: yaml.Node,
+-    path: SourcePath,
+-    active: set[int],
+-    heights: dict[int, int],
+-) -> int:
++@dataclass
++class _Walk:
++    """`_check_node`'s state: the nodes being walked, and per node its height and expanded size."""
++
++    active: set[int] = field(default_factory=set[int])
++    heights: dict[int, int] = field(default_factory=dict[int, int])
++    sizes: dict[int, int] = field(default_factory=dict[int, int])
++    reused: int = 0  # values that alias re-use has added so far
++
++
++def _check_node(loader: DescriptorLoader, node: yaml.Node, path: SourcePath, walk: _Walk) -> int:
+     """Walk the composed node graph before anything is constructed; the first problem raises.
+ 
+     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
+-    boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
+-    `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
++    boolean, an explicit `!!null` with a value, a lone surrogate in a string or key, a non-string
++    key, a repeated key, a self-referencing alias, nesting deeper than `MAX_DEPTH`, more than
++    `MAX_ALIAS_NODES` values added by re-using aliased nodes.
++
++    Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
+     intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
+     mapping is a repeated key like any other.
+ 
+     Returns the node's height (levels of nesting below it; a scalar or an empty collection is 0).
+     A node reached twice through an alias is walked once and its height cached by node identity;
+     every later use still checks that its own path plus that height stays within `MAX_DEPTH`, so a
+-    chain of shared aliases cannot nest deeper than the limit.
++    chain of shared aliases cannot nest deeper than the limit. Each such use also adds the node's
++    expanded size (values below it, itself included) to `walk.reused`, which may not pass
++    `MAX_ALIAS_NODES`.
+     """
+-    if id(node) in active:
++    if id(node) in walk.active:
+         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
+-    known = heights.get(id(node))
++    known = walk.heights.get(id(node))
+     if known is not None:
+         if len(path) + known > MAX_DEPTH:
+             raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
++        walk.reused += walk.sizes[id(node)]
++        if walk.reused > MAX_ALIAS_NODES:
++            raise _SourceError(
++                path, f"aliases expand to more than {MAX_ALIAS_NODES} values; write less reuse"
++            )
+         return known
+     if len(path) > MAX_DEPTH:
+         raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
+     _check_tag(node, path)
+-    active.add(id(node))
++    walk.active.add(id(node))
+     height = 0
++    size = 1
+     if isinstance(node, yaml.ScalarNode):
+-        _check_scalar(node, path)
++        _check_scalar(loader, node, path)
+     elif isinstance(node, yaml.MappingNode):
+         keys: set[str] = set()
+         merged = False
+@@ -350,7 +422,8 @@ def _check_node(
+                         f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
+                     )
+                 merged = True
+-                height = max(height, _check_node(loader, value_node, path, active, heights))
++                height = max(height, _check_node(loader, value_node, path, walk))
++                size += walk.sizes[id(value_node)]
+                 continue
+             key = _check_key(loader, key_node, path)
+             if key in keys:
+@@ -361,13 +434,16 @@ def _check_node(
+                     f"{mark.column + 1}; give each key once",
+                 )
+             keys.add(key)
+-            below = _check_node(loader, value_node, (*path, key), active, heights)
++            below = _check_node(loader, value_node, (*path, key), walk)
+             height = max(height, 1 + below)
++            size += 1 + walk.sizes[id(value_node)]  # the key and its value
+     elif isinstance(node, yaml.SequenceNode):
+         for index, item in enumerate(cast(list[yaml.Node], node.value)):
+-            height = max(height, 1 + _check_node(loader, item, (*path, index), active, heights))
+-    active.discard(id(node))
+-    heights[id(node)] = height
++            height = max(height, 1 + _check_node(loader, item, (*path, index), walk))
++            size += walk.sizes[id(item)]
++    walk.active.discard(id(node))
++    walk.heights[id(node)] = height
++    walk.sizes[id(node)] = size
+     return height
+ 
+ 
+@@ -383,7 +459,7 @@ def parse_yaml(text: str) -> object:
+         node = loader.get_single_node()
+         if node is None:
+             return None
+-        _check_node(loader, node, (), set(), {})
++        _check_node(loader, node, (), _Walk())
+         return loader.construct_document(node)
+     except RecursionError:
+         raise _SourceError((), f"nested more than {MAX_DEPTH} levels deep") from None
+diff --git a/src/arci/init.py b/src/arci/init.py
+index d27a13b..9d5d15e 100644
+--- a/src/arci/init.py
++++ b/src/arci/init.py
+@@ -9,9 +9,10 @@ names it advertises; explicit fault tools are checked against them. Agents, the
+ and `snapshot` are never called, and this process never imports a reference (AGENT_SEMANTICS).
+ 
+ The descriptor is rendered with every string value double-quoted, staged beside the destination,
+-re-loaded through the descriptor loader and seal-checked, then published: with `--force` by an
+-atomic rename; without it by a hard link or, where links are unsupported, an exclusive create, so
+-an existing file is never replaced. Errors are `InitError`, one line, with nothing written.
++re-loaded through the descriptor loader and seal-checked, then published atomically: with `--force`
++by a rename; without it by a hard link only, so an existing file is never replaced and, where hard
++links are unsupported, nothing is published (DECISIONS D-10). Errors are `InitError`, one line,
++with nothing written.
+ """
+ 
+ from __future__ import annotations
+@@ -602,38 +603,22 @@ def _exists(request: InitRequest) -> InitError:
+     return InitError(f"output {_show(request.out_text)} exists; use --force to replace it")
+ 
+ 
+-def _create_exclusive(dest: Path, data: bytes) -> None:
+-    """Publish `data` at `dest` only if nothing is there; remove only what this call created.
+-
+-    For file systems without hard links. `O_EXCL` fails on any existing entry, a symlink
+-    included, so an existing file is never replaced.
+-    """
+-    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+-    created: os.stat_result | None = None
+-    try:
++def _fsync_directory(directory: Path) -> None:
++    """Make a published entry durable where the platform allows; errors are ignored."""
++    with contextlib.suppress(OSError):
++        fd = os.open(directory, os.O_RDONLY)
+         try:
+-            created = os.fstat(fd)
+-            view = memoryview(data)
+-            while view:
+-                view = view[os.write(fd, view) :]
+             os.fsync(fd)
+         finally:
+             os.close(fd)
+-    except BaseException:
+-        with contextlib.suppress(OSError):
+-            now = os.lstat(dest)
+-            # The entry is removed only while it is still the file this call created.
+-            if created is None or (now.st_dev, now.st_ino) == (created.st_dev, created.st_ino):
+-                os.unlink(dest)
+-        raise
+ 
+ 
+ def publish(request: InitRequest, text: str) -> None:
+-    """Stage beside the destination, verify, then publish. Nothing is left on error.
++    """Stage beside the destination, verify, then publish atomically. Nothing is left on error.
+ 
+-    With --force the staged file replaces the destination atomically. Without it the publication
+-    fails closed: a hard link refuses an existing destination, and where hard links are
+-    unsupported an exclusive create does; neither ever falls back to a replacing rename.
++    The staged bytes are fsynced first. With --force the staged file replaces the destination by a
++    rename. Without it the only publication is a hard link, which refuses an existing destination;
++    where hard links are unsupported nothing is published (no copy, no replacing rename).
+     """
+     staged: Path | None = None
+     try:
+@@ -648,8 +633,10 @@ def publish(request: InitRequest, text: str) -> None:
+             raise
+         with handle:
+             handle.write(text)
+-        # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
+-        os.chmod(staged, 0o666 & ~_umask())
++            handle.flush()
++            # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
++            os.fchmod(handle.fileno(), 0o666 & ~_umask())
++            os.fsync(handle.fileno())
+         _verify(request, staged)
+         # Re-checked at the last moment: a directory or symlink is never replaced, and without
+         # --force a file that appeared meanwhile is not replaced either.
+@@ -662,12 +649,11 @@ def publish(request: InitRequest, text: str) -> None:
+             except FileExistsError:
+                 raise _exists(request) from None
+             except OSError:
+-                # No hard links here (EOPNOTSUPP, EPERM, ...): create exclusively instead; never
+-                # fall back to a rename, which would replace a file that appeared meanwhile.
+-                try:
+-                    _create_exclusive(request.out, staged.read_bytes())
+-                except FileExistsError:
+-                    raise _exists(request) from None
++                raise InitError(
++                    f"output {_show(request.out_text)}: cannot publish atomically here "
++                    "(hard links unsupported); choose another directory or pass --force"
++                ) from None
++        _fsync_directory(request.out.parent)
+     except OSError as exc:
+         raise InitError(
+             f"output {_show(request.out_text)}: cannot write: {exc.strerror or type(exc).__name__}"
+diff --git a/src/arci/runner.py b/src/arci/runner.py
+index b66c4b4..4002b18 100644
+--- a/src/arci/runner.py
++++ b/src/arci/runner.py
+@@ -122,7 +122,8 @@ def _pythonpath(extra: Sequence[str]) -> str:
+     ADR 0006: the current directory is appended when it is not already present, so a project's
+     own modules resolve under the `arci` console script (whose `sys.path` lacks it) exactly as
+     under `python -m arci.cli`. Appended, never prepended: installed packages and replay's bundle
+-    directory keep precedence.
++    directory keep precedence, except that a regular package found later on the path supersedes
++    namespace-package portions found earlier, bundle portions included (amended ADR 0006).
+     """
+     try:
+         cwd = os.getcwd()
+diff --git a/tests/unit/descriptor/test_round3.py b/tests/unit/descriptor/test_round3.py
+new file mode 100644
+index 0000000..c1d6ac7
+--- /dev/null
++++ b/tests/unit/descriptor/test_round3.py
+@@ -0,0 +1,141 @@
++"""T04r2 add-ons: lone surrogates, explicit scalar tags in the implicit forms, alias expansion."""
++
++from __future__ import annotations
++
++import pytest
++
++from arci.descriptor import MAX_ALIAS_NODES, DescriptorError, compile_descriptor_text, parse_yaml
++
++MOD = "tests.acceptance.fixture_agents"
++
++SMALL = f"""
++experiment_id: exp-yaml
++toolset: {MOD}:make_world
++oracle: {MOD}:oracle
++baseline: {MOD}:good_agent
++candidate: {MOD}:fragile_agent
++conditions:
++  - id: fetch_timeout
++    fault: {{name: tool_timeout, tool: fetch, occurrence: 0}}
++n_per_arm: 6
++"""
++
++
++def _where(text: str) -> str:
++    with pytest.raises(DescriptorError) as caught:
++        compile_descriptor_text(text, "arci.yaml")
++    assert type(caught.value) is DescriptorError
++    rendered = str(caught.value)
++    assert "\n" not in rendered
++    rendered.encode("utf-8")  # one printable line, whatever the file held
++    return rendered.removeprefix("descriptor arci.yaml:")
++
++
++# --- lone surrogates ----------------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("extra", "path", "point"),
++    [
++        ('task: {x: "a\\ud800b"}\n', "task.x", "D800"),
++        ('task: {x: [ok, "\\udfff"]}\n', "task.x[1]", "DFFF"),
++        ('task: {"k\\udc00": 1}\n', 'task["k\\udc00"]', "DC00"),
++        ('task: {x: "\\ud83d\\ude00"}\n', "task.x", "D83D"),  # YAML has no surrogate pairs
++    ],
++)
++def test_lone_surrogates_are_rejected_at_their_path(extra: str, path: str, point: str) -> None:
++    message = _where(SMALL + extra)
++    assert message.startswith(f"{path}: lone surrogate U+{point} is not valid text"), message
++
++
++def test_characters_outside_the_bmp_are_text() -> None:
++    loaded = parse_yaml('x: "\\U0001F600 \U0001f600"\n')
++    assert loaded == {"x": "\U0001f600 \U0001f600"}
++
++
++# --- explicit !!int / !!float / !!null ----------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("value", "message"),
++    [
++        ('!!int "1_000"', 'invalid integer "1_000"'),
++        ('!!int " 12"', 'invalid integer " 12"'),
++        ('!!int "12 "', 'invalid integer "12 "'),
++        ('!!int "0X1F"', 'invalid integer "0X1F"'),
++        ('!!float "1_0.5"', 'invalid number "1_0.5"'),
++        ('!!float " 1.5"', 'invalid number " 1.5"'),
++        ('!!float "1e5"', 'invalid number "1e5"'),
++        ('!!null "hello"', 'invalid null "hello"'),
++        ("!!null hello", 'invalid null "hello"'),
++        ("!!null NULL", 'invalid null "NULL"'),
++    ],
++)
++def test_explicit_scalars_follow_the_implicit_forms(value: str, message: str) -> None:
++    assert _where(SMALL + f"task: {{x: {value}}}\n").startswith(f"task.x: {message}")
++
++
++@pytest.mark.parametrize(
++    ("value", "expected"),
++    [
++        ('!!int "12"', 12),
++        ("!!int 0x1F", 31),
++        ('!!int "-7"', -7),
++        ('!!float "1.5"', 1.5),
++        ("!!float 2", 2.0),
++        ('!!float ".25"', 0.25),
++        ("!!null", None),
++        ('!!null ""', None),
++        ("!!null null", None),
++        ("!!null ~", None),
++        ("NULL", None),  # the implicit YAML 1.1 null forms are unchanged
++        ("Null", None),
++    ],
++)
++def test_explicit_scalars_in_the_implicit_forms_load(value: str, expected: object) -> None:
++    loaded = parse_yaml(f"x: {value}\n")
++    assert loaded == {"x": expected}
++    assert type(loaded["x"] if isinstance(loaded, dict) else None) is type(expected)
++
++
++# --- alias expansion cap ------------------------------------------------------------------------
++
++
++def _laughs(levels: int) -> str:
++    lines = ['a0: &a0 ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]']
++    for level in range(1, levels + 1):
++        items = ", ".join([f"*a{level - 1}"] * 10)
++        lines.append(f"a{level}: &a{level} [{items}]")
++    return "\n".join(lines) + "\n"
++
++
++def test_billion_laughs_is_refused_at_a_path() -> None:
++    with pytest.raises(Exception) as caught:
++        parse_yaml(_laughs(9))
++    error = caught.value
++    assert getattr(error, "message", "") == (
++        f"aliases expand to more than {MAX_ALIAS_NODES} values; write less reuse"
++    )
++    path = getattr(error, "path", ())
++    assert isinstance(path, tuple) and path
++
++
++def test_billion_laughs_in_a_descriptor_is_one_line_with_a_path() -> None:
++    nested = "".join(f"  {line}\n" for line in _laughs(9).splitlines())
++    message = _where(SMALL + "task:\n" + nested)
++    assert message.startswith("task.a")
++    assert message.endswith(
++        f"aliases expand to more than {MAX_ALIAS_NODES} values; write less reuse"
++    )
++
++
++def test_moderate_alias_reuse_loads() -> None:
++    loaded = parse_yaml(_laughs(3))  # about 1 000 values re-used
++    assert isinstance(loaded, dict)
++    assert len(loaded) == 4
++
++
++def test_a_large_document_without_aliases_is_not_capped() -> None:
++    items = ", ".join(str(index) for index in range(MAX_ALIAS_NODES + 10))
++    loaded = parse_yaml(f"x: [{items}]\n")
++    assert isinstance(loaded, dict)
+diff --git a/tests/unit/init/test_publish.py b/tests/unit/init/test_publish.py
+index d9cec24..7ed2ce5 100644
+--- a/tests/unit/init/test_publish.py
++++ b/tests/unit/init/test_publish.py
+@@ -70,15 +70,18 @@ def _ordinary_mode() -> int:
+ # --- 1b: without --force, publication fails closed --------------------------------------------
+ 
+ 
+-def test_without_links_an_exclusive_create_publishes_the_verified_bytes(
++NO_LINKS_LINE = (
++    f"{PREFIX}output arci.yaml: cannot publish atomically here (hard links unsupported); "
++    "choose another directory or pass --force\n"
++)
++
++
++def test_without_links_nothing_is_published(
+     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+ ) -> None:
+     monkeypatch.setattr(os, "link", _no_links)
+-    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
+-    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
+-    published = workdir / "arci.yaml"
+-    assert compile_descriptor(published).experiment_id == "exp"
+-    assert stat.S_IMODE(published.stat().st_mode) == _ordinary_mode()
++    assert _init(capsys) == (3, "", NO_LINKS_LINE)
++    assert set(workdir.iterdir()) == set()  # no destination, no staged file
+ 
+ 
+ def test_without_links_a_destination_that_appears_before_publication_survives(
+@@ -96,14 +99,22 @@ def test_without_links_a_destination_that_appears_before_publication_survives(
+ 
+     monkeypatch.setattr(init_module, "_check_output", check_then_race)
+     monkeypatch.setattr(os, "link", _no_links)
+-    code, out, err = _init(capsys)
++    assert _init(capsys) == (3, "", NO_LINKS_LINE)
+     assert len(calls) == 2
+-    assert (code, out) == (3, "")
+-    assert err == f"{PREFIX}output arci.yaml exists; use --force to replace it\n"
+     assert (workdir / "arci.yaml").read_bytes() == competitor
+     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
+ 
+ 
++def test_with_force_and_no_links_the_rename_still_publishes(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    (workdir / "arci.yaml").write_bytes(b"old\n")
++    monkeypatch.setattr(os, "link", _no_links)
++    assert _init(capsys, "--force") == (0, "arci run arci.yaml\n", "")
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
++    assert compile_descriptor(workdir / "arci.yaml").experiment_id == "exp"
++
++
+ def test_with_links_a_destination_that_appears_before_publication_survives(
+     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+ ) -> None:
+@@ -124,19 +135,58 @@ def test_with_links_a_destination_that_appears_before_publication_survives(
+     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
+ 
+ 
+-def test_a_failed_exclusive_write_removes_only_what_it_created(
++# --- 2b: durability ---------------------------------------------------------------------------
++
++
++def _is_directory(fd: int) -> bool:
++    return stat.S_ISDIR(os.fstat(fd).st_mode)
++
++
++def test_the_staged_file_and_the_directory_are_fsynced(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    real_fsync = os.fsync
++    synced: list[str] = []
++
++    def recording_fsync(fd: int) -> None:
++        synced.append("dir" if _is_directory(fd) else "file")
++        real_fsync(fd)
++
++    monkeypatch.setattr(os, "fsync", recording_fsync)
++    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
++    assert synced == ["file", "dir"]
++    published = workdir / "arci.yaml"
++    assert stat.S_IMODE(published.stat().st_mode) == _ordinary_mode()
++
++
++def test_a_failed_staged_fsync_writes_nothing(
+     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+ ) -> None:
+     def failing_fsync(fd: int) -> None:
+         del fd
+         raise OSError(errno.EIO, os.strerror(errno.EIO))
+ 
+-    monkeypatch.setattr(os, "link", _no_links)
+     monkeypatch.setattr(os, "fsync", failing_fsync)
+     code, out, err = _init(capsys)
+     assert (code, out) == (3, "")
+     assert err == f"{PREFIX}output arci.yaml: cannot write: {os.strerror(errno.EIO)}\n"
+-    assert set(workdir.iterdir()) == set()  # the partial destination and the staged file are gone
++    assert set(workdir.iterdir()) == set()  # no destination, no staged file
++
++
++def test_a_failed_directory_fsync_is_ignored(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    real_fsync = os.fsync
++
++    def directory_fsync_fails(fd: int) -> None:
++        if _is_directory(fd):
++            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
++        real_fsync(fd)
++
++    monkeypatch.setattr(os, "fsync", directory_fsync_fails)
++    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
++    assert compile_descriptor(workdir / "arci.yaml").experiment_id == "exp"
+ 
+ 
+ # --- 1c: an unwritable output directory -----------------------------------------------------------

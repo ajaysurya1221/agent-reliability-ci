@@ -1,0 +1,2271 @@
+diff --git a/docs/DESCRIPTOR.md b/docs/DESCRIPTOR.md
+new file mode 100644
+index 0000000..5499778
+--- /dev/null
++++ b/docs/DESCRIPTOR.md
+@@ -0,0 +1,197 @@
++# The `arci.yaml` descriptor
++
++`arci.yaml` describes one experiment. `arci run arci.yaml` loads it, compiles it into the frozen
++`Manifest`, seals it with `Manifest.create` (exactly as a Python builder does) and runs it; the run
++store is unchanged, so `runs/<experiment_id>/manifest.json` is the sealed manifest JSON. The
++descriptor is a thin deserialisation layer: no decision logic lives in it, and every rule the
++`Manifest` enforces is enforced by the `Manifest`. The Python builder (`Manifest.create` in your own
++script, as in `examples/`) remains the advanced path for anything the file cannot say.
++
++**Pydantic is authoritative.** `arci schema` prints `Descriptor.model_json_schema()` (two-space
++indent, sorted keys). The committed copy, [`docs/schema/arci.schema.json`](schema/arci.schema.json),
++is pinned under the locked pydantic and a test fails when it is stale. JSON Schema cannot express
++the cross-field rules below (one-of pairs, the experiment kind, decision faults); the models
++check them and their descriptions state them.
++
++For editor completion, write the schema beside the descriptor and point at it from a comment:
++
++```sh
++arci schema --out arci.schema.json
++```
++
++```yaml
++# yaml-language-server: $schema=./arci.schema.json
++```
++
++A `$schema` *key* is an unknown key; only the comment works.
++
++## Keys
++
++Keys are the `Manifest`'s field names. R = required, O = optional.
++
++| Key | Type | Default | Becomes |
++|---|---|---|---|
++| `experiment_id` | string | R | `experiment_id` (and the run directory name) |
++| `task_id` | string | O, the `experiment_id` | `task_id` |
++| `task` | JSON object | O, `{}` | `task` |
++| `toolset` | `module:function` | O, null; python arms need it | `toolset` |
++| `mcp_server` | `{name, argv, env, snapshot}` | O, null; command arms need it | `mcp_server` |
++| `decisions` | DecisionSpec mapping | O, null | `decisions` |
++| `oracle` | `module:function` | R unless `contract` | `contract.oracle` |
++| `contract` | ContractSpec mapping | R unless `oracle` | `contract` |
++| `baseline`, `candidate` | `module:function` or arm mapping | R | `baseline`, `candidate` |
++| `conditions` | list, at least one | R | `conditions` |
++| `alpha` | number in [0.000001, 0.5] | O, `0.05` | `alpha` |
++| `delta` | number in (0, 1) | O, `0.10` | `delta` |
++| `n_per_arm` | integer in [1, 10000] | O, `200` | `n_per_arm` |
++| `interval_method` | `clopper_pearson` or `newcombe` | O, `clopper_pearson` | `interval_method` |
++| `looks` | integer list | O, `[]` | `looks` |
++| `base_seed` | integer | O, `0` | `base_seed` |
++| `budgets` | `{max_tool_calls, max_model_steps, max_seconds, grader_seconds}` | O, 30, 50, 30.0, 20.0 | `budgets` |
++| `fixtures_sha256` | string, opaque | O, `""` | `fixtures_sha256` |
++| `prior_runs` | string list | O, `[]` | `prior_runs` |
++
++Give exactly one of `oracle` and `contract`; the `contract` mapping carries its own `oracle` plus
++`max_tool_calls`, `forbidden_tools`, `required_tools`, `max_calls_per_tool` (a non-empty
++`unobservable` is rejected). Non-empty `looks` increase strictly and end at `n_per_arm`.
++Unknown keys are errors everywhere. `schema_version`, `record_sha256` and `created_at` are not
++keys: the schema and the sealer own the first two and the loader sets `created_at` to `""`, as the
++builders do.
++
++## Arms
++
++- A bare string `app.v1:run` is a python agent: `ArmSpec(label="v1.run", agent="app.v1:run",
++  candidate_id="")`. The label is the last module segment and the function, so `app.v1:run` and
++  `app.v2:run` stay distinguishable in reports.
++- A mapping is an `ArmSpec` as is: `label` (required), exactly one of `agent` (`module:function`)
++  or `command`, and optional `candidate_id` (default `""`).
++
++References are checked for `module:function` syntax only; nothing is imported at load time.
++Both arms are python agents (top-level `toolset`, no `mcp_server`) or both commands.
++
++## Conditions and faults
++
++Each condition has `id` (or its full name `condition_id`) and either `fault` (one mapping) or
++`faults` (a list, applied together in order). A clean condition has neither. A fault has:
++
++- `name`: a built-in (`tool_timeout`, `tool_error_once`, `empty_result`,
++  `decision_low_confidence`, `decision_unavailable`) or a custom factory `module:function`
++  (syntax checked here, imported only in the trial process);
++- `bucket`: `falsify` (default), `benign` or `ceiling`;
++- `tool`: the tool to target, default null (any tool);
++- `occurrence` (or `at_occurrence`): zero-based call count, default null (the fault's default);
++- `params`: default `{}`.
++
++An alias and its full key (`id`/`condition_id`, `fault`/`faults`, `occurrence`/`at_occurrence`,
++`oracle`/`contract`) may never both be given, even with equal values. Decision faults need
++`decisions` and `tool: decision:systemone`; `decision_low_confidence` takes only
++`confidence_max` (a number in [0, 1]) and `decision_unavailable` takes no params.
++
++## Command experiments
++
++Both arms are `command: {argv, env, infra_exit_codes}` (defaults `env: {}`,
++`infra_exit_codes: [75]`), with `mcp_server: {name, argv, env, snapshot}` (defaults
++`name: env`, `env: {}`) and no `toolset`. `decisions` (`upstream`, `fixture`, `base_url`, `model`,
++`max_decisions`, `request_seconds`, `max_body_bytes`, `max_requests_per_minute`) needs a `fixture`
++exactly when `upstream: fixture`. Placeholders `{mcp_config}`, `{task_file}`, `{workdir}`,
++`{seed}` stay literal strings (quote them in YAML) and are expanded only at launch. YAML has no
++`sys.executable`: write an absolute interpreter path or `python` resolved on `PATH`.
++
++## How the file is parsed
++
++The descriptor loader reads one YAML document with its own SafeLoader subclass (the global
++`yaml.SafeLoader` and `contracts.load_contract`, which keeps plain `yaml.safe_load`, are
++untouched). It departs from YAML 1.1 coercion so that values stay what they look like:
++
++- booleans are only `true` and `false`; `yes`, `no`, `on`, `off`, `True` stay strings;
++- integers are decimal (`010` is 10, not octal 8), `0x1f`, `0o10` (8) or `0b101`; `1_000` and
++  `1:30` stay strings;
++- dates and timestamps (`2026-10-13`) stay strings;
++- null (`null`, `~`, empty), floats (with a `.`) and merge keys follow YAML 1.1.
++
++Quote any string that could still read as a number or null (`"1.0"`, `"null"`); `arci init`
++quotes every string it writes. Values in `task` and `params` must be JSON.
++Other YAML that ARCI reads (a contract file through `load_contract`) and other YAML tools keep
++YAML 1.1, where `yes`/`no`/`on`/`off` are booleans and `010` is 8: quoting keeps a file portable.
++
++## Errors
++
++A descriptor that does not load stops `arci run` before any trial: exit 3, empty stdout, one
++line on stderr naming the file, the source path (with the keys you wrote, aliases included, and
++zero-based indices) and the problem. When several things are wrong, the first by source path is
++reported.
++
++```text
++error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"
++error: CliError: descriptor arci.yaml:baseline: invalid reference "pkg/run"; expected module:function
++error: CliError: descriptor arci.yaml:conditions[0].fault.name: unknown fault "tool_timout"; expected one of ...
++```
++
++Library callers get `arci.descriptor.DescriptorError` (a `ValueError`) from
++`compile_descriptor(path)`.
++
++## Example: the retry demo
++
++This file seals to the same `record_sha256` as `arci.demo.experiment.build_manifest(200, "agent_b")`.
++
++```yaml
++# yaml-language-server: $schema=./arci.schema.json
++experiment_id: arci-demo-agent_b-reserve-timeout-200
++task_id: confirm-inventory-order
++task: {order_id: order-7, sku: widget, quantity: 2, stock: 10}
++toolset: arci.demo.world:make_world
++oracle: arci.demo.world:oracle
++baseline: {label: agent_a, agent: "arci.demo.agents:agent_a", candidate_id: baseline-a}
++candidate: {label: agent_b, agent: "arci.demo.agents:agent_b", candidate_id: candidate-agent_b}
++conditions:
++  - id: reserve-timeout
++    fault: {name: tool_timeout, tool: reserve, occurrence: 0}
++alpha: 0.05
++delta: 0.10
++n_per_arm: 200
++base_seed: 12000
++budgets: {max_tool_calls: 10, max_model_steps: 10, max_seconds: 15.0}
++```
++
++## Example: a command agent (the offline guardrail experiment)
++
++The translation of `examples/guardrail_agent/experiment.py:build_manifest()`. Its `task` lists
++182 commands; two are shown. Replace `/abs/.venv/bin/python` with your interpreter.
++
++```yaml
++experiment_id: guardrail-fixture-b-ask-provider_down-50
++task_id: guardrail-shell-command-ask
++task:
++  population: ask
++  commands:
++    - {"id": "read-003", "command": "head -n 20 app/main.py"}
++    - {"id": "read-004", "command": "tail -n 50 logs/app.log"}
++oracle: examples.guardrail_agent.world:oracle
++baseline:
++  label: a
++  candidate_id: guard-a
++  command:
++    argv: [/abs/.venv/bin/python, -P, -m, examples.guardrail_agent.agent,
++           --mcp-config, "{mcp_config}", --task-file, "{task_file}", --variant, a]
++    infra_exit_codes: []
++candidate:
++  label: b
++  candidate_id: guard-b
++  command:
++    argv: [/abs/.venv/bin/python, -P, -m, examples.guardrail_agent.agent,
++           --mcp-config, "{mcp_config}", --task-file, "{task_file}", --variant, b]
++    infra_exit_codes: []
++mcp_server:
++  name: guardrail
++  argv: [/abs/.venv/bin/python, -P, -m, arci.mcp_toolset_server,
++         --toolset, "examples.guardrail_agent.world:make_world",
++         --workdir, "{workdir}", --seed, "{seed}", --task-file, "{task_file}"]
++  snapshot: arci.mcp_toolset_server:snapshot
++decisions: {upstream: fixture, fixture: "examples.guardrail_agent.decisions:fixture", model: jev-1.13.0}
++conditions:
++  - id: provider_down
++    fault: {name: decision_unavailable, tool: "decision:systemone"}
++n_per_arm: 50
++base_seed: 31000
++budgets: {max_tool_calls: 4, max_model_steps: 10, max_seconds: 30.0, grader_seconds: 10.0}
++```
+diff --git a/docs/schema/arci.schema.json b/docs/schema/arci.schema.json
+new file mode 100644
+index 0000000..2f022da
+--- /dev/null
++++ b/docs/schema/arci.schema.json
+@@ -0,0 +1,588 @@
++{
++  "$defs": {
++    "ArmSpec": {
++      "additionalProperties": false,
++      "properties": {
++        "agent": {
++          "anyOf": [
++            {
++              "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++              "type": "string"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "title": "Agent"
++        },
++        "candidate_id": {
++          "default": "",
++          "title": "Candidate Id",
++          "type": "string"
++        },
++        "command": {
++          "anyOf": [
++            {
++              "$ref": "#/$defs/CommandSpec"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null
++        },
++        "label": {
++          "title": "Label",
++          "type": "string"
++        }
++      },
++      "required": [
++        "label"
++      ],
++      "title": "ArmSpec",
++      "type": "object"
++    },
++    "Bucket": {
++      "description": "What a perturbation is expected to do to a correct agent.",
++      "enum": [
++        "falsify",
++        "benign",
++        "ceiling"
++      ],
++      "title": "Bucket",
++      "type": "string"
++    },
++    "Budgets": {
++      "additionalProperties": false,
++      "properties": {
++        "grader_seconds": {
++          "default": 20.0,
++          "exclusiveMinimum": 0,
++          "maximum": 3600,
++          "title": "Grader Seconds",
++          "type": "number"
++        },
++        "max_model_steps": {
++          "default": 50,
++          "maximum": 1000,
++          "minimum": 1,
++          "title": "Max Model Steps",
++          "type": "integer"
++        },
++        "max_seconds": {
++          "default": 30.0,
++          "exclusiveMinimum": 0,
++          "maximum": 3600,
++          "title": "Max Seconds",
++          "type": "number"
++        },
++        "max_tool_calls": {
++          "default": 30,
++          "maximum": 1000,
++          "minimum": 0,
++          "title": "Max Tool Calls",
++          "type": "integer"
++        }
++      },
++      "title": "Budgets",
++      "type": "object"
++    },
++    "CommandSpec": {
++      "additionalProperties": false,
++      "description": "An agent that is any subprocess. Its tools must go through the MCP boundary.\n\n`argv` may use the placeholders {mcp_config}, {task_file}, {workdir} and {seed}; they are\nexpanded only at launch and never stored expanded, so sealed records stay path-free.\nExit status 0 means the agent claims success. Anything else is a crash.",
++      "properties": {
++        "argv": {
++          "items": {
++            "type": "string"
++          },
++          "minItems": 1,
++          "title": "Argv",
++          "type": "array"
++        },
++        "env": {
++          "additionalProperties": {
++            "type": "string"
++          },
++          "title": "Env",
++          "type": "object"
++        },
++        "infra_exit_codes": {
++          "default": [
++            75
++          ],
++          "items": {
++            "type": "integer"
++          },
++          "title": "Infra Exit Codes",
++          "type": "array"
++        }
++      },
++      "required": [
++        "argv"
++      ],
++      "title": "CommandSpec",
++      "type": "object"
++    },
++    "ContractSpec": {
++      "additionalProperties": false,
++      "description": "Behaviour contract. Only invariants the tool boundary can observe are allowed.",
++      "properties": {
++        "forbidden_tools": {
++          "default": [],
++          "items": {
++            "type": "string"
++          },
++          "title": "Forbidden Tools",
++          "type": "array"
++        },
++        "max_calls_per_tool": {
++          "additionalProperties": {
++            "type": "integer"
++          },
++          "title": "Max Calls Per Tool",
++          "type": "object"
++        },
++        "max_tool_calls": {
++          "anyOf": [
++            {
++              "minimum": 0,
++              "type": "integer"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "title": "Max Tool Calls"
++        },
++        "oracle": {
++          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++          "title": "Oracle",
++          "type": "string"
++        },
++        "required_tools": {
++          "default": [],
++          "items": {
++            "type": "string"
++          },
++          "title": "Required Tools",
++          "type": "array"
++        },
++        "unobservable": {
++          "default": [],
++          "items": {
++            "type": "string"
++          },
++          "title": "Unobservable",
++          "type": "array"
++        }
++      },
++      "required": [
++        "oracle"
++      ],
++      "title": "ContractSpec",
++      "type": "object"
++    },
++    "DecisionSpec": {
++      "additionalProperties": false,
++      "description": "A System One decision endpoint (TypeSafe's `POST /v1/systemone`) for command agents.\n\nThe boundary process serves it on loopback and the agent is pointed at it through\n`TYPESAFE_BASE_URL` / `TYPESAFE_API_KEY` (a per-trial token, never the real key), so an agent\nusing the official SDKs needs no code change. Every attempt the agent makes is recorded under\nthe reserved tool name `decision:systemone`, budgeted, perturbable and replayable exactly like\na tool call. `upstream` says where live answers come from: a trusted `fixture` function\n`(request, seed, occurrence) -> response body` imported in the boundary, or `http`, forwarded\nverbatim (with `model` pinned) to `base_url` with the real key taken from the HARNESS\nenvironment. Real upstream failures are harness faults (ERROR), never agent failures.",
++      "properties": {
++        "base_url": {
++          "default": "https://api.typesafe.ai",
++          "title": "Base Url",
++          "type": "string"
++        },
++        "fixture": {
++          "anyOf": [
++            {
++              "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++              "type": "string"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "title": "Fixture"
++        },
++        "max_body_bytes": {
++          "default": 262144,
++          "maximum": 1048576,
++          "minimum": 1,
++          "title": "Max Body Bytes",
++          "type": "integer"
++        },
++        "max_decisions": {
++          "default": 50,
++          "maximum": 1000,
++          "minimum": 0,
++          "title": "Max Decisions",
++          "type": "integer"
++        },
++        "max_requests_per_minute": {
++          "default": 600,
++          "maximum": 100000,
++          "minimum": 0,
++          "title": "Max Requests Per Minute",
++          "type": "integer"
++        },
++        "model": {
++          "default": "jev-1.13.0",
++          "title": "Model",
++          "type": "string"
++        },
++        "request_seconds": {
++          "default": 5.0,
++          "exclusiveMinimum": 0,
++          "maximum": 3600,
++          "title": "Request Seconds",
++          "type": "number"
++        },
++        "upstream": {
++          "enum": [
++            "fixture",
++            "http"
++          ],
++          "title": "Upstream",
++          "type": "string"
++        }
++      },
++      "required": [
++        "upstream"
++      ],
++      "title": "DecisionSpec",
++      "type": "object"
++    },
++    "DescriptorCondition": {
++      "additionalProperties": false,
++      "description": "One condition, compiled to a `Condition`.\n\nGive exactly one of `id` and `condition_id` (the same key). Give at most one of `fault` (one\nmapping) and `faults` (a list, applied in order); a clean condition gives neither.",
++      "properties": {
++        "condition_id": {
++          "description": "Condition name; alias `id`; exactly one of the two.",
++          "title": "Condition Id",
++          "type": "string"
++        },
++        "fault": {
++          "$ref": "#/$defs/DescriptorFault",
++          "description": "One fault; shorthand for a one-element `faults`; not with `faults`."
++        },
++        "faults": {
++          "default": [],
++          "description": "Faults applied together, in order; not with `fault`.",
++          "items": {
++            "$ref": "#/$defs/DescriptorFault"
++          },
++          "title": "Faults",
++          "type": "array"
++        },
++        "id": {
++          "description": "Alias of `condition_id`; exactly one of the two.",
++          "title": "Id",
++          "type": "string"
++        }
++      },
++      "title": "DescriptorCondition",
++      "type": "object"
++    },
++    "DescriptorFault": {
++      "additionalProperties": false,
++      "description": "One injected fault, compiled to a `FaultSpec`.\n\nShorthands: `bucket` may be omitted (it means `falsify`); `occurrence` is an alias of\n`at_occurrence`, and the two may not both be given, even with equal values. Decision faults\n(`decision_low_confidence`, `decision_unavailable`) need top-level `decisions` and\n`tool: decision:systemone`; `decision_low_confidence` accepts only the param `confidence_max`\n(a number in [0, 1]) and `decision_unavailable` accepts none.",
++      "properties": {
++        "at_occurrence": {
++          "anyOf": [
++            {
++              "minimum": 0,
++              "type": "integer"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "description": "Zero-based call count of `tool`; alias `occurrence`.",
++          "title": "At Occurrence"
++        },
++        "bucket": {
++          "$ref": "#/$defs/Bucket",
++          "default": "falsify",
++          "description": "falsify (default): a robust agent should still succeed; benign: must not change the outcome; ceiling: known unrecoverable, reported and never gated."
++        },
++        "name": {
++          "description": "A built-in fault (decision_low_confidence, decision_unavailable, empty_result, tool_error_once, tool_timeout) or a custom factory `module:function` (checked for syntax only; imported in the trial process).",
++          "title": "Name",
++          "type": "string"
++        },
++        "occurrence": {
++          "anyOf": [
++            {
++              "minimum": 0,
++              "type": "integer"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "description": "Alias of `at_occurrence` (give one, not both). Zero-based call count of `tool`; null means the fault's default.",
++          "title": "Occurrence"
++        },
++        "params": {
++          "additionalProperties": {
++            "$ref": "#/$defs/JsonValue"
++          },
++          "description": "Fault parameters, for example `confidence_max`.",
++          "title": "Params",
++          "type": "object"
++        },
++        "tool": {
++          "anyOf": [
++            {
++              "type": "string"
++            },
++            {
++              "type": "null"
++            }
++          ],
++          "default": null,
++          "description": "Tool to target; null means any tool.",
++          "title": "Tool"
++        }
++      },
++      "required": [
++        "name"
++      ],
++      "title": "DescriptorFault",
++      "type": "object"
++    },
++    "JsonValue": {},
++    "McpServerSpec": {
++      "additionalProperties": false,
++      "description": "The environment, as ONE stdio MCP server owned by the harness, never by the agent.\n\nSupported subset (protocol revision 2026-07-28, stdio transport): initialize,\nnotifications/initialized, ping, tools/list and SERIAL tools/call with `resultType`\n\"complete\". Anything else the boundary cannot faithfully record or replay (task results,\nsampling, elicitation, concurrent calls) is a harness fault, not a silent pass-through.\n`argv` may use {workdir}, {seed} and {task_file}; the server also gets ARCI_WORKDIR,\nARCI_SEED and ARCI_TASK_FILE in its environment.",
++      "properties": {
++        "argv": {
++          "items": {
++            "type": "string"
++          },
++          "minItems": 1,
++          "title": "Argv",
++          "type": "array"
++        },
++        "env": {
++          "additionalProperties": {
++            "type": "string"
++          },
++          "title": "Env",
++          "type": "object"
++        },
++        "name": {
++          "default": "env",
++          "title": "Name",
++          "type": "string"
++        },
++        "snapshot": {
++          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++          "title": "Snapshot",
++          "type": "string"
++        }
++      },
++      "required": [
++        "argv",
++        "snapshot"
++      ],
++      "title": "McpServerSpec",
++      "type": "object"
++    }
++  },
++  "$id": "https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/v0.8.0/docs/schema/arci.schema.json",
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "additionalProperties": false,
++  "description": "An ARCI experiment (`arci.yaml`), compiled into a sealed `Manifest` before any trial runs.\n\nKeys are the Manifest's field names. Shorthands: top-level `oracle` stands for\n`contract: {oracle: ...}` (give exactly one of `oracle` and `contract`); an arm may be a bare\n`module:function`; a condition may use `id` for `condition_id` and `fault` for a one-element\n`faults`; a fault may use `occurrence` for `at_occurrence` and omit `bucket` (falsify). An\nalias and its full key may never both be given. Unknown keys are errors everywhere, including\n`schema_version`, `record_sha256` and `created_at`, which the loader and sealer own. Python\nexperiments need `toolset` and no `mcp_server`; command experiments need `mcp_server` and no\n`toolset`; `decisions` needs command arms. Placeholders such as `{workdir}` stay literal.\nThis schema cannot express the cross-field rules; the pydantic models are authoritative.",
++  "properties": {
++    "alpha": {
++      "default": 0.05,
++      "description": "Family-wise error rate.",
++      "maximum": 0.5,
++      "minimum": 1e-06,
++      "title": "Alpha",
++      "type": "number"
++    },
++    "base_seed": {
++      "default": 0,
++      "description": "Seed from which every trial seed derives.",
++      "title": "Base Seed",
++      "type": "integer"
++    },
++    "baseline": {
++      "description": "A python agent as a bare `module:function` string (label `<last module segment>.<function>`, empty candidate_id), or a mapping with `label`, exactly one of `agent` (module:function) or `command` (a CommandSpec), and optional `candidate_id`. Both arms are python agents (top-level `toolset`, no `mcp_server`) or both commands (`mcp_server`, no `toolset`).",
++      "oneOf": [
++        {
++          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++          "type": "string"
++        },
++        {
++          "$ref": "#/$defs/ArmSpec"
++        }
++      ],
++      "title": "Baseline"
++    },
++    "budgets": {
++      "$ref": "#/$defs/Budgets",
++      "description": "Per-trial budgets."
++    },
++    "candidate": {
++      "description": "A python agent as a bare `module:function` string (label `<last module segment>.<function>`, empty candidate_id), or a mapping with `label`, exactly one of `agent` (module:function) or `command` (a CommandSpec), and optional `candidate_id`. Both arms are python agents (top-level `toolset`, no `mcp_server`) or both commands (`mcp_server`, no `toolset`).",
++      "oneOf": [
++        {
++          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++          "type": "string"
++        },
++        {
++          "$ref": "#/$defs/ArmSpec"
++        }
++      ],
++      "title": "Candidate"
++    },
++    "conditions": {
++      "description": "At least one condition; each runs n_per_arm pairs.",
++      "items": {
++        "$ref": "#/$defs/DescriptorCondition"
++      },
++      "minItems": 1,
++      "title": "Conditions",
++      "type": "array"
++    },
++    "contract": {
++      "$ref": "#/$defs/ContractSpec",
++      "description": "The behaviour contract, including its `oracle`; give exactly one of `oracle` and `contract`. A non-empty `unobservable` is rejected."
++    },
++    "decisions": {
++      "anyOf": [
++        {
++          "$ref": "#/$defs/DecisionSpec"
++        },
++        {
++          "type": "null"
++        }
++      ],
++      "default": null,
++      "description": "Command experiments only: a System One decision endpoint. A `fixture` is required exactly when upstream is `fixture`."
++    },
++    "delta": {
++      "default": 0.1,
++      "description": "Largest tolerated drop in success rate.",
++      "exclusiveMaximum": 1,
++      "exclusiveMinimum": 0,
++      "title": "Delta",
++      "type": "number"
++    },
++    "experiment_id": {
++      "description": "Names the experiment and its run directory.",
++      "title": "Experiment Id",
++      "type": "string"
++    },
++    "fixtures_sha256": {
++      "default": "",
++      "description": "Opaque value sealed into the manifest; never computed.",
++      "title": "Fixtures Sha256",
++      "type": "string"
++    },
++    "interval_method": {
++      "default": "clopper_pearson",
++      "description": "How the bounds on the rate difference are formed.",
++      "enum": [
++        "clopper_pearson",
++        "newcombe"
++      ],
++      "title": "Interval Method",
++      "type": "string"
++    },
++    "looks": {
++      "default": [],
++      "description": "Group-sequential looks: strictly increasing, the last equal to n_per_arm; empty means one look at n_per_arm.",
++      "items": {
++        "type": "integer"
++      },
++      "title": "Looks",
++      "type": "array"
++    },
++    "mcp_server": {
++      "anyOf": [
++        {
++          "$ref": "#/$defs/McpServerSpec"
++        },
++        {
++          "type": "null"
++        }
++      ],
++      "default": null,
++      "description": "Command experiments: the environment as one stdio MCP server. Not with `toolset`."
++    },
++    "n_per_arm": {
++      "default": 200,
++      "description": "Trials per arm per condition.",
++      "maximum": 10000,
++      "minimum": 1,
++      "title": "N Per Arm",
++      "type": "integer"
++    },
++    "oracle": {
++      "description": "Shorthand for `contract: {oracle: ...}`; give exactly one of `oracle` and `contract`.",
++      "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++      "title": "Oracle",
++      "type": "string"
++    },
++    "prior_runs": {
++      "default": [],
++      "description": "Every earlier experiment on the same candidate_id.",
++      "items": {
++        "type": "string"
++      },
++      "title": "Prior Runs",
++      "type": "array"
++    },
++    "task": {
++      "additionalProperties": {
++        "$ref": "#/$defs/JsonValue"
++      },
++      "description": "The task handed to every trial (any JSON object).",
++      "title": "Task",
++      "type": "object"
++    },
++    "task_id": {
++      "anyOf": [
++        {
++          "type": "string"
++        },
++        {
++          "type": "null"
++        }
++      ],
++      "default": null,
++      "description": "Task name; omitted or null means the experiment_id.",
++      "title": "Task Id"
++    },
++    "toolset": {
++      "anyOf": [
++        {
++          "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
++          "type": "string"
++        },
++        {
++          "type": "null"
++        }
++      ],
++      "default": null,
++      "description": "Python experiments: `module:function` (task, seed) -> object with `.tools` and `.snapshot()`. Not with `mcp_server`.",
++      "title": "Toolset"
++    }
++  },
++  "required": [
++    "experiment_id",
++    "baseline",
++    "candidate",
++    "conditions"
++  ],
++  "title": "ARCI experiment descriptor",
++  "type": "object"
++}
+diff --git a/plan/exec/decisions/E2-ruling.md b/plan/exec/decisions/E2-ruling.md
+new file mode 100644
+index 0000000..ff1ce66
+--- /dev/null
++++ b/plan/exec/decisions/E2-ruling.md
+@@ -0,0 +1,11 @@
++# E2 ruling (tie-break consult, plan/exec/consults/E2-tiebreak.md) — binding for TASK 03
++
++1. `task_id` is OPTIONAL and defaults to `experiment_id` (explicit value still allowed).
++2. A bare-string arm `app.v1:run` gets label `<last module segment>.<function>` → `v1.run`.
++3. YAML loading uses a SafeLoader subclass with ISOLATED resolver tables (do not touch the global
++   `yaml.SafeLoader` and leave `contracts.load_contract` unchanged): booleans only for `true|false`;
++   integers only decimal (`010` → 10, no leading-zero octal), `0x`, `0o` (`0o10` → 8), `0b`, with a
++   matching integer constructor; timestamps stay strings. Tests must cover: `yes`/`no`/`on`/`off`
++   stay strings, `010` → 10, `0o10` → 8, a quoted `"true"` stays a string, a date-like scalar stays a
++   string, and that the global `yaml.safe_load` behaviour is unchanged. Document the descriptor's
++   parsing rules in docs/DESCRIPTOR.md separately from load_contract.
+diff --git a/plan/exec/reports/03.md b/plan/exec/reports/03.md
+new file mode 100644
+index 0000000..fa9ac4f
+--- /dev/null
++++ b/plan/exec/reports/03.md
+@@ -0,0 +1,57 @@
++# REPORT 03 — Status DONE
++
++## Changes
++- `src/arci/descriptor.py` (new): `Descriptor`, `DescriptorCondition`, `DescriptorFault` (extra="forbid", frozen); it reuses the frozen `ArmSpec`, `CommandSpec`, `McpServerSpec`, `DecisionSpec`, `ContractSpec` and `Budgets` unchanged. `Descriptor.to_manifest()` calls `Manifest.create(..., created_at="")`. Also `DescriptorError(ValueError)` (`.source`, `.path`, `.message`), `loads_descriptor`, `load_descriptor`, `compile_descriptor(path)`, `compile_descriptor_text`, `render_schema`, `DescriptorLoader`, `parse_yaml`.
++  - Aliases: `oracle` -> `contract.oracle` (exactly one of the two); `id` -> `condition_id`; `fault` -> `faults`; `occurrence` -> `at_occurrence`. An alias and its full key are rejected together even when their values are equal (checked with `model_fields_set`). Defaults: bucket falsify, tool null, occurrence null, params {}. Fault names are checked against `perturb.REGISTRY` or the frozen AgentRef pattern, which is read from `AgentRef` rather than restated; nothing is imported. A non-empty `unobservable` is rejected through `contracts.validate_contract`. Decision-fault, kind and looks rules stay with the frozen Manifest validators. `schema_version`, `record_sha256`, `created_at` and `$schema` are unknown keys. `fixtures_sha256` is passed through as an opaque value.
++  - Errors: one line, `descriptor <file>:<source-path>: <message>`. The source path uses the keys the file used, with zero-based indices; it is built by walking the pydantic loc against the input, which drops union tag segments. When there are several errors, the first by source path is reported. A tuple's spurious `too_short` error is dropped when an item error under it exists. Control characters are escaped. Manifest-level validator errors carry no path (`descriptor arci.yaml: tool_timeout cannot target decisions`).
++- `src/arci/cli.py`, descriptor regions only:
++  - one import block;
++  - `_run_manifest` (.yaml/.yml is compiled and sealed; any other path is JSON as before, seal checked) and `_cmd_schema`;
++  - a 1-line region inside `_cmd_run`;
++  - the `run` parser: metavar PATH, `--out` default `runs`, help text;
++  - the `schema` subcommand and its dispatch.
++  The dest `manifest_json` is unchanged. A DescriptorError becomes a CliError, so main() prints `error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"`, exits 3 and leaves stdout empty.
++- `docs/schema/arci.schema.json` (generated, 589 lines): title "ARCI experiment descriptor", $id `.../v0.8.0/docs/schema/arci.schema.json`, plus `"$schema": draft 2020-12`. Optional-but-not-null keys (`id`, `condition_id`, `fault`, `oracle`, `contract`) are shown without the null branch.
++- `docs/DESCRIPTOR.md` (197 lines): key table, arms, conditions/faults, command experiments, parsing rules (kept separate from load_contract), errors, editor comment line, Pydantic authoritative, Python builder as the advanced path, and both examples. The guardrail task is abbreviated to 2 of 182 commands to stay under 200 lines.
++- `tests/unit/descriptor/{__init__,test_descriptor,test_schema_file,test_run_yaml}.py`.
++
++## Open items (E2-ruling.md existed; followed)
++1. `task_id` is optional and defaults to `experiment_id` (`default_task_id`).
++2. A bare-string arm gets the label `<last module segment>.<function>` and candidate_id "" (`bare_arm_label`).
++3. `DescriptorLoader`, a SafeLoader subclass with isolated resolver tables:
++   - bool only `true|false`;
++   - int: decimal (`010` -> 10), `0x`, `0o`, `0b`, with a matching constructor;
++   - timestamps stay strings.
++   Global `yaml.safe_load` and `load_contract` are unchanged (tested).
++
++## Tests
++- `.venv/bin/pytest tests/unit/descriptor tests/unit/cli tests/unit/report tests/acceptance/test_cli.py tests/acceptance/test_schema.py` -> `190 passed in 29.72s`
++- `.venv/bin/pytest tests/unit` -> `704 passed in 95.64s`
++- `.venv/bin/ruff format --check .` -> `265 files already formatted`; `.venv/bin/ruff check .` -> `All checks passed!`; `.venv/bin/basedpyright` -> `0 errors, 0 warnings, 0 notes` (no pyright ignores added)
++- `shasum -a 256 -c FROZEN.sha256 | grep -v OK` -> no output
++- `python3 docs/assets/src/make_figures.py --check` -> `figures are current: ...`
++- `.venv/bin/python -m arci.cli schema | diff - docs/schema/arci.schema.json` -> no output
++- Covered:
++  - retry example (taken from the docs block) has record_sha256 and JSON bytes equal to `build_manifest(200, "agent_b")`;
++  - guardrail round-trips to `examples/guardrail_agent/experiment.build_manifest()`: model_dump minus created_at/record_sha256 equal, seal equal too;
++  - each alias equals its full key, and simultaneous forms are rejected;
++  - unknown key, bad ref and unknown fault give exact stderr lines through main(), exit 3, empty stdout, no run dir;
++  - `arci run x.yaml` in a subprocess with fixture refs at N=6 exits 2 with VERDICT INCONCLUSIVE, the same as the JSON path (same decision seal); stored manifest.json bytes equal the compiled manifest;
++  - `--out` defaults to `runs`; JSON is still seal-checked;
++  - `arci schema` and `--out` bytes equal the committed file;
++  - `schema --help` and `run --help` exit 0 with empty stderr;
++  - no bench import;
++  - YAML scalar table from the ruling;
++  - Descriptor defaults and bounds equal the Manifest's (schema comparison).
++
++## Deviations
++- The ruling's text was followed literally for booleans: `True`/`TRUE` stay strings, unlike the YAML 1.2 core schema. This is documented and tested.
++- The YAML 1.1 `=` (value) resolver was also dropped: under plain SafeLoader a bare `=` crashes with a constructor error; now it is a string.
++- The error line uses the dispatch's `error: CliError: descriptor ...` form, not Astra's `arci: descriptor ...`.
++- `arci schema --out` prints nothing on stdout.
++
++## Open issues
++- Duplicate YAML keys are silently last-wins (PyYAML behaviour), e.g. two `n_per_arm:` lines. Rejecting them needs a constructor override in `DescriptorLoader`. Not done: outside the ruling.
++- Manifest-level validator errors (experiment kind, decision faults, looks) are reported at the file root without a source path.
++- A non-string YAML key such as `true:` prints as `[1]` in the path. This is cosmetic.
++- The guardrail example in DESCRIPTOR.md is abbreviated. The full 182-command file is generated in the test from `public_task("ask")`.
+diff --git a/src/arci/cli.py b/src/arci/cli.py
+index 2ed81a0..0fe239a 100644
+--- a/src/arci/cli.py
++++ b/src/arci/cli.py
+@@ -15,6 +15,16 @@ from typing import Literal, NoReturn, Protocol, cast
+ from pydantic import JsonValue
+ 
+ from arci.demo.run import check_keep, default_workers, run_demo
++
++# --- descriptor ---
++from arci.descriptor import (
++    DescriptorError,
++    compile_descriptor,
++    is_descriptor_path,
++    render_schema,
++)
++
++# --- end descriptor ---
+ from arci.gate import decide
+ from arci.mcp_boundary import (
+     UpstreamResult,
+@@ -118,10 +128,37 @@ def _find_spec(manifest: Manifest, trial_id: str) -> TrialSpec:
+     return matches[0]
+ 
+ 
+-def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
+-    manifest = Manifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
++# --- descriptor ---
++def _run_manifest(path: str) -> Manifest:
++    """`arci.yaml`/`.yml` is compiled and sealed; anything else is sealed JSON, seal checked."""
++    if is_descriptor_path(path):
++        try:
++            return compile_descriptor(path)
++        except DescriptorError as exc:
++            raise CliError(str(exc)) from None
++    manifest = Manifest.model_validate_json(Path(path).read_text(encoding="utf-8"))
+     if not manifest.validate_seal():
+         raise CliError("manifest seal is invalid")
++    return manifest
++
++
++def _cmd_schema(out_path: str | None) -> int:
++    """Print the descriptor's JSON Schema, or write the identical bytes to `out_path`."""
++    text = render_schema()
++    if out_path is None:
++        sys.stdout.write(text)
++    else:
++        Path(out_path).write_bytes(text.encode("utf-8"))
++    return 0
++
++
++# --- end descriptor ---
++
++
++def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
++    # --- descriptor ---
++    manifest = _run_manifest(manifest_path)
++    # --- end descriptor ---
+     trials = run_experiment(manifest, out_dir, max_workers=workers)
+     decision = decide(manifest, trials)
+     run_dir = Path(out_dir) / manifest.experiment_id
+@@ -414,9 +451,18 @@ def _parser() -> _Parser:
+     parser = _Parser(prog="arci")
+     commands = parser.add_subparsers(dest="command", required=True)
+ 
+-    run = commands.add_parser("run", help="run a frozen experiment manifest")
+-    run.add_argument("manifest_json", metavar="MANIFEST_JSON")
+-    run.add_argument("--out", required=True, metavar="DIR")
++    # --- descriptor ---
++    run = commands.add_parser(
++        "run",
++        help="run an arci.yaml descriptor or a frozen manifest",
++        description=(
++            "Run an experiment. A .yaml/.yml path is an arci.yaml descriptor, compiled and "
++            "sealed before any trial; any other path is a sealed manifest JSON, seal checked."
++        ),
++    )
++    run.add_argument("manifest_json", metavar="PATH", help="arci.yaml descriptor or manifest JSON")
++    run.add_argument("--out", default="runs", metavar="DIR", help="run store (default: runs)")
++    # --- end descriptor ---
+     run.add_argument("--workers", type=_positive_int, default=4, metavar="N")
+ 
+     preflight = commands.add_parser("preflight", help="check an HTTP decision upstream")
+@@ -523,6 +569,17 @@ def _parser() -> _Parser:
+         help="write the run stores to DIR (empty or new) instead of a kept temporary directory",
+     )
+     # --- end demo ---
++    # --- descriptor ---
++    schema = commands.add_parser(
++        "schema",
++        help="print the arci.yaml JSON Schema",
++        description=(
++            "Print the JSON Schema of the arci.yaml descriptor, generated from the pydantic "
++            "models (which stay authoritative: the schema cannot express cross-field rules)."
++        ),
++    )
++    schema.add_argument("--out", metavar="PATH", help="write the schema to PATH instead")
++    # --- end descriptor ---
+     return parser
+ 
+ 
+@@ -601,6 +658,10 @@ def _dispatch(values: dict[str, object]) -> int:
+             keep=None if keep is None else Path(keep),
+         )
+     # --- end demo ---
++    # --- descriptor ---
++    if command == "schema":
++        return _cmd_schema(cast(str | None, values["out"]))
++    # --- end descriptor ---
+     raise CliError(f"unknown command: {command}")
+ 
+ 
+diff --git a/src/arci/descriptor.py b/src/arci/descriptor.py
+new file mode 100644
+index 0000000..8c4a2e7
+--- /dev/null
++++ b/src/arci/descriptor.py
+@@ -0,0 +1,619 @@
++"""The `arci.yaml` experiment descriptor: a thin, declarative front end to `Manifest`.
++
++A descriptor is deserialised into `Descriptor`, then compiled by `Descriptor.to_manifest()` into
++the frozen `Manifest` and sealed with `Manifest.create`, exactly as a Python builder does. Keys are
++the Manifest's field names; the few documented shorthands (`oracle`, condition `id`, fault `fault`
++and `occurrence`, a bare-string arm) are expanded here and nowhere else. There is no decision logic
++in this layer: every rule the Manifest enforces is enforced by the Manifest itself.
++
++Pydantic is authoritative. `arci schema` prints `Descriptor.model_json_schema()` for editors; it
++cannot express the cross-field rules (mutual exclusions, the experiment kind, decision faults), so
++the model and field descriptions state them.
++"""
++
++from __future__ import annotations
++
++import json
++import re
++from collections.abc import Sequence
++from pathlib import Path
++from typing import Annotated, Any, Literal, Self
++
++import yaml
++from pydantic import (
++    BaseModel,
++    ConfigDict,
++    Discriminator,
++    Field,
++    JsonValue,
++    Tag,
++    TypeAdapter,
++    ValidationError,
++    field_validator,
++    model_validator,
++)
++
++from arci.contracts import validate_contract
++from arci.perturb import REGISTRY
++from arci.schema import (
++    N_PER_ARM_MAX,
++    N_PER_ARM_MIN,
++    AgentRef,
++    ArmSpec,
++    Bucket,
++    Budgets,
++    Condition,
++    ContractSpec,
++    DecisionSpec,
++    FaultSpec,
++    Manifest,
++    McpServerSpec,
++)
++
++SCHEMA_TITLE = "ARCI experiment descriptor"
++SCHEMA_ID = (
++    "https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/"
++    "v0.8.0/docs/schema/arci.schema.json"
++)
++SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
++DESCRIPTOR_SUFFIXES = (".yaml", ".yml")
++
++# The frozen `module:function` pattern, read from the schema rather than restated.
++REF_PATTERN: str = TypeAdapter(AgentRef).json_schema()["pattern"]
++BUILT_IN_FAULTS: tuple[str, ...] = tuple(sorted(REGISTRY))
++
++SourcePath = tuple[str | int, ...]
++
++
++class DescriptorError(ValueError):
++    """A descriptor that cannot be loaded, as one line: `descriptor <file>:<path>: <message>`.
++
++    `path` is the source path inside the file, written with the keys the file used (aliases
++    included) and zero-based indices, for example `conditions[0].fault.name`. An empty path means
++    the file as a whole.
++    """
++
++    def __init__(self, message: str, path: SourcePath = (), source: str = "<descriptor>") -> None:
++        self.message = message
++        self.path = path
++        self.source = source
++        super().__init__(self._render())
++
++    def _render(self) -> str:
++        where = format_path(self.path)
++        location = f"{self.source}:{where}" if where else self.source
++        return _escape(f"descriptor {location}: {self.message}")
++
++    def with_source(self, source: str) -> DescriptorError:
++        return DescriptorError(self.message, self.path, source)
++
++
++class _PathError(ValueError):
++    """Raised inside a validator to report at a path below the model being validated."""
++
++    def __init__(self, path: SourcePath, message: str) -> None:
++        self.path = path
++        self.message = message
++        super().__init__(message)
++
++
++def _quote(value: object) -> str:
++    return json.dumps(value, ensure_ascii=False) if isinstance(value, str) else repr(value)
++
++
++def _escape(text: str) -> str:
++    """Keep a message on one line: control and other non-printable characters are escaped."""
++    return "".join(ch if ch.isprintable() else json.dumps(ch)[1:-1] for ch in text)
++
++
++_SIMPLE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
++
++
++def format_path(path: SourcePath) -> str:
++    """`conditions[0].fault.name`; keys that are not plain words are quoted in brackets."""
++    out = ""
++    for segment in path:
++        if isinstance(segment, bool):
++            out += f"[{json.dumps(segment)}]"
++        elif isinstance(segment, int):
++            out += f"[{segment}]"
++        elif _SIMPLE_KEY.match(segment):
++            out += f".{segment}" if out else segment
++        else:
++            out += f"[{_quote(segment)}]"
++    return out
++
++
++# --- the three settled open items (plan/exec/decisions/E2-ruling.md) ----------------------------
++
++
++def default_task_id(experiment_id: str) -> str:
++    """Ruling 1: an omitted `task_id` is the experiment id (what `arci init` writes)."""
++    return experiment_id
++
++
++def bare_arm_label(ref: str) -> str:
++    """Ruling 2: a bare-string arm `app.v1:run` is labelled `v1.run` (last module segment)."""
++    module, _, function = ref.partition(":")
++    return f"{module.rpartition('.')[2]}.{function}"
++
++
++_BOOL_TAG = "tag:yaml.org,2002:bool"
++_INT_TAG = "tag:yaml.org,2002:int"
++_DROPPED_TAGS = frozenset(
++    {_BOOL_TAG, _INT_TAG, "tag:yaml.org,2002:timestamp", "tag:yaml.org,2002:value"}
++)
++_INT_FORMS = (("0x", 16), ("0o", 8), ("0b", 2))
++
++
++class DescriptorLoader(yaml.SafeLoader):
++    """Ruling 3: a SafeLoader with its OWN resolver tables (the global SafeLoader is untouched).
++
++    Booleans are only `true` and `false`; integers are decimal (`010` is 10), `0x`, `0o` or `0b`;
++    timestamps stay strings. Everything else is the SafeLoader's YAML 1.1 behaviour (null, floats,
++    merge keys). `yes`, `no`, `on`, `off` and dates are therefore strings.
++    """
++
++
++DescriptorLoader.yaml_implicit_resolvers = {
++    first: [(tag, regexp) for tag, regexp in resolvers if tag not in _DROPPED_TAGS]
++    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
++}
++DescriptorLoader.add_implicit_resolver(_BOOL_TAG, re.compile(r"^(?:true|false)$"), list("tf"))
++DescriptorLoader.add_implicit_resolver(
++    _INT_TAG,
++    re.compile(r"^(?:[-+]?[0-9]+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)$"),
++    list("-+0123456789"),
++)
++
++
++def _construct_int(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> int:
++    text = str(loader.construct_scalar(node)).replace("_", "")
++    sign = -1 if text.startswith("-") else 1
++    digits = text[1:] if text[:1] in "+-" else text
++    base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
++    try:
++        return sign * int(digits[2:] if base != 10 else digits, base)
++    except ValueError:
++        raise yaml.constructor.ConstructorError(
++            None, None, f"invalid integer {text!r}", node.start_mark
++        ) from None
++
++
++DescriptorLoader.add_constructor(_INT_TAG, _construct_int)
++
++
++def parse_yaml(text: str) -> object:
++    """Ruling 3: one YAML document through `DescriptorLoader`."""
++    return yaml.load(text, Loader=DescriptorLoader)  # a SafeLoader subclass: safe
++
++
++# --- the models -------------------------------------------------------------------------------
++
++
++class _Model(BaseModel):
++    model_config = ConfigDict(extra="forbid", frozen=True)
++
++
++def _not_null(schema: dict[str, Any]) -> None:
++    """Schema of an optional key that, when present, must not be null."""
++    options = [option for option in schema.pop("anyOf", []) if option.get("type") != "null"]
++    schema.pop("default", None)
++    if len(options) == 1:
++        schema.update(options[0])
++    else:
++        schema["anyOf"] = options
++
++
++class DescriptorFault(_Model):
++    """One injected fault, compiled to a `FaultSpec`.
++
++    Shorthands: `bucket` may be omitted (it means `falsify`); `occurrence` is an alias of
++    `at_occurrence`, and the two may not both be given, even with equal values. Decision faults
++    (`decision_low_confidence`, `decision_unavailable`) need top-level `decisions` and
++    `tool: decision:systemone`; `decision_low_confidence` accepts only the param `confidence_max`
++    (a number in [0, 1]) and `decision_unavailable` accepts none.
++    """
++
++    name: str = Field(
++        description=(
++            "A built-in fault (" + ", ".join(BUILT_IN_FAULTS) + ") or a custom factory "
++            "`module:function` (checked for syntax only; imported in the trial process)."
++        )
++    )
++    bucket: Bucket = Field(
++        default=Bucket.FALSIFY,
++        description="falsify (default): a robust agent should still succeed; benign: must not "
++        "change the outcome; ceiling: known unrecoverable, reported and never gated.",
++    )
++    tool: str | None = Field(default=None, description="Tool to target; null means any tool.")
++    occurrence: int | None = Field(
++        default=None,
++        ge=0,
++        description="Alias of `at_occurrence` (give one, not both). Zero-based call count of "
++        "`tool`; null means the fault's default.",
++    )
++    at_occurrence: int | None = Field(
++        default=None, ge=0, description="Zero-based call count of `tool`; alias `occurrence`."
++    )
++    params: dict[str, JsonValue] = Field(
++        default_factory=dict, description="Fault parameters, for example `confidence_max`."
++    )
++
++    @field_validator("name")
++    @classmethod
++    def _known_fault(cls, name: str) -> str:
++        if name in REGISTRY or re.fullmatch(REF_PATTERN, name):
++            return name
++        raise ValueError(
++            f"unknown fault {_quote(name)}; expected one of {', '.join(BUILT_IN_FAULTS)} "
++            "or module:function"
++        )
++
++    @model_validator(mode="after")
++    def _one_occurrence_key(self) -> Self:
++        if {"occurrence", "at_occurrence"} <= self.model_fields_set:
++            raise _PathError(("occurrence",), _both("occurrence", "at_occurrence"))
++        return self
++
++    def to_fault_spec(self) -> FaultSpec:
++        given = "occurrence" in self.model_fields_set
++        return FaultSpec(
++            name=self.name,
++            bucket=self.bucket,
++            tool=self.tool,
++            at_occurrence=self.occurrence if given else self.at_occurrence,
++            params=dict(self.params),
++        )
++
++
++def _both(alias: str, name: str) -> str:
++    return f"{_quote(alias)} and {_quote(name)} are the same key; give one, not both"
++
++
++class DescriptorCondition(_Model):
++    """One condition, compiled to a `Condition`.
++
++    Give exactly one of `id` and `condition_id` (the same key). Give at most one of `fault` (one
++    mapping) and `faults` (a list, applied in order); a clean condition gives neither.
++    """
++
++    id: str | None = Field(
++        default=None,
++        description="Alias of `condition_id`; exactly one of the two.",
++        json_schema_extra=_not_null,
++    )
++    condition_id: str | None = Field(
++        default=None,
++        description="Condition name; alias `id`; exactly one of the two.",
++        json_schema_extra=_not_null,
++    )
++    fault: DescriptorFault | None = Field(
++        default=None,
++        description="One fault; shorthand for a one-element `faults`; not with `faults`.",
++        json_schema_extra=_not_null,
++    )
++    faults: tuple[DescriptorFault, ...] = Field(
++        default=(), description="Faults applied together, in order; not with `fault`."
++    )
++
++    @model_validator(mode="after")
++    def _one_of_each(self) -> Self:
++        given = self.model_fields_set
++        if {"id", "condition_id"} <= given:
++            raise _PathError(("id",), _both("id", "condition_id"))
++        if not {"id", "condition_id"} & given:
++            raise _PathError(("id",), 'missing required key "id" (or "condition_id")')
++        key = "id" if "id" in given else "condition_id"
++        if getattr(self, key) is None:
++            raise _PathError((key,), "must be a string")
++        if {"fault", "faults"} <= given:
++            raise _PathError(("fault",), '"fault" and "faults" both given; give one, not both')
++        if "fault" in given and self.fault is None:
++            raise _PathError(("fault",), "must be a mapping; omit it for a clean condition")
++        return self
++
++    def to_condition(self) -> Condition:
++        faults = (self.fault,) if self.fault is not None else self.faults
++        return Condition(
++            condition_id=self.id if self.id is not None else str(self.condition_id),
++            faults=tuple(fault.to_fault_spec() for fault in faults),
++        )
++
++
++_REF_TAG = "module:function"
++_ARM_TAG = "arm mapping"
++
++
++def _arm_kind(value: Any) -> str:
++    return _REF_TAG if isinstance(value, str) else _ARM_TAG
++
++
++Arm = Annotated[
++    Annotated[AgentRef, Tag(_REF_TAG)] | Annotated[ArmSpec, Tag(_ARM_TAG)],
++    Discriminator(_arm_kind),
++]
++
++_ARM_HELP = (
++    "A python agent as a bare `module:function` string (label `<last module "
++    "segment>.<function>`, empty candidate_id), or a mapping with `label`, exactly one of "
++    "`agent` (module:function) or `command` (a CommandSpec), and optional `candidate_id`. Both "
++    "arms are python agents (top-level `toolset`, no `mcp_server`) or both commands "
++    "(`mcp_server`, no `toolset`)."
++)
++
++
++class Descriptor(_Model):
++    """An ARCI experiment (`arci.yaml`), compiled into a sealed `Manifest` before any trial runs.
++
++    Keys are the Manifest's field names. Shorthands: top-level `oracle` stands for
++    `contract: {oracle: ...}` (give exactly one of `oracle` and `contract`); an arm may be a bare
++    `module:function`; a condition may use `id` for `condition_id` and `fault` for a one-element
++    `faults`; a fault may use `occurrence` for `at_occurrence` and omit `bucket` (falsify). An
++    alias and its full key may never both be given. Unknown keys are errors everywhere, including
++    `schema_version`, `record_sha256` and `created_at`, which the loader and sealer own. Python
++    experiments need `toolset` and no `mcp_server`; command experiments need `mcp_server` and no
++    `toolset`; `decisions` needs command arms. Placeholders such as `{workdir}` stay literal.
++    This schema cannot express the cross-field rules; the pydantic models are authoritative.
++    """
++
++    model_config = ConfigDict(
++        extra="forbid",
++        frozen=True,
++        title=SCHEMA_TITLE,
++        json_schema_extra={"$id": SCHEMA_ID, "$schema": SCHEMA_DIALECT},
++    )
++
++    experiment_id: str = Field(description="Names the experiment and its run directory.")
++    task_id: str | None = Field(
++        default=None, description="Task name; omitted or null means the experiment_id."
++    )
++    task: dict[str, JsonValue] = Field(
++        default_factory=dict, description="The task handed to every trial (any JSON object)."
++    )
++    toolset: AgentRef | None = Field(
++        default=None,
++        description="Python experiments: `module:function` (task, seed) -> object with `.tools` "
++        "and `.snapshot()`. Not with `mcp_server`.",
++    )
++    mcp_server: McpServerSpec | None = Field(
++        default=None,
++        description="Command experiments: the environment as one stdio MCP server. Not with "
++        "`toolset`.",
++    )
++    decisions: DecisionSpec | None = Field(
++        default=None,
++        description="Command experiments only: a System One decision endpoint. A `fixture` "
++        "is required exactly when upstream is `fixture`.",
++    )
++    oracle: AgentRef | None = Field(
++        default=None,
++        description="Shorthand for `contract: {oracle: ...}`; give exactly one of `oracle` and "
++        "`contract`.",
++        json_schema_extra=_not_null,
++    )
++    contract: ContractSpec | None = Field(
++        default=None,
++        description="The behaviour contract, including its `oracle`; give exactly one of "
++        "`oracle` and `contract`. A non-empty `unobservable` is rejected.",
++        json_schema_extra=_not_null,
++    )
++    baseline: Arm = Field(description=_ARM_HELP)
++    candidate: Arm = Field(description=_ARM_HELP)
++    conditions: tuple[DescriptorCondition, ...] = Field(
++        min_length=1, description="At least one condition; each runs n_per_arm pairs."
++    )
++    alpha: float = Field(default=0.05, ge=1e-6, le=0.5, description="Family-wise error rate.")
++    delta: float = Field(
++        default=0.10, gt=0, lt=1, description="Largest tolerated drop in success rate."
++    )
++    n_per_arm: int = Field(
++        default=200, ge=N_PER_ARM_MIN, le=N_PER_ARM_MAX, description="Trials per arm per condition."
++    )
++    interval_method: Literal["clopper_pearson", "newcombe"] = Field(
++        default="clopper_pearson", description="How the bounds on the rate difference are formed."
++    )
++    looks: tuple[int, ...] = Field(
++        default=(),
++        description="Group-sequential looks: strictly increasing, the last equal to n_per_arm; "
++        "empty means one look at n_per_arm.",
++    )
++    base_seed: int = Field(default=0, description="Seed from which every trial seed derives.")
++    budgets: Budgets = Field(default_factory=Budgets, description="Per-trial budgets.")
++    fixtures_sha256: str = Field(
++        default="", description="Opaque value sealed into the manifest; never computed."
++    )
++    prior_runs: tuple[str, ...] = Field(
++        default=(), description="Every earlier experiment on the same candidate_id."
++    )
++
++    @model_validator(mode="after")
++    def _one_contract(self) -> Self:
++        given = self.model_fields_set
++        if {"oracle", "contract"} <= given:
++            raise _PathError(("oracle",), '"oracle" and "contract" both given; give one, not both')
++        if not {"oracle", "contract"} & given:
++            raise _PathError(("oracle",), 'missing required key "oracle" (or "contract")')
++        key = "oracle" if "oracle" in given else "contract"
++        if getattr(self, key) is None:
++            raise _PathError((key,), "must not be null")
++        if self.contract is not None:
++            try:
++                validate_contract(self.contract)
++            except ValueError as exc:
++                raise _PathError(("contract", "unobservable"), str(exc)) from None
++        return self
++
++    def contract_spec(self) -> ContractSpec:
++        if self.contract is not None:
++            return self.contract
++        return ContractSpec(oracle=str(self.oracle))
++
++    def to_manifest(self) -> Manifest:
++        """Compile and seal. `created_at` is "", as the Python builders leave it."""
++        try:
++            return Manifest.create(
++                experiment_id=self.experiment_id,
++                created_at="",
++                task_id=default_task_id(self.experiment_id)
++                if self.task_id is None
++                else self.task_id,
++                task=dict(self.task),
++                toolset=self.toolset,
++                mcp_server=self.mcp_server,
++                decisions=self.decisions,
++                contract=self.contract_spec(),
++                baseline=_arm(self.baseline),
++                candidate=_arm(self.candidate),
++                conditions=tuple(condition.to_condition() for condition in self.conditions),
++                alpha=self.alpha,
++                delta=self.delta,
++                n_per_arm=self.n_per_arm,
++                interval_method=self.interval_method,
++                looks=self.looks,
++                base_seed=self.base_seed,
++                budgets=self.budgets,
++                fixtures_sha256=self.fixtures_sha256,
++                prior_runs=self.prior_runs,
++            )
++        except ValidationError as exc:
++            path, message = _first_error(exc, None)
++            raise DescriptorError(message, path) from None
++
++
++def _arm(value: str | ArmSpec) -> ArmSpec:
++    if isinstance(value, ArmSpec):
++        return value
++    return ArmSpec(label=bare_arm_label(value), agent=value, candidate_id="")
++
++
++# --- errors -----------------------------------------------------------------------------------
++
++
++def _has(node: object, segment: str | int) -> bool:
++    if isinstance(node, dict):
++        return segment in node
++    return isinstance(node, list) and isinstance(segment, int) and 0 <= segment < len(node)
++
++
++def _source_path(loc: Sequence[str | int], data: object, keep_last: bool) -> SourcePath:
++    """Map a pydantic `loc` onto the keys present in the input, dropping union tags."""
++    path: list[str | int] = []
++    node: Any = data
++    for index, segment in enumerate(loc):
++        if _has(node, segment):
++            path.append(segment)
++            node = node[segment]
++        elif keep_last and index == len(loc) - 1:
++            path.append(segment)
++    return tuple(path)
++
++
++def _message(error: Any) -> str:
++    kind: str = error["type"]
++    loc: tuple[str | int, ...] = error["loc"]
++    context: dict[str, Any] = error.get("ctx") or {}
++    if kind == "extra_forbidden":
++        return f"unknown key {_quote(loc[-1])}"
++    if kind == "missing":
++        return f"missing required key {_quote(loc[-1])}"
++    if kind == "string_pattern_mismatch" and context.get("pattern") == REF_PATTERN:
++        return f"invalid reference {_quote(error['input'])}; expected module:function"
++    if kind == "invalid-json-value":
++        return "not a JSON value (dates, binary and sets are not JSON; quote the value)"
++    if kind == "value_error" and "error" in context:
++        return str(context["error"])
++    return str(error["msg"])
++
++
++def _sort_key(path: SourcePath) -> tuple[tuple[int, int, str], ...]:
++    return tuple((0, s, "") if isinstance(s, int) else (1, 0, str(s)) for s in path)
++
++
++def _first_error(exc: ValidationError, data: object) -> tuple[SourcePath, str]:
++    found: list[tuple[SourcePath, str, str]] = []
++    for error in exc.errors():
++        if data is None:
++            path: SourcePath = tuple(error["loc"])
++        else:
++            path = _source_path(error["loc"], data, keep_last=error["type"] == "missing")
++        cause = (error.get("ctx") or {}).get("error")
++        if isinstance(cause, _PathError):
++            found.append(((*path, *cause.path), cause.message, error["type"]))
++        else:
++            found.append((path, _message(error), error["type"]))
++    # A list whose items failed is also reported as too short; the item error is the cause.
++    kept = [
++        item
++        for item in found
++        if item[2] != "too_short"
++        or not any(
++            len(other[0]) > len(item[0]) and other[0][: len(item[0])] == item[0] for other in found
++        )
++    ]
++    path, message, _ = min(kept, key=lambda item: (_sort_key(item[0]), item[1]))
++    return path, message
++
++
++# --- loading ----------------------------------------------------------------------------------
++
++
++def is_descriptor_path(path: str | Path) -> bool:
++    return Path(path).suffix.lower() in DESCRIPTOR_SUFFIXES
++
++
++def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
++    """Parse one YAML document and validate it. Raises `DescriptorError`."""
++    try:
++        data = parse_yaml(text)
++    except yaml.MarkedYAMLError as exc:
++        mark = exc.problem_mark
++        where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
++        raise DescriptorError(f"invalid YAML{where}: {exc.problem}", (), source) from None
++    except yaml.YAMLError as exc:
++        raise DescriptorError(f"invalid YAML: {exc}", (), source) from None
++    if not isinstance(data, dict):
++        kind = "empty" if data is None else type(data).__name__
++        raise DescriptorError(f"must be one YAML mapping, got {kind}", (), source)
++    try:
++        return Descriptor.model_validate(data)
++    except ValidationError as exc:
++        path, message = _first_error(exc, data)
++        raise DescriptorError(message, path, source) from None
++
++
++def load_descriptor(path: str | Path) -> Descriptor:
++    source = str(path)
++    try:
++        text = Path(path).read_text(encoding="utf-8")
++    except (OSError, UnicodeDecodeError) as exc:
++        detail = exc.strerror if isinstance(exc, OSError) and exc.strerror else str(exc)
++        raise DescriptorError(f"cannot read: {detail}", (), source) from None
++    return loads_descriptor(text, source)
++
++
++def compile_descriptor_text(text: str, source: str = "<descriptor>") -> Manifest:
++    """`compile_descriptor` for text already in memory."""
++    descriptor = loads_descriptor(text, source)
++    try:
++        return descriptor.to_manifest()
++    except DescriptorError as exc:
++        raise exc.with_source(source) from None
++
++
++def compile_descriptor(path: str | Path) -> Manifest:
++    """Load `arci.yaml`, compile it and seal it: the manifest `arci run` executes."""
++    descriptor = load_descriptor(path)
++    try:
++        return descriptor.to_manifest()
++    except DescriptorError as exc:
++        raise exc.with_source(str(path)) from None
++
++
++def descriptor_schema() -> dict[str, Any]:
++    return Descriptor.model_json_schema()
++
++
++def render_schema() -> str:
++    """The bytes of `arci schema` and docs/schema/arci.schema.json."""
++    return json.dumps(descriptor_schema(), indent=2, sort_keys=True) + "\n"
+diff --git a/tests/unit/descriptor/__init__.py b/tests/unit/descriptor/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/tests/unit/descriptor/test_descriptor.py b/tests/unit/descriptor/test_descriptor.py
+new file mode 100644
+index 0000000..fccbad1
+--- /dev/null
++++ b/tests/unit/descriptor/test_descriptor.py
+@@ -0,0 +1,426 @@
++"""`arci.yaml` compiles to the sealed Manifest a Python builder makes, or fails in one line."""
++
++from __future__ import annotations
++
++import datetime
++import json
++import re
++import sys
++from collections.abc import Callable
++from pathlib import Path
++from typing import Any
++
++import pytest
++import yaml
++
++from arci.cli import main
++from arci.demo.experiment import build_manifest as build_retry
++from arci.descriptor import (
++    Descriptor,
++    DescriptorError,
++    bare_arm_label,
++    compile_descriptor,
++    compile_descriptor_text,
++    loads_descriptor,
++    parse_yaml,
++)
++from arci.schema import Bucket, Manifest
++from examples.guardrail_agent.experiment import build_manifest as build_guardrail
++from examples.guardrail_agent.world import public_task
++
++REPO = Path(__file__).resolve().parents[3]
++DOC = REPO / "docs" / "DESCRIPTOR.md"
++MOD = "tests.acceptance.fixture_agents"
++
++
++def _doc_block(heading: str) -> str:
++    text = DOC.read_text(encoding="utf-8")
++    section = text[text.index(heading) :]
++    match = re.search(r"```yaml\n(.*?)```", section, re.S)
++    assert match is not None
++    return match.group(1)
++
++
++RETRY = _doc_block("## Example: the retry demo")
++
++SMALL = f"""
++experiment_id: exp-yaml
++toolset: {MOD}:make_world
++oracle: {MOD}:oracle
++baseline: {MOD}:good_agent
++candidate: {MOD}:fragile_agent
++conditions:
++  - id: fetch_timeout
++    fault: {{name: tool_timeout, tool: fetch, occurrence: 0}}
++n_per_arm: 6
++"""
++
++GUARDRAIL = """
++experiment_id: guardrail-fixture-b-ask-provider_down-50
++task_id: guardrail-shell-command-ask
++task: TASK_JSON
++oracle: examples.guardrail_agent.world:oracle
++baseline:
++  label: a
++  candidate_id: guard-a
++  command:
++    argv: [PYTHON, -P, -m, examples.guardrail_agent.agent,
++           --mcp-config, "{mcp_config}", --task-file, "{task_file}", --variant, a]
++    infra_exit_codes: []
++candidate:
++  label: b
++  candidate_id: guard-b
++  command:
++    argv: [PYTHON, -P, -m, examples.guardrail_agent.agent,
++           --mcp-config, "{mcp_config}", --task-file, "{task_file}", --variant, b]
++    infra_exit_codes: []
++mcp_server:
++  name: guardrail
++  argv: [PYTHON, -P, -m, arci.mcp_toolset_server,
++         --toolset, "examples.guardrail_agent.world:make_world",
++         --workdir, "{workdir}", --seed, "{seed}", --task-file, "{task_file}"]
++  snapshot: arci.mcp_toolset_server:snapshot
++decisions:
++  upstream: fixture
++  fixture: "examples.guardrail_agent.decisions:fixture"
++  model: jev-1.13.0
++conditions:
++  - id: provider_down
++    fault: {name: decision_unavailable, tool: "decision:systemone"}
++n_per_arm: 50
++base_seed: 31000
++budgets: {max_tool_calls: 4, max_model_steps: 10, max_seconds: 30.0, grader_seconds: 10.0}
++prior_runs: []
++"""
++
++
++def _append(extra: str) -> Callable[[str], str]:
++    return lambda text: text + extra
++
++
++def _swap(old: str, new: str) -> Callable[[str], str]:
++    return lambda text: text.replace(old, new)
++
++
++def _whole(content: str) -> Callable[[str], str]:
++    return lambda _text: content
++
++
++def _compile(text: str) -> Manifest:
++    return compile_descriptor_text(text, "arci.yaml")
++
++
++def _error(text: str) -> str:
++    with pytest.raises(DescriptorError) as caught:
++        _compile(text)
++    return str(caught.value)
++
++
++def _semantic(manifest: Manifest) -> dict[str, Any]:
++    dumped = manifest.model_dump(mode="json")
++    del dumped["created_at"], dumped["record_sha256"]
++    return dumped
++
++
++# --- the two example files ---------------------------------------------------------------------
++
++
++def test_the_retry_example_seals_byte_equal_to_the_demo_builder() -> None:
++    compiled = _compile(RETRY)
++    built = build_retry(200, "agent_b")
++    assert compiled.record_sha256 == built.record_sha256
++    assert compiled.model_dump_json() == built.model_dump_json()
++    assert compiled.validate_seal() and compiled.created_at == ""
++
++
++def test_the_guardrail_example_round_trips_to_its_builder() -> None:
++    text = GUARDRAIL.replace("TASK_JSON", json.dumps(public_task("ask"))).replace(
++        "PYTHON", json.dumps(sys.executable)
++    )
++    compiled = _compile(text)
++    built = build_guardrail()
++    commands = public_task("ask")["commands"]
++    assert isinstance(commands, list) and len(commands) == 182
++    assert _semantic(compiled) == _semantic(built)
++    assert compiled.record_sha256 == built.record_sha256
++    # Placeholders stay literal strings in the sealed manifest.
++    assert compiled.mcp_server is not None and "{workdir}" in compiled.mcp_server.argv
++
++
++def test_compile_descriptor_reads_a_file(tmp_path: Path) -> None:
++    path = tmp_path / "arci.yaml"
++    path.write_text(RETRY, encoding="utf-8")
++    assert compile_descriptor(path).record_sha256 == build_retry().record_sha256
++    with pytest.raises(DescriptorError, match=r"^descriptor .*missing\.yaml: cannot read: "):
++        compile_descriptor(tmp_path / "missing.yaml")
++
++
++# --- aliases and shorthands -------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("short", "long"),
++    [
++        ("oracle: arci.demo.world:oracle", "contract: {oracle: 'arci.demo.world:oracle'}"),
++        ("  - id: reserve-timeout", "  - condition_id: reserve-timeout"),
++        ("occurrence: 0}", "at_occurrence: 0}"),
++        (
++            "    fault: {name: tool_timeout, tool: reserve, occurrence: 0}",
++            "    faults: [{name: tool_timeout, tool: reserve, occurrence: 0, bucket: falsify}]",
++        ),
++    ],
++)
++def test_an_alias_compiles_like_its_full_key(short: str, long: str) -> None:
++    assert short in RETRY
++    assert _compile(RETRY.replace(short, long)).record_sha256 == build_retry().record_sha256
++
++
++@pytest.mark.parametrize(
++    ("anchor", "extra", "path", "first", "second"),
++    [
++        (
++            "oracle: arci.demo.world:oracle",
++            "\ncontract: {oracle: 'arci.demo.world:oracle'}",
++            "oracle",
++            "oracle",
++            "contract",
++        ),
++        (
++            "  - id: reserve-timeout",
++            "\n    condition_id: reserve-timeout",
++            "conditions[0].id",
++            "id",
++            "condition_id",
++        ),
++        ("occurrence: 0}", "", "conditions[0].fault.occurrence", "occurrence", "at_occurrence"),
++        (
++            "    fault: {name: tool_timeout, tool: reserve, occurrence: 0}",
++            "\n    faults: [{name: tool_timeout, tool: reserve, occurrence: 0}]",
++            "conditions[0].fault",
++            "fault",
++            "faults",
++        ),
++    ],
++)
++def test_an_alias_and_its_full_key_are_never_both_accepted(
++    anchor: str, extra: str, path: str, first: str, second: str
++) -> None:
++    replacement = anchor + extra if extra else "occurrence: 0, at_occurrence: 0}"
++    message = _error(RETRY.replace(anchor, replacement))
++    assert message.startswith(f"descriptor arci.yaml:{path}: ")
++    assert f'"{first}"' in message and f'"{second}"' in message
++
++
++def test_bare_string_arms_and_fault_defaults() -> None:
++    manifest = _compile(SMALL)
++    assert manifest.baseline.label == "fixture_agents.good_agent"
++    assert manifest.baseline.agent == f"{MOD}:good_agent"
++    assert manifest.baseline.candidate_id == ""
++    assert manifest.candidate.label == "fixture_agents.fragile_agent"
++    assert manifest.task_id == "exp-yaml"  # defaults to the experiment id
++    fault = manifest.conditions[0].faults[0]
++    assert (fault.bucket, fault.params) == (Bucket.FALSIFY, {})
++    bare = _compile(SMALL.replace(", tool: fetch, occurrence: 0", "")).conditions[0].faults[0]
++    assert (bare.tool, bare.at_occurrence) == (None, None)
++    assert bare_arm_label("app.v1:run") == "v1.run"
++    assert bare_arm_label("agents:run") == "agents.run"
++
++
++def test_explicit_task_id_and_a_clean_condition() -> None:
++    text = SMALL.replace("experiment_id: exp-yaml", "experiment_id: exp-yaml\ntask_id: other")
++    text = text.replace("    fault: {name: tool_timeout, tool: fetch, occurrence: 0}\n", "")
++    manifest = _compile(text)
++    assert manifest.task_id == "other"
++    assert manifest.conditions[0].faults == ()
++
++
++def test_fixtures_sha256_is_an_opaque_pass_through() -> None:
++    manifest = _compile(SMALL + "fixtures_sha256: anything at all\n")
++    assert manifest.fixtures_sha256 == "anything at all"
++
++
++def test_a_custom_fault_factory_is_checked_for_syntax_but_never_imported() -> None:
++    text = SMALL.replace("name: tool_timeout", "name: 'nowhere.not_a_module:factory'")
++    assert _compile(text).conditions[0].faults[0].name == "nowhere.not_a_module:factory"
++    assert "nowhere" not in sys.modules
++
++
++def test_descriptor_defaults_and_bounds_are_the_manifest_s() -> None:
++    ours = Descriptor.model_json_schema()["properties"]
++    theirs = Manifest.model_json_schema()["properties"]
++    shared = [
++        "alpha",
++        "delta",
++        "n_per_arm",
++        "interval_method",
++        "looks",
++        "base_seed",
++        "fixtures_sha256",
++        "prior_runs",
++        "task",
++        "toolset",
++    ]
++    for key in shared:
++        strip = {"description", "title"}
++        assert {k: v for k, v in ours[key].items() if k not in strip} == {
++            k: v for k, v in theirs[key].items() if k not in strip
++        }, key
++
++
++# --- one-line errors --------------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("change", "expected"),
++    [
++        (
++            _append("n_per_arn: 3\n"),
++            'descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"',
++        ),
++        (
++            _swap(f"baseline: {MOD}:good_agent", "baseline: pkg/run"),
++            'descriptor arci.yaml:baseline: invalid reference "pkg/run"; expected module:function',
++        ),
++        (
++            _swap("name: tool_timeout", "name: tool_timout"),
++            'descriptor arci.yaml:conditions[0].fault.name: unknown fault "tool_timout"; '
++            "expected one of decision_low_confidence, decision_unavailable, empty_result, "
++            "tool_error_once, tool_timeout or module:function",
++        ),
++    ],
++)
++def test_errors_through_main_are_one_line_exit_three_with_empty_stdout(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++    capsys: pytest.CaptureFixture[str],
++    change: Callable[[str], str],
++    expected: str,
++) -> None:
++    monkeypatch.chdir(tmp_path)
++    Path("arci.yaml").write_text(change(SMALL), encoding="utf-8")
++    assert main(["run", "arci.yaml", "--out", "runs"]) == 3
++    captured = capsys.readouterr()
++    assert captured.out == ""
++    assert captured.err == f"error: CliError: {expected}\n"
++    assert not Path("runs").exists()
++
++
++@pytest.mark.parametrize("key", ["schema_version", "record_sha256", "created_at", "$schema"])
++def test_sealer_owned_keys_are_unknown(key: str) -> None:
++    message = _error(SMALL + f'"{key}": x\n')
++    assert message.endswith(f'unknown key "{key}"')
++
++
++@pytest.mark.parametrize(
++    ("change", "expected"),
++    [
++        (_swap(f"oracle: {MOD}:oracle", ""), 'oracle: missing required key "oracle"'),
++        (
++            _swap("  - id: fetch_timeout\n    fault:", "  - fault:"),
++            'conditions[0].id: missing required key "id" (or "condition_id")',
++        ),
++        (_swap("conditions:", "conditions: []\nx:"), ":conditions: "),
++        (
++            _append("contract: {oracle: 'a:b', unobservable: [mood]}\n"),
++            ":oracle: ",  # both given; reported first by source path
++        ),
++        (_append("looks: [3]\n"), "arci.yaml: looks must start above 0 and end at n_per_arm"),
++        (
++            _swap("tool: fetch", "tool: 'decision:systemone'"),
++            "arci.yaml: tool_timeout cannot target decisions",
++        ),
++        (
++            _swap("name: tool_timeout", "name: decision_unavailable"),
++            "arci.yaml: decision_unavailable needs `decisions`",
++        ),
++        (_append("mcp_server: {argv: [x], snapshot: 'a:b'}\n"), "need `toolset` and no"),
++        (_whole("- a list\n"), "arci.yaml: must be one YAML mapping, got list"),
++        (_whole(""), "arci.yaml: must be one YAML mapping, got empty"),
++        (_whole('a: !!int "zz"\n'), "arci.yaml: invalid YAML at line 1, column 4: invalid integer"),
++        (_append("task: [\n"), "arci.yaml: invalid YAML at line "),
++        (_append("---\nx: 1\n"), "arci.yaml: invalid YAML at line "),
++        (_append("task: {when: !!timestamp 2026-10-13}\n"), "task.when: not a JSON value"),
++    ],
++)
++def test_error_paths_and_messages(change: Callable[[str], str], expected: str) -> None:
++    message = _error(change(SMALL))
++    assert expected in message
++    assert "\n" not in message
++
++
++def test_unobservable_contract_is_rejected_at_its_path() -> None:
++    text = SMALL.replace(
++        f"oracle: {MOD}:oracle", f"contract: {{oracle: '{MOD}:oracle', unobservable: [mood]}}"
++    )
++    assert ":contract.unobservable: invariants outside the tool boundary" in _error(text)
++
++
++def test_the_first_error_by_source_path_is_reported() -> None:
++    text = SMALL + "zzz: 1\nalpha: 7\n"
++    assert _error(text).startswith("descriptor arci.yaml:alpha: ")
++
++
++def test_control_characters_are_escaped_into_one_line() -> None:
++    message = _error(SMALL + '"bad\\nkey\\u0007": 1\n')
++    assert "\n" not in message and "\x07" not in message
++    assert message.endswith('unknown key "bad\\nkey\\u0007"')
++
++
++def test_descriptor_error_is_a_value_error_with_its_parts() -> None:
++    with pytest.raises(ValueError) as caught:
++        loads_descriptor(SMALL + "n_per_arn: 3\n", "x.yaml")
++    error = caught.value
++    assert isinstance(error, DescriptorError)
++    assert (error.source, error.path, error.message) == (
++        "x.yaml",
++        ("n_per_arn",),
++        'unknown key "n_per_arn"',
++    )
++
++
++# --- YAML parsing (ruling 3) ------------------------------------------------------------------
++
++
++def test_the_descriptor_loader_resolves_only_unambiguous_scalars() -> None:
++    parsed = parse_yaml(
++        "a: yes\nb: no\nc: on\nd: off\ne: True\nf: 010\ng: 0o10\nh: 0x1f\ni: 0b101\n"
++        'j: "true"\nk: 2026-10-13\nl: 2026-10-13T10:00:00Z\nm: true\nn: false\no: -42\n'
++        "p: 1.5\nq: null\nr: ~\ns: 1:30\nt: 1_000\n"
++    )
++    assert parsed == {
++        "a": "yes",
++        "b": "no",
++        "c": "on",
++        "d": "off",
++        "e": "True",
++        "f": 10,
++        "g": 8,
++        "h": 31,
++        "i": 5,
++        "j": "true",
++        "k": "2026-10-13",
++        "l": "2026-10-13T10:00:00Z",
++        "m": True,
++        "n": False,
++        "o": -42,
++        "p": 1.5,
++        "q": None,
++        "r": None,
++        "s": "1:30",
++        "t": "1_000",
++    }
++
++
++def test_the_global_safe_load_is_unchanged() -> None:
++    parse_yaml("a: yes\n")
++    assert yaml.safe_load("a: yes\nb: 010\nc: 2026-10-13\nd: on\n") == {
++        "a": True,
++        "b": 8,
++        "c": datetime.date(2026, 10, 13),
++        "d": True,
++    }
++
++
++def test_yes_in_a_task_stays_a_string_in_the_manifest() -> None:
++    text = SMALL + "task: {answer: yes, code: 010, day: 2026-10-13}\n"
++    assert _compile(text).task == {"answer": "yes", "code": 10, "day": "2026-10-13"}
+diff --git a/tests/unit/descriptor/test_run_yaml.py b/tests/unit/descriptor/test_run_yaml.py
+new file mode 100644
+index 0000000..65c9e00
+--- /dev/null
++++ b/tests/unit/descriptor/test_run_yaml.py
+@@ -0,0 +1,126 @@
++"""`arci run x.yaml` compiles, seals and runs; the run store and verdict match the JSON path."""
++
++from __future__ import annotations
++
++import os
++import subprocess
++import sys
++import textwrap
++from pathlib import Path
++
++from arci.descriptor import compile_descriptor_text
++from arci.schema import GateDecision, Manifest
++
++REPO = Path(__file__).resolve().parents[3]
++MOD = "tests.acceptance.fixture_agents"
++
++DESCRIPTOR = f"""\
++experiment_id: exp-yaml
++task_id: store-the-answer
++task: {{goal: store 42}}
++toolset: {MOD}:make_world
++oracle: {MOD}:oracle
++baseline: {{label: A, agent: "{MOD}:good_agent", candidate_id: a}}
++candidate: {{label: B, agent: "{MOD}:fragile_agent", candidate_id: b}}
++conditions:
++  - id: fetch_timeout
++    fault: {{name: tool_timeout, tool: fetch, occurrence: 0}}
++n_per_arm: 6
++base_seed: 7
++budgets: {{max_tool_calls: 20, max_seconds: 10.0}}
++"""
++
++
++def arci(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
++    env = {**os.environ, "PYTHONPATH": str(REPO)}
++    return subprocess.run(
++        [sys.executable, "-m", "arci.cli", *args],
++        cwd=cwd,
++        env=env,
++        capture_output=True,
++        text=True,
++        timeout=300,
++        check=False,
++    )
++
++
++def test_run_yaml_matches_the_json_path(tmp_path: Path) -> None:
++    compiled = compile_descriptor_text(DESCRIPTOR)
++    yaml_dir, json_dir = tmp_path / "yaml", tmp_path / "json"
++    yaml_dir.mkdir()
++    json_dir.mkdir()
++    (yaml_dir / "arci.yaml").write_text(DESCRIPTOR, encoding="utf-8")
++    (json_dir / "manifest.json").write_text(compiled.model_dump_json(), encoding="utf-8")
++
++    from_yaml = arci("run", "arci.yaml", "--out", "runs", "--workers", "8", cwd=yaml_dir)
++    from_json = arci("run", "manifest.json", "--out", "runs", "--workers", "8", cwd=json_dir)
++
++    assert from_yaml.returncode == 2, from_yaml.stderr[-2000:]  # 6/6 vs 0/6: INCONCLUSIVE
++    assert from_json.returncode == 2, from_json.stderr[-2000:]
++    assert from_yaml.stderr == ""
++    last = from_yaml.stdout.strip().splitlines()[-1]
++    assert last.startswith("VERDICT: INCONCLUSIVE")
++    assert last == from_json.stdout.strip().splitlines()[-1]
++
++    run_dir = yaml_dir / "runs" / "exp-yaml"
++    stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text())
++    assert stored.validate_seal()
++    assert stored == compiled
++    assert (run_dir / "manifest.json").read_text() == compiled.model_dump_json(indent=2) + "\n"
++    yaml_decision = GateDecision.model_validate_json((run_dir / "decision.json").read_text())
++    json_decision = GateDecision.model_validate_json(
++        (json_dir / "runs" / "exp-yaml" / "decision.json").read_text()
++    )
++    assert yaml_decision.record_sha256 == json_decision.record_sha256
++
++
++def test_out_defaults_to_runs(tmp_path: Path) -> None:
++    (tmp_path / "arci.yml").write_text(
++        DESCRIPTOR.replace("n_per_arm: 6", "n_per_arm: 1"), encoding="utf-8"
++    )
++    done = arci("run", "arci.yml", cwd=tmp_path)
++    assert done.returncode == 2, done.stderr[-2000:]
++    assert done.stdout.strip().splitlines()[-1].startswith("VERDICT: ")
++    assert (tmp_path / "runs" / "exp-yaml" / "manifest.json").is_file()
++    assert (tmp_path / "runs" / "exp-yaml" / "decision.json").is_file()
++
++
++def test_a_broken_descriptor_fails_before_any_trial(tmp_path: Path) -> None:
++    (tmp_path / "arci.yaml").write_text(DESCRIPTOR + "n_per_arn: 3\n", encoding="utf-8")
++    done = arci("run", "arci.yaml", cwd=tmp_path)
++    assert done.returncode == 3
++    assert done.stdout == ""
++    assert done.stderr == (
++        'error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"\n'
++    )
++    assert not (tmp_path / "runs").exists()
++
++
++def test_a_json_manifest_is_still_seal_checked(tmp_path: Path) -> None:
++    compiled = compile_descriptor_text(DESCRIPTOR)
++    tampered = compiled.model_copy(update={"n_per_arm": 5})
++    (tmp_path / "manifest.json").write_text(tampered.model_dump_json(), encoding="utf-8")
++    done = arci("run", "manifest.json", cwd=tmp_path)
++    assert done.returncode == 3
++    assert done.stderr == "error: CliError: manifest seal is invalid\n"
++
++
++def test_the_cli_with_the_descriptor_never_imports_bench() -> None:
++    script = textwrap.dedent(
++        """
++        import contextlib, io, sys
++        from arci.cli import main
++        with contextlib.redirect_stdout(io.StringIO()):
++            code = main(["schema"])
++        assert code == 0, code
++        assert "arci.descriptor" in sys.modules
++        loaded = sorted(m for m in sys.modules if m == "bench" or m.startswith("bench."))
++        assert not loaded, loaded
++        print("ok")
++        """
++    )
++    completed = subprocess.run(
++        [sys.executable, "-c", script], capture_output=True, text=True, check=False
++    )
++    assert completed.returncode == 0, completed.stderr
++    assert completed.stdout == "ok\n"
+diff --git a/tests/unit/descriptor/test_schema_file.py b/tests/unit/descriptor/test_schema_file.py
+new file mode 100644
+index 0000000..e795b77
+--- /dev/null
++++ b/tests/unit/descriptor/test_schema_file.py
+@@ -0,0 +1,84 @@
++"""`arci schema` is deterministic and docs/schema/arci.schema.json is never stale."""
++
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++
++from arci.cli import main
++from arci.descriptor import SCHEMA_ID, SCHEMA_TITLE, render_schema
++
++REPO = Path(__file__).resolve().parents[3]
++COMMITTED = REPO / "docs" / "schema" / "arci.schema.json"
++
++
++def test_the_committed_schema_is_not_stale() -> None:
++    # Regenerate with: .venv/bin/python -m arci.cli schema --out docs/schema/arci.schema.json
++    assert COMMITTED.read_bytes() == render_schema().encode("utf-8")
++
++
++def test_arci_schema_prints_the_committed_bytes(capsys: pytest.CaptureFixture[str]) -> None:
++    assert main(["schema"]) == 0
++    captured = capsys.readouterr()
++    assert captured.err == ""
++    assert captured.out.encode("utf-8") == COMMITTED.read_bytes()
++
++
++def test_arci_schema_out_writes_identical_bytes(
++    tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    out = tmp_path / "arci.schema.json"
++    assert main(["schema", "--out", str(out)]) == 0
++    captured = capsys.readouterr()
++    assert (captured.out, captured.err) == ("", "")
++    assert out.read_bytes() == COMMITTED.read_bytes()
++
++
++def test_schema_format_title_and_id() -> None:
++    text = render_schema()
++    assert text.endswith("}\n") and not text.endswith("\n\n")
++    document = json.loads(text)
++    assert text == json.dumps(document, indent=2, sort_keys=True) + "\n"
++    assert document["title"] == SCHEMA_TITLE == "ARCI experiment descriptor"
++    assert document["$id"] == SCHEMA_ID
++    assert SCHEMA_ID.endswith("/v0.8.0/docs/schema/arci.schema.json")
++    assert document["additionalProperties"] is False
++    assert sorted(document["required"]) == ["baseline", "candidate", "conditions", "experiment_id"]
++
++
++def test_the_schema_describes_every_shorthand_and_exclusion() -> None:
++    document = json.loads(render_schema())
++    top = document["description"]
++    for phrase in (
++        "`oracle`",
++        "`contract`",
++        "bare",
++        "`id`",
++        "`fault`",
++        "`occurrence`",
++        "authoritative",
++    ):
++        assert phrase in top, phrase
++    defs = document["$defs"]
++    assert "exactly one of `id` and `condition_id`" in defs["DescriptorCondition"]["description"]
++    assert "at most one of `fault`" in defs["DescriptorCondition"]["description"]
++    assert "not both" in defs["DescriptorFault"]["description"]
++    assert "exactly one of" in document["properties"]["baseline"]["description"]
++    assert "exactly one of" in document["properties"]["oracle"]["description"]
++
++
++@pytest.mark.parametrize("command", ["schema", "run"])
++def test_help_exits_zero_with_empty_stderr(command: str) -> None:
++    completed = subprocess.run(
++        [sys.executable, "-m", "arci.cli", command, "--help"],
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    assert completed.returncode == 0
++    assert completed.stderr == ""
++    assert completed.stdout.startswith(f"usage: arci {command}")

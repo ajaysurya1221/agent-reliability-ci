@@ -15,7 +15,29 @@ from typing import Literal, NoReturn, Protocol, cast
 from pydantic import JsonValue
 
 from arci.demo.run import check_keep, default_workers, run_demo
+
+# --- descriptor ---
+from arci.descriptor import (
+    DescriptorError,
+    compile_descriptor,
+    is_descriptor_path,
+    render_schema,
+)
+
+# --- end descriptor ---
 from arci.gate import decide
+
+# --- init ---
+from arci.init import (
+    DEFAULT_N_PER_ARM,
+    DEFAULT_OUT,
+    INIT_FAULTS,
+    InitError,
+    parse_request,
+    run_init,
+)
+
+# --- end init ---
 from arci.mcp_boundary import (
     UpstreamResult,
     request_decision_upstream,
@@ -118,15 +140,169 @@ def _find_spec(manifest: Manifest, trial_id: str) -> TrialSpec:
     return matches[0]
 
 
-def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
-    manifest = Manifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
+# --- descriptor ---
+def _run_manifest(path: str) -> Manifest:
+    """`arci.yaml`/`.yml` is compiled and sealed; anything else is sealed JSON, seal checked."""
+    if is_descriptor_path(path):
+        try:
+            return compile_descriptor(path)
+        except DescriptorError as exc:
+            raise CliError(str(exc)) from None
+    manifest = Manifest.model_validate_json(Path(path).read_text(encoding="utf-8"))
     if not manifest.validate_seal():
         raise CliError("manifest seal is invalid")
+    return manifest
+
+
+def _cmd_schema(out_path: str | None) -> int:
+    """Print the descriptor's JSON Schema, or write the identical bytes to `out_path`."""
+    text = render_schema()
+    if out_path is None:
+        sys.stdout.write(text)
+    else:
+        Path(out_path).write_bytes(text.encode("utf-8"))
+    return 0
+
+
+# --- end descriptor ---
+
+
+# --- init ---
+def _cmd_init(values: dict[str, object]) -> int:
+    """`arci init`: one stdout line (the next command), empty stderr, exit 0; or exit 3."""
+    try:
+        request = parse_request(
+            experiment_id=cast(str, values["experiment_id"]),
+            baseline=cast(str, values["baseline"]),
+            candidate=cast(str, values["candidate"]),
+            toolset=cast(str, values["toolset"]),
+            oracle=cast(str, values["oracle"]),
+            task=cast(str | None, values["task"]),
+            task_file=cast(str | None, values["task_file"]),
+            faults=tuple(cast(list[str], values["fault"])),
+            n=cast(str, values["n"]),
+            out=cast(str, values["init_out"]),
+            force=cast(bool, values["force"]),
+        )
+        print(run_init(request))
+    except InitError as exc:
+        raise CliError(f"init: {exc}") from None
+    return 0
+
+
+# --- end init ---
+
+
+# --- smoke ---
+# The smoke notice imports its gate and planner names locally, so that this block stays the only
+# place in this module the notice touches.
+SMOKE_N_BELOW = 100
+_SMOKE_PLAN = (
+    "Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK"
+)
+
+
+def _gating_conditions(manifest: Manifest) -> int:
+    """K as the gate counts it: conditions with no ceiling fault."""
+    from arci.schema import Bucket
+
+    return sum(
+        not any(fault.bucket is Bucket.CEILING for fault in condition.faults)
+        for condition in manifest.conditions
+    )
+
+
+def _smallest_n(alpha: float, delta: float, *, collapse: bool) -> int | None:
+    """The smallest N <= the planner's bound at which the gate's own functions give the verdict.
+
+    Two perfect arms (N/N vs N/N) for PASS; a total collapse (N/N vs 0/N) for BLOCK. One gating
+    condition, one look, Clopper-Pearson at the gate's per-arm tail alpha/4: the planner's domain.
+    Every N is checked, from 1 up; nothing is assumed about monotonicity.
+    """
+    from arci.gate import classify
+    from arci.planning import MAX_N_PER_ARM, per_arm_tail
+    from arci.stats import clopper_pearson_tail, difference_bounds
+
+    tail = per_arm_tail(alpha)
+    target = Verdict.BLOCK if collapse else Verdict.PASS
+    for n in range(1, MAX_N_PER_ARM + 1):
+        bounds = difference_bounds(
+            baseline=clopper_pearson_tail(n, n, tail),
+            candidate=clopper_pearson_tail(0 if collapse else n, n, tail),
+        )
+        if classify(*bounds, delta) is target:
+            return n
+    return None
+
+
+def _cannot(outcome: str, verdict: str, n: int | None) -> str:
+    from arci.planning import MAX_N_PER_ARM
+
+    if n is None:
+        return f"{outcome} cannot {verdict} at any N up to {MAX_N_PER_ARM}"
+    return f"{outcome} cannot {verdict} below N={n}"
+
+
+def smoke_notice(manifest: Manifest) -> str | None:
+    """The one stderr line `arci run` prints before a smoke design runs, or None.
+
+    It fires when some gating condition has n_per_arm < 100. Inside the planner's domain
+    (clopper_pearson, K=1, one look) the thresholds are this manifest's own alpha and delta under
+    its fixed-sample Clopper-Pearson rule; otherwise they are given for reference only, under
+    Clopper-Pearson with alpha 0.05, delta 0.1, K=1 and one look, and the line says so.
+    """
+    k = _gating_conditions(manifest)
+    n = manifest.n_per_arm
+    if k == 0 or n >= SMOKE_N_BELOW:
+        return None
+    in_domain = (
+        manifest.interval_method == INTERVAL_METHOD and k == 1 and manifest.looks in ((), (n,))
+    )
+    alpha, delta = (manifest.alpha, manifest.delta) if in_domain else (0.05, 0.10)
+    rule = (
+        "under this design's fixed-sample Clopper\u2013Pearson rule"
+        if in_domain
+        else f"for reference only, under Clopper\u2013Pearson with alpha {alpha:g}, "
+        f"delta {delta:g}, K=1 and one look,"
+    )
+    return (
+        f"SMOKE DESIGN: n_per_arm={n} (alpha {manifest.alpha:g}, delta {manifest.delta:g}, "
+        f"K={k}): {rule} "
+        f"{_cannot('two perfect arms', 'PASS', _smallest_n(alpha, delta, collapse=False))} and "
+        f"{_cannot('a total collapse', 'BLOCK', _smallest_n(alpha, delta, collapse=True))}; "
+        f"expect INCONCLUSIVE. {_SMOKE_PLAN}"
+    )
+
+
+def smoke_followup(manifest: Manifest) -> str:
+    """The second stderr line, after an INCONCLUSIVE verdict on a design that got the notice."""
+    return (
+        f"INCONCLUSIVE at n_per_arm={manifest.n_per_arm} is the expected smoke result; "
+        "choose a confirmatory N with arci plan before re-running."
+    )
+
+
+# --- end smoke ---
+
+
+def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
+    # --- descriptor ---
+    manifest = _run_manifest(manifest_path)
+    # --- end descriptor ---
+    # --- smoke ---
+    notice = smoke_notice(manifest)
+    if notice is not None:
+        print(notice, file=sys.stderr, flush=True)
+    # --- end smoke ---
     trials = run_experiment(manifest, out_dir, max_workers=workers)
     decision = decide(manifest, trials)
     run_dir = Path(out_dir) / manifest.experiment_id
     _write(run_dir / "decision.json", decision.model_dump_json(indent=2) + "\n")
     _print(render_markdown(manifest, decision, trials))
+    # --- smoke ---
+    if notice is not None and decision.verdict is Verdict.INCONCLUSIVE:
+        print(smoke_followup(manifest), file=sys.stderr)
+    # --- end smoke ---
     return decision.exit_code
 
 
@@ -414,9 +590,18 @@ def _parser() -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    run = commands.add_parser("run", help="run a frozen experiment manifest")
-    run.add_argument("manifest_json", metavar="MANIFEST_JSON")
-    run.add_argument("--out", required=True, metavar="DIR")
+    # --- descriptor ---
+    run = commands.add_parser(
+        "run",
+        help="run an arci.yaml descriptor or a frozen manifest",
+        description=(
+            "Run an experiment. A .yaml/.yml path is an arci.yaml descriptor, compiled and "
+            "sealed before any trial; any other path is a sealed manifest JSON, seal checked."
+        ),
+    )
+    run.add_argument("manifest_json", metavar="PATH", help="arci.yaml descriptor or manifest JSON")
+    run.add_argument("--out", default="runs", metavar="DIR", help="run store (default: runs)")
+    # --- end descriptor ---
     run.add_argument("--workers", type=_positive_int, default=4, metavar="N")
 
     preflight = commands.add_parser("preflight", help="check an HTTP decision upstream")
@@ -523,6 +708,61 @@ def _parser() -> _Parser:
         help="write the run stores to DIR (empty or new) instead of a kept temporary directory",
     )
     # --- end demo ---
+    # --- descriptor ---
+    schema = commands.add_parser(
+        "schema",
+        help="print the arci.yaml JSON Schema",
+        description=(
+            "Print the JSON Schema of the arci.yaml descriptor, generated from the pydantic "
+            "models (which stay authoritative: the schema cannot express cross-field rules)."
+        ),
+    )
+    schema.add_argument("--out", metavar="PATH", help="write the schema to PATH instead")
+    # --- end descriptor ---
+    # --- init ---
+    init = commands.add_parser(
+        "init",
+        help="write a runnable arci.yaml for a first experiment",
+        description=(
+            "Write an arci.yaml smoke design from four module:function references, checked at "
+            "once in a child process (imported and resolved; the toolset is built once with "
+            "the task and seed 0; nothing else is called). Prints the next command."
+        ),
+    )
+    init.add_argument("experiment_id", metavar="EXPERIMENT_ID", help="also the task id")
+    init.add_argument("--baseline", required=True, metavar="REF", help="module:function agent")
+    init.add_argument("--candidate", required=True, metavar="REF", help="module:function agent")
+    init.add_argument(
+        "--toolset", required=True, metavar="REF", help="module:function (task, seed) factory"
+    )
+    init.add_argument(
+        "--oracle", required=True, metavar="REF", help="module:function (task, state) -> bool"
+    )
+    init.add_argument("--task", metavar="JSON", help="the task, a JSON object (default {})")
+    init.add_argument("--task-file", metavar="PATH", help="read the task JSON from a UTF-8 file")
+    init.add_argument(
+        "--fault",
+        action="append",
+        default=[],
+        metavar="NAME[:TOOL[:OCC]]",
+        help=(
+            f"repeatable; one of {', '.join(INIT_FAULTS)}; TOOL omitted means any tool, OCC "
+            "omitted means 0; all faults form one condition, 'faults' (none: 'clean')"
+        ),
+    )
+    init.add_argument(
+        "--n",
+        default=str(DEFAULT_N_PER_ARM),
+        metavar="N",
+        help=f"trials per arm (default {DEFAULT_N_PER_ARM}: a smoke design)",
+    )
+    init.add_argument(
+        "--out", dest="init_out", default=DEFAULT_OUT, metavar="PATH", help="default arci.yaml"
+    )
+    init.add_argument(
+        "--force", action="store_true", help="replace an existing regular file at --out"
+    )
+    # --- end init ---
     return parser
 
 
@@ -601,6 +841,14 @@ def _dispatch(values: dict[str, object]) -> int:
             keep=None if keep is None else Path(keep),
         )
     # --- end demo ---
+    # --- descriptor ---
+    if command == "schema":
+        return _cmd_schema(cast(str | None, values["out"]))
+    # --- end descriptor ---
+    # --- init ---
+    if command == "init":
+        return _cmd_init(values)
+    # --- end init ---
     raise CliError(f"unknown command: {command}")
 
 

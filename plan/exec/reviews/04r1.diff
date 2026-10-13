@@ -1,0 +1,823 @@
+diff --git a/src/arci/cli.py b/src/arci/cli.py
+index 44eac3d..9eca881 100644
+--- a/src/arci/cli.py
++++ b/src/arci/cli.py
+@@ -247,8 +247,9 @@ def smoke_notice(manifest: Manifest) -> str | None:
+     """The one stderr line `arci run` prints before a smoke design runs, or None.
+ 
+     It fires when some gating condition has n_per_arm < 100. Inside the planner's domain
+-    (clopper_pearson, K=1, one look) the thresholds are this manifest's; otherwise they are the
+-    default rule's (alpha 0.05, delta 0.10, K=1, one look), and the line says so.
++    (clopper_pearson, K=1, one look) the thresholds are this manifest's own alpha and delta under
++    its fixed-sample Clopper-Pearson rule; otherwise they are given for reference only, under
++    Clopper-Pearson with alpha 0.05, delta 0.1, K=1 and one look, and the line says so.
+     """
+     k = _gating_conditions(manifest)
+     n = manifest.n_per_arm
+@@ -259,10 +260,10 @@ def smoke_notice(manifest: Manifest) -> str | None:
+     )
+     alpha, delta = (manifest.alpha, manifest.delta) if in_domain else (0.05, 0.10)
+     rule = (
+-        "under the default rule"
++        "under this design's fixed-sample Clopper\u2013Pearson rule"
+         if in_domain
+-        else "under the default rule (default rule: alpha 0.05, delta 0.1, K=1, one look; "
+-        "this design is outside the planner's domain)"
++        else f"for reference only, under Clopper\u2013Pearson with alpha {alpha:g}, "
++        f"delta {delta:g}, K=1 and one look,"
+     )
+     return (
+         f"SMOKE DESIGN: n_per_arm={n} (alpha {manifest.alpha:g}, delta {manifest.delta:g}, "
+diff --git a/src/arci/descriptor.py b/src/arci/descriptor.py
+index a094576..be43b9a 100644
+--- a/src/arci/descriptor.py
++++ b/src/arci/descriptor.py
+@@ -295,8 +295,9 @@ def _check_node(
+ 
+     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
+     boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
+-    `MAX_DEPTH`. A merge key (`<<`) is not a duplicate: keys it brings in may be overridden, as
+-    YAML intends. A node reached twice through an alias is checked once.
++    `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
++    intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
++    mapping is a repeated key like any other. A node reached twice through an alias is checked once.
+     """
+     if id(node) in active:
+         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
+@@ -310,8 +311,17 @@ def _check_node(
+         _check_scalar(node, path)
+     elif isinstance(node, yaml.MappingNode):
+         keys: set[str] = set()
++        merged = False
+         for key_node, value_node in cast(list[tuple[yaml.Node, yaml.Node]], node.value):
+             if key_node.tag == _MERGE_TAG:
++                if merged:
++                    mark = key_node.start_mark
++                    raise _SourceError(
++                        path,
++                        f"duplicate merge key {_quote('<<')} at line {mark.line + 1}, column "
++                        f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
++                    )
++                merged = True
+                 _check_node(loader, value_node, path, active, done)
+                 continue
+             key = _check_key(loader, key_node, path)
+diff --git a/src/arci/init.py b/src/arci/init.py
+index cf7f9c1..d27a13b 100644
+--- a/src/arci/init.py
++++ b/src/arci/init.py
+@@ -9,8 +9,9 @@ names it advertises; explicit fault tools are checked against them. Agents, the
+ and `snapshot` are never called, and this process never imports a reference (AGENT_SEMANTICS).
+ 
+ The descriptor is rendered with every string value double-quoted, staged beside the destination,
+-re-loaded through the descriptor loader and seal-checked, then published atomically. Errors are
+-`InitError`, one line, with nothing written.
++re-loaded through the descriptor loader and seal-checked, then published: with `--force` by an
++atomic rename; without it by a hard link or, where links are unsupported, an exclusive create, so
++an existing file is never replaced. Errors are `InitError`, one line, with nothing written.
+ """
+ 
+ from __future__ import annotations
+@@ -61,10 +62,15 @@ HEADER: Final = (
+     "# Plan before trials: arci plan --help\n"
+     "# Never extend this experiment based on its verdict.\n"
+ )
++# From this N per arm a design is not a smoke design (the same bound as `arci run`'s notice).
++NON_SMOKE_N: Final = 100
+ 
+ # The flags in validation order; the child resolves the references in this order too.
+ _REFERENCE_FLAGS: Final = ("--baseline", "--candidate", "--toolset", "--oracle")
+ _DETAIL_LIMIT: Final = 200
++EXPERIMENT_ID_MAX: Final = 200
++OCCURRENCE_MAX: Final = 10**9
++_ADVERTISED_MAX: Final = 20
+ 
+ assert set(INIT_FAULTS) <= set(REGISTRY), "init offers only registered built-in faults"
+ 
+@@ -124,7 +130,7 @@ def _one_line(text: str) -> str:
+ 
+ 
+ def _parse_n(text: str) -> int:
+-    if not (text.isascii() and text.isdecimal()) or not (
++    if not (text.isascii() and text.isdecimal() and len(text) <= len(str(N_PER_ARM_MAX))) or not (
+         N_PER_ARM_MIN <= int(text) <= N_PER_ARM_MAX
+     ):
+         raise InitError(
+@@ -142,6 +148,11 @@ def _check_out_suffix(out_text: str) -> None:
+ 
+ 
+ def _check_experiment_id(experiment_id: str) -> None:
++    if len(experiment_id) > EXPERIMENT_ID_MAX:
++        raise InitError(
++            f"experiment id has {len(experiment_id)} characters; at most {EXPERIMENT_ID_MAX} "
++            "(it names the run directory)"
++        )
+     if re.fullmatch(EXPERIMENT_ID_PATTERN, experiment_id) is None:
+         raise InitError(
+             f"experiment id {_show(experiment_id)} must match {EXPERIMENT_ID_PATTERN} "
+@@ -204,8 +215,15 @@ def _parse_fault(text: str) -> InitFault:
+     occurrence = 0
+     if len(parts) == 3:
+         occ = parts[2]
+-        if not (occ.isascii() and occ.isdecimal()):
+-            raise InitError(f"{flag}: occurrence {_show(occ)} must be a non-negative integer")
++        if not (
++            occ.isascii()
++            and occ.isdecimal()
++            and len(occ) <= len(str(OCCURRENCE_MAX))
++            and int(occ) <= OCCURRENCE_MAX
++        ):
++            raise InitError(
++                f"{flag}: occurrence {_show(occ)} must be an integer from 0 to {OCCURRENCE_MAX}"
++            )
+         occurrence = int(occ)
+     return InitFault(text=text, name=name, tool=tool, occurrence=occurrence)
+ 
+@@ -296,7 +314,10 @@ os.dup2(2, 1)
+ sys.stdout = sys.stderr
+ 
+ def finish(result):
+-    sys.stderr.flush()
++    try:
++        sys.stderr.flush()
++    except BaseException:
++        pass
+     os.write(result_fd, (json.dumps(result) + "\n").encode("utf-8"))
+     os._exit(0)
+ 
+@@ -323,7 +344,8 @@ for flag, ref in request["references"]:
+         finish({"ok": False, "kind": "callable", "flag": flag, "ref": ref,
+                 "detail": describe(exc)})
+     except BaseException as exc:
+-        finish({"ok": False, "kind": "import", "flag": flag, "ref": ref, "detail": describe(exc)})
++        finish({"ok": False, "kind": "resolve", "flag": flag, "ref": ref,
++                "detail": type(exc).__name__})
+ 
+ toolset = request["toolset"]
+ try:
+@@ -359,7 +381,12 @@ def _child_failure(result: dict[str, object]) -> InitError:
+     detail = _one_line(str(result.get("detail", "")))
+     module, _, attribute = ref.partition(":")
+     if kind == "import":
+-        return InitError(f"{flag} {ref}: module not importable; check module and dependencies")
++        return InitError(
++            f"{flag} {ref}: module not importable; importing {module} raised {detail}; "
++            "check module and dependencies"
++        )
++    if kind == "resolve":
++        return InitError(f"{flag} {ref}: importable but resolving {attribute} raised {detail}")
+     if kind == "attribute":
+         return InitError(
+             f"{flag} {ref}: module {module} has no attribute {attribute}; check the function name"
+@@ -396,7 +423,9 @@ def check_references(
+ 
+     The child gets `deadline` seconds; on timeout its whole process group is killed. Its stdout
+     and stderr go to temporary files, never pipes, so a descendant holding them open cannot stall
+-    this process; the process group is killed on every path, so no descendant outlives the check.
++    this process. The child's process group is killed on every path, so no descendant that stays
++    in that group outlives the check; a descendant that starts its own session (or moves to
++    another process group) is outside that boundary and is not killed.
+     """
+     payload = json.dumps(
+         {
+@@ -448,7 +477,10 @@ def check_references(
+     tools = tuple(str(name) for name in cast(list[object], result.get("tools", [])))
+     for fault in request.faults:
+         if fault.tool is not None and fault.tool not in tools:
+-            advertised = ", ".join(tools) if tools else "none"
++            shown = [_show(name) for name in tools[:_ADVERTISED_MAX]]
++            if len(tools) > _ADVERTISED_MAX:
++                shown.append(f"and {len(tools) - _ADVERTISED_MAX} more")
++            advertised = ", ".join(shown) if shown else "none"
+             raise InitError(
+                 f"--fault {_show(fault.text)}: tool {_show(fault.tool)} absent from --toolset "
+                 f"{request.toolset}; choose an advertised tool ({advertised})"
+@@ -483,6 +515,21 @@ def _flow(value: JsonValue) -> str:
+     return text.removesuffix("\n...\n").rstrip("\n")
+ 
+ 
++def header(n_per_arm: int) -> str:
++    """`HEADER` for a smoke design (N < `NON_SMOKE_N`); otherwise lines 2-3 name the chosen N."""
++    if n_per_arm < NON_SMOKE_N:
++        return HEADER
++    first, _, _, *rest = HEADER.splitlines(keepends=True)
++    return "".join(
++        [
++            first,
++            f"# design: {n_per_arm} trials per arm, chosen by you; plan it with arci plan\n",
++            "# This file was written by arci init; re-run init or edit to change the design.\n",
++            *rest,
++        ]
++    )
++
++
+ def render_descriptor(request: InitRequest) -> str:
+     """The header, then the descriptor keys; every string value is quoted."""
+     lines = [
+@@ -511,7 +558,7 @@ def render_descriptor(request: InitRequest) -> str:
+     else:
+         lines.append(f"  - id: {_flow(CLEAN_CONDITION)}")
+     lines.append(f"n_per_arm: {request.n_per_arm}")
+-    return HEADER + "\n".join(lines) + "\n"
++    return header(request.n_per_arm) + "\n".join(lines) + "\n"
+ 
+ 
+ def _verify(request: InitRequest, staged: Path) -> Manifest:
+@@ -551,21 +598,61 @@ def _umask() -> int:
+     return mask
+ 
+ 
+-def publish(request: InitRequest, text: str) -> None:
+-    """Stage beside the destination, verify, then publish atomically. Nothing is left on error."""
+-    fd, staged_name = tempfile.mkstemp(
+-        prefix=f".{request.out.name}.", suffix=".tmp", dir=request.out.parent
+-    )
+-    staged = Path(staged_name)
++def _exists(request: InitRequest) -> InitError:
++    return InitError(f"output {_show(request.out_text)} exists; use --force to replace it")
++
++
++def _create_exclusive(dest: Path, data: bytes) -> None:
++    """Publish `data` at `dest` only if nothing is there; remove only what this call created.
++
++    For file systems without hard links. `O_EXCL` fails on any existing entry, a symlink
++    included, so an existing file is never replaced.
++    """
++    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
++    created: os.stat_result | None = None
+     try:
+-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
++        try:
++            created = os.fstat(fd)
++            view = memoryview(data)
++            while view:
++                view = view[os.write(fd, view) :]
++            os.fsync(fd)
++        finally:
++            os.close(fd)
++    except BaseException:
++        with contextlib.suppress(OSError):
++            now = os.lstat(dest)
++            # The entry is removed only while it is still the file this call created.
++            if created is None or (now.st_dev, now.st_ino) == (created.st_dev, created.st_ino):
++                os.unlink(dest)
++        raise
++
++
++def publish(request: InitRequest, text: str) -> None:
++    """Stage beside the destination, verify, then publish. Nothing is left on error.
++
++    With --force the staged file replaces the destination atomically. Without it the publication
++    fails closed: a hard link refuses an existing destination, and where hard links are
++    unsupported an exclusive create does; neither ever falls back to a replacing rename.
++    """
++    staged: Path | None = None
++    try:
++        fd, staged_name = tempfile.mkstemp(
++            prefix=f".{request.out.name}.", suffix=".tmp", dir=request.out.parent
++        )
++        staged = Path(staged_name)
++        try:
++            handle = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
++        except BaseException:
++            os.close(fd)
++            raise
++        with handle:
+             handle.write(text)
+         # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
+         os.chmod(staged, 0o666 & ~_umask())
+         _verify(request, staged)
+         # Re-checked at the last moment: a directory or symlink is never replaced, and without
+-        # --force a file that appeared meanwhile is not replaced either (a hard link refuses to
+-        # overwrite; where links are unsupported, the check above is the guard).
++        # --force a file that appeared meanwhile is not replaced either.
+         _check_output(request.out, request.out_text, request.force)
+         if request.force:
+             os.replace(staged, request.out)
+@@ -573,22 +660,28 @@ def publish(request: InitRequest, text: str) -> None:
+             try:
+                 os.link(staged, request.out)
+             except FileExistsError:
+-                raise InitError(
+-                    f"output {_show(request.out_text)} exists; use --force to replace it"
+-                ) from None
++                raise _exists(request) from None
+             except OSError:
+-                os.replace(staged, request.out)
++                # No hard links here (EOPNOTSUPP, EPERM, ...): create exclusively instead; never
++                # fall back to a rename, which would replace a file that appeared meanwhile.
++                try:
++                    _create_exclusive(request.out, staged.read_bytes())
++                except FileExistsError:
++                    raise _exists(request) from None
+     except OSError as exc:
+         raise InitError(
+             f"output {_show(request.out_text)}: cannot write: {exc.strerror or type(exc).__name__}"
+         ) from None
+     finally:
+-        with contextlib.suppress(OSError):
+-            staged.unlink()
++        if staged is not None:
++            with contextlib.suppress(OSError):
++                staged.unlink()
+ 
+ 
+ def next_command(request: InitRequest) -> str:
+-    return f"arci run {shlex.quote(request.out_text)}"
++    """`arci run PATH`, shell-quoted; `--` first when PATH starts with `-`, so it is not a flag."""
++    separator = "-- " if request.out_text.startswith("-") else ""
++    return f"arci run {separator}{shlex.quote(request.out_text)}"
+ 
+ 
+ def run_init(request: InitRequest, *, deadline: float = REFERENCE_CHECK_SECONDS) -> str:
+diff --git a/tests/unit/cli/test_smoke_notice.py b/tests/unit/cli/test_smoke_notice.py
+index cc9c6f5..b37446c 100644
+--- a/tests/unit/cli/test_smoke_notice.py
++++ b/tests/unit/cli/test_smoke_notice.py
+@@ -20,11 +20,18 @@ from arci.storage import load_run
+ from tests.acceptance.helpers import COND_CEILING, COND_CLEAN, COND_TIMEOUT, manifest
+ 
+ REPO = Path(__file__).resolve().parents[3]
++PLAN = (
++    "Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK"
++)
+ DEFAULT_LINE = (
+-    "SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=1): under the default rule two "
+-    "perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect "
+-    "INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P "
+-    "--target-verdict BLOCK"
++    "SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample "
++    "Clopper\u2013Pearson rule two perfect arms cannot PASS below N=42 and a total collapse "
++    f"cannot BLOCK below N=8; expect INCONCLUSIVE. {PLAN}"
++)
++REFERENCE_ONLY = (
++    "for reference only, under Clopper\u2013Pearson with alpha 0.05, delta 0.1, K=1 and one "
++    "look, two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; "
++    "expect INCONCLUSIVE."
+ )
+ FOLLOWUP_6 = (
+     "INCONCLUSIVE at n_per_arm=6 is the expected smoke result; choose a confirmatory N with "
+@@ -135,27 +142,44 @@ def test_the_notice_comes_before_the_run_only_below_100(
+     assert _stderr_before_the_run(built, tmp_path, monkeypatch, capsys) == expected
+ 
+ 
+-def test_a_design_outside_the_planner_uses_the_default_rule_and_says_so() -> None:
++def test_a_design_outside_the_planner_gives_reference_thresholds_and_says_so() -> None:
+     two = manifest(n_per_arm=6, conditions=(COND_TIMEOUT, COND_CLEAN))
+     newcombe = _with(manifest(n_per_arm=6), interval_method="newcombe")
+     looks = _with(manifest(n_per_arm=6), looks=(3, 6))
+-    default_rule = (
+-        "under the default rule (default rule: alpha 0.05, delta 0.1, K=1, one look; this "
+-        "design is outside the planner's domain) two perfect arms cannot PASS below N=42 and a "
+-        "total collapse cannot BLOCK below N=8; expect INCONCLUSIVE."
+-    )
+     assert smoke_notice(two) == (
+-        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=2): {default_rule} Plan a "
+-        "confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK"
++        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=2): {REFERENCE_ONLY} {PLAN}"
+     )
+     for design in (two, newcombe, looks):
+         notice = smoke_notice(design)
+         assert notice is not None
+-        assert default_rule in notice
++        assert REFERENCE_ONLY in notice
++        assert "default rule" not in notice
+     one_look = _with(manifest(n_per_arm=6), looks=(6,))
+     assert smoke_notice(one_look) == DEFAULT_LINE
+ 
+ 
++def test_an_out_of_domain_design_with_its_own_parameters_names_them_and_the_reference() -> None:
++    # The header shows the manifest's own alpha and delta; the thresholds stay the reference
++    # design's 42 and 8, and the line says which rule they belong to.
++    design = _with(
++        manifest(n_per_arm=6, alpha=0.1, conditions=(COND_TIMEOUT, COND_CLEAN)), delta=0.2
++    )
++    assert smoke_notice(design) == (
++        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.1, delta 0.2, K=2): {REFERENCE_ONLY} {PLAN}"
++    )
++
++
++def test_an_in_domain_design_with_its_own_parameters_uses_them() -> None:
++    design = _with(manifest(n_per_arm=6, alpha=0.1), delta=0.2)
++    # 17 and 8 are this design's own thresholds (test_printed_thresholds_agree_with_the_gate
++    # checks them against the gate), not the reference design's 42 and 8.
++    assert smoke_notice(design) == (
++        "SMOKE DESIGN: n_per_arm=6 (alpha 0.1, delta 0.2, K=1): under this design's fixed-sample "
++        "Clopper\u2013Pearson rule two perfect arms cannot PASS below N=17 and a total collapse "
++        f"cannot BLOCK below N=8; expect INCONCLUSIVE. {PLAN}"
++    )
++
++
+ def test_the_followup_line() -> None:
+     assert smoke_followup(manifest(n_per_arm=6)) == FOLLOWUP_6
+ 
+diff --git a/tests/unit/descriptor/test_descriptor.py b/tests/unit/descriptor/test_descriptor.py
+index 6110a0e..b0eb863 100644
+--- a/tests/unit/descriptor/test_descriptor.py
++++ b/tests/unit/descriptor/test_descriptor.py
+@@ -460,3 +460,21 @@ def test_a_merge_key_override_is_not_a_duplicate() -> None:
+         "base": {"label": "A", "agent": "m.a:f"},
+         "data": {"label": "B", "agent": "m.a:f"},
+     }
++
++
++def test_a_merge_list_is_one_merge_key_and_is_allowed() -> None:
++    text = "a: &a {x: 1}\nb: &b {x: 2, y: 3}\nc:\n  <<: [*a, *b]\n  y: 4\n"
++    # The first mapping in the list wins for a key both give; an explicit key wins over both.
++    assert parse_yaml(text) == {"a": {"x": 1}, "b": {"x": 2, "y": 3}, "c": {"x": 1, "y": 4}}
++
++
++def test_a_repeated_merge_key_in_one_mapping_is_rejected() -> None:
++    text = "a: &a {x: 1}\nb: &b {y: 2}\nc:\n  <<: *a\n  <<: *b\n"
++    # PyYAML alone merges both silently; the descriptor loader refuses, as for any repeated key.
++    assert yaml.safe_load(text)["c"] == {"x": 1, "y": 2}
++    with pytest.raises(DescriptorError) as caught:
++        loads_descriptor(text)
++    assert str(caught.value) == (
++        'descriptor <descriptor>:c: duplicate merge key "<<" at line 5, column 3; merge several '
++        "mappings with <<: [*a, *b]"
++    )
+diff --git a/tests/unit/init/test_child.py b/tests/unit/init/test_child.py
+index 5f326c8..18f0e8f 100644
+--- a/tests/unit/init/test_child.py
++++ b/tests/unit/init/test_child.py
+@@ -177,7 +177,8 @@ def test_user_output_never_mixes_with_the_result_and_nothing_else_is_called(
+         ),
+         (
+             "raise SystemExit(4)\n",
+-            "--baseline init_bad_world:agent: module not importable; check module and dependencies",
++            "--baseline init_bad_world:agent: module not importable; importing init_bad_world "
++            "raised SystemExit: 4; check module and dependencies",
+         ),
+     ],
+ )
+@@ -187,3 +188,74 @@ def test_toolset_and_child_failures_are_one_line(workdir: Path, body: str, detai
+         check_references(_request("init_bad_world"))
+     assert str(caught.value) == detail
+     assert "init_bad_world" not in sys.modules
++
++
++def test_a_resolve_error_other_than_a_missing_attribute_names_its_type(workdir: Path) -> None:
++    _write(
++        workdir,
++        "init_lazy_world",
++        "def __getattr__(name):\n    raise ValueError('lazy attributes fail')\n",
++    )
++    request = parse_request(
++        experiment_id="child-check",
++        baseline="init_lazy_world:lazy",
++        candidate="init_lazy_world:agent",
++        toolset="init_lazy_world:make_world",
++        oracle="init_lazy_world:oracle",
++        task=None,
++        task_file=None,
++        faults=(),
++        n="8",
++        out="arci.yaml",
++        force=False,
++    )
++    with pytest.raises(InitError) as caught:
++        check_references(request)
++    assert str(caught.value) == (
++        "--baseline init_lazy_world:lazy: importable but resolving lazy raised ValueError"
++    )
++
++
++def test_a_failing_import_names_the_module_and_the_exception_in_one_bounded_line(
++    workdir: Path,
++) -> None:
++    _write(workdir, "init_dep_world", "import init_missing_dependency\n")
++    with pytest.raises(InitError) as caught:
++        check_references(_request("init_dep_world"))
++    assert str(caught.value) == (
++        "--baseline init_dep_world:agent: module not importable; importing init_dep_world raised "
++        "ModuleNotFoundError: No module named 'init_missing_dependency'; check module and "
++        "dependencies"
++    )
++    _write(workdir, "init_long_world", "raise RuntimeError('x' * 5000 + '\\nsecond line')\n")
++    with pytest.raises(InitError) as caught:
++        check_references(_request("init_long_world"))
++    message = str(caught.value)
++    assert "\n" not in message
++    detail = message.split(" raised ", 1)[1].removesuffix("; check module and dependencies")
++    assert len(detail) == 200
++    assert detail.startswith("RuntimeError: xxx")
++    assert detail.endswith("...")
++
++
++MANY_TOOLS = """
++class World:
++    tools = {f"t{i:02d}": len for i in range(25)}
++
++    def snapshot(self):
++        return {}
++
++def make_world(task, seed):
++    return World()
++"""
++
++
++def test_the_advertised_tools_suffix_names_at_most_twenty(workdir: Path) -> None:
++    _write(workdir, "init_many_world", MANY_TOOLS)
++    with pytest.raises(InitError) as caught:
++        check_references(_request("init_many_world", faults=("tool_timeout:charge",)))
++    names = ", ".join(f"t{i:02d}" for i in range(20))
++    assert str(caught.value) == (
++        "--fault tool_timeout:charge: tool charge absent from --toolset "
++        f"init_many_world:make_world; choose an advertised tool ({names}, and 5 more)"
++    )
+diff --git a/tests/unit/init/test_init.py b/tests/unit/init/test_init.py
+index 143c4ba..2bcd715 100644
+--- a/tests/unit/init/test_init.py
++++ b/tests/unit/init/test_init.py
+@@ -215,7 +215,8 @@ def test_force_replaces_an_existing_regular_file(project: Path) -> None:
+     [
+         (
+             ("--baseline", "app.v9:run"),
+-            "--baseline app.v9:run: module not importable; check module and dependencies",
++            "--baseline app.v9:run: module not importable; importing app.v9 raised "
++            "ModuleNotFoundError: No module named 'app.v9'; check module and dependencies",
+         ),
+         (
+             ("--candidate", "app.v2:runn"),
+@@ -232,7 +233,8 @@ def test_force_replaces_an_existing_regular_file(project: Path) -> None:
+         ),
+         (
+             ("--toolset", "tests.nowhere:make_world"),
+-            "--toolset tests.nowhere:make_world: module not importable; check module and "
++            "--toolset tests.nowhere:make_world: module not importable; importing tests.nowhere "
++            "raised ModuleNotFoundError: No module named 'tests.nowhere'; check module and "
+             "dependencies",
+         ),
+     ],
+@@ -378,7 +380,23 @@ def _main(
+         ),
+         (
+             [*INIT, "--fault", "tool_timeout:reserve:-1"],
+-            "--fault tool_timeout:reserve:-1: occurrence -1 must be a non-negative integer",
++            "--fault tool_timeout:reserve:-1: occurrence -1 must be an integer from 0 to "
++            "1000000000",
++        ),
++        (
++            [*INIT, "--fault", "tool_timeout:reserve:1000000001"],
++            "--fault tool_timeout:reserve:1000000001: occurrence 1000000001 must be an integer "
++            "from 0 to 1000000000",
++        ),
++        (
++            [*INIT, "--fault", "tool_timeout:reserve:" + "9" * 5000],
++            f"--fault tool_timeout:reserve:{'9' * 5000}: occurrence {'9' * 5000} must be an "
++            "integer from 0 to 1000000000",
++        ),
++        ([*INIT, "--n", "9" * 5000], f"--n must be an integer from 1 to 10000, got {'9' * 5000}"),
++        (
++            ["init", "e" * 201, *REFS],
++            "experiment id has 201 characters; at most 200 (it names the run directory)",
+         ),
+         (
+             [*INIT, "--out", "no/such/dir/arci.yaml"],
+diff --git a/tests/unit/init/test_publish.py b/tests/unit/init/test_publish.py
+new file mode 100644
+index 0000000..d9cec24
+--- /dev/null
++++ b/tests/unit/init/test_publish.py
+@@ -0,0 +1,240 @@
++"""`arci init` publication and the descriptor's header and next command, in-process.
++
++The reference check is replaced by a stub (its child is covered by test_child.py and test_init.py),
++so these tests reach `publish` with references that need not import.
++"""
++
++from __future__ import annotations
++
++import argparse
++import errno
++import os
++import shlex
++import stat
++from collections.abc import Callable
++from pathlib import Path
++from typing import cast
++
++import pytest
++
++import arci.cli as cli_module
++import arci.init as init_module
++from arci.cli import main
++from arci.descriptor import compile_descriptor, compile_descriptor_text
++from arci.init import HEADER, NON_SMOKE_N, InitRequest, parse_request, render_descriptor
++
++REFS: tuple[str, ...] = (
++    "--baseline",
++    "app.v1:run",
++    "--candidate",
++    "app.v2:run",
++    "--toolset",
++    "tests.world:make_world",
++    "--oracle",
++    "tests.world:passed",
++)
++PREFIX = "error: CliError: init: "
++# The units under test, taken by name so that no private-usage suppression is needed.
++REAL_CHECK_OUTPUT = cast(Callable[[Path, str, bool], None], vars(init_module)["_check_output"])
++REAL_PARSER = cast(Callable[[], argparse.ArgumentParser], vars(cli_module)["_parser"])
++
++
++@pytest.fixture
++def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
++    def no_child(request: InitRequest, *, deadline: float) -> tuple[str, ...]:
++        del request, deadline
++        return ()
++
++    monkeypatch.chdir(tmp_path)
++    monkeypatch.setattr(init_module, "check_references", no_child)
++    return tmp_path
++
++
++def _init(capsys: pytest.CaptureFixture[str], *extra: str) -> tuple[int, str, str]:
++    code = main(["init", "exp", *REFS, *extra])
++    captured = capsys.readouterr()
++    return code, captured.out, captured.err
++
++
++def _no_links(source: object, dest: object) -> None:
++    del source, dest
++    raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP))
++
++
++def _ordinary_mode() -> int:
++    umask = os.umask(0o022)
++    os.umask(umask)
++    return 0o666 & ~umask
++
++
++# --- 1b: without --force, publication fails closed --------------------------------------------
++
++
++def test_without_links_an_exclusive_create_publishes_the_verified_bytes(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.setattr(os, "link", _no_links)
++    assert _init(capsys) == (0, "arci run arci.yaml\n", "")
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
++    published = workdir / "arci.yaml"
++    assert compile_descriptor(published).experiment_id == "exp"
++    assert stat.S_IMODE(published.stat().st_mode) == _ordinary_mode()
++
++
++def test_without_links_a_destination_that_appears_before_publication_survives(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    real_check = REAL_CHECK_OUTPUT
++    competitor = b"a competitor's bytes\n"
++    calls: list[Path] = []
++
++    def check_then_race(out: Path, out_text: str, force: bool) -> None:
++        real_check(out, out_text, force)
++        calls.append(out)
++        if len(calls) == 2:  # the re-check in publish: the competitor lands right after it
++            out.write_bytes(competitor)
++
++    monkeypatch.setattr(init_module, "_check_output", check_then_race)
++    monkeypatch.setattr(os, "link", _no_links)
++    code, out, err = _init(capsys)
++    assert len(calls) == 2
++    assert (code, out) == (3, "")
++    assert err == f"{PREFIX}output arci.yaml exists; use --force to replace it\n"
++    assert (workdir / "arci.yaml").read_bytes() == competitor
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
++
++
++def test_with_links_a_destination_that_appears_before_publication_survives(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    real_check = REAL_CHECK_OUTPUT
++    calls: list[Path] = []
++
++    def check_then_race(out: Path, out_text: str, force: bool) -> None:
++        real_check(out, out_text, force)
++        calls.append(out)
++        if len(calls) == 2:
++            out.write_bytes(b"competitor\n")
++
++    monkeypatch.setattr(init_module, "_check_output", check_then_race)
++    code, _, err = _init(capsys)
++    assert code == 3
++    assert err == f"{PREFIX}output arci.yaml exists; use --force to replace it\n"
++    assert (workdir / "arci.yaml").read_bytes() == b"competitor\n"
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}
++
++
++def test_a_failed_exclusive_write_removes_only_what_it_created(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    def failing_fsync(fd: int) -> None:
++        del fd
++        raise OSError(errno.EIO, os.strerror(errno.EIO))
++
++    monkeypatch.setattr(os, "link", _no_links)
++    monkeypatch.setattr(os, "fsync", failing_fsync)
++    code, out, err = _init(capsys)
++    assert (code, out) == (3, "")
++    assert err == f"{PREFIX}output arci.yaml: cannot write: {os.strerror(errno.EIO)}\n"
++    assert set(workdir.iterdir()) == set()  # the partial destination and the staged file are gone
++
++
++# --- 1c: an unwritable output directory -----------------------------------------------------------
++
++
++@pytest.mark.skipif(os.geteuid() == 0, reason="root writes into a read-only directory")
++def test_an_unwritable_output_directory_is_one_line_and_writes_nothing(
++    workdir: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    locked = workdir / "locked"
++    locked.mkdir()
++    locked.chmod(0o555)
++    try:
++        code, out, err = _init(capsys, "--out", "locked/arci.yaml")
++        assert (code, out) == (3, "")
++        assert err == (
++            f"{PREFIX}output locked/arci.yaml: cannot write: {os.strerror(errno.EACCES)}\n"
++        )
++        assert list(locked.iterdir()) == []
++    finally:
++        locked.chmod(0o755)
++
++
++# --- 1e: the next command parses with the real parser ---------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("out", "line"),
++    [
++        ("arci.yaml", "arci run arci.yaml"),
++        ("-x.yaml", "arci run -- -x.yaml"),
++        ("--help.yml", "arci run -- --help.yml"),
++        ("-my file.yaml", "arci run -- '-my file.yaml'"),
++    ],
++)
++def test_the_printed_command_parses_back_to_the_written_path(
++    workdir: Path, capsys: pytest.CaptureFixture[str], out: str, line: str
++) -> None:
++    code, printed, err = _init(capsys, f"--out={out}")
++    assert (code, printed, err) == (0, f"{line}\n", "")
++    assert (workdir / out).is_file()
++    words = shlex.split(printed)
++    assert words[0] == "arci"
++    values = vars(REAL_PARSER().parse_args(words[1:]))
++    assert values["command"] == "run"
++    assert values["manifest_json"] == out
++
++
++# --- 1f: the header names a chosen design from N = 100 ----------------------------------------
++
++
++def _request(n: int) -> InitRequest:
++    return parse_request(
++        experiment_id="exp",
++        baseline="app.v1:run",
++        candidate="app.v2:run",
++        toolset="tests.world:make_world",
++        oracle="tests.world:passed",
++        task=None,
++        task_file=None,
++        faults=(),
++        n=str(n),
++        out="arci.yaml",
++        force=False,
++    )
++
++
++def test_the_non_smoke_bound_is_the_run_notices() -> None:
++    assert NON_SMOKE_N == cli_module.SMOKE_N_BELOW == 100
++
++
++@pytest.mark.parametrize("n", [1, 8, 99])
++def test_a_smoke_design_keeps_the_smoke_header(workdir: Path, n: int) -> None:
++    del workdir
++    text = render_descriptor(_request(n))
++    assert text.startswith(HEADER)
++    assert compile_descriptor_text(text).n_per_arm == n
++
++
++@pytest.mark.parametrize("n", [100, 250, 10000])
++def test_a_design_from_100_names_the_chosen_n(workdir: Path, n: int) -> None:
++    del workdir
++    text = render_descriptor(_request(n))
++    assert text.splitlines()[:5] == [
++        "# arci experiment descriptor. Schema: `arci schema`.",
++        f"# design: {n} trials per arm, chosen by you; plan it with arci plan",
++        "# This file was written by arci init; re-run init or edit to change the design.",
++        "# Plan before trials: arci plan --help",
++        "# Never extend this experiment based on its verdict.",
++    ]
++    assert "smoke" not in text.lower()
++    assert compile_descriptor_text(text).n_per_arm == n
++
++
++def test_init_writes_the_chosen_design_header(
++    workdir: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    assert _init(capsys, "--n", "120") == (0, "arci run arci.yaml\n", "")
++    lines = (workdir / "arci.yaml").read_text(encoding="utf-8").splitlines()
++    assert lines[1] == "# design: 120 trials per arm, chosen by you; plan it with arci plan"
++    assert "n_per_arm: 120" in lines

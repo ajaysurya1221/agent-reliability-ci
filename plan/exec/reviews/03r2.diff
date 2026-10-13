@@ -1,0 +1,462 @@
+diff --git a/docs/DESCRIPTOR.md b/docs/DESCRIPTOR.md
+index f7e9fac..140f8a4 100644
+--- a/docs/DESCRIPTOR.md
++++ b/docs/DESCRIPTOR.md
+@@ -109,8 +109,10 @@ stay what they look like:
+   null (`null`, `~`, empty) and merge keys (`<<`) follow YAML 1.1.
+ 
+ The result must be JSON: `!!set`, `!!omap`, `!!pairs`, `!!binary`, `!!timestamp` and custom tags,
+-`.nan`/`.inf`, non-string keys (write `"1":`), self-containing aliases and nesting deeper than 100
+-levels are errors. Numbers are strict at every level: `n_per_arm: true`, `base_seed: "7"`,
++`.nan`/`.inf`, an integer too large to seal (more than Python's integer string limit, 4300
++decimal digits by default; `0x1` followed by 3600 zeros is one), non-string keys (write `"1":`),
++self-containing aliases and nesting deeper than 100 levels are errors. Depth counts every use of
++an alias: a value shared through `&a`/`*a` is as deep as the deepest place it is used. Numbers are strict at every level: `n_per_arm: true`, `base_seed: "7"`,
+ `alpha: "0.05"` and `n_per_arm: 6.0` are errors (`max_seconds: 15` is fine). Quote strings that
+ could read as numbers or null (`"1.0"`, `"null"`), as `arci init` does; other YAML readers
+ (`load_contract`, other tools) keep YAML 1.1, so quoting also keeps a file portable.
+@@ -122,7 +124,9 @@ line on stderr naming the file, the source path (the keys you wrote, aliases inc
+ zero-based indices) and the problem. A YAML-level problem (syntax, a repeated key, a value
+ refused above) is reported where it first occurs in the file. Otherwise every key is checked and
+ the reported error is the first by **sorted** source path, not file order: segment by segment,
+-indices numerically and keys by character code, so `aaa` beats `oracle` beats `zzz`.
++indices numerically and keys by character code, so `aaa` beats `oracle` beats `zzz`. Every
++independent problem counts: a condition with both `id`/`condition_id` and `fault`/`faults`
++reports `conditions[0].fault`, which sorts before `conditions[0].id`.
+ 
+ ```text
+ error: CliError: descriptor arci.yaml:n_per_arn: unknown key "n_per_arn"
+diff --git a/src/arci/descriptor.py b/src/arci/descriptor.py
+index be43b9a..766d173 100644
+--- a/src/arci/descriptor.py
++++ b/src/arci/descriptor.py
+@@ -16,6 +16,7 @@ from __future__ import annotations
+ import json
+ import math
+ import re
++import sys
+ from collections.abc import Callable, Mapping, Sequence
+ from pathlib import Path
+ from typing import Annotated, Any, Literal, Self, cast
+@@ -188,15 +189,29 @@ DescriptorLoader.add_implicit_resolver(
+ DescriptorLoader.add_implicit_resolver(_FLOAT_TAG, re.compile(FLOAT_PATTERN), list("-+0123456789."))
+ 
+ 
++def _too_large() -> str:
++    limit = sys.get_int_max_str_digits()
++    return f"integer too large to seal: more than {limit} decimal digits"
++
++
+ def _int_value(text: str) -> int:
++    """An integer the seal can write: `json.dumps` refuses more than Python's digit limit."""
+     digits = text.replace("_", "")
+     sign = -1 if digits.startswith("-") else 1
+     digits = digits[1:] if digits[:1] in "+-" else digits
+     base = next((b for prefix, b in _INT_FORMS if digits.startswith(prefix)), 10)
++    body = digits[2:] if base != 10 else digits
+     try:
+-        return sign * int(digits[2:] if base != 10 else digits, base)
++        value = sign * int(body, base)
+     except ValueError:
++        if base == 10 and body.isascii() and body.isdigit():  # only the digit limit refuses it
++            raise ValueError(_too_large()) from None
+         raise ValueError(f"invalid integer {_quote(text)}") from None
++    try:
++        str(value)  # a 0x/0o/0b literal converts freely; writing it in decimal may not
++    except ValueError:
++        raise ValueError(_too_large()) from None
++    return value
+ 
+ 
+ _NON_FINITE = {".inf": math.inf, "+.inf": math.inf, "-.inf": -math.inf, ".nan": math.nan}
+@@ -289,24 +304,37 @@ def _check_key(loader: DescriptorLoader, key_node: yaml.Node, path: SourcePath)
+ 
+ 
+ def _check_node(
+-    loader: DescriptorLoader, node: yaml.Node, path: SourcePath, active: set[int], done: set[int]
+-) -> None:
++    loader: DescriptorLoader,
++    node: yaml.Node,
++    path: SourcePath,
++    active: set[int],
++    heights: dict[int, int],
++) -> int:
+     """Walk the composed node graph before anything is constructed; the first problem raises.
+ 
+     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
+     boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
+     `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
+     intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
+-    mapping is a repeated key like any other. A node reached twice through an alias is checked once.
++    mapping is a repeated key like any other.
++
++    Returns the node's height (levels of nesting below it; a scalar or an empty collection is 0).
++    A node reached twice through an alias is walked once and its height cached by node identity;
++    every later use still checks that its own path plus that height stays within `MAX_DEPTH`, so a
++    chain of shared aliases cannot nest deeper than the limit.
+     """
+     if id(node) in active:
+         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
+-    if id(node) in done:
+-        return
++    known = heights.get(id(node))
++    if known is not None:
++        if len(path) + known > MAX_DEPTH:
++            raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
++        return known
+     if len(path) > MAX_DEPTH:
+         raise _SourceError(path, f"nested more than {MAX_DEPTH} levels deep")
+     _check_tag(node, path)
+     active.add(id(node))
++    height = 0
+     if isinstance(node, yaml.ScalarNode):
+         _check_scalar(node, path)
+     elif isinstance(node, yaml.MappingNode):
+@@ -322,7 +350,7 @@ def _check_node(
+                         f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
+                     )
+                 merged = True
+-                _check_node(loader, value_node, path, active, done)
++                height = max(height, _check_node(loader, value_node, path, active, heights))
+                 continue
+             key = _check_key(loader, key_node, path)
+             if key in keys:
+@@ -333,12 +361,14 @@ def _check_node(
+                     f"{mark.column + 1}; give each key once",
+                 )
+             keys.add(key)
+-            _check_node(loader, value_node, (*path, key), active, done)
++            below = _check_node(loader, value_node, (*path, key), active, heights)
++            height = max(height, 1 + below)
+     elif isinstance(node, yaml.SequenceNode):
+         for index, item in enumerate(cast(list[yaml.Node], node.value)):
+-            _check_node(loader, item, (*path, index), active, done)
++            height = max(height, 1 + _check_node(loader, item, (*path, index), active, heights))
+     active.discard(id(node))
+-    done.add(id(node))
++    heights[id(node)] = height
++    return height
+ 
+ 
+ def parse_yaml(text: str) -> object:
+@@ -353,7 +383,7 @@ def parse_yaml(text: str) -> object:
+         node = loader.get_single_node()
+         if node is None:
+             return None
+-        _check_node(loader, node, (), set(), set())
++        _check_node(loader, node, (), set(), {})
+         return loader.construct_document(node)
+     except RecursionError:
+         raise _SourceError((), f"nested more than {MAX_DEPTH} levels deep") from None
+@@ -373,45 +403,48 @@ def _both(alias: str, name: str) -> str:
+     return f"{_quote(alias)} and {_quote(name)} are the same key; give one, not both"
+ 
+ 
+-def _fault_rule(given: Mapping[str, object]) -> Problem | None:
++def _fault_rule(given: Mapping[str, object]) -> list[Problem]:
+     if "occurrence" in given and "at_occurrence" in given:
+-        return ("occurrence",), _both("occurrence", "at_occurrence")
+-    return None
++        return [(("occurrence",), _both("occurrence", "at_occurrence"))]
++    return []
+ 
+ 
+-def _condition_rule(given: Mapping[str, object]) -> Problem | None:
++def _condition_rule(given: Mapping[str, object]) -> list[Problem]:
++    """Both independent rules are checked: the condition id, and `fault`/`faults`."""
++    found: list[Problem] = []
+     if "id" in given and "condition_id" in given:
+-        return ("id",), _both("id", "condition_id")
+-    if "id" not in given and "condition_id" not in given:
+-        return ("id",), 'missing required key "id" (or "condition_id")'
+-    key = "id" if "id" in given else "condition_id"
+-    if given[key] is None:
+-        return (key,), "must be a string"
++        found.append((("id",), _both("id", "condition_id")))
++    elif "id" not in given and "condition_id" not in given:
++        found.append((("id",), 'missing required key "id" (or "condition_id")'))
++    else:
++        key = "id" if "id" in given else "condition_id"
++        if given[key] is None:
++            found.append(((key,), "must be a string"))
+     if "fault" in given and "faults" in given:
+-        return ("fault",), '"fault" and "faults" both given; give one, not both'
+-    if "fault" in given and given["fault"] is None:
+-        return ("fault",), "must be a mapping; omit it for a clean condition"
+-    return None
++        found.append((("fault",), '"fault" and "faults" both given; give one, not both'))
++    elif "fault" in given and given["fault"] is None:
++        found.append((("fault",), "must be a mapping; omit it for a clean condition"))
++    return found
+ 
+ 
+-def _contract_rule(given: Mapping[str, object]) -> Problem | None:
++def _contract_rule(given: Mapping[str, object]) -> list[Problem]:
+     if "oracle" in given and "contract" in given:
+-        return ("oracle",), '"oracle" and "contract" both given; give one, not both'
++        return [(("oracle",), '"oracle" and "contract" both given; give one, not both')]
+     if "oracle" not in given and "contract" not in given:
+-        return ("oracle",), 'missing required key "oracle" (or "contract")'
++        return [(("oracle",), 'missing required key "oracle" (or "contract")')]
+     key = "oracle" if "oracle" in given else "contract"
+     if given[key] is None:
+-        return (key,), "must not be null"
+-    return None
++        return [((key,), "must not be null")]
++    return []
+ 
+ 
+ def _given(model: BaseModel) -> dict[str, object]:
+     return {name: getattr(model, name) for name in model.model_fields_set}
+ 
+ 
+-def _raise(problem: Problem | None) -> None:
+-    if problem is not None:
+-        raise _PathError(*problem)
++def _raise(problems: Sequence[Problem]) -> None:
++    if problems:
++        raise _PathError(*first_problem(problems))
+ 
+ 
+ def _mapping(value: object) -> dict[str, object] | None:
+@@ -427,12 +460,11 @@ def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
+     found: list[Problem] = []
+ 
+     def check(
+-        rule: Callable[[Mapping[str, object]], Problem | None], at: SourcePath, value: object
++        rule: Callable[[Mapping[str, object]], list[Problem]], at: SourcePath, value: object
+     ) -> None:
+         given = _mapping(value)
+-        problem = rule(given) if given is not None else None
+-        if problem is not None:
+-            found.append(((*at, *problem[0]), problem[1]))
++        for path, message in rule(given) if given is not None else []:
++            found.append(((*at, *path), message))
+ 
+     check(_contract_rule, (), data)
+     for index, condition in enumerate(_items(data.get("conditions"))):
+@@ -713,7 +745,7 @@ class Descriptor(_Model):
+         except ValidationError as exc:
+             path, message = first_problem(validation_problems(exc, None))
+             raise DescriptorError(message, path) from None
+-        except (ValueError, TypeError) as exc:  # e.g. a value the seal (hash_record) refuses
++        except (ValueError, TypeError, RecursionError) as exc:  # e.g. what hash_record refuses
+             raise DescriptorError(f"cannot seal the manifest: {exc}") from None
+ 
+ 
+@@ -853,6 +885,8 @@ def loads_descriptor(text: str, source: str = "<descriptor>") -> Descriptor:
+         raise DescriptorError(f"invalid YAML{where}: {exc.problem}", (), source) from None
+     except yaml.YAMLError as exc:
+         raise DescriptorError(f"invalid YAML: {exc}", (), source) from None
++    except (ValueError, TypeError, RecursionError) as exc:  # defence in depth: never bare
++        raise DescriptorError(f"invalid YAML: {exc}", (), source) from None
+     if not isinstance(data, dict):
+         kind = "empty" if data is None else type(data).__name__
+         raise DescriptorError(f"must be one YAML mapping, got {kind}", (), source)
+@@ -870,7 +904,11 @@ def _validate(data: dict[str, object], source: str) -> Descriptor:
+     """
+     problems = shorthand_problems(data)
+     try:
+-        descriptor = Descriptor.model_validate_json(json.dumps(data, allow_nan=False), strict=True)
++        text = json.dumps(data, allow_nan=False)
++    except (ValueError, TypeError, RecursionError) as exc:  # parse_yaml already refuses these
++        raise DescriptorError(f"not a JSON value: {exc}", (), source) from None
++    try:
++        descriptor = Descriptor.model_validate_json(text, strict=True)
+     except ValidationError as exc:
+         problems += validation_problems(exc, data)
+     else:
+diff --git a/tests/unit/descriptor/test_round2.py b/tests/unit/descriptor/test_round2.py
+new file mode 100644
+index 0000000..fee44ad
+--- /dev/null
++++ b/tests/unit/descriptor/test_round2.py
+@@ -0,0 +1,188 @@
++"""T03r2: unencodable integers, every shorthand violation, and depth through shared aliases."""
++
++from __future__ import annotations
++
++import json
++import sys
++from pathlib import Path
++from typing import cast
++
++import pytest
++import yaml
++
++from arci.cli import main
++from arci.descriptor import (
++    MAX_DEPTH,
++    DescriptorError,
++    compile_descriptor,
++    compile_descriptor_text,
++    loads_descriptor,
++    parse_yaml,
++    shorthand_problems,
++)
++
++MOD = "tests.acceptance.fixture_agents"
++
++SMALL = f"""
++experiment_id: exp-yaml
++toolset: {MOD}:make_world
++oracle: {MOD}:oracle
++baseline: {MOD}:good_agent
++candidate: {MOD}:fragile_agent
++conditions:
++  - id: fetch_timeout
++    fault: {{name: tool_timeout, tool: fetch, occurrence: 0}}
++n_per_arm: 6
++"""
++
++LIMIT = sys.get_int_max_str_digits()
++TOO_LARGE = f"integer too large to seal: more than {LIMIT} decimal digits"
++HUGE_HEX = "0x1" + "0" * 3600  # 16**3600 has about 4335 decimal digits
++
++
++def _where(text: str) -> str:
++    with pytest.raises(DescriptorError) as caught:
++        compile_descriptor_text(text, "arci.yaml")
++    assert type(caught.value) is DescriptorError
++    assert "\n" not in str(caught.value)
++    return str(caught.value).removeprefix("descriptor arci.yaml:")
++
++
++# --- 1. unencodable integers --------------------------------------------------------------------
++
++needs_limit = pytest.mark.skipif(LIMIT == 0, reason="no integer string limit in this interpreter")
++
++
++@needs_limit
++@pytest.mark.parametrize(
++    ("extra", "path"),
++    [
++        (f"task: {{x: {HUGE_HEX}}}\n", "task.x"),
++        (f"task: {{x: !!int {HUGE_HEX}}}\n", "task.x"),
++        ("task: {x: 1" + "0" * LIMIT + "}\n", "task.x"),
++        (f"base_seed: {HUGE_HEX}\n", "base_seed"),
++        (f"task: {{x: [1, {{y: {HUGE_HEX}}}]}}\n", "task.x[1].y"),
++    ],
++    ids=["hex", "tagged-hex", "decimal", "base_seed", "nested"],
++)
++def test_an_unencodable_integer_is_refused_at_its_path(extra: str, path: str) -> None:
++    assert _where(SMALL + extra) == f"{path}: {TOO_LARGE}"
++    with pytest.raises(DescriptorError) as caught:
++        loads_descriptor(SMALL + extra, "arci.yaml")
++    assert str(caught.value) == f"descriptor arci.yaml:{path}: {TOO_LARGE}"
++
++
++@needs_limit
++def test_the_largest_encodable_integer_still_seals() -> None:
++    value = int("9" * LIMIT)
++    manifest = compile_descriptor_text(SMALL + f"task: {{x: {'9' * LIMIT}}}\n")
++    assert manifest.task == {"x": value}
++    assert manifest.validate_seal()
++
++
++@needs_limit
++def test_the_cli_reports_an_unencodable_integer_with_exit_three(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.chdir(tmp_path)
++    Path("arci.yaml").write_text(SMALL + f"task: {{x: {HUGE_HEX}}}\n", encoding="utf-8")
++    assert main(["run", "arci.yaml", "--out", "runs"]) == 3
++    err = capsys.readouterr().err
++    assert err == f"error: CliError: descriptor arci.yaml:task.x: {TOO_LARGE}\n"
++    assert not Path("runs").exists()
++    with pytest.raises(DescriptorError):
++        compile_descriptor(Path("arci.yaml"))
++
++
++def test_a_serialization_failure_after_parsing_is_a_descriptor_error(
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    def refuse(*_args: object, **_kwargs: object) -> str:
++        raise ValueError("Exceeds the limit (4300 digits) for integer string conversion")
++
++    monkeypatch.setattr(json, "dumps", refuse)
++    with pytest.raises(DescriptorError) as caught:
++        loads_descriptor(SMALL, "arci.yaml")
++    assert type(caught.value) is DescriptorError
++    assert str(caught.value) == (
++        "descriptor arci.yaml: not a JSON value: "
++        "Exceeds the limit (4300 digits) for integer string conversion"
++    )
++
++
++# --- 2. every shorthand violation of a condition is collected -----------------------------------
++
++BOTH = "  - id: a\n    condition_id: b\n    fault: {name: tool_timeout, FAULT}\n    faults: []\n"
++FAULT_MESSAGE = 'conditions[0].fault: "fault" and "faults" both given; give one, not both'
++
++
++def _conditions(block: str) -> str:
++    start = SMALL.index("  - id: fetch_timeout")
++    end = SMALL.index("n_per_arm")
++    return SMALL[:start] + block + SMALL[end:]
++
++
++@pytest.mark.parametrize("unknown", ["    g: 1\n", ""])
++@pytest.mark.parametrize("fault", ["occurrence: 0", "occurrence: 0, at_occurrence: 1"])
++def test_every_condition_violation_is_collected(unknown: str, fault: str) -> None:
++    text = _conditions(BOTH.replace("FAULT", fault) + unknown)
++    assert _where(text) == FAULT_MESSAGE
++
++
++def test_shorthand_problems_lists_each_independent_violation() -> None:
++    data = parse_yaml(_conditions(BOTH.replace("FAULT", "occurrence: 0, at_occurrence: 1")))
++    problems = shorthand_problems(cast(dict[str, object], data))
++    assert sorted(path for path, _ in problems) == [
++        ("conditions", 0, "fault"),
++        ("conditions", 0, "fault", "occurrence"),
++        ("conditions", 0, "id"),
++    ]
++
++
++def test_a_null_id_and_a_null_fault_are_both_collected() -> None:
++    data = parse_yaml(_conditions("  - id: null\n    fault: null\n"))
++    problems = shorthand_problems(cast(dict[str, object], data))
++    assert sorted(problems) == [
++        (("conditions", 0, "fault"), "must be a mapping; omit it for a clean condition"),
++        (("conditions", 0, "id"), "must be a string"),
++    ]
++
++
++# --- 3. the depth limit holds through shared aliases --------------------------------------------
++
++
++def _chain(links: int) -> str:
++    lines = ["task:", "  a0: &a0 []"]
++    lines += [f"  a{i}: &a{i} [*a{i - 1}]" for i in range(1, links + 1)]
++    return "\n".join(lines) + "\n"
++
++
++def test_a_chain_of_shared_aliases_cannot_nest_past_the_limit() -> None:
++    message = _where(SMALL + _chain(MAX_DEPTH + 1))
++    assert message.endswith(f": nested more than {MAX_DEPTH} levels deep")
++    assert message.startswith("task.a")
++    with pytest.raises(yaml.YAMLError, match=f"nested more than {MAX_DEPTH} levels deep"):
++        parse_yaml(_chain(MAX_DEPTH + 1))
++
++
++def test_a_shared_alias_used_deeper_than_its_first_use_is_measured_again() -> None:
++    # `v` is first met two levels down; its second use puts its leaf at depth MAX_DEPTH + 1.
++    inner = "[" * (MAX_DEPTH - 3) + "1" + "]" * (MAX_DEPTH - 3)
++    text = SMALL + f"task: {{a: &v {inner}, b: [[*v]]}}\n"
++    assert _where(text) == f"task.b[0][0]: nested more than {MAX_DEPTH} levels deep"
++    assert compile_descriptor_text(SMALL + f"task: {{a: &v {inner}, b: [*v]}}\n").validate_seal()
++
++
++def test_a_short_chain_of_shared_aliases_is_accepted() -> None:
++    manifest = compile_descriptor_text(SMALL + _chain(20))
++    assert json.dumps(manifest.task["a20"]) == "[" * 21 + "]" * 21
++    assert json.dumps(manifest.task["a0"]) == "[]"
++    assert manifest.validate_seal()
++
++
++def test_shared_aliases_up_to_the_limit_are_accepted() -> None:
++    # task (1) + a<i> (2) + i nested lists: the deepest leaf of a(MAX_DEPTH - 2) is at MAX_DEPTH.
++    assert compile_descriptor_text(SMALL + _chain(MAX_DEPTH - 2)).validate_seal()
++    assert _where(SMALL + _chain(MAX_DEPTH - 1)).endswith(
++        f"nested more than {MAX_DEPTH} levels deep"
++    )
