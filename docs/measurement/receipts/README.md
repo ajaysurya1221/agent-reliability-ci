@@ -6,7 +6,9 @@ One JSON file per reader per track, filled in by hand from
 only place these measurements live.
 
 - **Naming:** `YYYY-MM-DD-<handle>-<track>.json`, where `<track>` is `demo` or `own-agent` and the
-  date is the day of the attempt.
+  date is the day of the attempt. A repeat attempt by the same reader on the same track appends an
+  attempt suffix to the handle (for example `-2`, or `-pypi` for a different package source) and
+  says so in `notes`; it is the same reader for every count.
 - **Failures are kept.** An attempt that stalled, errored, was abandoned or was coached is
   committed like a successful one, with what went wrong in `failures` or `coaching_events`.
   Receipts are never edited after merge except to fix a transcription error, stated in the PR.
