@@ -267,8 +267,9 @@ injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `res
 sets the task. `arci init` calls your toolset factory once with that task, so a factory that reads
 task data needs `--task`: the sample project's `make_world`
 ([examples/recipes/python_agent](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/examples/recipes/python_agent))
-reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`;
-without it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault looks like this:
+reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`; without
+it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault
+looks like this:
 
 ```yaml
 experiment_id: checkout-retry
