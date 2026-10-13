@@ -124,7 +124,7 @@ def run(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Run]:
 
 def test_the_doc_commands_are_the_ones_these_tests_run() -> None:
     assert doc_commands() == DOC_COMMANDS
-    assert "<<Inspector result recorded by the orchestrator on 2026-10-13>>" in _doc()
+    assert "Server's protocol version is not supported: 2026-07-28" in _doc()
     readme = (RECIPE / "README.md").read_text(encoding="utf-8")
     for command in (INSPECTOR, RUN, DIAGNOSE[0]):
         assert command in readme.splitlines()

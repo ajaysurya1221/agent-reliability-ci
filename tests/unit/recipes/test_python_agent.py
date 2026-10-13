@@ -130,7 +130,7 @@ def test_the_readme_commands_are_the_ones_these_tests_run() -> None:
     assert readme_commands() == README_COMMANDS
     first_screen = f"{INSTALL} && {INIT} && {SMOKE_RUN}"
     assert first_screen in README.read_text(encoding="utf-8").splitlines()
-    assert "<<recorded run>>" in README.read_text(encoding="utf-8")
+    assert "Recorded by the orchestrator on 2026-10-13" in README.read_text(encoding="utf-8")
 
 
 def test_init_writes_the_committed_descriptor_byte_for_byte(smoke: Smoke) -> None:
