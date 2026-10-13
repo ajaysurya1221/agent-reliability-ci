@@ -19,3 +19,26 @@
   so the cache state is not what drives these timings; the cause (leftover processes, accumulating
   stores, runner throttling) is unknown and is a follow-up before any macOS number is called a
   reference timing. ubuntu samples got faster run to run (169 → 137 s).
+
+## Reference-machine demo timing (T18r1 workflow, run 38451606669, 2026-10-13 ~19:05–19:22Z)
+
+Five cold samples per OS (each with its own fresh `UV_CACHE_DIR`), `uvx --from agent-reliability-ci==0.8.0 arci demo`,
+command_start → "All six steps held", 1 s resolution; package agent-reliability-ci==0.8.0, uv 0.12.5.
+
+| Runner | cold totals (s) | cold p50 | cold p95 (= max of 5) | vs memo target (p50 ≤ 120 s, p95 ≤ 180 s) |
+|---|---|---|---|---|
+| ubuntu-latest (Linux x64) | 227, 226, 224, 222, 223 | 224 s | 227 s | over, over |
+| macos-latest (macOS arm64) | 223, 213, 213, 227, 213 | 213 s | 227 s | over, over |
+
+- The two warm samples per OS did not start: the 1200 s loop budget was spent by the five cold
+  samples (5 × ~225 s), so they are recorded as timed out and the jobs' final check failed by
+  design. T18r2 replaces the fixed budget with deadline arithmetic (40-min job) so all seven fit.
+- The resolve/install share is ~1 s per cold sample on both runners; the demo's compute (two
+  200-trial-per-arm experiments plus diff, minimise, replay, and the repaired agent's run) is the
+  time. The first (superseded) run's ubuntu samples were faster (137–169 s), so hosted-runner
+  variance between VMs is large; macOS no longer shows the monotonic slowdown seen in the first run
+  (that run's warm samples shared one cache and ran back to back; cause still unknown).
+- Honest reading against the memo (line 287): on GitHub-hosted runners the packaged demo misses the
+  target by about 2×; it meets it only on the maintainer's 15-core machine (73–80 s). Either the
+  target names a machine class or the demo on hosted runners must do less work (fewer trials per
+  arm, or fewer of the six steps); that is a planning decision for the next run, not a workflow fix.
