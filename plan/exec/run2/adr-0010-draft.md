@@ -1,8 +1,9 @@
 # 0010 (DRAFT, not under docs/design until accepted): the imported-session record (memo D2)
 
-Status: draft written by the orchestrator (Claude Fable 5.1) in run 2, 2026-10-13; for Astra review
-(CONSULT run2-D2). Becomes `docs/design/0010-imported-session-record.md` plus a re-freeze only when
-accepted and when D3 (the first importer) is scheduled. No code in this run.
+Status: draft v2 by the orchestrator (Claude Fable 5.1), run 2, 2026-10-13; v1 reviewed by Astra
+(CONSULT run2-D2/D11: REVISE), v2 incorporates every point. Becomes
+`docs/design/0010-imported-session-record.md` plus a re-freeze only when accepted and when D3 (the
+first importer) is scheduled. No code in this run.
 
 ## Problem
 
@@ -11,72 +12,78 @@ and Codex session output consumed through the same model (D5, D6). All of that n
 shape for data ARCI did not schedule: a production trace, an exported observability session, a
 coding-agent transcript. The memo's constraint (line 109) is absolute: an imported trace "cannot
 retrospectively become a valid ARCI gate record", because the gate requires the rule, schedule,
-seeds and experiment identity to have been fixed before execution. The record must therefore be
-useful for diffing, cohort discovery and manifest drafting, and structurally incapable of being
-mistaken for a scheduled trial.
+seeds and experiment identity to have been fixed before execution. The record must be useful for
+diffing, cohort discovery and manifest drafting, and structurally incapable of being mistaken for
+a scheduled trial. Separately, "unsupported or incomplete semantics stay explicit" (D3 acceptance).
 
 ## Decision (proposed)
 
-1. **A new, separate schema id.** `ImportedSession` is a `Sealed` record (reusing
-   `src/arci/schema.py`'s `Sealed`/`record_sha256` mechanism and `src/arci/hashing.py`'s
-   `canonical_json`/`hash_record`) with `schema_version: Literal["arci-import/0.1"]`. It lives in a
-   new module, `src/arci/imports/record.py`; `schema.py` (frozen) is not changed. Every loader of
-   gate evidence (`arci gate`, `arci report`, `arci diff`, `arci replay`) keeps requiring
-   `arci/0.5` records, so an imported record is rejected by construction, not by a flag.
-2. **Provenance is mandatory and immutable.** Fields: `source` (`producer`: free string such as
-   `"opentelemetry-python-contrib/openai-v2"`, `"langfuse"`, `"phoenix"`, `"claude-code"`;
-   `format`: `"otlp-json" | "otlp-protobuf" | "openinference-jsonl" | "claude-session-jsonl" |
-   "codex-otlp"`; `format_version`: the producer's or spec's version string; `obtained_from`: URL or
-   path as given, never rewritten), `original_ids` (trace/session/span ids exactly as in the
-   source), `raw_sha256` (digest of the raw bytes before any parsing; the raw file is kept beside
-   the record), `imported_at` (ISO 8601) and `importer` (`arci` version + importer name/version).
-3. **Completeness and capability flags are explicit.** `completeness`: `complete | partial |
-   unknown` with a free-text reason; `capabilities`: booleans the analysis code checks before
-   offering a feature: `has_tool_calls`, `has_tool_order`, `has_tool_args`, `has_tool_results`,
-   `has_outcome`, `has_timestamps`, `has_model_io`. An importer that cannot establish a capability
-   sets it false and lists the span/field it could not map under `unsupported` (a list of
-   `{path, reason}`), so "unsupported or incomplete semantics stay explicit" (memo D3 acceptance).
-4. **Calls reuse the boundary's vocabulary without its guarantees.** `calls` is a list of
-   `ImportedCall` records shaped like `RecordedCall` (tool name, args, result or error kind,
-   ordinal, timestamps) plus `confidence: "exact" | "inferred"` per field group; there is no
-   `fingerprint`, no `seed`, no `occurrence` counter and no `trial_index`, because none were
-   produced by ARCI's schedule. `events` reuses `Event` kinds only where the source states them;
-   anything inferred is tagged.
-5. **What the record is for.** `arci diff` gains an `--imported` mode in D3 that diffs two imported
-   sessions or an imported session against a recorded trial on the shared call vocabulary
-   (name, order, error kinds), labelling the imported side "imported, unscheduled". Cohort
-   discovery (`arci import … --suggest-conditions`) proposes faults from observed error kinds.
-   `arci init --from-import <record>` drafts an `arci.yaml` with the observed tool names as the
-   toolset's expected tools and the observed fault kinds as `--fault` candidates; the draft is a
-   smoke design like any other and seals only when run.
+1. **A separate schema id, refused by every evidence loader.** `ImportedSession` is a `Sealed`
+   record (reusing `src/arci/schema.py`'s `Sealed`/`record_sha256` and `src/arci/hashing.py`'s
+   `canonical_json`/`hash_record`) with `schema_version: Literal["arci-import/0.1"]`, in a new
+   module `src/arci/imports/record.py`; `schema.py` (frozen) is not changed. `arci gate`, `arci
+   report`, `arci diff` (default mode) and `arci replay` keep requiring `arci/0.5` records and
+   refuse `arci-import/*` with one line naming this design record. Shared field names with
+   `RecordedCall` are harmless (Astra Q1): the refusal is structural, not by field shape. This
+   prevents accidental misuse; it does not authenticate producers (a digest is not provenance
+   proof), and the record says so in its docstring.
+2. **Provenance, versions and immutability.** `source`: `producer` (free string, e.g.
+   `"opentelemetry-python-contrib/openai-v2"`), `producer_version` (the producing software's
+   version), `format` (`"otlp-json" | "otlp-protobuf" | "openinference-jsonl" |
+   "claude-session-jsonl" | "codex-otlp"`), `format_version` (the spec/schema version the file
+   declares or the importer assumed, marked which), `obtained_from` (URL or path as given, never
+   rewritten), `original_ids` (trace/session/span ids verbatim). `raw_sha256` covers the raw bytes
+   only (Astra Q3); the raw file is stored beside the record. `importer` (`arci` version, importer
+   name, importer version, configuration used) and the normalised content are bound by the record
+   seal (`record_sha256`), so the parse is reproducible: same raw bytes + same importer + same
+   configuration → same seal. `imported_at` is **volatile** (excluded from the digest payload, like
+   other volatile fields in `schema.py`), so the transformation stays pure and two imports of the
+   same bytes seal identically. The record is deeply immutable: all containers are tuples, models
+   are frozen (`Model` config), and the only mutation path is "import again".
+3. **Completeness and capabilities, stated conservatively.** `completeness`: `complete | partial
+   | unknown` with a reason. `capabilities` are computed over **all** relevant calls, not any
+   (`has_tool_calls`, `has_tool_args`, `has_tool_results`, `has_model_io`, `has_timestamps`,
+   `has_outcome`), plus `ordering: "total" | "partial" | "none"` (total only when every call has a
+   source-given monotonic order key; partial when only parent/child or per-span order is known).
+   `unsupported`: a list of `{path, reason, source_ref}` for every span/field the importer saw and
+   could not map (including attributes of unknown semantic-convention version). Nothing is
+   inferred silently.
+4. **Calls and events with per-field provenance.** `calls: tuple[ImportedCall, ...]`, each with
+   `name`, `args`, `result`, `error_kind`, `started_at`, `ended_at`, and for each field group a
+   `Provenance` of `state: "exact" | "inferred" | "missing" | "unsupported"`, `source_ref` (span
+   id / line number / attribute path) and, when inferred, `reason`. "missing" (the source has no
+   value) is distinct from a JSON `null` result (the source says the result was null).
+   `source_outcome` (what the producer reported: success/error) is separate from ARCI's oracle-
+   graded outcome and is never written into an `Outcome` field. `ordinal` is the position in the
+   source's own order and never implies observed execution order unless `ordering == "total"`.
+   `events: tuple[ImportedEvent, ...]` reuse `EventKind` names only where the source states them
+   and carry the same `Provenance`; there is no `trial_index`, `seed`, `occurrence`,
+   `fingerprint`, manifest reference or verdict anywhere in the record.
+5. **What the record is for.** `arci diff --imported`: diff two imported sessions, or an imported
+   session against a recorded trial, on the shared call vocabulary (name, order where total, error
+   kinds), labelling the imported side "imported, unscheduled". `arci import … --suggest-conditions`:
+   proposes faults from observed `error_kind`s. `arci init --from-import <record>`: drafts an
+   `arci.yaml` with the observed tool names as the toolset's expected tools and the observed error
+   kinds as `--fault` candidates; the draft is a smoke design like any other and seals only when run.
 6. **What it is never for.** No verdict, no PASS/BLOCK, no report row, no replay (replay is of the
-   boundary's own records, ADR 0002). `arci gate` and `arci report` refuse `arci-import/*`
-   records with a one-line error that names this design record.
+   boundary's own records, ADR 0002); the loaders refuse it (item 1).
 
 ## Consequences
 
-- One importer model for D3–D6; each importer is a pure function raw bytes → `ImportedSession`
-  with a versioned fixture test, as the memo requires ("authentic versioned fixtures from at least
-  two independent producers" for D3). Fixture provenance (URL, version, sha256) is recorded in the
-  test file; no fixture is hand-written.
-- Nothing frozen changes for D2 itself: `schema.py`, `interfaces.py`, `hashing.py` are reused, not
-  edited. The record kind is additive. `docs/AGENT_SEMANTICS.md` gains a section only when D3
-  ships (then re-freeze).
-- The trust model (`docs/TRUST_MODEL.md`) is unchanged: imported data is untrusted input and is
-  treated as data by every consumer; the raw file's digest makes tampering after import detectable,
-  nothing more.
+- One importer model for D3–D6: each importer is a pure function raw bytes + configuration →
+  `ImportedSession`, with a versioned fixture test. Fixtures are genuine producer output (an
+  instrumentation replaying its own recorded cassettes through a genuine OTLP exporter qualifies;
+  hand-written or reconstructed spans do not), pinned by instrumentation, cassette and exporter
+  versions, with the capture command and the exported bytes' sha256 in the test (Astra, point 2).
+  A producer counts towards D3's "two independent producers" only once its fixture demonstrates
+  useful tool identity and order, not generic LLM spans alone.
+- Nothing frozen changes for D2 itself: `schema.py`, `interfaces.py`, `hashing.py` are reused.
+  `docs/AGENT_SEMANTICS.md` gains an "imported records" section when D3 ships (then re-freeze).
+- `docs/TRUST_MODEL.md` unchanged: imported data is untrusted input, treated as data by every
+  consumer; the raw digest makes tampering after import detectable, nothing more.
 
 ## Not decided here
 
-Which producer's fixtures come first (memo open question 4: Claude vs Codex; the OTLP pair is
-chosen in `plan/exec/run2/fixtures.md`); the protobuf path (D4) waits for JSON semantics; any
-CLI surface beyond `arci import <file> --out <record.json>`.
-
-## Review questions for Astra
-
-1. Does a separate schema id plus loader refusal satisfy "cannot masquerade as a scheduled ARCI
-   trial", or must the record also omit every field name shared with `RecordedCall`?
-2. Is `confidence` per field group enough, or should inferred values be stored separately from
-   exact ones?
-3. Should `raw_sha256` cover the raw bytes only, or the raw bytes plus the importer version, to pin
-   reproducibility of the parse?
+Which producer's fixtures come first (memo open question 4; candidates in
+`plan/exec/run2/fixtures.md`); the protobuf path (D4); any CLI surface beyond
+`arci import <file> [--format …] --out <record.json>`.

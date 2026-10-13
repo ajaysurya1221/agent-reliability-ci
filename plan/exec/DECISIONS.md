@@ -122,16 +122,21 @@ bridge's revision 2026-07-28, so every Inspector release rejects the bridge at `
 (`src/arci/mcp_toolset_server.py`, not frozen) answers `initialize` with its constant regardless of
 the client's requested version, i.e. it does not negotiate at all.
 
-What a fix would be: the bridge answers a foreign client's `initialize` with the client's requested
-revision when that revision is in a small allowlist the bridge's subset can serve honestly
-(2025-11-25, 2025-06-18: initialize, initialized, ping, tools/list, serial tools/call), and omits
-revision-specific fields (`resultType`) in those replies; ARCI's own boundary keeps speaking
-2026-07-28 to the bridge in trials, so no recorded run, seal or replay changes. Frozen touches: ADR
-0002 line 36 and `schema.py:276` document the boundary's revision and stay true; AGENT_SEMANTICS
-needs a sentence only if it states the bridge's revision. It is a design change (what the bridge
-promises to third-party clients), not a one-line fix → ADR 0011 + Astra review, scheduled with the
-next engineering run, not this one (rule e: the check is done; the implementation is reversible and
-waits for an MCP pilot or the MCP post, per the tie-break F2).
+What a fix would be (corrected after Astra's review, CONSULT run2-D2/D11): ARCI's boundary forwards
+the agent's `initialize` parameters to the server unchanged (`src/arci/mcp_boundary.py` ~line 1595),
+so it does not itself pin 2026-07-28 in the request; a bridge that negotiated on the requested
+revision would therefore change trial traffic too. The honest design is an explicit, standalone
+**compatibility mode** of the bridge (a flag or environment variable that ARCI never sets in
+trials): in that mode only, the bridge answers a foreign client's `initialize` with the requested
+revision when it is in a small allowlist the subset can serve (2025-11-25, 2025-06-18: initialize,
+initialized, ping, tools/list, serial tools/call), persists the negotiated revision for the whole
+connection, omits revision-specific fields (`resultType`) in those replies, and rejects other
+revisions with a defined error; each allowlisted revision's subset is verified by tests, not merely
+echoed. Outside that mode, behaviour, recording and replay are unchanged and covered by tests that
+pin the trial responses. Frozen touches: ADR 0002 line 36 and `schema.py:276` stay true (the
+boundary contract is unchanged); AGENT_SEMANTICS gains a sentence only if it describes the bridge.
+It is a design change → ADR 0011 + Astra review, scheduled with the next engineering run and only
+once an MCP pilot or the MCP post commits to it (tie-break F2; rule e).
 
 Consequence now: HUMAN_INBOX drafts C and E stay on hold; the recipe's Inspector step stays
 "blocked" with today's versions added to the record.
