@@ -37,8 +37,8 @@ env:
   # SAMPLE_TIMEOUT_S is recorded with timeout_reason "sample", a sample cut short by the loop
   # deadline with "budget", and a sample with under a second left is not started (timed out,
   # "budget"). What this guarantees: not seven 600 s samples (7 x 600 = 4200 s > 1980 s), but
-  # seven samples of the measured ~225 s (1575 s) plus the 120 s probe and the 300 s reserve fit
-  # when setup takes under 4 minutes (360 + 1575 + 120 + 300 = 2355 s <= 2400 s). After sampling,
+  # seven samples of the measured ~225 s (1575 s) plus the 120 s probe and the 420 s reserve fit
+  # when setup takes under 4 minutes (240 + 1575 + 120 + 420 = 2355 s <= 2400 s). After sampling,
   # the probe (PROBE_TIMEOUT_S) runs only if at least PROBE_MIN_LEFT_S remain before the job
   # deadline, else it is recorded as skipped. The step timeouts are backstops behind this.
   JOB_TIMEOUT_S: "2400"
@@ -76,7 +76,7 @@ jobs:
       - name: Time the demo (five cold samples, then two warm)
         # Backstop only. The loop ends RESERVE_S before the job deadline (plus the kill/join of a
         # last timed-out sample, ~10 s) and the probe takes at most 120 s, so this step ends by job
-        # time 2400 - 300 + 10 + 120 s; counted from the step's start that is under 38 minutes.
+        # time 2400 - 420 + 10 + 120 s; counted from the step's start that is under 38 minutes.
         # The job timeout comes first whenever setup took longer than 2 minutes.
         timeout-minutes: 38
         shell: python
