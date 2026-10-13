@@ -23,7 +23,7 @@ decisions, measurements), `docs/design/0005`–`0009`.
 | S9 TTFV harness | merged (T10, two revision rounds) | `docs/measurement/ttfv-protocol.md`, `receipt.template.json`, `receipts/README.md` |
 | S10 release-integrity merge | merged (T12, two rounds) | 68f7c8c on main; ADR 0005; titled re-freeze commit 5142d66; merge bar on the merge commit green (1216 tests, frozen 53/53, reproduce 0 failed) |
 | S11 install/Action matrix | merged (T07) | CI jobs wheel-smoke (Ubuntu/macOS × 3.11/3.14), windows-smoke (install/--help only), action-fixture (must BLOCK); `sprint/**` trigger |
-| S12 release | <<state>> | tag v0.8.0, GitHub release, PyPI |
+| S12 release | tagged; PyPI and GitHub release need the user (HUMAN_INBOX 1 and 3) | annotated tag v0.8.0 = 48e60ac (main CI green); release run 38365660814: guard+build and wheel smoke ×4 green, publish failed `invalid-publisher` (no trusted publisher registered); CI artefacts byte-identical to a local build; `gh release create` denied by the user's settings; receipts and notes on sprint/t13-docs (REVIEW 13) |
 
 ## 2. Deviations from the memo, with the rule that decided each
 (rules: a = the prompt, b = the memo, c = the repo's rules, d = Astra consult, e = reversibility)
@@ -65,11 +65,11 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 | Packaged demo TTFV | p50 ≤ 2 min, p95 ≤ 3 min | 80 s cold uv cache (9 s install + 71 s run), 72 s and 73 s warm; `uvx --from <0.8.0 wheel> arci demo`, empty dir, maintainer machine (15-core M5 Pro); AI-agent labelled, not cold readers | plan/exec/measurements.md; docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-demo.json |
 | Own-agent TTFV (sample tree) | p50 ≤ 10 min (cold users) | 3 s from scaffold start to a validated INCONCLUSIVE (install 0 s from a local wheel, init 1 s, run 2 s); tool path only, no reading or reference writing; AI-agent labelled | docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-own-agent.json |
 | Cold read of the README (Opus subagent, no context; AI-agent labelled) | ≥ 4/5 | 5/5, BLOCK interpretation correct (plan/exec/cold-read-2026-10-13.json) | plan/exec/measurements.md |
-| Installed-package smoke on CI | green | <<>> | release workflow |
+| Installed-package smoke on CI | green | green: wheel smoke on Ubuntu and macOS × Python 3.11/3.14 from an empty directory (release run 38365660814); Windows install/--help job green on main CI | release workflow; .github/workflows/ci.yml |
 | Merge bar on the released commit | green | green: isolated `just check` 1216 passed/2 skipped, `just frozen` 53 OK, `uv lock --check`, figures, schema, `reproduce.py --check` 0 failed, at 68f7c8c (tag v0.8.0 = 48e60ac, same tree + plan records); main CI run 38363108519 success | plan/exec/STATUS.md (V rows) |
 
 ## 5. Cuts and why
-<<>>
+None of S1–S12 was cut. Reduced: S8's Inspector preflight ships as a recorded, blocked step rather than a working one (D-03); S9 shipped the protocol and maintainer-machine receipts but no cold readers (recruiting is the user's step, HUMAN_INBOX 5); S12's PyPI upload and GitHub release page wait on the user (HUMAN_INBOX 1 and 3). The budget was not the reason for any of these.
 
 ## 6. Usage
 - Opus 5.5 (workflow subagents, all `claude-opus-5-5`, effort high): 32 workflow runs, 39 agent transcripts (14 coder task dispatches incl. 7 revision rounds; 15 reviewer dispatches; 1 cold read; 1 probe; 1 read-only repo map). Output tokens 948,886; cache reads 232.4 M; cache creation 9.2 M (summed from the transcripts at 07:15Z; T12 round 2 and T13 reviews add to this; final figure at wrap-up <<>>).
@@ -86,9 +86,10 @@ Cross-family (Astra, read-only) reviews of merged changes: T06+T07 (release work
 - The `pypi` GitHub environment has a tag policy (`v*`) but no required reviewer.
 - Measurement protocol follow-ups from the T10 reviews: a `trials_started` field and a Track A version check.
 - README: several lines below the fold exceed the wrap width; the first-screen "on PyPI" availability sentence is true only after the tag publishes.
-- <<T13 additions>>
+- The README's first-screen commands (`uvx --from agent-reliability-ci …`, `uv tool install agent-reliability-ci`) do not resolve until the user registers the PyPI publisher and re-runs the publish job; the Availability line says publication was pending at that commit.
+- No GitHub release page yet (`gh release create` denied); the CI-built files are in the run's `dist` artifact.
 
 ## 8. Next three steps
-1. <<>>
-2. <<>>
-3. <<>>
+1. Register the PyPI pending publisher and re-run the publish job, then create the GitHub release with the CI artefacts (HUMAN_INBOX 1 and 3; about five minutes). Until then the two first-screen commands do not resolve.
+2. Run the TTFV protocol with five cold readers on the released package (HUMAN_INBOX 5, the pilot template), and re-measure Track A from PyPI; the maintainer-machine numbers (80 s cold, 72–73 s warm; 3 s own-agent tool path) are not cold-reader evidence.
+3. Open the follow-up branch for the review leftovers: ADR 0005 `httpcore2` typo at the next re-freeze, an sdist allowlist step in release.yml, the `arci init` link-error attribution and macOS F_FULLFSYNC note, dead branches in `descriptor._int_value`, `trials_started`/Track A version check in the protocol, and MCP Inspector protocol negotiation (ADR + Astra) if the Inspector recipe is to work end to end.
