@@ -1,0 +1,390 @@
+diff --git a/plan/exec/reports/02b.md b/plan/exec/reports/02b.md
+new file mode 100644
+index 0000000..6d7be9d
+--- /dev/null
++++ b/plan/exec/reports/02b.md
+@@ -0,0 +1,39 @@
++REPORT 02b — Status DONE
++
++Changes:
++- src/arci/demo/run.py
++  - New `failing_trial(run_dir)` used by step 3. It picks the candidate FAIL whose paired baseline is PASS with the smallest pair index (`int(pair_id.rsplit(":", 1)[1])`), not the first row in completion order. When no such pair exists it returns None, and step 3 still fails with "no pair where A passes and B fails".
++  - Step 3: a failing `arci diff` now prints `indented(diffed.stdout or diffed.stderr)`, the same way step 4 does.
++  - Step 2: new `RECORDED_PASSES = {"agent_b": (192, 132), "agent_a": (192, 192)}` and `recorded_comparison(candidate, counts)`. Each experiment prints one line, either "  matches the recorded run (A 192/200, <cand> N/200)" or "  differs from the recorded run (recorded A 192/200, <cand> N/200)". If the run did not complete (no counts), the line says it differs. `frozen_experiment` now returns True only when both experiments match. A difference never fails the step; the two verdict `expect`s still decide that.
++  - The final line comes from the new `final_line(work, matched=...)`: "Run stores: <dir>. Every count above was computed fresh on this machine, not replayed from evidence; they matched the recorded run (A 192/200, B 132/200)." or "...; they did not all match the recorded run (see step 2)."
++  - The trials.jsonl reader moved into a shared `_trials()`, used by `_candidate_passes` and `failing_trial`.
++- src/arci/cli.py (demo region only): the `--keep` help now reads "write the run stores to DIR (empty or new) instead of a kept temporary directory".
++- tests/unit/demo/test_demo.py: 13 new test cases (26 in total).
++  - (a) `test_the_last_line_names_the_store_and_the_recorded_comparison` [matched True/False]: monkeypatches all seven step functions and asserts the exact last two lines of `run_demo`, including `keep.resolve()`.
++  - (b) `_candidate_passes` is checked on the real noisy store in the existing step-logic test (it must agree with the row counts, and 0 <= B < A <= 12), plus `test_candidate_passes_counts_each_arm` on synthetic rows.
++  - (c) `test_failing_trial_is_the_smallest_pair_index_in_any_row_order` (5 shuffle seeds; the rows include decoys where the baseline fails or the candidate errors) and `test_failing_trial_is_none_without_an_a_pass_b_fail_pair`.
++  - Also `test_step_two_compares_with_the_recorded_run`, 4 cases covering the matching and differing lines and the no-counts case.
++
++Tests (run from the worktree):
++- .venv/bin/pytest tests/unit/demo -q -o addopts="" -> 26 passed in 2.68s
++- .venv/bin/ruff format --check . -> 230 files already formatted
++- .venv/bin/ruff check . -> All checks passed!
++- .venv/bin/basedpyright -> 0 errors, 0 warnings, 0 notes
++- shasum -a 256 -c FROZEN.sha256 | grep -v OK -> no output
++- .venv/bin/python -m arci.cli demo --workers 8, run twice from an empty scratch directory: both exit 0 with empty stderr and nothing written to the current directory. The output of steps 3 and 4 is byte-identical between the two runs. Step 3 picked reserve-timeout:00005:candidate in both runs (read with `failing_trial` from each kept store). A separate 1-worker run of step 3 picked the same trial.
++  - Step 2 lines, run 1:
++      VERDICT: BLOCK (exit 1)   [A vs agent_b]
++      passed under the fault: A 192/200, agent_b 132/200
++      matches the recorded run (A 192/200, agent_b 132/200)
++      VERDICT: PASS (exit 0)   [A vs agent_a]
++      passed under the fault: A 192/200, agent_a 192/200
++      matches the recorded run (A 192/200, agent_a 192/200)
++  - Final line, run 1:
++      Run stores: /var/folders/.../T/arci-demo-1bxpi_k8. Every count above was computed fresh on this machine, not replayed from evidence; they matched the recorded run (A 192/200, B 132/200).
++
++Deviations:
++- The tests reach `_candidate_passes` through two `# pyright: ignore[reportPrivateUsage]` comments. The brief names that private helper, and renaming it would widen the public surface for test use only.
++- The step-3 output does not print the trial id, so the identical-id check was made by reading each kept store, not from stdout.
++
++Open issues:
++- Seen only while checking by hand, and outside my files: importing `arci.cli` for the first time while `sys.stdout` is redirected to a StringIO raises AttributeError, because `arci/mcp_boundary.py:70` reads `sys.stdout.buffer` at import. The demo itself is not affected: `arci()` imports `arci.cli` before it redirects, and the entry points import it at startup. It would only hit someone who calls `run_demo()` from library code while stdout is already redirected.
+diff --git a/src/arci/cli.py b/src/arci/cli.py
+index 41986a0..2ed81a0 100644
+--- a/src/arci/cli.py
++++ b/src/arci/cli.py
+@@ -520,7 +520,7 @@ def _parser() -> _Parser:
+     demo.add_argument(
+         "--keep",
+         metavar="DIR",
+-        help="write the run stores to DIR (empty or new) instead of a temporary directory",
++        help="write the run stores to DIR (empty or new) instead of a kept temporary directory",
+     )
+     # --- end demo ---
+     return parser
+diff --git a/src/arci/demo/run.py b/src/arci/demo/run.py
+index 60c7f40..0eec6d9 100644
+--- a/src/arci/demo/run.py
++++ b/src/arci/demo/run.py
+@@ -21,7 +21,7 @@ import os
+ import tempfile
+ from dataclasses import dataclass
+ from pathlib import Path
+-from typing import NoReturn
++from typing import Any, NoReturn
+ 
+ from arci.demo.experiment import build_manifest, clean_manifest
+ from arci.replay import replay
+@@ -41,6 +41,8 @@ from arci.schema import (
+ N_PER_ARM = 200
+ NOISY_N_PER_ARM = 12
+ RECORDED_COUNTS = "A 192/200, B 132/200"
++# Passes under the fault in the recorded N=200 run: (A, candidate) per step-2 experiment.
++RECORDED_PASSES: dict[str, tuple[int, int]] = {"agent_b": (192, 132), "agent_a": (192, 192)}
+ 
+ 
+ class StepFailed(Exception):
+@@ -131,14 +133,17 @@ def _run(work: Path, manifest_path: Path, workers: int) -> CliResult:
+     return arci("run", str(manifest_path), "--out", str(work / "runs"), "--workers", str(workers))
+ 
+ 
+-def _candidate_passes(run_dir: Path) -> tuple[int, int]:
+-    trials = [
++def _trials(run_dir: Path) -> list[dict[str, Any]]:
++    return [
+         json.loads(line)
+         for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
+         if line.strip()
+     ]
++
++
++def _candidate_passes(run_dir: Path) -> tuple[int, int]:
+     counts = {"baseline": 0, "candidate": 0}
+-    for trial in trials:
++    for trial in _trials(run_dir):
+         if trial["outcome"] == "PASS":
+             counts[trial["arm"]] += 1
+     return counts["baseline"], counts["candidate"]
+@@ -158,24 +163,67 @@ def illustrative_run() -> None:
+     )
+ 
+ 
+-def frozen_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> None:
+-    """Step 2: A vs B BLOCKs, A vs A PASSes."""
++def recorded_comparison(candidate: str, counts: tuple[int, int] | None) -> tuple[bool, str]:
++    """Compare fresh step-2 passes with the recorded run; the line says which, never fails."""
++    baseline, passed = RECORDED_PASSES[candidate]
++    recorded = f"A {baseline}/{N_PER_ARM}, {candidate} {passed}/{N_PER_ARM}"
++    if counts == (baseline, passed):
++        return True, f"  matches the recorded run ({recorded})"
++    return False, f"  differs from the recorded run (recorded {recorded})"
++
++
++def frozen_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> bool:
++    """Step 2: A vs B BLOCKs, A vs A PASSes; True when both counts match the recorded run.
++
++    A count that differs from the recorded run is reported, not failed: the verdict
++    expectations decide whether the step holds.
++    """
+     step(2, f"The frozen experiment, N={n_per_arm} per arm, fault: tool_timeout on reserve")
+     verdicts: dict[str, int] = {}
++    matched = True
+     for candidate in ("agent_b", "agent_a"):
+         manifest = build_manifest(n_per_arm=n_per_arm, candidate=candidate)
+         done = _run(work, _write_manifest(work, candidate, manifest), workers)
+         verdicts[candidate] = done.code
+         print(f"  {done.last_line}   [A vs {candidate}]", flush=True)
++        counts: tuple[int, int] | None = None
+         if done.code in (0, 1):
+-            baseline, passed = _candidate_passes(work / "runs" / manifest.experiment_id)
++            counts = _candidate_passes(work / "runs" / manifest.experiment_id)
+             print(
+-                f"  passed under the fault: A {baseline}/{n_per_arm}, "
+-                f"{candidate} {passed}/{n_per_arm}",
++                f"  passed under the fault: A {counts[0]}/{n_per_arm}, "
++                f"{candidate} {counts[1]}/{n_per_arm}",
+                 flush=True,
+             )
++        same, line = recorded_comparison(candidate, counts)
++        matched = matched and same
++        print(line, flush=True)
+     expect(verdicts["agent_b"] == 1, "A vs B is BLOCKED (exit 1)")
+     expect(verdicts["agent_a"] == 0, "A vs A PASSES (exit 0)")
++    return matched
++
++
++def _pair_index(pair_id: str) -> int:
++    return int(pair_id.rsplit(":", 1)[1])
++
++
++def failing_trial(run_dir: Path) -> str | None:
++    """The candidate FAIL whose paired baseline PASSes, with the smallest pair index.
++
++    Chosen by pair index, not by row order: trials.jsonl is written in completion order,
++    which varies with the worker count and the scheduler.
++    """
++    trials = _trials(run_dir)
++    by_id = {trial["trial_id"]: trial for trial in trials}
++    candidates = [
++        trial
++        for trial in trials
++        if trial["arm"] == "candidate"
++        and trial["outcome"] == "FAIL"
++        and by_id.get(trial["pair_id"] + ":baseline", {}).get("outcome") == "PASS"
++    ]
++    if not candidates:
++        return None
++    return str(min(candidates, key=lambda trial: _pair_index(trial["pair_id"]))["trial_id"])
+ 
+ 
+ def first_divergence(work: Path, workers: int) -> tuple[Path, str]:
+@@ -186,27 +234,12 @@ def first_divergence(work: Path, workers: int) -> tuple[Path, str]:
+     if done.code not in (0, 1, 2):
+         fail(f"the noisy run did not complete: {done.last_line}")
+     run_dir = work / "runs" / noisy.experiment_id
+-    trials = [
+-        json.loads(line)
+-        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
+-        if line.strip()
+-    ]
+-    by_id = {trial["trial_id"]: trial for trial in trials}
+-    failing = next(
+-        (
+-            trial["trial_id"]
+-            for trial in trials
+-            if trial["arm"] == "candidate"
+-            and trial["outcome"] == "FAIL"
+-            and by_id[trial["pair_id"] + ":baseline"]["outcome"] == "PASS"
+-        ),
+-        None,
+-    )
++    failing = failing_trial(run_dir)
+     if failing is None:
+         fail("no pair where A passes and B fails")
+     passing = failing.rsplit(":", 1)[0] + ":baseline"
+     diffed = arci("diff", str(run_dir), passing, failing)
+-    print(indented(diffed.stdout), flush=True)
++    print(indented(diffed.stdout or diffed.stderr), flush=True)
+     expect(
+         diffed.code == 0 and "tool_timeout" in diffed.stdout,
+         "the divergence sits right after the injected tool_timeout",
+@@ -280,7 +313,7 @@ def run_demo(*, workers: int | None = None, keep: Path | None = None) -> int:
+     print(f"arci demo: the retry story, {workers} workers, run stores in {work}", flush=True)
+     try:
+         illustrative_run()
+-        frozen_experiment(work, workers)
++        matched = frozen_experiment(work, workers)
+         run_dir, failing = first_divergence(work, workers)
+         reduced = shrink(work, run_dir, failing)
+         replay_offline(work)
+@@ -291,10 +324,17 @@ def run_demo(*, workers: int | None = None, keep: Path | None = None) -> int:
+         print(f"\nA step did not hold: {failed}. Run stores: {work}", flush=True)
+         return 1
+     print("\nAll six steps held.", flush=True)
+-    print(
+-        f"Run stores: {work}. Every count above was computed fresh on this machine, "
+-        f"not replayed from evidence; they are expected to match the recorded run "
+-        f"({RECORDED_COUNTS}).",
+-        flush=True,
+-    )
++    print(final_line(work, matched=matched), flush=True)
+     return 0
++
++
++def final_line(work: Path, *, matched: bool) -> str:
++    comparison = (
++        f"they matched the recorded run ({RECORDED_COUNTS})"
++        if matched
++        else "they did not all match the recorded run (see step 2)"
++    )
++    return (
++        f"Run stores: {work}. Every count above was computed fresh on this machine, "
++        f"not replayed from evidence; {comparison}."
++    )
+diff --git a/tests/unit/demo/test_demo.py b/tests/unit/demo/test_demo.py
+index c0c29f8..a2e3b39 100644
+--- a/tests/unit/demo/test_demo.py
++++ b/tests/unit/demo/test_demo.py
+@@ -6,6 +6,8 @@ The full N=200 demo is not run here (CI time); the step logic is exercised with
+ 
+ from __future__ import annotations
+ 
++import json
++import random
+ import subprocess
+ import sys
+ import textwrap
+@@ -146,6 +148,139 @@ def test_the_step_logic_holds_on_the_noisy_run(
+     assert "minimality: 1-minimal" in out
+     assert "REPRODUCED: failure reproduced" in out
+ 
++    baseline, candidate = demo_run._candidate_passes(run_dir)  # pyright: ignore[reportPrivateUsage]
++    rows = [
++        json.loads(line)
++        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
++        if line.strip()
++    ]
++    assert len(rows) == 2 * demo_run.NOISY_N_PER_ARM
++    assert baseline == sum(r["arm"] == "baseline" and r["outcome"] == "PASS" for r in rows)
++    assert candidate == sum(r["arm"] == "candidate" and r["outcome"] == "PASS" for r in rows)
++    assert 0 <= candidate < baseline <= demo_run.NOISY_N_PER_ARM
++
++
++def _write_trials(run_dir: Path, rows: list[dict[str, str]]) -> None:
++    run_dir.mkdir(parents=True, exist_ok=True)
++    text = "".join(json.dumps(row) + "\n" for row in rows)
++    (run_dir / "trials.jsonl").write_text(text, encoding="utf-8")
++
++
++def _pair(index: int, baseline: str, candidate: str) -> list[dict[str, str]]:
++    pair_id = f"reserve-timeout:{index:05d}"
++    return [
++        {
++            "trial_id": f"{pair_id}:baseline",
++            "pair_id": pair_id,
++            "arm": "baseline",
++            "outcome": baseline,
++        },
++        {
++            "trial_id": f"{pair_id}:candidate",
++            "pair_id": pair_id,
++            "arm": "candidate",
++            "outcome": candidate,
++        },
++    ]
++
++
++def test_candidate_passes_counts_each_arm(tmp_path: Path) -> None:
++    rows = [
++        *_pair(0, "PASS", "PASS"),
++        *_pair(1, "PASS", "FAIL"),
++        *_pair(2, "FAIL", "PASS"),
++        *_pair(3, "PASS", "ERROR"),
++    ]
++    _write_trials(tmp_path, rows)
++    assert demo_run._candidate_passes(tmp_path) == (3, 2)  # pyright: ignore[reportPrivateUsage]
++
++
++@pytest.mark.parametrize("seed", range(5))
++def test_failing_trial_is_the_smallest_pair_index_in_any_row_order(
++    tmp_path: Path, seed: int
++) -> None:
++    rows = [
++        *_pair(0, "PASS", "PASS"),
++        *_pair(1, "FAIL", "FAIL"),  # baseline fails too: not a usable pair
++        *_pair(2, "PASS", "ERROR"),  # candidate errored, not FAIL
++        *_pair(3, "PASS", "FAIL"),
++        *_pair(7, "PASS", "FAIL"),
++        *_pair(11, "PASS", "FAIL"),
++    ]
++    random.Random(seed).shuffle(rows)
++    _write_trials(tmp_path, rows)
++    assert demo_run.failing_trial(tmp_path) == "reserve-timeout:00003:candidate"
++
++
++def test_failing_trial_is_none_without_an_a_pass_b_fail_pair(tmp_path: Path) -> None:
++    _write_trials(tmp_path, [*_pair(0, "PASS", "PASS"), *_pair(1, "FAIL", "FAIL")])
++    assert demo_run.failing_trial(tmp_path) is None
++
++
++@pytest.mark.parametrize("matched", [True, False])
++def test_the_last_line_names_the_store_and_the_recorded_comparison(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++    capsys: pytest.CaptureFixture[str],
++    matched: bool,
++) -> None:
++    def frozen(work: Path, workers: int) -> bool:
++        return matched
++
++    def divergence(work: Path, workers: int) -> tuple[Path, str]:
++        return work / "runs" / "noisy", "reserve-timeout:00003:candidate"
++
++    def shrunk(work: Path, run_dir: Path, failing: str) -> object:
++        return object()
++
++    def nothing(*_args: object) -> None:
++        return None
++
++    monkeypatch.setattr(demo_run, "illustrative_run", nothing)
++    monkeypatch.setattr(demo_run, "frozen_experiment", frozen)
++    monkeypatch.setattr(demo_run, "first_divergence", divergence)
++    monkeypatch.setattr(demo_run, "shrink", shrunk)
++    monkeypatch.setattr(demo_run, "replay_offline", nothing)
++    monkeypatch.setattr(demo_run, "repaired_reproducer", nothing)
++    monkeypatch.setattr(demo_run, "repaired_experiment", nothing)
++    keep = tmp_path / "stores"
++
++    assert demo_run.run_demo(workers=1, keep=keep) == 0
++    lines = capsys.readouterr().out.splitlines()
++    comparison = (
++        "they matched the recorded run (A 192/200, B 132/200)."
++        if matched
++        else "they did not all match the recorded run (see step 2)."
++    )
++    assert lines[-2] == "All six steps held."
++    assert lines[-1] == (
++        f"Run stores: {keep.resolve()}. Every count above was computed fresh on this machine, "
++        f"not replayed from evidence; {comparison}"
++    )
++
++
++@pytest.mark.parametrize(
++    ("candidate", "counts", "line"),
++    [
++        ("agent_b", (192, 132), "  matches the recorded run (A 192/200, agent_b 132/200)"),
++        ("agent_a", (192, 192), "  matches the recorded run (A 192/200, agent_a 192/200)"),
++        (
++            "agent_b",
++            (191, 132),
++            "  differs from the recorded run (recorded A 192/200, agent_b 132/200)",
++        ),
++        (
++            "agent_a",
++            None,
++            "  differs from the recorded run (recorded A 192/200, agent_a 192/200)",
++        ),
++    ],
++)
++def test_step_two_compares_with_the_recorded_run(
++    candidate: str, counts: tuple[int, int] | None, line: str
++) -> None:
++    assert demo_run.recorded_comparison(candidate, counts) == (line.startswith("  matches"), line)
++
+ 
+ def test_a_failed_step_exits_one_and_names_the_store(
+     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
