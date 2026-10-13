@@ -16,3 +16,24 @@
   first screen (`read_whole_readme: true`; its own reading-time estimate 7 min). Memo target for
   cold readers: ≥ 80 % answer all five; this single AI-agent run is a check of the text, not a
   measurement of cold readers (none recruited in this run; HUMAN_INBOX 5).
+
+## Own-agent TTFV, Track B (maintainer-machine run by the orchestrator; AI-agent labelled)
+
+- 2026-10-13T07:31:44Z–07:31:47Z, sample tree `examples/recipes/python_agent` copied outside the
+  checkout, local 0.8.0 wheel (sha256 10ddc682…2899, built from main 48e60ac), warm uv cache.
+  install 0 s (uv venv + uv pip install; the `uv tool install` route is denied here), scaffold 1 s,
+  run 2 s, store validated (gate reproduces the line; decision sha unchanged), total 3 s to a
+  validated INCONCLUSIVE at N=8; agent execution summed over 16 trials 5.9 s. Receipt:
+  `docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-own-agent.json`. This measures the
+  tool path, not a person reading the README or writing references; the memo's ≤ 10 min target is
+  for cold users, none measured in this run.
+
+## Packaged demo TTFV, Track A (maintainer-machine runs by the orchestrator; AI-agent labelled; local 0.8.0 wheel)
+
+- `uvx --from <wheel> arci demo` from an empty directory, default workers, wheel sha256 10ddc682…2899
+  (built from main 48e60ac; PyPI not yet published at measurement time). Three samples:
+  cold uv cache (fresh UV_CACHE_DIR): install 9 s, run 71 s, total 80 s; warm cache: 1 s + 71 s = 72 s;
+  warm cache: 1 s + 72 s = 73 s. All exit 0, "All six steps held". Receipt (the cold run):
+  `docs/measurement/receipts/2026-10-13-claude-fable-orchestrator-demo.json`. Memo target: p50 ≤ 2 min,
+  p95 ≤ 3 min (all three samples under 1:20; cold readers not measured). The earlier 1:12 figure
+  (pre-release wheel, 06:xxZ) is consistent.

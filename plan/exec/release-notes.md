@@ -58,8 +58,11 @@ uv tool install agent-reliability-ci                  # the arci command
 
 ## Measured in this release's run (orchestrator's machine, 15-core Apple Silicon)
 
-- `arci demo` from the checkout: 38 s; through `uvx` from an empty directory incl. environment
-  creation: 72 s. <<final numbers filled in at the end of the run from plan/exec/measurements.md>>
+- `arci demo` from the checkout: 38 s. Through `uvx --from <the 0.8.0 wheel> arci demo` in an empty
+  directory, including environment creation: 80 s with a cold uv cache (9 s resolve/install + 71 s
+  run), 72 s and 73 s warm. Own-agent path on the sample tree (`arci init` + `arci run` at
+  N=8): 3 s to a validated INCONCLUSIVE. Receipts in `docs/measurement/receipts/`, labelled as
+  maintainer-machine runs; no cold-reader measurement yet.
 
 ## Limits that have not moved
 
