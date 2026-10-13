@@ -1,0 +1,626 @@
+diff --git a/docs/recipes/mcp-inspector.md b/docs/recipes/mcp-inspector.md
+index 3a72f67..df47e3a 100644
+--- a/docs/recipes/mcp-inspector.md
++++ b/docs/recipes/mcp-inspector.md
+@@ -35,8 +35,9 @@ npx @modelcontextprotocol/inspector --cli --config mcp.inspector.json --server e
+ 
+ `mcp.inspector.json` starts the bridge directly (seed 0, `--task-file task.json`,
+ `"env": {"PYTHONPATH": "."}` so `world` imports from this directory). The Inspector connects,
+-initializes and lists the tools (its `tools/call` method calls one). It talks to the **raw** server: ARCI's boundary is not in the path, so nothing it
+-sees is recorded, budgeted or fault-injected.
++initializes and lists the tools (its `tools/call` method calls one). It talks to the **raw**
++server: ARCI's boundary is not in the path, so nothing it sees is recorded, budgeted or
++fault-injected.
+ 
+ Recorded on the orchestrator's machine:
+ 
+@@ -125,7 +126,7 @@ That works because the client is scripted; a live model that calls differently i
+ 
+ | Question | Inspector or manual preflight (raw bridge) | `arci run` (through the boundary) |
+ |---|---|---|
+-| Server starts, `initialize` succeeds | yes (blocked on the Inspector SDK's version check today) | yes, every trial |
++| Server starts and initializes | yes (the Inspector is blocked today, above) | yes, every trial |
+ | Tools listed with schemas | yes | yes, recorded |
+ | One `tools/call` routes and returns | yes | yes, every call recorded |
+ | Fault injection (`tool_error_once`, `tool_timeout`, `empty_result`) | no | yes |
+diff --git a/docs/recipes/python-agent.md b/docs/recipes/python-agent.md
+index c753b25..08febf6 100644
+--- a/docs/recipes/python-agent.md
++++ b/docs/recipes/python-agent.md
+@@ -74,7 +74,10 @@ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
+ ```
+ 
+ The planner enumerates every pair of success counts on its grid and reports the smallest N per arm
+-with P(BLOCK) >= 0.8: 400. These are probabilities under your assumptions, not observed power.
++with P(BLOCK) >= 0.8: 400, at P(BLOCK) 0.828. These are probabilities under your assumptions, not
++observed power. `arci plan` assumes independent arms and does not model this recipe's shared seeds
++and held-order state, so 0.828 is a planning figure under that assumption, not calibrated power for
++this fixture.
+ 
+ Write that design as a new experiment before running any of it:
+ 
+@@ -92,7 +95,9 @@ arci run confirm.yaml
+ 
+ Evaluate it once at N=400. Growing N because a verdict disappointed you is outcome-dependent
+ extension; the descriptor's header says never to do it, and
+-[docs/STATISTICS.md](../STATISTICS.md) explains why.
++[docs/STATISTICS.md](../STATISTICS.md) explains why. Its "Discipline" section adds the rule that
++`prior_runs` serves: a new experiment id does not reset error control and does not license
++retrying an unchanged candidate until it passes. Every run on this candidate stays listed.
+ 
+ ## Step 4: look at one failure
+ 
+@@ -101,7 +106,7 @@ In the smoke run, pair 0 has v1 passing and v2 failing:
+ ```bash
+ arci diff runs/checkout-retry faults:00000:baseline faults:00000:candidate
+ arci minimize runs/checkout-retry faults:00000:candidate --out min.json
+-arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/v2.py --include tests/world.py
++arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/__init__.py --include app/v2.py --include tests/__init__.py --include tests/world.py
+ arci replay bundle.json
+ ```
+ 
+@@ -111,29 +116,60 @@ arci replay bundle.json
+   1-minimal.
+ - `bundle` packs the trial, its recording and the named source files into one JSON file;
+   `replay` re-runs it offline against the recording and exits 0 when the failure reproduces.
++- Name both `__init__.py` files. Replay puts the bundle's directory first on the import path, and
++  only as regular packages do the bundled `app` and `tests` shadow the working tree's. Without
++  them the bundled directories are namespace portions, the tree's regular packages win, and replay
++  runs whatever `app/v2.py` and `tests/world.py` say now, not what was bundled. The recipe's test
++  edits both files after bundling: the full bundle still reproduces (exit 0); the bundle without
++  the two `__init__.py` files does not (exit 1).
+ 
+ ## Recorded run
+ 
+-The orchestrator's machine, one smoke run and one confirmatory run, with wall-clock times:
++Recorded on the maintainer's machine during the v0.8.0 sprint (2026-10-13; 15-core Apple Silicon
++Mac; ARCI at the sprint's descriptor lane), from a fresh copy of the tree made as in step 1
++(`arci.yaml` removed, `PYTHONPATH` unset, the clone's `.venv/bin/arci` on `PATH`, default 4
++workers). `[...]` marks output left out. The blocks, in order: `arci init` and its one line of
++output; the smoke run's stderr (the two smoke notices), its condition table, its verdict line and
++its wall time; the planner's table, its result and its "No pairing" assumption; the confirmatory
++descriptor, its two appended lines, and that run's condition table, its "Earlier runs" section,
++its verdict line and its wall time.
+ 
+ ```text
+ $ arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0
+ arci run arci.yaml
+-exit 0
+-$ arci run arci.yaml
+-- None recorded.
++```
+ 
+-## Reasons
+-
+-- Experiment: no global errors.
+-- `faults`: bounds cross the margin
+-
+-VERDICT: INCONCLUSIVE (exit 2)
+-exit 2
++```text
++$ /usr/bin/time -p arci run arci.yaml
+ --- stderr ---
+-SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under the default rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
++SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper–Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
+ INCONCLUSIVE at n_per_arm=8 is the expected smoke result; choose a confirmatory N with arci plan before re-running.
++--- stdout, from its condition table ---
++## Condition: faults
++
++| Measure | Baseline | Candidate / condition |
++|---|---:|---:|
++| Role | — | Gating |
++| n | 8 | 8 |
++| Successes | 8 | 2 |
++| Success rate | 100.0% | 25.0% |
++| Wilson 95% (display only) | [0.6756, 1.0000] | [0.0715, 0.5907] |
++| Clopper-Pearson (97.5000%) | [0.5782, 1.0000] | [0.0221, 0.6942] |
++| Bounds on difference, clopper_pearson (candidate - baseline) | — | [-0.9779, 0.1160] |
++| Candidate hard violations | — | 0 |
++| Condition verdict | — | **INCONCLUSIVE** |
++[...]
++VERDICT: INCONCLUSIVE (exit 2)
++--- /usr/bin/time -p ---
++real 1.60
++user 4.85
++sys 0.44
++```
++
++```text
+ $ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
++[...]
++| N per arm | Total trials | P(PASS) | P(BLOCK) | P(INCONCLUSIVE) | Meets target |
+ |---:|---:|---:|---:|---:|---|
+ | 20 | 40 | 0.000 | 0.000 | 1.000 | no |
+ | 50 | 100 | 0.000 | 0.016 | 0.984 | no |
+@@ -142,13 +178,47 @@ $ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
+ | 400 | 800 | 0.000 | 0.828 | 0.172 | yes |
+ 
+ Result: smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 (800 trials in total).
+-
++[...]
++Assumptions: [...] No pairing: shared seeds or any other dependence between the arms is not modelled. [...]
+ ```
+ 
+-Recorded by the orchestrator on 2026-10-13 from a fresh copy of this directory, `PYTHONPATH` unset,
+-ARCI at the sprint's descriptor lane (the `arci run` output is cut to its last lines; the smoke run took 1.6 s
+-on a 15-core Apple Silicon Mac; the baseline passed 8/8 and the candidate 2/8). Counts depend on the seeds
+-in `arci.yaml`, so your run prints the same numbers; the verdict is INCONCLUSIVE because 8 pairs cannot decide.
++```text
++$ arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 --n 400 --out confirm.yaml
++arci run confirm.yaml
++$ printf 'base_seed: 1000\nprior_runs: ["checkout-retry"]\n' >> confirm.yaml
++$ /usr/bin/time -p arci run confirm.yaml
++--- stderr: empty (no smoke notice at N=400) ---
++--- stdout, from its condition table ---
++## Condition: faults
++
++| Measure | Baseline | Candidate / condition |
++|---|---:|---:|
++| Role | — | Gating |
++| n | 400 | 400 |
++| Successes | 390 | 296 |
++| Success rate | 97.5% | 74.0% |
++| Wilson 95% (display only) | [0.9546, 0.9864] | [0.6949, 0.7806] |
++| Clopper-Pearson (97.5000%) | [0.9513, 0.9892] | [0.6875, 0.7880] |
++| Bounds on difference, clopper_pearson (candidate - baseline) | — | [-0.3018, -0.1633] |
++| Candidate hard violations | — | 0 |
++| Condition verdict | — | **BLOCK** |
++[...]
++## Earlier runs on this candidate are never hidden
++
++- `checkout-retry`
++[...]
++VERDICT: BLOCK (exit 1)
++--- /usr/bin/time -p ---
++real 96.65
++user 288.65
++sys 32.55
++```
++
++The smoke run passed 8/8 against 2/8 and is INCONCLUSIVE, because 8 pairs cannot decide anything
++short of a total collapse. The confirmatory run passed 390/400 against 296/400; the bounds on the
++difference, [-0.3018, -0.1633], lie wholly below -delta (-0.10), so it BLOCKs, and its report lists
++the smoke run `checkout-retry` as an earlier run on this candidate. The trials are seeded by the
++descriptors, so the same files give the same counts on your machine; wall times differ.
+ 
+ ## What this does not show
+ 
+diff --git a/examples/recipes/mcp_agent/README.md b/examples/recipes/mcp_agent/README.md
+index b089428..df83396 100644
+--- a/examples/recipes/mcp_agent/README.md
++++ b/examples/recipes/mcp_agent/README.md
+@@ -9,7 +9,7 @@ including what the Inspector and ARCI each check, is
+ | File | What it is |
+ |---|---|
+ | `world.py` | `make_world(task, seed)`: tools `fetch(key)` (30% of seeds fail the first real call transiently) and `store(key, value)`; `snapshot()`; `passed(task, final_state)`: the stored value equals the upstream's |
+-| `agent.py` | stdlib newline-delimited JSON-RPC stdio client: one session, `initialize` (protocol `2026-07-28`), `notifications/initialized`, `tools/list`, `fetch`, `store`; exit 0 done, 1 gave up, 75 infrastructure |
++| `agent.py` | stdlib newline-delimited JSON-RPC stdio client: one session, `initialize` (protocol `2026-07-28`), `notifications/initialized`, `tools/list`, `fetch`, `store`; exit 0 done, 1 gave up, 75 infrastructure (including an `initialize` error, another protocol version or a tool result that is not `complete`) |
+ | `arci.yaml` | written by hand (`arci init` scaffolds Python arms only): two command arms, `mcp_server` = the bridge `arci.mcp_toolset_server --toolset world:make_world`, one condition `tool_error_once` on `fetch` at occurrence 0, 8 trials per arm |
+ | `mcp.inspector.json` | an Inspector `--config` file that starts the same bridge directly (seed 0, `task.json`, `PYTHONPATH=.`) |
+ | `task.json` | the task, `{"key": "answer"}` |
+diff --git a/examples/recipes/mcp_agent/agent.py b/examples/recipes/mcp_agent/agent.py
+index 5871728..ac0fff1 100644
+--- a/examples/recipes/mcp_agent/agent.py
++++ b/examples/recipes/mcp_agent/agent.py
+@@ -4,7 +4,9 @@
+ 
+ It starts the one server in the config, initializes, lists tools, fetches the task's key and
+ stores the value. `retry` retries a failed fetch up to 3 times; `fragile` gives up on the first
+-error. Exit 0: done (the agent's claim of success); 1: gave up; 75: infrastructure problem.
++error. Exit 0: done (the agent's claim of success); 1: gave up; 75: infrastructure problem (the
++server is missing or closes, `initialize` fails or answers another protocol version, or a tool
++result is not `complete`).
+ """
+ 
+ from __future__ import annotations
+@@ -17,6 +19,7 @@ from pathlib import Path
+ from typing import Any
+ 
+ RETRIES = {"retry": 3, "fragile": 0}
++PROTOCOL = "2026-07-28"
+ INFRA = 75  # EX_TEMPFAIL: the trial is a harness ERROR, not the agent's failure
+ 
+ 
+@@ -54,6 +57,8 @@ class Session:
+     def call(self, name: str, **arguments: str) -> Any:
+         """The tool's JSON value, or None for an error result."""
+         result: Any = self.send("tools/call", {"name": name, "arguments": arguments}).get("result")
++        if isinstance(result, dict) and result.get("resultType", "complete") != "complete":
++            raise ConnectionError(f"tools/call {name}: resultType {result['resultType']!r}")
+         if not isinstance(result, dict) or result.get("isError") or not result.get("content"):
+             return None
+         return json.loads(result["content"][0]["text"])
+@@ -69,8 +74,10 @@ class Session:
+ 
+ def work(session: Session, key: str, retries: int) -> bool:
+     client = {"name": "recipe-agent", "version": "1"}
+-    init = {"protocolVersion": "2026-07-28", "capabilities": {}, "clientInfo": client}
+-    session.send("initialize", init)
++    init = {"protocolVersion": PROTOCOL, "capabilities": {}, "clientInfo": client}
++    initialized: Any = session.send("initialize", init)
++    if "error" in initialized or initialized.get("result", {}).get("protocolVersion") != PROTOCOL:
++        raise ConnectionError(f"initialize failed or answered another protocol: {initialized}")
+     session.send("notifications/initialized", {}, notify=True)
+     listed: Any = session.send("tools/list", {})["result"]["tools"]
+     if {"fetch", "store"} - {tool["name"] for tool in listed}:
+diff --git a/examples/recipes/python_agent/README.md b/examples/recipes/python_agent/README.md
+index 18fb51c..dc39b26 100644
+--- a/examples/recipes/python_agent/README.md
++++ b/examples/recipes/python_agent/README.md
+@@ -45,7 +45,8 @@ Expect `VERDICT: INCONCLUSIVE (exit 2)` and two stderr lines that say so. Eight
+ smoke design: under the default rule (alpha 0.05, delta 0.10, Clopper-Pearson) two perfect arms
+ cannot PASS below N=42, and only a total collapse can BLOCK at N=8. Here v2 still confirms every
+ order that arrived held (two of the eight seeds 0-7, so expect 8/8 against 2/8), so it does not
+-collapse to 0/8, and the interval on the difference crosses the margin. INCONCLUSIVE claims no regression and no safety; it says this N cannot tell.
++collapse to 0/8, and the interval on the difference crosses the margin. INCONCLUSIVE claims no
++regression and no safety; it says this N cannot tell.
+ 
+ ## Choose a confirmatory N before running it
+ 
+@@ -56,7 +57,10 @@ smallest N that BLOCKs with probability at least 0.8:
+ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
+ ```
+ 
+-The planner answers 400 per arm. Write that design as a new experiment before any of its trials:
++The planner answers 400 per arm (P(BLOCK) 0.828). `arci plan` assumes independent arms and does
++not model this recipe's shared seeds and held-order state, so 0.828 is a planning figure under that
++assumption, not calibrated power for this fixture. Write that design as a new experiment before
++any of its trials:
+ 
+ ```bash
+ arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 --n 400 --out confirm.yaml
+@@ -75,7 +79,10 @@ arci run confirm.yaml
+ ```
+ 
+ Evaluate once at that N. Never grow N because a verdict disappointed you; that is the extension the
+-header of `arci.yaml` forbids.
++header of `arci.yaml` forbids. As the "Discipline" section of
++[docs/STATISTICS.md](../../../docs/STATISTICS.md) puts it, a new experiment id does not reset error
++control and does not license retrying an unchanged candidate until it passes: `prior_runs` keeps
++the smoke run in view, and every later run on this candidate belongs there too.
+ 
+ ## Look at a failing trial
+ 
+@@ -84,34 +91,64 @@ At N=8, pair 0 has v1 passing and v2 failing:
+ ```bash
+ arci diff runs/checkout-retry faults:00000:baseline faults:00000:candidate
+ arci minimize runs/checkout-retry faults:00000:candidate --out min.json
+-arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/v2.py --include tests/world.py
++arci bundle runs/checkout-retry faults:00000:candidate --out bundle.json --root . --include app/__init__.py --include app/v2.py --include tests/__init__.py --include tests/world.py
+ arci replay bundle.json
+ ```
+ 
+ `diff` names the first divergence (v1 calls `reserve` again, v2 returns) and the injected fault
+ before it; `minimize` shows the one fault is needed; `replay` re-runs the bundle offline from its
+-recording and exits 0 when the failure reproduces.
++recording and exits 0 when the failure reproduces. Name both `__init__.py` files: replay puts the
++bundle's directory first on the import path, and only as regular packages do the bundled `app` and
++`tests` shadow this tree's. Without them the tree's current `app/v2.py` and `tests/world.py` run
++instead of the bundled ones (a test edits both after bundling to show it).
+ 
+ ## Recorded run
+ 
++Recorded on the maintainer's machine during the v0.8.0 sprint (2026-10-13; 15-core Apple Silicon
++Mac; ARCI at the sprint's descriptor lane), from a fresh copy of this directory made as in "Run
++it" (`arci.yaml` removed, `PYTHONPATH` unset, the clone's `.venv/bin/arci` on `PATH`, default 4
++workers). `[...]` marks output left out. The blocks, in order: `arci init` and its one line of
++output; the smoke run's stderr (the two smoke notices), its condition table, its verdict line and
++its wall time; the planner's table, its result and its "No pairing" assumption; the confirmatory
++descriptor, its two appended lines, and that run's condition table, its "Earlier runs" section,
++its verdict line and its wall time.
++
+ ```text
+ $ arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0
+ arci run arci.yaml
+-exit 0
+-$ arci run arci.yaml
+-- None recorded.
++```
+ 
+-## Reasons
+-
+-- Experiment: no global errors.
+-- `faults`: bounds cross the margin
+-
+-VERDICT: INCONCLUSIVE (exit 2)
+-exit 2
++```text
++$ /usr/bin/time -p arci run arci.yaml
+ --- stderr ---
+-SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under the default rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
++SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper–Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
+ INCONCLUSIVE at n_per_arm=8 is the expected smoke result; choose a confirmatory N with arci plan before re-running.
++--- stdout, from its condition table ---
++## Condition: faults
++
++| Measure | Baseline | Candidate / condition |
++|---|---:|---:|
++| Role | — | Gating |
++| n | 8 | 8 |
++| Successes | 8 | 2 |
++| Success rate | 100.0% | 25.0% |
++| Wilson 95% (display only) | [0.6756, 1.0000] | [0.0715, 0.5907] |
++| Clopper-Pearson (97.5000%) | [0.5782, 1.0000] | [0.0221, 0.6942] |
++| Bounds on difference, clopper_pearson (candidate - baseline) | — | [-0.9779, 0.1160] |
++| Candidate hard violations | — | 0 |
++| Condition verdict | — | **INCONCLUSIVE** |
++[...]
++VERDICT: INCONCLUSIVE (exit 2)
++--- /usr/bin/time -p ---
++real 1.60
++user 4.85
++sys 0.44
++```
++
++```text
+ $ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
++[...]
++| N per arm | Total trials | P(PASS) | P(BLOCK) | P(INCONCLUSIVE) | Meets target |
+ |---:|---:|---:|---:|---:|---|
+ | 20 | 40 | 0.000 | 0.000 | 1.000 | no |
+ | 50 | 100 | 0.000 | 0.016 | 0.984 | no |
+@@ -120,13 +157,47 @@ $ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
+ | 400 | 800 | 0.000 | 0.828 | 0.172 | yes |
+ 
+ Result: smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 (800 trials in total).
+-
++[...]
++Assumptions: [...] No pairing: shared seeds or any other dependence between the arms is not modelled. [...]
+ ```
+ 
+-Recorded by the orchestrator on 2026-10-13 from a fresh copy of this directory, `PYTHONPATH` unset,
+-ARCI at the sprint's descriptor lane (the `arci run` output is cut to its last lines; the smoke run took 1.6 s
+-on a 15-core Apple Silicon Mac; the baseline passed 8/8 and the candidate 2/8). Counts depend on the seeds
+-in `arci.yaml`, so your run prints the same numbers; the verdict is INCONCLUSIVE because 8 pairs cannot decide.
++```text
++$ arci init checkout-retry-n400 --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0 --n 400 --out confirm.yaml
++arci run confirm.yaml
++$ printf 'base_seed: 1000\nprior_runs: ["checkout-retry"]\n' >> confirm.yaml
++$ /usr/bin/time -p arci run confirm.yaml
++--- stderr: empty (no smoke notice at N=400) ---
++--- stdout, from its condition table ---
++## Condition: faults
++
++| Measure | Baseline | Candidate / condition |
++|---|---:|---:|
++| Role | — | Gating |
++| n | 400 | 400 |
++| Successes | 390 | 296 |
++| Success rate | 97.5% | 74.0% |
++| Wilson 95% (display only) | [0.9546, 0.9864] | [0.6949, 0.7806] |
++| Clopper-Pearson (97.5000%) | [0.9513, 0.9892] | [0.6875, 0.7880] |
++| Bounds on difference, clopper_pearson (candidate - baseline) | — | [-0.3018, -0.1633] |
++| Candidate hard violations | — | 0 |
++| Condition verdict | — | **BLOCK** |
++[...]
++## Earlier runs on this candidate are never hidden
++
++- `checkout-retry`
++[...]
++VERDICT: BLOCK (exit 1)
++--- /usr/bin/time -p ---
++real 96.65
++user 288.65
++sys 32.55
++```
++
++The smoke run passed 8/8 against 2/8 and is INCONCLUSIVE, because 8 pairs cannot decide anything
++short of a total collapse. The confirmatory run passed 390/400 against 296/400; the bounds on the
++difference, [-0.3018, -0.1633], lie wholly below -delta (-0.10), so it BLOCKs, and its report lists
++the smoke run `checkout-retry` as an earlier run on this candidate. The trials are seeded by the
++descriptors, so the same files give the same counts on your machine; wall times differ.
+ 
+ ## What this does not show
+ 
+diff --git a/tests/unit/recipes/test_mcp_agent.py b/tests/unit/recipes/test_mcp_agent.py
+index 44461eb..357fe39 100644
+--- a/tests/unit/recipes/test_mcp_agent.py
++++ b/tests/unit/recipes/test_mcp_agent.py
+@@ -197,3 +197,61 @@ def test_diff_minimize_bundle_and_replay(run: Run) -> None:
+     assert 'left: tool_start tool="fetch"' in diff.stdout
+     assert "kept: tool_error_once" in minimize.stdout
+     assert replay.stdout.startswith("REPRODUCED")
++
++
++FAKE_SERVER = """
++import json, sys
++
++mode = sys.argv[1]
++for line in sys.stdin:
++    request = json.loads(line)
++    method = request["method"]
++    if "id" not in request:
++        continue
++    if method == "initialize":
++        version = "2025-11-25" if mode == "old-protocol" else "2026-07-28"
++        reply = {"result": {"protocolVersion": version, "capabilities": {}}}
++        if mode == "init-error":
++            reply = {"error": {"code": -32602, "message": "unsupported"}}
++    elif method == "tools/list":
++        reply = {"result": {"tools": [{"name": "fetch"}, {"name": "store"}]}}
++    else:
++        value = {"value": "42"} if request["params"]["name"] == "fetch" else {"stored": True}
++        reply = {"result": {"content": [{"type": "text", "text": json.dumps(value)}]}}
++        if mode != "no-result-type":
++            reply["result"]["resultType"] = "incomplete" if mode == "incomplete" else "complete"
++    print(json.dumps({"jsonrpc": "2.0", "id": request["id"], **reply}), flush=True)
++"""
++
++
++@pytest.mark.parametrize(
++    ("mode", "exit_code"),
++    [
++        ("ok", 0),
++        ("no-result-type", 0),
++        ("init-error", 75),
++        ("old-protocol", 75),
++        ("incomplete", 75),
++    ],
++)
++def test_the_agent_checks_initialize_and_result_type(
++    tmp_path: Path, mode: str, exit_code: int
++) -> None:
++    """A fake stdio server: an `initialize` error, another protocol or a result that is not
++    `complete` is an infrastructure problem (75), never the agent's success or failure."""
++    (tmp_path / "fake_server.py").write_text(FAKE_SERVER, encoding="utf-8")
++    server = {"command": sys.executable, "args": ["-P", "fake_server.py", mode], "env": {}}
++    config = tmp_path / "config.json"
++    config.write_text(json.dumps({"mcpServers": {"fake": server}}), encoding="utf-8")
++    shutil.copy(RECIPE / "task.json", tmp_path / "task.json")
++    argv = ["--mcp-config", str(config), "--task-file", "task.json", "--variant", "fragile"]
++    done = subprocess.run(
++        [sys.executable, str(RECIPE / "agent.py"), *argv],
++        cwd=tmp_path,
++        env=_env(),
++        capture_output=True,
++        text=True,
++        timeout=30,
++        check=False,
++    )
++    assert done.returncode == exit_code, done.stderr[-2000:]
+diff --git a/tests/unit/recipes/test_python_agent.py b/tests/unit/recipes/test_python_agent.py
+index f5e20af..15e49a8 100644
+--- a/tests/unit/recipes/test_python_agent.py
++++ b/tests/unit/recipes/test_python_agent.py
+@@ -7,8 +7,14 @@ console script's situation; ADR 0006 puts the copy on the child's import path).
+ the recipe in-process: its `tests` package would collide with this repository's.
+ 
+ Not run here: `uv tool install` (network; the test uses this environment's arci) and
+-`arci run confirm.yaml` (800 trials; the orchestrator records that run). The confirmatory
+-descriptor is still written by the README's command and compiled.
++`arci run confirm.yaml` (800 trials, about 80 s; the README's recorded run shows it). The
++confirmatory descriptor is still written by the README's command and compiled.
++
++The bundle names `app/__init__.py` and `tests/__init__.py` so that its `app` and `tests` are
++regular packages: replay puts the bundle directory first on the import path, and a regular package
++there shadows the working tree's. Without the two `__init__.py` files the bundled directories are
++only namespace portions, the working tree's regular packages win, and replay runs the tree's
++current sources instead of the bundled ones; two tests below show both cases.
+ """
+ 
+ from __future__ import annotations
+@@ -33,6 +39,7 @@ from arci.schema import GateDecision, Manifest, Outcome, TrialEnvelope, Verdict
+ ROOT = Path(__file__).resolve().parents[3]
+ RECIPE = ROOT / "examples" / "recipes" / "python_agent"
+ README = RECIPE / "README.md"
++DOC = ROOT / "docs" / "recipes" / "python-agent.md"
+ COMMITTED = RECIPE / "arci.yaml"
+ 
+ INIT = (
+@@ -54,7 +61,8 @@ DIAGNOSE = (
+     f"arci diff runs/checkout-retry faults:00000:baseline {FAILING}",
+     f"arci minimize runs/checkout-retry {FAILING} --out min.json",
+     f"arci bundle runs/checkout-retry {FAILING} --out bundle.json --root ."
+-    " --include app/v2.py --include tests/world.py",
++    " --include app/__init__.py --include app/v2.py --include tests/__init__.py"
++    " --include tests/world.py",
+     "arci replay bundle.json",
+ )
+ SETUP = (
+@@ -130,7 +138,45 @@ def test_the_readme_commands_are_the_ones_these_tests_run() -> None:
+     assert readme_commands() == README_COMMANDS
+     first_screen = f"{INSTALL} && {INIT} && {SMOKE_RUN}"
+     assert first_screen in README.read_text(encoding="utf-8").splitlines()
+-    assert "Recorded by the orchestrator on 2026-10-13" in README.read_text(encoding="utf-8")
++
++
++RECORDED_LABEL = (
++    "Recorded on the maintainer's machine during the v0.8.0 sprint (2026-10-13; 15-core Apple"
++    " Silicon Mac; ARCI at the sprint's descriptor lane)"
++)
++
++
++def _recorded_blocks(path: Path) -> list[str]:
++    """The ```text blocks of the "Recorded run" section, in order."""
++    text = path.read_text(encoding="utf-8")
++    section = text.split("\n## Recorded run\n", 1)[1].split("\n## What this does not show", 1)[0]
++    assert " ".join(section.split()).count(RECORDED_LABEL) == 1, path
++    return re.findall(r"^```text\n(.*?)^```$", section, flags=re.MULTILINE | re.DOTALL)
++
++
++@pytest.mark.parametrize("path", [README, DOC], ids=["readme", "doc"])
++def test_the_recorded_run_sections(path: Path) -> None:
++    init, smoke_run, plan, confirm = _recorded_blocks(path)
++    assert init.splitlines() == [f"$ {INIT}", SMOKE_RUN]
++    assert smoke_run.startswith(f"$ /usr/bin/time -p {SMOKE_RUN}\n")
++    manifest = compile_descriptor(COMMITTED)  # the notices as this ARCI prints them, verbatim
++    assert smoke_notice(manifest) in smoke_run.splitlines()
++    assert smoke_followup(manifest) in smoke_run.splitlines()
++    assert "## Condition: faults" in smoke_run
++    assert "| Successes | 8 | 2 |" in smoke_run
++    assert any(line.startswith("real ") for line in smoke_run.splitlines())  # wall time
++    assert "VERDICT: INCONCLUSIVE (exit 2)" in smoke_run
++    assert plan.startswith(f"$ {PLAN}\n")
++    assert "smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 " in plan
++    assert "| 400 | 800 | 0.000 | 0.828 | 0.172 | yes |" in plan
++    assert "No pairing:" in plan
++    assert confirm.startswith(f"$ {CONFIRM_INIT}\n")
++    assert "base_seed: 1000" in confirm and 'prior_runs: ["checkout-retry"]' in confirm
++    assert "## Condition: faults" in confirm and "| n | 400 | 400 |" in confirm
++    assert "VERDICT: BLOCK (exit 1)" in confirm
++    earlier = confirm.split("## Earlier runs on this candidate", 1)[1].split("\n[...]", 1)[0]
++    assert "- `checkout-retry`" in earlier.splitlines()
++    assert any(line.startswith("real ") for line in confirm.splitlines())
+ 
+ 
+ def test_init_writes_the_committed_descriptor_byte_for_byte(smoke: Smoke) -> None:
+@@ -199,3 +245,59 @@ def test_diff_minimize_bundle_and_replay_a_failing_trial(smoke: Smoke) -> None:
+     assert "kept: tool_timeout" in minimize.stdout
+     assert json.loads((smoke.copy / "min.json").read_text("utf-8"))
+     assert replay.stdout.startswith("REPRODUCED")
++
++
++GIVE_UP = 'return {"confirmed": False}  # gives up on the first fault'
++BARE_BUNDLE = (
++    f"arci bundle runs/checkout-retry {FAILING} --out bare.json --root ."
++    " --include app/v2.py --include tests/world.py"
++)
++
++
++@dataclass(frozen=True)
++class Edited:
++    copy: Path
++    bundled: subprocess.CompletedProcess[str]
++    bare: subprocess.CompletedProcess[str]
++
++
++@pytest.fixture(scope="module")
++def edited(smoke: Smoke, tmp_path_factory: pytest.TempPathFactory) -> Iterator[Edited]:
++    """Bundle the failing trial twice, then change the working tree under both bundles.
++
++    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. The
++    edits would each turn the failure into something else if they ran: v2 raises instead of
++    returning after the fault (same tool calls, so no recording miss, but a crash), and the oracle
++    passes every final state. (v1's body is not used as the edit: its second `reserve` call is not
++    in the recording, so replay would report INVALID, exit 3, whichever sources ran.)
++    """
++    copy = tmp_path_factory.mktemp("edited") / "checkout"
++    shutil.copytree(smoke.copy, copy, ignore=shutil.ignore_patterns("__pycache__"))
++    for command in (DIAGNOSE[2], BARE_BUNDLE):
++        done = arci(command, copy)
++        assert done.returncode == 0, done.stderr[-2000:]
++    v2 = copy / "app" / "v2.py"
++    source = v2.read_text(encoding="utf-8")
++    assert source.count(GIVE_UP) == 1
++    v2.write_text(source.replace(GIVE_UP, 'raise RuntimeError("the working tree")'), "utf-8")
++    with (copy / "tests" / "world.py").open("a", encoding="utf-8") as handle:
++        handle.write(
++            "\n\ndef passed(task: object, final_state: object) -> bool:\n    return True\n"
++        )
++    yield Edited(
++        copy=copy,
++        bundled=arci("arci replay bundle.json", copy),
++        bare=arci("arci replay bare.json", copy),
++    )
++
++
++def test_replay_runs_the_bundled_sources_not_the_working_tree(edited: Edited) -> None:
++    assert edited.bundled.returncode == 0, edited.bundled.stdout + edited.bundled.stderr[-2000:]
++    assert edited.bundled.stdout.startswith("REPRODUCED")
++
++
++def test_without_the_init_files_replay_runs_the_edited_tree(edited: Edited) -> None:
++    # The control: the bundle's bare `app/` and `tests/` are namespace portions, so the working
++    # tree's regular packages win and the edited sources run; the failure does not reproduce.
++    assert edited.bare.returncode == 1, edited.bare.stdout + edited.bare.stderr[-2000:]
++    assert edited.bare.stdout.startswith("NOT_REPRODUCED")
