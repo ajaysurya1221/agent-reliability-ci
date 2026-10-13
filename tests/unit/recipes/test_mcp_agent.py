@@ -168,8 +168,8 @@ def test_the_faulted_run_blocks_with_a_sealed_store(run: Run) -> None:
     assert done.returncode == 1, done.stderr[-2000:]
     assert done.stdout.strip().splitlines()[-1] == "VERDICT: BLOCK (exit 1)"
     manifest = compile_descriptor(run.copy / "arci.yaml")
-    assert done.stderr == f"{smoke_notice(manifest)}\n"
     run_dir = run.copy / "runs" / "mcp-fetch-retry"
+    assert done.stderr == f"{smoke_notice(manifest)}\nrun store: {run_dir.resolve()}\n"
     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
     assert stored.validate_seal() and stored == manifest
     trials = [

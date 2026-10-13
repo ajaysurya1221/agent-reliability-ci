@@ -74,6 +74,56 @@ jobs:
           PY
       - name: Build the wheel and the sdist
         run: uv build --no-sources
+      - name: List the sdist and refuse any entry outside the allowlist
+        run: |
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if [ "${#sdists[@]}" -ne 1 ]; then
+            echo "::error title=sdist allowlist::expected one sdist in dist/, found ${#sdists[@]}"
+            exit 1
+          fi
+          tar -tzf "${sdists[0]}" > "$RUNNER_TEMP/sdist-entries"
+          cat "$RUNNER_TEMP/sdist-entries"
+          python - "$RUNNER_TEMP/sdist-entries" <<'PY'
+          import pathlib
+          import sys
+          import tomllib
+
+          version = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          root = f"agent_reliability_ci-{version}/"
+          files = {
+              "README.md",
+              "LICENSE",
+              "NOTICE",
+              "CHANGELOG.md",
+              "pyproject.toml",
+              "PKG-INFO",
+              ".gitignore",
+          }
+
+
+          def allowed(entry: str) -> bool:
+              if entry == root:
+                  return True
+              if not entry.startswith(root):
+                  return False
+              rest = entry.removeprefix(root)
+              if "\\" in rest or ".." in rest.split("/"):
+                  return False
+              return rest in files or rest.startswith("src/arci/")
+
+
+          entries = pathlib.Path(sys.argv[1]).read_text().splitlines()
+          outside = [entry for entry in entries if not allowed(entry)]
+          if not entries:
+              print("::error title=sdist allowlist::the sdist is empty")
+              sys.exit(1)
+          if outside:
+              for entry in outside:
+                  print(f"::error title=sdist allowlist::outside the allowlist: {entry}")
+              sys.exit(1)
+          print(f"sdist allowlist: {len(entries)} entries, all under {root}")
+          PY
       - name: List the wheel contents
         run: python -m zipfile -l dist/*.whl
       - name: Write SHA256SUMS to dist and to the job summary

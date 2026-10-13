@@ -303,6 +303,7 @@ def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
     if notice is not None and decision.verdict is Verdict.INCONCLUSIVE:
         print(smoke_followup(manifest), file=sys.stderr)
     # --- end smoke ---
+    print(f"run store: {run_dir.resolve()}", file=sys.stderr)
     return decision.exit_code
 
 

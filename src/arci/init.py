@@ -13,11 +13,15 @@ re-loaded through the descriptor loader and seal-checked, then published atomica
 by a rename; without it by a hard link only, so an existing file is never replaced and, where hard
 links are unsupported, nothing is published (DECISIONS D-10). Errors are `InitError`, one line,
 with nothing written.
+
+Durability is best effort: the staged file and its directory are fsynced, but on macOS `os.fsync`
+is not `F_FULLFSYNC`, so a published descriptor may not survive a power loss there.
 """
 
 from __future__ import annotations
 
 import contextlib
+import errno
 import json
 import math
 import os
@@ -613,12 +617,32 @@ def _fsync_directory(directory: Path) -> None:
             os.close(fd)
 
 
+# `os.link` errnos that mean "this filesystem does not do hard links" (on Linux ENOTSUP is
+# EOPNOTSUPP; EPERM is what some filesystems, FAT among them, return for link(2)).
+_LINKS_UNSUPPORTED: Final = frozenset({errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM})
+
+
+def _link_failure(request: InitRequest, exc: OSError) -> InitError:
+    """The hard-link publication failed: name unsupported links, otherwise the actual cause."""
+    shown = _show(request.out_text)
+    if exc.errno in _LINKS_UNSUPPORTED:
+        return InitError(
+            f"output {shown}: cannot publish atomically here "
+            "(hard links unsupported); choose another directory or pass --force"
+        )
+    name = errno.errorcode.get(exc.errno, str(exc.errno)) if exc.errno is not None else "unknown"
+    reason = exc.strerror or type(exc).__name__
+    return InitError(f"output {shown}: cannot publish: {reason} (errno {name})")
+
+
 def publish(request: InitRequest, text: str) -> None:
     """Stage beside the destination, verify, then publish atomically. Nothing is left on error.
 
     The staged bytes are fsynced first. With --force the staged file replaces the destination by a
     rename. Without it the only publication is a hard link, which refuses an existing destination;
-    where hard links are unsupported nothing is published (no copy, no replacing rename).
+    where hard links are unsupported nothing is published (no copy, no replacing rename), and any
+    other link failure is reported with its errno, also publishing nothing. The fsyncs are best
+    effort: on macOS `os.fsync` is not `F_FULLFSYNC` (see the module docstring).
     """
     staged: Path | None = None
     try:
@@ -648,11 +672,8 @@ def publish(request: InitRequest, text: str) -> None:
                 os.link(staged, request.out)
             except FileExistsError:
                 raise _exists(request) from None
-            except OSError:
-                raise InitError(
-                    f"output {_show(request.out_text)}: cannot publish atomically here "
-                    "(hard links unsupported); choose another directory or pass --force"
-                ) from None
+            except OSError as exc:
+                raise _link_failure(request, exc) from None
         _fsync_directory(request.out.parent)
     except OSError as exc:
         raise InitError(

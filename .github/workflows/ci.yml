@@ -205,3 +205,54 @@ jobs:
           test "$OUTCOME" = failure
           test -f arci-report.md
           grep -q "VERDICT: BLOCK" arci-report.md
+      # $GITHUB_STEP_SUMMARY is a per-step file: the runner gives the next step a new, empty one,
+      # so the Action step's summary cannot be read from here. Instead run the Action's own gate
+      # script (read from action.yml) with fresh summary and output files and an `arci` stub that
+      # prints the report above and exits 1, and require the summary file to hold that report. The
+      # stub also writes a line to stderr, which must reach neither the summary nor the report file.
+      - name: Assert the Action's gate script writes the report to the step summary
+        run: |
+          work="$RUNNER_TEMP/summary-check"
+          mkdir -p "$work/bin"
+          cp arci-report.md "$work/report.md"
+          printf '#!/usr/bin/env bash\necho STUB-STDERR-LINE >&2\ncat "%s"\nexit 1\n' \
+            "$work/report.md" > "$work/bin/arci"
+          chmod +x "$work/bin/arci"
+          python - "$work/gate.sh" <<'PY'
+          import pathlib
+          import sys
+
+          import yaml  # installed with arci by the Action step
+
+          steps = yaml.safe_load(pathlib.Path("action.yml").read_text())["runs"]["steps"]
+          (gate,) = [step for step in steps if step.get("id") == "gate"]
+          assert gate["shell"] == "bash", gate["shell"]
+          pathlib.Path(sys.argv[1]).write_text(gate["run"])
+          PY
+          : > "$work/summary.md"
+          : > "$work/output"
+          set +e
+          (
+            cd "$work" &&
+              PATH="$work/bin:$PATH" GITHUB_STEP_SUMMARY="$work/summary.md" \
+              GITHUB_OUTPUT="$work/output" ARCI_MANIFEST=manifest.json ARCI_OUT=runs \
+              ARCI_WORKERS=1 ARCI_ALLOW_INCONCLUSIVE=false \
+              bash --noprofile --norc -eo pipefail "$work/gate.sh"
+          )
+          code=$?
+          set -e
+          echo "gate script exit=$code"
+          test "$code" = 1
+          grep -q "VERDICT: BLOCK" "$work/summary.md"
+          cmp "$work/summary.md" "$work/report.md"
+          grep -qx "verdict=BLOCK" "$work/output"
+          for file in "$work/summary.md" "$work/arci-report.md"; do
+            # grep exit 1 is the only acceptable outcome (the line is absent); 0 means a leak,
+            # anything else (2: unreadable or missing file) is a failed check, not a pass.
+            grep -q STUB-STDERR-LINE "$file" && status=0 || status=$?
+            case "$status" in
+              0) echo "::error::arci's stderr leaked into $file"; exit 1 ;;
+              1) ;;
+              *) echo "::error::could not check $file for leaked stderr (grep exit $status)"; exit 1 ;;
+            esac
+          done

@@ -58,9 +58,12 @@ def test_run_yaml_matches_the_json_path(tmp_path: Path) -> None:
 
     assert from_yaml.returncode == 2, from_yaml.stderr[-2000:]  # 6/6 vs 0/6: INCONCLUSIVE
     assert from_json.returncode == 2, from_json.stderr[-2000:]
-    # stderr carries only the smoke-design notice (task 05), identical for both paths.
-    assert from_yaml.stderr == f"{smoke_notice(compiled)}\n{smoke_followup(compiled)}\n"
-    assert from_yaml.stderr == from_json.stderr
+    # stderr carries the smoke-design notice (task 05), identical for both paths, then the line
+    # naming each run's own store (task 16).
+    notice = f"{smoke_notice(compiled)}\n{smoke_followup(compiled)}\n"
+    for done, workdir in ((from_yaml, yaml_dir), (from_json, json_dir)):
+        store_line = f"run store: {(workdir / 'runs' / compiled.experiment_id).resolve()}\n"
+        assert done.stderr == notice + store_line
     last = from_yaml.stdout.strip().splitlines()[-1]
     assert last.startswith("VERDICT: INCONCLUSIVE")
     assert last == from_json.stdout.strip().splitlines()[-1]

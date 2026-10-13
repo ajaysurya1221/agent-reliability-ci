@@ -85,6 +85,13 @@ grep -qx 'All six steps held.' "$root/demo.log" || fail "arci demo did not print
 leftover="$(ls -A "$work")"
 [ -z "$leftover" ] || fail "the working directory is not empty after the demo: $leftover"
 
+# The packaged JSON Schema prints and parses (written into the empty directory, removed on exit).
+echo "wheel_smoke: arci schema"
+start=$(now)
+arci schema >schema.json || fail "arci schema exited non-zero"
+python3 -c "import json; json.load(open('schema.json'))" || fail "arci schema did not print JSON"
+record "arci schema" "$start" "$(now)"
+
 echo "wheel_smoke: timings"
 cat "$root/timings"
 echo "wheel_smoke: OK"

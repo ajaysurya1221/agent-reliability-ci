@@ -193,8 +193,10 @@ def test_the_smoke_run_is_inconclusive_with_a_sealed_store(smoke: Smoke) -> None
     assert done.returncode == 2, done.stderr[-2000:]
     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
     manifest = compile_descriptor(COMMITTED)
-    assert done.stderr == f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\n"
     run_dir = smoke.copy / "runs" / "checkout-retry"
+    assert done.stderr == (
+        f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\nrun store: {run_dir.resolve()}\n"
+    )
     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
     assert stored.validate_seal()
     assert stored == manifest
@@ -265,17 +267,22 @@ class Edited:
 def edited(smoke: Smoke, tmp_path_factory: pytest.TempPathFactory) -> Iterator[Edited]:
     """Bundle the failing trial twice, then change the working tree under both bundles.
 
-    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. The
-    edits would each turn the failure into something else if they ran: v2 raises instead of
-    returning after the fault (same tool calls, so no recording miss, but a crash), and the oracle
-    passes every final state. (v1's body is not used as the edit: its second `reserve` call is not
-    in the recording, so replay would report INVALID, exit 3, whichever sources ran.)
+    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. Before
+    any edit, `bare.json` reproduces on the unedited tree, so its later NOT_REPRODUCED comes from
+    the edits and not from the bundle itself. The edits would each turn the failure into something
+    else if they ran: v2 raises instead of returning after the fault (same tool calls, so no
+    recording miss, but a crash), and the oracle passes every final state. (v1's body is not used
+    as the edit: if the tree's v1 ran, its second `reserve` call would not be in the recording, so
+    replay would report INVALID, exit 3, a recording miss rather than a changed outcome.)
     """
     copy = tmp_path_factory.mktemp("edited") / "checkout"
     shutil.copytree(smoke.copy, copy, ignore=shutil.ignore_patterns("__pycache__"))
     for command in (DIAGNOSE[2], BARE_BUNDLE):
         done = arci(command, copy)
         assert done.returncode == 0, done.stderr[-2000:]
+    unedited = arci("arci replay bare.json", copy)
+    assert unedited.returncode == 0, unedited.stdout + unedited.stderr[-2000:]
+    assert unedited.stdout.startswith("REPRODUCED")
     v2 = copy / "app" / "v2.py"
     source = v2.read_text(encoding="utf-8")
     assert source.count(GIVE_UP) == 1
