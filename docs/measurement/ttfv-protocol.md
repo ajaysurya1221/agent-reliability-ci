@@ -44,6 +44,9 @@ Protocol; no cold-reader receipt yet (the receipts committed so far are maintain
    uvx --from agent-reliability-ci python -c "import importlib.metadata as m; print(m.version('agent-reliability-ci'))"
    ```
 
+   The facilitator runs it with the same uv cache (`UV_CACHE_DIR`, or the default cache) and the
+   same `UV_FIND_LINKS` the reader used, so it resolves the same release rather than a newer one.
+
 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in

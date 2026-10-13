@@ -1,7 +1,7 @@
 """Build TTFV receipts (one per reader per track) from the AI-cohort workflow result.
 
     python plan/exec/scripts/cohort_receipts.py <result json> <receipts dir> <readme commit>
-        [--legacy-sentence]
+        [--legacy-sentence] [--overwrite]
     python plan/exec/scripts/cohort_receipts.py <result json> --persist <augmented json>
 
 The result json is the Workflow tool's return value: {"results": [{"reader": {...}, "out": {...}}],
@@ -17,6 +17,11 @@ uses them when the store is gone, so the receipts rebuild byte for byte without 
 reader text ending in a period inside closing quotes or brackets (`."`, `.")`, `."}`). The
 2026-10-13 cohort receipts were built that way and are never edited after merge, so rebuild them
 with this flag.
+
+A build refuses to replace a receipt file that already exists in the receipts dir unless
+`--overwrite` is given (committed receipts are never edited; rebuild them into a scratch copy).
+It is all-or-nothing: every receipt is built in memory first, so an error leaves the receipts dir
+untouched, then written to a staging directory inside it and moved into place.
 """
 
 from __future__ import annotations
@@ -24,8 +29,11 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -239,7 +247,35 @@ def persist(result_path: Path, out_path: Path) -> None:
     out_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool = False) -> None:
+def write_all(out_dir: Path, receipts: dict[str, str], *, overwrite: bool) -> None:
+    """Write every receipt or none: refuse existing files unless `overwrite`, stage the files in
+    a temporary directory inside `out_dir`, then move each into place."""
+    if not out_dir.is_dir():
+        raise SystemExit(f"receipts dir {out_dir} does not exist")
+    existing = sorted(name for name in receipts if (out_dir / name).exists())
+    if existing and not overwrite:
+        raise SystemExit(
+            f"refusing to overwrite existing receipts in {out_dir} (pass --overwrite): "
+            + ", ".join(existing)
+        )
+    staging = Path(tempfile.mkdtemp(prefix=".cohort-receipts-", dir=out_dir))
+    try:
+        for name, text in receipts.items():
+            (staging / name).write_text(text, encoding="utf-8")
+        for name in receipts:
+            os.replace(staging / name, out_dir / name)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def build(
+    result_path: Path,
+    out_dir: Path,
+    readme_commit: str,
+    *,
+    legacy: bool = False,
+    overwrite: bool = False,
+) -> None:
     data: Json = json.loads(result_path.read_text(encoding="utf-8"))
     template: Json = json.loads(
         (out_dir.parent / "receipt.template.json").read_text(encoding="utf-8")
@@ -250,6 +286,7 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool 
 
     scores = {s["id"]: s["score"] for s in data.get("scores", []) if s}
     rows: list[str] = []
+    receipts: dict[str, str] = {}
     for item in data["results"]:
         reader, out = item["reader"], item["out"]
         if not out:
@@ -440,8 +477,10 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool 
         )
         rb["failures"] = [f for f in failures if not is_demo_failure(f)]
         for rec, track in ((ra, "demo"), (rb, "own-agent")):
-            path = out_dir / f"2026-10-13-ai-{reader['id']}-{track}.json"
-            path.write_text(json.dumps(rec, indent=2) + "\n", encoding="utf-8")
+            name = f"2026-10-13-ai-{reader['id']}-{track}.json"
+            if name in receipts:
+                raise ValueError(f"two readers would write {name}")
+            receipts[name] = json.dumps(rec, indent=2) + "\n"
         rows.append(
             f"| ai-{reader['id']} ({model}) | A: {ra['durations_seconds']['install']}+"
             f"{ra['durations_seconds']['run']}={ra['durations_seconds']['total']} s, "
@@ -454,6 +493,7 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool 
             f"own {sc.get('interpretation_own_run')} | "
             f"failures {len(out.get('failures', []))} |"
         )
+    write_all(out_dir, receipts, overwrite=overwrite)
     print("| reader | Track A | Track B | comprehension | interpretation | failures |")
     print("|---|---|---|---|---|---|")
     print("\n".join(rows))
@@ -466,6 +506,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("readme_commit", nargs="?")
     ap.add_argument("--persist", type=Path, metavar="OUT_JSON", help="write an augmented copy")
     ap.add_argument("--legacy-sentence", action="store_true", help="v0.8.0 punctuation")
+    ap.add_argument(
+        "--overwrite", action="store_true", help="replace receipt files that already exist"
+    )
     args = ap.parse_args(argv)
     if args.persist is not None:
         if args.receipts_dir is not None:
@@ -474,7 +517,13 @@ def main(argv: list[str] | None = None) -> None:
         return
     if args.receipts_dir is None or args.readme_commit is None:
         ap.error("building receipts needs <receipts dir> and <readme commit>")
-    build(args.result, args.receipts_dir, args.readme_commit, legacy=args.legacy_sentence)
+    build(
+        args.result,
+        args.receipts_dir,
+        args.readme_commit,
+        legacy=args.legacy_sentence,
+        overwrite=args.overwrite,
+    )
 
 
 if __name__ == "__main__":
