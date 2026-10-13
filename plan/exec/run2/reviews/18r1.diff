@@ -1,0 +1,1064 @@
+diff --git a/.github/workflows/ttfv-reference.yml b/.github/workflows/ttfv-reference.yml
+new file mode 100644
+index 0000000..44b3ff2
+--- /dev/null
++++ b/.github/workflows/ttfv-reference.yml
+@@ -0,0 +1,326 @@
++name: TTFV reference machines
++
++# Times the packaged demo (`uvx --from agent-reliability-ci==0.8.0 arci demo`) on clean
++# GitHub-hosted runners: no checkout, no secrets, no telemetry. Per OS: five cold samples, each
++# with its own fresh, empty uv cache (the case the memo target is about: a first-time user), then
++# two warm samples that reuse the cache the last cold sample filled. Every sample is bounded
++# (SAMPLE_TIMEOUT_S, and the whole loop by TIMING_BUDGET_S, inside the 25-minute job); a sample
++# that hits the bound is killed, kept, and recorded as timed out. The JSON and the timestamped logs
++# are uploaded as an artifact; the orchestrator commits the JSON under
++# docs/measurement/reference-machines/. These are machine timings, not receipts, and never count
++# as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
++
++on:
++  push:
++    branches:
++      - 'sprint/t18-**'
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++env:
++  UV_VERSION: "0.12.5"
++  PACKAGE: "agent-reliability-ci==0.8.0"
++  UV_NO_PROGRESS: "1"
++  COLD_SAMPLES: "5"
++  WARM_SAMPLES: "2"
++  # Per-sample bound, and a bound on the whole sampling loop that leaves the 25-minute job time
++  # for setup, the JSON and the upload. A sample the loop has no time left for is recorded as
++  # timed out and not started.
++  SAMPLE_TIMEOUT_S: "600"
++  TIMING_BUDGET_S: "1200"
++
++jobs:
++  reference:
++    name: reference machine / ${{ matrix.os }}
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 25
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest]
++    defaults:
++      run:
++        shell: bash
++    steps:
++      - name: Set up Python
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: "3.12"
++      - name: Install uv
++        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
++      - name: Time the demo (five cold samples, then two warm)
++        shell: python
++        env:
++          OUT_DIR: ${{ runner.temp }}/ttfv-reference
++        run: |
++          import datetime as dt
++          import json
++          import os
++          import platform
++          import signal
++          import subprocess
++          import sys
++          import tempfile
++          import threading
++          import time
++          from pathlib import Path
++
++          PACKAGE = os.environ["PACKAGE"]
++          OUT_DIR = Path(os.environ["OUT_DIR"])
++          COLD = int(os.environ["COLD_SAMPLES"])
++          WARM = int(os.environ["WARM_SAMPLES"])
++          SAMPLE_TIMEOUT = float(os.environ["SAMPLE_TIMEOUT_S"])
++          DEADLINE = time.monotonic() + float(os.environ["TIMING_BUDGET_S"])
++          assert COLD >= 1 and WARM >= 0
++
++
++          def stamp():
++              return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
++          def kill_group(pid):
++              try:
++                  os.killpg(pid, signal.SIGKILL)
++              except (ProcessLookupError, PermissionError):
++                  pass
++
++
++          def run(cmd, log_path, env, cwd, timeout):
++              """Run cmd, prefixing each output line with its UTC arrival time; kill it at timeout.
++
++              Returns (exit code or None, timed_out). A last line without a newline is kept.
++              """
++              with log_path.open("w", encoding="utf-8") as log:
++                  proc = subprocess.Popen(
++                      cmd,
++                      stdout=subprocess.PIPE,
++                      stderr=subprocess.STDOUT,
++                      env=env,
++                      cwd=cwd,
++                      start_new_session=True,
++                  )
++                  assert proc.stdout is not None
++                  stdout = proc.stdout
++
++                  def pump():
++                      for raw in stdout:
++                          line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
++                          log.write(f"{stamp()} {line}\n")
++                          log.flush()
++
++                  reader = threading.Thread(target=pump, daemon=True)
++                  reader.start()
++                  try:
++                      code, timed_out = proc.wait(timeout=timeout), False
++                  except subprocess.TimeoutExpired:
++                      kill_group(proc.pid)
++                      proc.wait()
++                      code, timed_out = None, True
++                  kill_group(proc.pid)  # stragglers holding the pipe open
++                  reader.join(timeout=10)
++                  if timed_out:
++                      log.write(f"{stamp()} [ttfv-reference] killed after {timeout:g} s\n")
++              return code, timed_out
++
++
++          OUT_DIR.mkdir(parents=True, exist_ok=True)
++          work = Path(tempfile.mkdtemp(prefix="ttfv-work-"))  # empty, no checkout
++          uv_version = subprocess.run(["uv", "--version"], capture_output=True, text=True)
++          (OUT_DIR / "uv-version.txt").write_text(uv_version.stdout, encoding="utf-8")
++          (OUT_DIR / "setup-python.txt").write_text(platform.python_version() + "\n", encoding="utf-8")
++
++          rows = OUT_DIR / "samples.jsonl"
++          rows.write_text("", encoding="utf-8")
++          warm_cache = None
++          for n in range(1, COLD + WARM + 1):
++              kind = "cold" if n <= COLD else "warm"
++              if kind == "cold":
++                  # A new, empty uv cache per cold sample; the last one becomes the warm cache.
++                  cache = Path(tempfile.mkdtemp(prefix="uv-cache-"))
++                  warm_cache = cache
++              else:
++                  cache = warm_cache
++              entries = len(os.listdir(cache))
++              if kind == "cold" and entries:
++                  print(f"::error title=ttfv-reference::fresh uv cache {cache} is not empty")
++                  sys.exit(1)
++              env = {**os.environ, "UV_CACHE_DIR": str(cache)}
++              log = OUT_DIR / f"sample-{n}.log"
++              timeout = min(SAMPLE_TIMEOUT, DEADLINE - time.monotonic())
++              start = stamp()
++              if timeout < 1:
++                  log.write_text(f"{start} [ttfv-reference] not started: timing budget used up\n")
++                  code, timed_out, started, timeout = None, True, False, 0.0
++              else:
++                  cmd = ["uvx", "--from", PACKAGE, "arci", "demo"]
++                  code, timed_out = run(cmd, log, env, work, timeout)
++                  started = True
++              record = {
++                  "sample": n,
++                  "uv_cache": kind,
++                  "uv_cache_entries_at_start": entries,
++                  "command_start": start,
++                  "started": started,
++                  "exit_code": code,
++                  "timed_out": timed_out,
++                  "timeout_seconds": round(timeout),
++              }
++              # Appended per sample, so a later crash or a cancelled job keeps what was measured.
++              with rows.open("a", encoding="utf-8") as f:
++                  f.write(json.dumps(record) + "\n")
++              state = f"timed out after {timeout:g} s" if timed_out else f"exit {code}"
++              print(f"sample {n} ({kind}): {state}", flush=True)
++
++          # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
++          probe = ["uvx", "--from", PACKAGE, "python", "-c", "import platform; print(platform.python_version())"]
++          try:
++              done = subprocess.run(
++                  probe,
++                  capture_output=True,
++                  text=True,
++                  env={**os.environ, "UV_CACHE_DIR": str(warm_cache)},
++                  cwd=work,
++                  timeout=120,
++              )
++              python = done.stdout if done.returncode == 0 else ""
++          except subprocess.TimeoutExpired:
++              python = ""
++          (OUT_DIR / "python.txt").write_text(python, encoding="utf-8")
++      - name: Parse the logs into reference-${{ matrix.os }}.json
++        if: always()
++        shell: python
++        env:
++          OUT_DIR: ${{ runner.temp }}/ttfv-reference
++          OUT_JSON: reference-${{ matrix.os }}.json
++          REF_RUNNER_OS: ${{ runner.os }}
++          REF_RUNNER_ARCH: ${{ runner.arch }}
++          REF_RUNNER_LABEL: ${{ matrix.os }}
++          REF_RUN_ID: ${{ github.run_id }}
++          REF_RUN_ATTEMPT: ${{ github.run_attempt }}
++          REF_SHA: ${{ github.sha }}
++        run: |
++          import json
++          import os
++          from pathlib import Path
++
++          out_dir = Path(os.environ["OUT_DIR"])
++          out_dir.mkdir(parents=True, exist_ok=True)
++          MARKERS = {
++              "demo_banner": "arci demo:",
++              "demo_verdict": "VERDICT:",
++              "all_steps_held": "All six steps held",
++          }
++
++
++          def text(name):
++              path = out_dir / name
++              if not path.is_file():
++                  return None
++              return path.read_text(encoding="utf-8", errors="replace").strip() or None
++
++
++          def first_stamps(log):
++              found = dict.fromkeys(MARKERS)
++              if not log.is_file():
++                  return found
++              for raw in log.read_text(encoding="utf-8", errors="replace").splitlines():
++                  stamp, _, line = raw.partition(" ")
++                  for key, marker in MARKERS.items():
++                      if found[key] is None and marker in line:
++                          found[key] = stamp
++              return found
++
++
++          rows = out_dir / "samples.jsonl"
++          samples = []
++          for row in rows.read_text(encoding="utf-8").splitlines() if rows.is_file() else []:
++              record = json.loads(row)
++              log = out_dir / f"sample-{record['sample']}.log"
++              stamps = first_stamps(log)
++              if record["timed_out"]:
++                  stamps["all_steps_held"] = None  # killed: never counts as held
++              samples.append(
++                  {
++                      "sample": record["sample"],
++                      "uv_cache": record["uv_cache"],
++                      "command_start": record["command_start"],
++                      **stamps,
++                      "exit_code": record["exit_code"],
++                      "log": log.name,
++                      "timed_out": record["timed_out"],
++                      "started": record["started"],
++                      "timeout_seconds": record["timeout_seconds"],
++                      "uv_cache_entries_at_start": record["uv_cache_entries_at_start"],
++                  }
++              )
++
++          env = os.environ.get
++          doc = {
++              "kind": "reference-machine timing",
++              "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
++              "package": env("PACKAGE"),
++              "command": f"uvx --from {env('PACKAGE')} arci demo",
++              "runner": {
++                  "os": env("REF_RUNNER_OS"),
++                  "arch": env("REF_RUNNER_ARCH"),
++                  "label": env("REF_RUNNER_LABEL"),
++                  "image": env("ImageOS"),
++                  "image_version": env("ImageVersion"),
++              },
++              "python": text("python.txt"),
++              "setup_python": text("setup-python.txt"),
++              "uv": text("uv-version.txt"),
++              "workflow_run": {
++                  "run_id": env("REF_RUN_ID"),
++                  "run_attempt": env("REF_RUN_ATTEMPT"),
++                  "sha": env("REF_SHA"),
++              },
++              "timestamp_resolution_seconds": 1,
++              "design": {
++                  "cold_samples": int(env("COLD_SAMPLES", "0")),
++                  "warm_samples": int(env("WARM_SAMPLES", "0")),
++                  "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
++                  "warm": "warm samples reuse the cache the last cold sample filled",
++                  "sample_timeout_seconds": int(env("SAMPLE_TIMEOUT_S", "0")),
++                  "timing_budget_seconds": int(env("TIMING_BUDGET_S", "0")),
++              },
++              "samples": samples,
++          }
++          out = out_dir / os.environ["OUT_JSON"]
++          out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
++          print(out.read_text(encoding="utf-8"))
++      - name: Upload the JSON and the logs
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: ttfv-reference-${{ matrix.os }}
++          path: ${{ runner.temp }}/ttfv-reference/
++          if-no-files-found: error
++          retention-days: 30
++      - name: Fail if any sample did not hold
++        shell: python
++        env:
++          OUT_JSON: ${{ runner.temp }}/ttfv-reference/reference-${{ matrix.os }}.json
++        run: |
++          import json
++          import os
++          import sys
++
++          with open(os.environ["OUT_JSON"], encoding="utf-8") as f:
++              samples = json.load(f)["samples"]
++          expected = int(os.environ["COLD_SAMPLES"]) + int(os.environ["WARM_SAMPLES"])
++          bad = [
++              s["sample"]
++              for s in samples
++              if s["timed_out"] or s["exit_code"] != 0 or not s["all_steps_held"]
++          ]
++          timed_out = [s["sample"] for s in samples if s["timed_out"]]
++          if len(samples) != expected or bad:
++              print(
++                  f"::error title=ttfv-reference::{len(samples)} of {expected} samples; "
++                  f"not held: {bad}; timed out: {timed_out}"
++              )
++              sys.exit(1)
++          print(f"all {expected} samples held")
+diff --git a/docs/measurement/reference-machines/README.md b/docs/measurement/reference-machines/README.md
+new file mode 100644
+index 0000000..0bf3e24
+--- /dev/null
++++ b/docs/measurement/reference-machines/README.md
+@@ -0,0 +1,109 @@
++# Reference-machine demo timings
++
++How long the packaged demo takes on a clean machine, measured by CI rather than by a person. It
++backs the memo target for the packaged demo: p50 ≤ 2 min and p95 ≤ 3 min "on clean reference
++machines" (`plan/research/forward-plan-2026-10-13.md`, adoption metrics).
++
++## What a reference machine is
++
++A fresh GitHub-hosted runner (`ubuntu-latest` and `macos-latest`) with:
++
++- no ARCI checkout: the job never checks out this repository, and the demo runs in an empty
++  temporary directory;
++- Python 3.12 from `actions/setup-python` and uv from PyPI at the version CI pins;
++- no secrets and no telemetry.
++
++The command is the README's first-screen command pinned to the release under test,
++`uvx --from agent-reliability-ci==0.8.0 arci demo`.
++
++## Cold and warm samples
++
++Per OS the job takes seven samples, in this order:
++
++- **five cold samples**, each with its own new `UV_CACHE_DIR` (a fresh temporary directory,
++  checked empty before the sample starts; `uv_cache_entries_at_start` records the count, 0). uv
++  has nothing cached, so each one resolves and downloads the package and its dependencies and
++  builds the tool environment, as a first-time user's machine would;
++- **two warm samples** that reuse the cache the fifth cold sample filled, so they measure a
++  repeat run.
++
++Only the cold samples are compared with the memo target. The target is about a first-time user,
++and a warm run skips the downloads that dominate a first run, so pooling warm samples in would
++pull the percentiles down and could report the target met when no first run met it. The warm
++samples are reported separately, for information.
++
++## Network traffic
++
++The job touches the network only for:
++
++1. `actions/setup-python` fetching the Python 3.12 build (from the runner's tool cache or
++   GitHub's python-versions releases);
++2. `pip install uv==<pinned>`: uv's wheel from PyPI;
++3. each cold sample: uv resolving `agent-reliability-ci==0.8.0` against PyPI and downloading it
++   and its dependencies (`pydantic`, `pyyaml` and their own dependencies) into that sample's
++   empty cache; a warm sample may still query the PyPI index but finds the files cached; uv may
++   also fetch a managed Python if it does not use the runner's interpreter;
++4. one last `uvx … python` call (after the samples, timing nothing) that records the Python
++   uvx ran arci with;
++5. `actions/upload-artifact` uploading the JSON and the logs to GitHub.
++
++The cold totals therefore include PyPI and the runner's network on that day.
++
++## How the JSON is produced
++
++[`.github/workflows/ttfv-reference.yml`](../../../.github/workflows/ttfv-reference.yml) runs on
++pushes to `sprint/t18-**` branches and on manual dispatch (`workflow_dispatch`). For each OS it:
++
++1. stamps `command_start` (UTC, whole seconds) and runs the command, prefixing every line of its
++   stdout and stderr with its arrival time into `sample-<n>.log`;
++2. bounds every sample: a sample still running after `SAMPLE_TIMEOUT_S` (600 s) is killed with
++   its whole process group, its log is kept and ends with a `killed after` line, and it is
++   recorded with `timed_out: true`, `exit_code: null` and `all_steps_held: null`. The sampling
++   loop as a whole has `TIMING_BUDGET_S` (1200 s) inside the 25-minute job; a sample with no time
++   left is not started and is recorded as timed out with `started: false`;
++3. parses the logs into `reference-<os>.json` (this step runs even if the timing step failed):
++   per sample `command_start`, `demo_banner` (first line containing `arci demo:`),
++   `demo_verdict` (first `VERDICT:`), `all_steps_held` (first `All six steps held`),
++   `exit_code`, `uv_cache` (`cold` or `warm`), `timed_out`, `started`, `timeout_seconds` and
++   `uv_cache_entries_at_start`; plus the runner (OS, architecture, image), the Python uvx ran
++   arci with, `uv --version`, the package and the design (`cold_samples`, `warm_samples`,
++   timeouts);
++4. uploads the JSON and the logs as the artifact `ttfv-reference-<os>`, and fails the job if
++   there are not seven samples or any sample timed out, exited non-zero or never printed
++   `All six steps held`.
++
++The maintainer downloads the artifact and commits the JSON here, whatever it shows. Failed and
++timed-out samples are kept. The JSON files are never edited after commit.
++
++## Not receipts
++
++These are machine timings. They are not TTFV receipts (`../receipts/`) and never count as cold
++readers ([protocol](../ttfv-protocol.md) section 1.4): nobody reads the README, so the time to
++open it, find the command and interpret the verdict is not in them. They bound the part of
++time-to-first-verdict that the package and the network control; a person's time is longer.
++
++## Reading p50 and p95
++
++```
++python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/reference-*.json
++```
++
++For each file it first checks the structure and the timestamps (stamps present and in order
++`command_start` ≤ `demo_banner` ≤ `demo_verdict` ≤ `all_steps_held`, no negative duration, no
++null or duplicate sample, `exit_code` null only for a timed-out sample). A file that fails is
++reported as INVALID with its problems and no figures.
++
++Otherwise it prints two blocks, never pooled. The **cold** block lists the totals
++(`command_start` to `all_steps_held`, in seconds), then p50 and p95 by nearest rank and a
++one-line verdict, each figure within or over its target (120 s and 180 s). With five samples,
++nearest rank makes p50 the third-fastest sample and p95 the slowest. A sample that failed or
++timed out has no total and ranks above every finished one; a percentile that lands on it is "not
++reached", which is never within target. With fewer than five cold samples it lists the raw values
++and makes no percentile claim ([protocol](../ttfv-protocol.md) section 8.3). The **warm** block
++lists its totals the same way (two samples: raw values only) and is never compared with the
++target. The script always exits 0: it reports, it does not gate.
++
++Timestamps have one-second resolution, so each total is good to about ±1 s. Five cold samples on
++one runner image are a spot check of that image on that day, not a distribution over users'
++machines: GitHub-hosted runners vary in CPU and network, and a reader's laptop may be faster or
++slower.
+diff --git a/plan/exec/scripts/reference_stats.py b/plan/exec/scripts/reference_stats.py
+new file mode 100644
+index 0000000..2de1fd7
+--- /dev/null
++++ b/plan/exec/scripts/reference_stats.py
+@@ -0,0 +1,188 @@
++"""Summarise reference-machine demo timings (docs/measurement/reference-machines/).
++
++    python plan/exec/scripts/reference_stats.py reference-ubuntu-latest.json [more.json ...]
++
++For each file (one OS per file, written by .github/workflows/ttfv-reference.yml) it first
++validates the structure and the timestamps. An invalid file is reported as INVALID with its
++problems and no figures. A valid file gets two blocks, never pooled:
++
++- cold (each sample with its own empty uv cache, a first-time user): the `total` values
++  (command_start -> all_steps_held, whole seconds), then p50 and p95 by nearest rank, each
++  within or over the memo target (p50 <= 120 s, p95 <= 180 s). Fewer than five cold samples:
++  raw values only, no percentile claim (protocol section 8.3).
++- warm (cache already filled): the same figures, never compared with the memo target.
++
++A sample that exited non-zero, timed out or never printed "All six steps held" has no total: it
++is shown as failed and ranks above every finished sample, so it can only push a percentile up;
++a percentile that lands on it is "not reached". It reports; it does not gate: the exit status
++is always 0.
++"""
++
++from __future__ import annotations
++
++import datetime as dt
++import itertools
++import json
++import math
++import sys
++from pathlib import Path
++from typing import Any, cast
++
++TARGETS = {50: 120.0, 95: 180.0}  # percentile -> memo target in seconds
++MIN_FOR_PERCENTILES = 5
++STAMP = "%Y-%m-%dT%H:%M:%SZ"
++CACHES = ("cold", "warm")
++# Stamps a sample may carry, in the order they must occur.
++ORDERED_STAMPS = ("command_start", "demo_banner", "demo_verdict", "all_steps_held")
++
++
++def parse(stamp: object) -> dt.datetime | None:
++    if not isinstance(stamp, str):
++        return None
++    try:
++        return dt.datetime.strptime(stamp, STAMP)
++    except ValueError:
++        return None
++
++
++def is_int(value: object) -> bool:
++    return isinstance(value, int) and not isinstance(value, bool)
++
++
++def sample_problems(where: str, sample: dict[str, Any]) -> list[str]:
++    out: list[str] = []
++    if not is_int(sample.get("sample")):
++        out.append(f"{where}: 'sample' is not an integer")
++    if sample.get("uv_cache") not in CACHES:
++        out.append(f"{where}: 'uv_cache' is {sample.get('uv_cache')!r}, not cold or warm")
++    timed_out = sample.get("timed_out", False)
++    if not isinstance(timed_out, bool):
++        out.append(f"{where}: 'timed_out' is not true or false")
++    code = sample.get("exit_code", "missing")
++    if not (is_int(code) or (code is None and timed_out is True)):
++        out.append(f"{where}: 'exit_code' is {code!r} (null only for a timed-out sample)")
++    if timed_out is True and sample.get("all_steps_held") is not None:
++        out.append(f"{where}: timed out but 'all_steps_held' is set")
++    if "all_steps_held" not in sample:
++        out.append(f"{where}: 'all_steps_held' is missing")
++    stamps: list[tuple[str, dt.datetime]] = []
++    for key in ORDERED_STAMPS:
++        value = sample.get(key)
++        if value is None:
++            if key == "command_start":
++                out.append(f"{where}: 'command_start' is missing")
++            continue
++        when = parse(value)
++        if when is None:
++            out.append(f"{where}: {key!r} is {value!r}, not a UTC timestamp")
++            continue
++        stamps.append((key, when))
++    for (k1, t1), (k2, t2) in itertools.pairwise(stamps):
++        if t2 < t1:
++            seconds = (t2 - t1).total_seconds()
++            out.append(f"{where}: {k2} is before {k1} ({seconds:g} s, out of order)")
++    return out
++
++
++def problems(doc: object) -> list[str]:
++    """Everything wrong with a reference JSON; empty when it can be summarised."""
++    if not isinstance(doc, dict):
++        return ["the top level is not an object"]
++    samples = cast("dict[str, Any]", doc).get("samples")
++    if not isinstance(samples, list):
++        return ["'samples' is missing or not a list"]
++    out: list[str] = []
++    seen: set[int] = set()
++    for i, sample in enumerate(cast("list[Any]", samples)):
++        where = f"samples[{i}]"
++        if not isinstance(sample, dict):
++            out.append(f"{where} is {json.dumps(sample)}, not an object")
++            continue
++        typed = cast("dict[str, Any]", sample)
++        out.extend(sample_problems(where, typed))
++        n = typed.get("sample")
++        if isinstance(n, int) and not isinstance(n, bool):
++            if n in seen:
++                out.append(f"{where}: sample number {n} appears twice")
++            seen.add(n)
++    return out
++
++
++def total(sample: dict[str, Any]) -> float | None:
++    """Seconds from command_start to all_steps_held; None if the sample did not hold."""
++    if sample.get("timed_out") is True or sample.get("exit_code") != 0:
++        return None
++    start, held = parse(sample.get("command_start")), parse(sample.get("all_steps_held"))
++    if start is None or held is None or held < start:
++        return None
++    return (held - start).total_seconds()
++
++
++def nearest_rank(values: list[float | None], p: int) -> float | None:
++    """Nearest-rank percentile; None (a failed sample) ranks above every number."""
++    if not values:
++        return None
++    ranked = sorted(values, key=lambda v: math.inf if v is None else v)
++    return ranked[max(1, math.ceil(p / 100 * len(ranked))) - 1]
++
++
++def shown(sample: dict[str, Any], value: float | None) -> str:
++    if value is not None:
++        return f"{value:g} s"
++    return "timed out" if sample.get("timed_out") is True else "failed"
++
++
++def block(name: str, samples: list[dict[str, Any]], *, compare: bool) -> list[str]:
++    totals = [total(s) for s in samples]
++    raw = ", ".join(shown(s, t) for s, t in zip(samples, totals, strict=True)) or "none"
++    lines = [f"  {name} totals ({len(samples)}): {raw}"]
++    if len(samples) < MIN_FOR_PERCENTILES:
++        claim = f"fewer than {MIN_FOR_PERCENTILES} samples, raw values only, no percentile claim"
++    else:
++        parts: list[str] = []
++        for p, target in TARGETS.items():
++            value = nearest_rank(totals, p)
++            figure = "not reached" if value is None else f"{value:g} s"
++            if compare:
++                within = value is not None and value <= target
++                figure += f" {'within' if within else 'over'} target (<= {target:g} s)"
++            parts.append(f"p{p} {figure}")
++        claim = "; ".join(parts)
++        if len(samples) < 20:
++            claim += f"; p95 of {len(samples)} is the maximum"
++    if not compare:
++        claim += "; warm samples are never compared with the memo target"
++    return [*lines, f"  {name}: {claim}"]
++
++
++def report(path: Path) -> list[str]:
++    try:
++        doc: object = json.loads(path.read_text(encoding="utf-8"))
++    except (OSError, ValueError) as exc:
++        return [f"{path.name}: unreadable ({exc.__class__.__name__}: {exc})"]
++    found = problems(doc)
++    if found:
++        return [f"{path.name}: INVALID, no figures reported", *(f"  - {p}" for p in found)]
++    data = cast("dict[str, Any]", doc)  # validated by problems()
++    runner = data.get("runner")
++    info = cast("dict[str, Any]", runner) if isinstance(runner, dict) else {}
++    where = " ".join(str(info.get(k)) for k in ("os", "arch", "label") if info.get(k))
++    lines = [f"{path.name}: {where or 'unknown runner'}, {data.get('package', '?')}"]
++    samples: list[dict[str, Any]] = data["samples"]
++    for cache in CACHES:
++        chosen = [s for s in samples if s["uv_cache"] == cache]
++        lines.extend(block(cache, chosen, compare=cache == "cold"))
++    return lines
++
++
++def main(argv: list[str]) -> int:
++    if not argv:
++        print((__doc__ or "").strip())
++        return 0
++    for arg in argv:
++        print("\n".join(report(Path(arg))))
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main(sys.argv[1:]))
+diff --git a/plan/exec/scripts/test_reference_stats.py b/plan/exec/scripts/test_reference_stats.py
+new file mode 100644
+index 0000000..77dcb5a
+--- /dev/null
++++ b/plan/exec/scripts/test_reference_stats.py
+@@ -0,0 +1,417 @@
++"""Dry run of .github/workflows/ttfv-reference.yml and reference_stats.py, no network.
++
++The workflow's own `run:` bodies are lifted from the YAML and executed: the timing step against a
++fake `uv`/`uvx` on PATH (sample 3 fails, sample 6 hangs until the per-sample timeout kills it),
++the parse step on the logs that produced, and the final check step. A second run gives the loop
++no time budget, so every sample is recorded as timed out without starting. reference_stats.py is
++then run on those JSONs and on hand-written ones with known stamps, valid and invalid.
++
++    .venv/bin/pytest -p no:cacheprovider plan/exec/scripts/test_reference_stats.py
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import os
++import re
++import subprocess
++import sys
++from pathlib import Path
++from types import ModuleType
++from typing import Any
++
++import pytest
++import yaml
++
++HERE = Path(__file__).resolve().parent
++WORKFLOW = HERE.parents[2] / ".github" / "workflows" / "ttfv-reference.yml"
++STAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
++PACKAGE = "agent-reliability-ci==0.8.0"
++# Short enough to keep the test quick, far above the fake's millisecond samples.
++SAMPLE_TIMEOUT_S = "5"
++
++FAKE_UV = """#!/usr/bin/env bash
++echo "uv 0.12.5 (fake)"
++"""
++# Sample 3 fails; sample 6 prints every marker, then hangs. Every demo call records its number,
++# the cache it saw and how many entries that cache had at start.
++FAKE_UVX = """#!/usr/bin/env bash
++set -u
++if [ "$1" != --from ] || [ "$2" != "agent-reliability-ci==0.8.0" ]; then
++  echo "bad args: $*" >&2
++  exit 90
++fi
++if [ "$3" = python ]; then echo 3.12.99; exit 0; fi
++[ "$3 $4" = "arci demo" ] || { echo "bad args: $*" >&2; exit 91; }
++n=$(( $(cat "$FAKE_STATE/count" 2>/dev/null || echo 0) + 1 ))
++echo "$n" >"$FAKE_STATE/count"
++printf '%s %s %s\\n' "$n" "$UV_CACHE_DIR" "$(ls -A "$UV_CACHE_DIR" | wc -l | tr -d ' ')" \\
++  >>"$FAKE_STATE/calls"
++touch "$UV_CACHE_DIR/filled"
++echo "Installed 3 packages in 5ms" >&2
++echo "arci demo: the retry story, 8 workers, run stores in /tmp/x"
++echo "  VERDICT: BLOCK (exit 1)   [A vs agent_b]"
++echo "  VERDICT: PASS (exit 0)   [A vs agent_a]"
++if [ "$n" = 3 ]; then echo "Traceback: boom" >&2; exit 3; fi
++echo "All six steps held."
++if [ "$n" = 6 ]; then sleep 300; fi
++printf 'Run stores: /tmp/x'
++"""
++
++
++def load_stats() -> ModuleType:
++    spec = importlib.util.spec_from_file_location("reference_stats", HERE / "reference_stats.py")
++    assert spec is not None and spec.loader is not None
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++stats = load_stats()
++
++
++def step(name_prefix: str) -> dict[str, Any]:
++    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
++    steps: list[dict[str, Any]] = doc["jobs"]["reference"]["steps"]
++    matches = [s for s in steps if str(s.get("name", "")).startswith(name_prefix)]
++    assert len(matches) == 1, name_prefix
++    return matches[0]
++
++
++def workflow_env() -> dict[str, str]:
++    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
++    return {str(k): str(v) for k, v in doc["env"].items()}
++
++
++def write_exe(path: Path, body: str) -> None:
++    path.write_text(body, encoding="utf-8")
++    path.chmod(0o755)
++
++
++def run_step(
++    name_prefix: str, tmp_path: Path, env: dict[str, str]
++) -> subprocess.CompletedProcess[str]:
++    body = step(name_prefix)
++    assert body["shell"] == "python", name_prefix
++    script = tmp_path / f"step-{len(list(tmp_path.glob('step-*.py')))}.py"
++    script.write_text(body["run"], encoding="utf-8")
++    return subprocess.run(
++        [sys.executable, str(script)], env=env, capture_output=True, text=True, check=False
++    )
++
++
++def fake_env(tmp_path: Path, **overrides: str) -> dict[str, str]:
++    bin_dir, state, tmp = (tmp_path / d for d in ("bin", "state", "tmp"))
++    for d in (bin_dir, state, tmp):
++        d.mkdir()
++    write_exe(bin_dir / "uv", FAKE_UV)
++    write_exe(bin_dir / "uvx", FAKE_UVX)
++    return (
++        workflow_env()
++        | {
++            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
++            "HOME": str(tmp_path),
++            "TMPDIR": str(tmp),
++            "FAKE_STATE": str(state),
++            "OUT_DIR": str(tmp_path / "out"),
++            "OUT_JSON": "reference-test.json",
++            "REF_RUNNER_OS": "Linux",
++            "REF_RUNNER_ARCH": "X64",
++            "REF_RUNNER_LABEL": "ubuntu-latest",
++            "REF_RUN_ID": "1",
++            "REF_RUN_ATTEMPT": "1",
++            "REF_SHA": "0" * 40,
++        }
++        | overrides
++    )
++
++
++def test_workflow_design_values() -> None:
++    env = workflow_env()
++    assert env["PACKAGE"] == PACKAGE
++    assert (env["COLD_SAMPLES"], env["WARM_SAMPLES"]) == ("5", "2")
++    assert env["SAMPLE_TIMEOUT_S"] == "600"
++    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
++    job_minutes = doc["jobs"]["reference"]["timeout-minutes"]
++    # The sampling loop is bounded well inside the job, leaving time for the JSON and upload.
++    assert int(env["TIMING_BUDGET_S"]) <= (job_minutes - 3) * 60
++    assert step("Parse the logs")["if"] == "always()"
++    assert step("Upload the JSON")["if"] == "always()"
++
++
++def test_workflow_steps_dry_run(tmp_path: Path) -> None:
++    env = fake_env(tmp_path, SAMPLE_TIMEOUT_S=SAMPLE_TIMEOUT_S)
++    out_dir, state = Path(env["OUT_DIR"]), Path(env["FAKE_STATE"])
++
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert "sample 3 (cold): exit 3" in done.stdout
++    assert f"sample 6 (warm): timed out after {SAMPLE_TIMEOUT_S} s" in done.stdout
++
++    calls = [line.split() for line in (state / "calls").read_text().splitlines()]
++    assert [c[0] for c in calls] == ["1", "2", "3", "4", "5", "6", "7"]
++    caches = [c[1] for c in calls]
++    assert len(set(caches[:5])) == 5  # a new uv cache for every cold sample
++    assert caches[5] == caches[6] == caches[4]  # warm samples reuse the last cold cache
++    assert [c[2] for c in calls] == ["0", "0", "0", "0", "0", "1", "1"]
++
++    log3 = (out_dir / "sample-3.log").read_text().splitlines()
++    assert all(STAMP_RE.match(line.split(" ", 1)[0]) for line in log3)
++    assert log3[-1].endswith(" Traceback: boom")
++    # The unterminated last line survives the timestamping.
++    assert (out_dir / "sample-1.log").read_text().splitlines()[-1].endswith(" Run stores: /tmp/x")
++    log6 = (out_dir / "sample-6.log").read_text().splitlines()
++    assert log6[-1].endswith(f"[ttfv-reference] killed after {SAMPLE_TIMEOUT_S} s")
++
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    out = out_dir / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["package"] == PACKAGE
++    assert doc["runner"]["os"] == "Linux" and doc["runner"]["arch"] == "X64"
++    assert doc["python"] == "3.12.99"
++    assert doc["uv"] == "uv 0.12.5 (fake)"
++    assert doc["setup_python"]
++    assert doc["design"]["cold_samples"] == 5 and doc["design"]["warm_samples"] == 2
++    assert doc["design"]["sample_timeout_seconds"] == int(SAMPLE_TIMEOUT_S)
++    samples = doc["samples"]
++    assert [s["sample"] for s in samples] == [1, 2, 3, 4, 5, 6, 7]
++    assert [s["uv_cache"] for s in samples] == ["cold"] * 5 + ["warm"] * 2
++    assert [s["uv_cache_entries_at_start"] for s in samples] == [0, 0, 0, 0, 0, 1, 1]
++    assert [s["exit_code"] for s in samples] == [0, 0, 3, 0, 0, None, 0]
++    assert [s["timed_out"] for s in samples] == [False] * 5 + [True, False]
++    assert all(s["started"] for s in samples)
++    for s in samples:
++        for key in ("command_start", "demo_banner", "demo_verdict"):
++            assert STAMP_RE.match(s[key]), (s["sample"], key)
++        assert s["log"] == f"sample-{s['sample']}.log"
++    # Sample 6 printed the marker before hanging; a timed-out sample never counts as held.
++    assert samples[2]["all_steps_held"] is None and samples[5]["all_steps_held"] is None
++    assert all(STAMP_RE.match(s["all_steps_held"]) for s in samples if s["sample"] not in (3, 6))
++
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "7 of 7 samples; not held: [3, 6]; timed out: [6]" in done.stdout
++
++    assert stats.problems(doc) == []
++    lines = stats.report(out)
++    assert lines[0] == "reference-test.json: Linux X64 ubuntu-latest, agent-reliability-ci==0.8.0"
++    assert lines[1].startswith("  cold totals (5): ") and "failed" in lines[1]
++    assert lines[2].startswith("  cold: p50 ") and "p95 not reached over target" in lines[2]
++    assert lines[3].startswith("  warm totals (2): timed out, ")
++    assert lines[4].startswith("  warm: fewer than 5 samples")
++    assert len(lines) == 5
++
++
++def test_workflow_budget_used_up(tmp_path: Path) -> None:
++    """No time left: nothing starts, every sample is recorded as timed out, the JSON still comes."""
++    env = fake_env(tmp_path, TIMING_BUDGET_S="0")
++    out_dir, state = Path(env["OUT_DIR"]), Path(env["FAKE_STATE"])
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert not (state / "calls").exists()
++    assert "not started" in (out_dir / "sample-7.log").read_text()
++    assert run_step("Parse the logs", tmp_path, env).returncode == 0
++    out = out_dir / "reference-test.json"
++    samples = json.loads(out.read_text())["samples"]
++    assert [(s["timed_out"], s["started"], s["exit_code"]) for s in samples] == [
++        (True, False, None)
++    ] * 7
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "timed out: [1, 2, 3, 4, 5, 6, 7]" in done.stdout
++    lines = stats.report(out)
++    assert lines[1] == "  cold totals (5): " + ", ".join(["timed out"] * 5)
++    assert lines[2].startswith("  cold: p50 not reached over target (<= 120 s)")
++
++
++def test_parse_step_without_samples(tmp_path: Path) -> None:
++    """The timing step died before writing anything: the JSON step still writes a file."""
++    env = fake_env(tmp_path)
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    doc = json.loads((Path(env["OUT_DIR"]) / "reference-test.json").read_text())
++    assert doc["samples"] == []
++
++
++T0 = "2026-10-14T10:00:00Z"
++
++
++def at(seconds: int) -> str:
++    return f"2026-10-14T10:{seconds // 60:02d}:{seconds % 60:02d}Z"
++
++
++def sample(
++    n: int, cache: str, held: int | None, exit_code: int | None = 0, *, timed_out: bool = False
++) -> dict[str, Any]:
++    """A sample that started at T0 and held `held` seconds later (None: never held)."""
++    return {
++        "sample": n,
++        "uv_cache": cache,
++        "command_start": T0,
++        "demo_banner": at(1),
++        "demo_verdict": at(2),
++        "all_steps_held": None if held is None else at(held),
++        "exit_code": exit_code,
++        "timed_out": timed_out,
++    }
++
++
++def write_doc(path: Path, samples: list[Any]) -> Path:
++    doc = {
++        "package": PACKAGE,
++        "runner": {"os": "macOS", "arch": "ARM64", "label": "macos-latest"},
++        "samples": samples,
++    }
++    path.write_text(json.dumps(doc), encoding="utf-8")
++    return path
++
++
++HEADER = "reference-macos-latest.json: macOS ARM64 macos-latest, agent-reliability-ci==0.8.0"
++
++
++def test_cold_and_warm_blocks_are_separate(tmp_path: Path) -> None:
++    cold = [sample(n, "cold", t) for n, t in zip(range(1, 6), (185, 40, 30, 50, 20), strict=True)]
++    warm = [sample(6, "warm", 12), sample(7, "warm", 10)]
++    path = write_doc(tmp_path / "reference-macos-latest.json", cold + warm)
++    assert stats.report(path) == [
++        HEADER,
++        "  cold totals (5): 185 s, 40 s, 30 s, 50 s, 20 s",
++        "  cold: p50 40 s within target (<= 120 s); p95 185 s over target (<= 180 s);"
++        " p95 of 5 is the maximum",
++        "  warm totals (2): 12 s, 10 s",
++        "  warm: fewer than 5 samples, raw values only, no percentile claim;"
++        " warm samples are never compared with the memo target",
++    ]
++
++
++def test_warm_samples_never_rescue_a_slow_cold_one(tmp_path: Path) -> None:
++    """Review 18 finding 1: one cold 150 s and four warm 10 s used to read as within target."""
++    samples = [sample(1, "cold", 150), *(sample(n, "warm", 10) for n in range(2, 6))]
++    lines = stats.report(write_doc(tmp_path / "reference-macos-latest.json", samples))
++    assert lines == [
++        HEADER,
++        "  cold totals (1): 150 s",
++        "  cold: fewer than 5 samples, raw values only, no percentile claim",
++        "  warm totals (4): 10 s, 10 s, 10 s, 10 s",
++        "  warm: fewer than 5 samples, raw values only, no percentile claim;"
++        " warm samples are never compared with the memo target",
++    ]
++    assert not any("within" in line for line in lines)
++
++
++def test_five_warm_samples_get_percentiles_but_no_target(tmp_path: Path) -> None:
++    samples = [sample(n, "cold", 100) for n in range(1, 6)]
++    samples += [sample(n, "warm", 10) for n in range(6, 11)]
++    lines = stats.report(write_doc(tmp_path / "r.json", samples))
++    assert lines[2] == (
++        "  cold: p50 100 s within target (<= 120 s); p95 100 s within target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++    assert lines[4] == (
++        "  warm: p50 10 s; p95 10 s; p95 of 5 is the maximum;"
++        " warm samples are never compared with the memo target"
++    )
++
++
++def test_failed_and_timed_out_cold_samples(tmp_path: Path) -> None:
++    samples = [
++        sample(1, "cold", 60),
++        sample(2, "cold", None, exit_code=1),
++        sample(3, "cold", None, exit_code=None, timed_out=True),
++        sample(4, "cold", 70),
++        sample(5, "cold", 80),
++    ]
++    lines = stats.report(write_doc(tmp_path / "r.json", samples))
++    assert lines[1] == "  cold totals (5): 60 s, failed, timed out, 70 s, 80 s"
++    assert lines[2] == (
++        "  cold: p50 80 s within target (<= 120 s); p95 not reached over target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++
++
++INVALID_CASES: dict[str, tuple[object, str]] = {
++    "top level not an object": ([1, 2], "the top level is not an object"),
++    "no samples key": ({"package": PACKAGE}, "'samples' is missing or not a list"),
++    "samples not a list": ({"samples": {"1": {}}}, "'samples' is missing or not a list"),
++    "null sample": ({"samples": [None]}, "samples[0] is null, not an object"),
++    "negative duration": (
++        {"samples": [sample(1, "cold", None) | {"all_steps_held": "2026-10-14T09:59:00Z"}]},
++        "samples[0]: all_steps_held is before demo_verdict",
++    ),
++    "out of order markers": (
++        {"samples": [sample(1, "cold", 60) | {"demo_banner": at(5)}]},
++        "samples[0]: demo_verdict is before demo_banner (-3 s, out of order)",
++    ),
++    "bad timestamp": (
++        {"samples": [sample(1, "cold", 60) | {"command_start": "yesterday"}]},
++        "samples[0]: 'command_start' is 'yesterday', not a UTC timestamp",
++    ),
++    "missing command_start": (
++        {"samples": [sample(1, "cold", 60) | {"command_start": None}]},
++        "samples[0]: 'command_start' is missing",
++    ),
++    "unknown cache": (
++        {"samples": [sample(1, "lukewarm", 60)]},
++        "samples[0]: 'uv_cache' is 'lukewarm', not cold or warm",
++    ),
++    "null exit code without timeout": (
++        {"samples": [sample(1, "cold", None, exit_code=None)]},
++        "samples[0]: 'exit_code' is None (null only for a timed-out sample)",
++    ),
++    "timed out but held": (
++        {"samples": [sample(1, "cold", 60, exit_code=None, timed_out=True)]},
++        "samples[0]: timed out but 'all_steps_held' is set",
++    ),
++    "duplicate sample": (
++        {"samples": [sample(1, "cold", 60), sample(1, "warm", 10)]},
++        "samples[1]: sample number 1 appears twice",
++    ),
++    "sample number not an integer": (
++        {"samples": [sample(1, "cold", 60) | {"sample": "1"}]},
++        "samples[0]: 'sample' is not an integer",
++    ),
++}
++
++
++@pytest.mark.parametrize("case", sorted(INVALID_CASES))
++def test_invalid_files_are_reported_without_figures(
++    case: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    doc, expected = INVALID_CASES[case]
++    path = tmp_path / "reference-bad.json"
++    path.write_text(json.dumps(doc), encoding="utf-8")
++    assert any(problem.startswith(expected) for problem in stats.problems(doc)), stats.problems(doc)
++    assert stats.main([str(path)]) == 0
++    out = capsys.readouterr().out
++    assert out.startswith("reference-bad.json: INVALID, no figures reported\n")
++    assert expected in out
++    assert "p50" not in out and "within" not in out and "totals" not in out
++
++
++def test_failed_samples_rank_last() -> None:
++    assert stats.nearest_rank([10.0, None, 30.0, 20.0, 40.0], 50) == 30.0
++    assert stats.nearest_rank([10.0, None, 30.0, 20.0, 40.0], 95) is None
++    assert stats.nearest_rank([None, None, None, 5.0, 6.0], 50) is None
++    assert stats.nearest_rank([], 50) is None
++
++
++def test_total() -> None:
++    assert stats.total(sample(1, "cold", 60)) == 60.0
++    assert stats.total(sample(1, "cold", 60, exit_code=1)) is None
++    assert stats.total(sample(1, "cold", None)) is None
++    assert stats.total(sample(1, "cold", 60, exit_code=None, timed_out=True)) is None
++    assert stats.total(sample(1, "cold", 60) | {"command_start": "garbage"}) is None
++
++
++def test_main_always_exits_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
++    bad = tmp_path / "reference-broken.json"
++    bad.write_text("{not json", encoding="utf-8")
++    empty = write_doc(tmp_path / "reference-empty.json", [])
++    assert stats.main([str(bad), str(empty), str(tmp_path / "missing.json")]) == 0
++    assert stats.main([]) == 0
++    out = capsys.readouterr().out
++    assert "reference-broken.json: unreadable" in out
++    assert "missing.json: unreadable" in out
++    assert "  cold totals (0): none" in out
