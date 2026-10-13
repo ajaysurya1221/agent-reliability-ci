@@ -11,5 +11,6 @@ Budget clock start (Task 00 commit): 2026-10-13T18:12:20Z. Stop starting tasks a
 | 17 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT, reviewer ACCEPT (r1, r2) | sprint/t17-protocol 9b2e4b5 → main | lane CI green |
 | 16 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT; reviewer ACCEPT ×3; Astra ACCEPT (r1, r3) | sprint/t16-code dfdb11f → main | lane CI green; isolated merge bar 1225 passed; main CI running |
 | V (19:53Z) | GREEN | Fable | main d152ea3 (T17 + T16 merged and pushed) | main CI run success; T18 still on its lane |
-| 18 | MERGED locally (D-12 tie-break); push after lane CI on 1f67f8c; merge bar running | Fable ACCEPT; reviewer ACCEPT (r3); Astra ACCEPT (delta) | sprint/t18-refmachines 1f67f8c → main | final run 38470699338: ubuntu cold p50 232 s, macOS 220 s, warm ≈ cold; JSON committed |
 | V (22:05Z) | GREEN (local) | Fable | main 1c4802c (T17, T16, T18 merged) | isolated: just frozen 53 OK; just check 1225 passed, 2 skipped (8:03); figures current; schema current; first screen 191; plan-script tests green; actionlint clean; reference JSON files valid; push waits for lane CI on 1f67f8c |
+| 18 | DONE, MERGED, PUSHED (main 02910c3) | Fable ACCEPT; reviewer ACCEPT (r3); Astra ACCEPT (delta, D-12) | sprint/t18-refmachines 1f67f8c → main | lane CI green; main CI run 38476482555 success |
+| V (final, 22:31Z) | GREEN | Fable | main 02910c3 (T17, T16, T18 merged; records) | main CI run 38476482555 success; isolated merge bar on 1c4802c green; worktrees clean; nothing in flight |

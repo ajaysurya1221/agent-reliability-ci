@@ -1,7 +1,8 @@
 # FINAL_REPORT — run 2, "post-release hardening and reference measurement" (2026-10-13/14)
 
-<<DRAFT at 19:17Z; the T18 row, the reference-machine figures and the usage counts are completed at wrap-up.
-Budget clock: Task 00 commit 2026-10-13T18:12:20Z; stop-starting at 01:27:20Z; end 02:12:20Z (2026-10-14).>>
+Budget clock: Task 00 commit 2026-10-13T18:12:20Z; stop-starting at 01:27:20Z; end 02:12:20Z (2026-10-14).
+Work ended at 22:31Z on 2026-10-13 (4 h 19 min of the 8 h), every lane merged, main green at 02910c3
+(CI run 38476482555), nothing in flight.
 
 Orchestrator: Claude Fable 5.1. Coders and reviewers: Claude Opus 5.5 at effort high (workflow
 subagents). Consultant: Codex `gpt-6-astra` at xhigh, read-only. Records: `plan/exec/run2/`

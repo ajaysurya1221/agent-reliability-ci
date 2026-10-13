@@ -67,8 +67,9 @@ Posting (drafts B–F) and recruiting five cold readers (template F). Until then
 metric in the memo stays "unmeasured"; the AI cohort and the reference machines do not count.
 
 ## R2-3. Nothing else
-No command to run, no setting to change. Run 2 merged T16 (code leftovers), T17 (protocol and
-scripts) and T18 (reference-machine timing workflow, see FINAL_REPORT.md for its state), recorded
+No command to run, no setting to change. Run 2 ended with main green at 02910c3 (CI run
+38476482555): it merged T16 (code leftovers), T17 (protocol and scripts) and T18 (reference-machine
+timing workflow with the run-38470699338 timings committed), recorded
 decision D-11 (Inspector: no SDK supports revision 2026-07-28; a bridge compatibility mode is ADR 0011
 for the next run) and the accepted design for the memo's D2 (plan/exec/run2/adr-0010-draft.md).
 
