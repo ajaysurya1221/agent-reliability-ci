@@ -53,7 +53,8 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 
 - main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
   every later plan-only commit; T13 docs (receipts, recipe titles, availability line) merged from
-  sprint/t13-docs after REVIEW 13 (two rounds, both reviewers ACCEPT).
+  sprint/t13-docs after REVIEW 13 (two rounds, both reviewers ACCEPT); T14 (availability line
+  "published", PyPI-route receipt) merged after REVIEW 14 (two rounds).
 - PyPI: published (0.8.0, attested, 08:25Z). GitHub release page: created by you at ~08:27Z with the CI files attached.
 - Nothing half-applied: every lane branch is merged; no frozen file changed outside ADR 0005's
   re-freeze; no recorded result edited; no force-push, no deleted branch/tag/release, no secret.
