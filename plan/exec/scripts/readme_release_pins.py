@@ -12,22 +12,36 @@ from pathlib import Path
 
 PINS = [
     ("releases/tag/v0.7.0)", "releases/tag/v0.8.0)"),
-    ("- uses: ajaysurya1221/agent-reliability-ci@v0.7.0", "- uses: ajaysurya1221/agent-reliability-ci@v0.8.0"),
     (
-        "This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in pass^k\n"
-        "reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; see the\n"
-        "Unreleased section of [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).",
-        "This example pins `v0.8.0`, the released feature set (the Action installs that tag's source; the\n"
-        "same code is on PyPI as `agent-reliability-ci==0.8.0`). See\n"
-        "[CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).",
+        "- uses: ajaysurya1221/agent-reliability-ci@v0.7.0",
+        "- uses: ajaysurya1221/agent-reliability-ci@v0.8.0",
     ),
     (
-        "**Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`),\n"
-        "`arci init`, the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability\n"
+        "This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in "
+        "pass^k\n"
+        "reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; "
+        "see the\n"
+        "Unreleased section of "
+        "[CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md"
+        ").",
+        "This example pins `v0.8.0`, the released feature set (the Action installs that tag's "
+        "source; the\n"
+        "same code is on PyPI as `agent-reliability-ci==0.8.0`). See\n"
+        "[CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md"
+        ").",
+    ),
+    (
+        "**Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, "
+        "`arci schema`),\n"
+        "`arci init`, the planner (`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) "
+        "and portability\n"
         "fixes beyond v0.7.0; the v0.8.0 release and the PyPI package follow this sprint.",
-        "**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag `v0.8.0`; it adds the\n"
-        "packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, the planner\n"
-        "(`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes over v0.7.0.",
+        "**Availability:** v0.8.0 is on PyPI as `agent-reliability-ci` and as the Action tag "
+        "`v0.8.0`; it adds the\n"
+        "packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`), `arci init`, "
+        "the planner\n"
+        "(`arci plan`), opt-in pass^k reporting (`arci report --pass-k`) and portability fixes "
+        "over v0.7.0.",
     ),
 ]
 
