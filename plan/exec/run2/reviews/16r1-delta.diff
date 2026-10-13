@@ -1,0 +1,65 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 765a4a2..86edadd 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -208,13 +208,15 @@ jobs:
+       # $GITHUB_STEP_SUMMARY is a per-step file: the runner gives the next step a new, empty one,
+       # so the Action step's summary cannot be read from here. Instead run the Action's own gate
+       # script (read from action.yml) with fresh summary and output files and an `arci` stub that
+-      # prints the report above and exits 1, and require the summary file to hold that report.
++      # prints the report above and exits 1, and require the summary file to hold that report. The
++      # stub also writes a line to stderr, which must reach neither the summary nor the report file.
+       - name: Assert the Action's gate script writes the report to the step summary
+         run: |
+           work="$RUNNER_TEMP/summary-check"
+           mkdir -p "$work/bin"
+           cp arci-report.md "$work/report.md"
+-          printf '#!/usr/bin/env bash\ncat "%s"\nexit 1\n' "$work/report.md" > "$work/bin/arci"
++          printf '#!/usr/bin/env bash\necho STUB-STDERR-LINE >&2\ncat "%s"\nexit 1\n' \
++            "$work/report.md" > "$work/bin/arci"
+           chmod +x "$work/bin/arci"
+           python - "$work/gate.sh" <<'PY'
+           import pathlib
+@@ -244,3 +246,9 @@ jobs:
+           grep -q "VERDICT: BLOCK" "$work/summary.md"
+           cmp "$work/summary.md" "$work/report.md"
+           grep -qx "verdict=BLOCK" "$work/output"
++          for file in "$work/summary.md" "$work/arci-report.md"; do
++            if grep -q STUB-STDERR-LINE "$file"; then
++              echo "::error::arci's stderr leaked into $file"
++              exit 1
++            fi
++          done
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9dd5124..0191bd0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,7 +2,11 @@
+ 
+ ## Unreleased
+ 
+-(nothing yet)
++- **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
++  stores are unchanged.
++- **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason
++  other than unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
++  the sdist against an allowlist and the CI Action fixture checks the step summary.
+ 
+ ## v0.8.0 (2026-10-13)
+ 
+diff --git a/README.md b/README.md
+index 92dc7f1..795237d 100644
+--- a/README.md
++++ b/README.md
+@@ -267,8 +267,9 @@ injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `res
+ sets the task. `arci init` calls your toolset factory once with that task, so a factory that reads
+ task data needs `--task`: the sample project's `make_world`
+ ([examples/recipes/python_agent](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/examples/recipes/python_agent))
+-reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`;
+-without it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault looks like this:
++reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`; without
++it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault
++looks like this:
+ 
+ ```yaml
+ experiment_id: checkout-retry

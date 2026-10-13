@@ -1,0 +1,834 @@
+diff --git a/docs/measurement/receipts/README.md b/docs/measurement/receipts/README.md
+index 787025c..7df5b4f 100644
+--- a/docs/measurement/receipts/README.md
++++ b/docs/measurement/receipts/README.md
+@@ -1,6 +1,6 @@
+ # TTFV receipts
+ 
+-One JSON file per reader per track, filled in by hand from
++One JSON file per reader per track per attempt, filled in by hand from
+ [../receipt.template.json](../receipt.template.json) following
+ [../ttfv-protocol.md](../ttfv-protocol.md). ARCI collects no telemetry; this directory is the
+ only place these measurements live.
+diff --git a/docs/measurement/ttfv-protocol.md b/docs/measurement/ttfv-protocol.md
+index f08ca5b..69438eb 100644
+--- a/docs/measurement/ttfv-protocol.md
++++ b/docs/measurement/ttfv-protocol.md
+@@ -34,6 +34,19 @@ Protocol; no cold-reader receipt yet (the receipts committed so far are maintain
+    records both values in `notes`. `package.source` is then `wheel` and `package.wheel_sha256` is
+    filled. After a wheel attempt the facilitator checks that the installed version equals
+    `package.version` (`uv tool list` is enough) and records any mismatch in `failures`.
++   A Track A `uvx` run installs no `arci` command, so `uv tool list` and `arci --version` cannot
++   show the version. After the attempt, outside the clock and with the reader's shell settings,
++   the facilitator runs the command below (or the same with `--from <wheel path>` to pin the
++   wheel), records the printed version in `notes`, and records a mismatch with `package.version`
++   in `failures`:
++
++   ```bash
++   uvx --from agent-reliability-ci python -c "import importlib.metadata as m; print(m.version('agent-reliability-ci'))"
++   ```
++
++   The facilitator runs it with the same uv cache (`UV_CACHE_DIR`, or the default cache) and the
++   same `UV_FIND_LINKS` the reader used, so it resolves the same release rather than a newer one.
++
+ 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
+ 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
+    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
+@@ -126,7 +139,9 @@ later `arci run` that does.
+    no valid verdict, true if the reader edited `arci.yaml` by hand before any `arci run` that
+    started trials. Re-running `arci init` with corrected flags is not hand editing.
+    `outcome.trials_started` is true if `trials.jsonl` in the run store (4.2) exists and is
+-   non-empty after the attempt.
++   non-empty after the attempt. When the attempt produced several run stores (a retry with
++   `--out`, or runs from more than one directory), it is true if any store's `trials.jsonl` is
++   non-empty, and `notes` names the store used for the verdict.
+ 
+ ## 5. Comprehension
+ 
+@@ -144,7 +159,7 @@ later `arci run` that does.
+ | # | Question | Key elements (all required unless marked optional) |
+ |---|---|---|
+ | q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict usable as a CI gate, naming at least PASS and BLOCK (required); naming all four, PASS, BLOCK, INCONCLUSIVE and ERROR (optional). |
+-| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
++| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. An answer that correctly describes either integration route (the Python function or the MCP-over-stdio command) satisfies (b); naming both is not required. |
+ | q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) shown not to be worse than the baseline by more than the allowed drop (`delta`), i.e. non-inferior within `delta` (the lower bound on the candidate-minus-baseline difference is above `-delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
+ | q4 | What does it not do? Name two. | Two distinct items, each a limit stated in the README version under test (`package.readme_url`) under "What it does not do" or in the first-screen boundary sentence. For example: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
+ | q5 | What are the first three commands for your own agent? | In order: install the `agent-reliability-ci` package (for example `uv tool install agent-reliability-ci`); `arci init <id>` with `--baseline`, `--candidate`, `--toolset`, `--oracle`; `arci run arci.yaml`. |
+@@ -173,12 +188,29 @@ later `arci run` that does.
+ 
+ ## 7. Filling the receipt
+ 
+-1. Copy `receipt.template.json`, one file per reader per track; delete no keys. `track`: `demo` or
+-   `own-agent`; `reader.kind`: `cold`, `maintainer` or `ai-agent`. A milestone not reached or not
+-   in the track stays null. Durations are whole seconds as defined above; null if an end is null.
++1. Copy `receipt.template.json`: one JSON file per reader per track per attempt; delete no keys.
++   A repeat attempt by the same reader on the same track appends an attempt suffix to the handle
++   (for example `-2`, or `-pypi` for a different package source) and says so in `notes`; it is
++   the same reader for every count. `track`: `demo` or `own-agent`; `reader.kind`: `cold`,
++   `maintainer` or `ai-agent`. A milestone not reached or not in the track stays null. Durations
++   are whole seconds as defined above; null if an end is null.
+ 2. Every error, wrong turn or abandonment goes into `failures` as
+-   `{"at", "milestone", "what"}` with the first line of any error verbatim. Failed attempts are
+-   kept and contributed like successful ones.
++   `{"at", "milestone", "what"}` with the first line of any error verbatim. `at` is an ISO 8601
++   time as in 2.6, or empty when the moment was not stamped; a remark about the time ("approx.",
++   "before readme_opened") goes in `what`, never in `at`. `milestone` names the stage the failure
++   belongs to, one of:
++   - `install`: getting the package and the `arci` command (Track A up to `demo_banner`, Track B
++     up to `install_done`), e.g. a resolver error or `arci` not on `PATH`;
++   - `scaffold`: `arci init` refusing or writing an unusable `arci.yaml` (Track B);
++   - `run`: the demo or `arci run` (a step that does not hold, an `ERROR` line,
++     `run directory is not empty`);
++   - `store`: the store check in 4.3 (a missing file, `arci gate` disagreeing, a changed sha256);
++   - `interpretation`: a wrong answer to the interpretation question (5.3);
++   - `environment`: anything outside ARCI and the README (a harness or policy denying a command,
++     a shell difference, no network, a full disk). It is recorded, and the attempt still counts.
++
++   Failed attempts are kept and contributed like successful ones. `outcome.verdict` is `ERROR`
++   when no valid verdict line was printed (the template's "ERROR if none").
+ 3. Path: `docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json`, the date of the attempt.
+    No personal data beyond the handle; `facilitator` and `comprehension.scorer` are handles only,
+    with no personal data.
+@@ -187,12 +219,16 @@ later `arci run` that does.
+ 
+ 1. Use only receipts with `reader.kind: cold` and no coaching events. Report the count used and
+    the count excluded, and why.
+-2. Per track, sort `total` ascending; a failed attempt counts as longer than every success.
++2. Per track, only each reader's first attempt enters the ranking (the receipt without an attempt
++   suffix, 7.1; if in doubt, the earliest `readme_opened`). Repeat attempts are listed separately
++   and never replace or improve a reader's number. Sort `total` ascending; a failed attempt counts
++   as longer than every success.
+    Percentiles are nearest rank: pN is the value at rank ceil(N/100 × n). If that rank is a
+    failure, report "not reached". With fewer than 20 receipts p95 is the maximum; say so.
+-3. With fewer than five receipts in a track, make no percentile claim; list the raw values.
+-4. Report the "4/5 within 15 min" metric as k of n attempts with `total` ≤ 900 s, and the
+-   cold-read metric as k of n readers with `all_correct: true`.
++3. With fewer than five first attempts in a track, make no percentile claim; list the raw values.
++4. Report the "4/5 within 15 min" metric as k of n attempts with `total` ≤ 900 s, where n counts
++   only each reader's first attempt on the track (8.2), and the cold-read metric as k of n
++   readers with `all_correct: true`.
+ 5. Report `agent_execution` beside Track B totals (never subtracted), and Track A's
+    interpretation correctness (k of n) beside Track A totals.
+ 6. Beside Track A's `total`, report the memo-definition figure `readme_opened` →
+diff --git a/plan/exec/scripts/cohort_receipts.py b/plan/exec/scripts/cohort_receipts.py
+index 3d38c6b..6db9032 100644
+--- a/plan/exec/scripts/cohort_receipts.py
++++ b/plan/exec/scripts/cohort_receipts.py
+@@ -1,19 +1,43 @@
+ """Build TTFV receipts (one per reader per track) from the AI-cohort workflow result.
+ 
+     python plan/exec/scripts/cohort_receipts.py <result json> <receipts dir> <readme commit>
++        [--legacy-sentence] [--overwrite]
++    python plan/exec/scripts/cohort_receipts.py <result json> --persist <augmented json>
+ 
+ The result json is the Workflow tool's return value: {"results": [{"reader": {...}, "out": {...}}],
+ "scores": [{"id": ..., "score": {...}}]}. Readers are AI agents: every receipt sets reader.kind to
+ "ai-agent" and is never counted as a cold reader (protocol section 1.4).
++
++`--persist` writes a copy of the result json in which each reader's `track_b` gains
++`persisted_store`: the raw `trials.jsonl` lines of the reader's run store and their summed
++`agent_execution`, read while the temporary store still exists. A later build from that copy
++uses them when the store is gone, so the receipts rebuild byte for byte without the stores.
++
++`--legacy-sentence` keeps the v0.8.0 builder's punctuation, which put an extra period after
++reader text ending in a period inside closing quotes or brackets (`."`, `.")`, `."}`). The
++2026-10-13 cohort receipts were built that way and are never edited after merge, so rebuild them
++with this flag.
++
++A build refuses to replace a receipt file that already exists in the receipts dir unless
++`--overwrite` is given (committed receipts are never edited; rebuild them into a scratch copy).
++It is all-or-nothing: every receipt is built in memory first, so an error leaves the receipts dir
++untouched, then written to a staging directory inside it and moved into place.
+ """
+ 
+ from __future__ import annotations
+ 
++import argparse
+ import datetime as dt
+ import json
++import os
+ import re
++import shutil
+ import sys
++import tempfile
+ from pathlib import Path
++from typing import Any
++
++Json = dict[str, Any]
+ 
+ MACHINE = {
+     "os": "Darwin 27.0.0 (macOS, arm64)",
+@@ -63,10 +87,22 @@ def scrub(text: str | None) -> str:
+     return LEAF_RE.sub("<tmp>", text)
+ 
+ 
+-def sentence(text: str | None) -> str:
+-    """Reader text followed by exactly one period."""
++# Text whose last sentence already ended inside closing quotes or brackets: `."`, `.")`, `."}`.
++CLOSED_SENTENCE_RE = re.compile(r"[.!?][\"')\]}]+$")
++
++
++def sentence(text: str | None, *, legacy: bool = False) -> str:
++    """Scrubbed reader text ending in exactly one terminal mark; "" when there is no text.
++
++    A period is appended unless the text already ends in one, or (unless `legacy`) in a terminal
++    mark followed by closing quotes or brackets. `legacy=True` reproduces the v0.8.0 builder.
++    """
+     t = scrub(text).rstrip()
+-    return t[:-1] if t.endswith(".") else t
++    if not t or t.endswith("."):
++        return t
++    if not legacy and (t.endswith(("?", "!")) or CLOSED_SENTENCE_RE.search(t)):
++        return t
++    return t + "."
+ 
+ 
+ def parse(ts: str | None) -> dt.datetime | None:
+@@ -85,8 +121,8 @@ def seconds(a: str | None, b: str | None) -> int | None:
+     return int((pb - pa).total_seconds())
+ 
+ 
+-def base(template: dict, reader: dict, track: str, readme_commit: str) -> dict:
+-    r = json.loads(json.dumps(template))
++def base(template: Json, reader: Json, track: str, readme_commit: str) -> Json:
++    r: Json = json.loads(json.dumps(template))
+     r["track"] = track
+     r["date"] = "2026-10-13"
+     r["reader"] = {
+@@ -110,7 +146,7 @@ def base(template: dict, reader: dict, track: str, readme_commit: str) -> dict:
+     return r
+ 
+ 
+-def clean_failure(f: dict) -> dict:
++def clean_failure(f: Json) -> Json:
+     """ISO `at` only; any remark attached to the timestamp moves into `what`; paths scrubbed."""
+     at = str(f.get("at", ""))
+     m = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)(.*)", at)
+@@ -124,7 +160,7 @@ def clean_failure(f: dict) -> dict:
+     return {"at": at, "milestone": scrub(f.get("milestone", "")), "what": what}
+ 
+ 
+-def is_demo_failure(f: dict) -> bool:
++def is_demo_failure(f: Json) -> bool:
+     text = (f.get("milestone", "") + " " + f.get("what", "")).lower()
+     return "demo" in text or "all_steps_held" in text or "command_start" in text
+ 
+@@ -138,24 +174,119 @@ def verdict_of(line: str | None) -> str:
+     return m.group(1) if m else "ERROR"
+ 
+ 
+-def agent_execution(store_dir: str | None) -> float | None:
++PERSISTED = "persisted_store"
++
++
++def read_trials(store_dir: str | None) -> list[str] | None:
++    """The raw lines of `<store>/trials.jsonl`, or None when the store is gone or unreadable."""
+     if not store_dir:
+         return None
+     path = Path(store_dir) / "trials.jsonl"
+-    if not path.exists():
++    try:
++        return path.read_text(encoding="utf-8").splitlines()
++    except OSError:
+         return None
++
++
++def sum_wall_seconds(lines: list[str]) -> float:
++    """Protocol 4.5: the sum of usage.wall_seconds over the non-blank trials.jsonl lines."""
+     total = 0.0
+-    for line in path.read_text(encoding="utf-8").splitlines():
++    for line in lines:
+         if line.strip():
+             total += float(json.loads(line)["usage"]["wall_seconds"])
+     return round(total, 3)
+ 
+ 
+-def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+-    data = json.loads(result_path.read_text(encoding="utf-8"))
+-    template = json.loads((out_dir.parent / "receipt.template.json").read_text(encoding="utf-8"))
++def agent_execution(track_b: Json) -> float | None:
++    """Summed agent_execution from the live store, else from `persisted_store`, else None.
++
++    When both exist they must agree; a rebuild never silently changes a recorded value."""
++    lines = read_trials(track_b.get("store_dir"))
++    persisted: Json = track_b.get(PERSISTED) or {}
++    from_persisted: float | None = None
++    if persisted.get("trials_jsonl") is not None:
++        from_persisted = sum_wall_seconds(persisted["trials_jsonl"])
++        recorded = persisted.get("agent_execution")
++        if recorded is not None and float(recorded) != from_persisted:
++            msg = f"persisted agent_execution {recorded} != sum of persisted lines {from_persisted}"
++            raise ValueError(msg)
++    elif persisted.get("agent_execution") is not None:
++        from_persisted = float(persisted["agent_execution"])
++    if lines is None:
++        return from_persisted
++    live = sum_wall_seconds(lines)
++    if from_persisted is not None and live != from_persisted:
++        msg = f"store {track_b.get('store_dir')}: live {live} != persisted {from_persisted}"
++        raise ValueError(msg)
++    return live
++
++
++def persist(result_path: Path, out_path: Path) -> None:
++    """Write a copy of the result json with each readable store's trials lines and sum."""
++    if out_path.resolve() == result_path.resolve():
++        raise SystemExit("--persist writes a copy; give an output path other than the input")
++    data: Json = json.loads(result_path.read_text(encoding="utf-8"))
++    for item in data["results"]:
++        out = item.get("out")
++        if not out:
++            continue
++        b: Json = out["track_b"]
++        lines = read_trials(b.get("store_dir"))
++        rid = item["reader"]["id"]
++        if lines is not None:
++            total = sum_wall_seconds(lines)
++            b[PERSISTED] = {"agent_execution": total, "trials_jsonl": lines}
++            print(f"{rid}: persisted {len(lines)} lines, agent_execution {total}")
++        elif b.get(PERSISTED):
++            print(f"{rid}: store gone; keeping the already persisted values")
++        else:
++            print(
++                f"{rid}: store gone and nothing persisted; agent_execution stays null",
++                file=sys.stderr,
++            )
++    out_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
++
++
++def write_all(out_dir: Path, receipts: dict[str, str], *, overwrite: bool) -> None:
++    """Write every receipt or none: refuse existing files unless `overwrite`, stage the files in
++    a temporary directory inside `out_dir`, then move each into place."""
++    if not out_dir.is_dir():
++        raise SystemExit(f"receipts dir {out_dir} does not exist")
++    existing = sorted(name for name in receipts if (out_dir / name).exists())
++    if existing and not overwrite:
++        raise SystemExit(
++            f"refusing to overwrite existing receipts in {out_dir} (pass --overwrite): "
++            + ", ".join(existing)
++        )
++    staging = Path(tempfile.mkdtemp(prefix=".cohort-receipts-", dir=out_dir))
++    try:
++        for name, text in receipts.items():
++            (staging / name).write_text(text, encoding="utf-8")
++        for name in receipts:
++            os.replace(staging / name, out_dir / name)
++    finally:
++        shutil.rmtree(staging, ignore_errors=True)
++
++
++def build(
++    result_path: Path,
++    out_dir: Path,
++    readme_commit: str,
++    *,
++    legacy: bool = False,
++    overwrite: bool = False,
++) -> None:
++    data: Json = json.loads(result_path.read_text(encoding="utf-8"))
++    template: Json = json.loads(
++        (out_dir.parent / "receipt.template.json").read_text(encoding="utf-8")
++    )
++
++    def sent(text: str | None, fallback: str = "none.") -> str:
++        return sentence(text, legacy=legacy) or fallback
++
+     scores = {s["id"]: s["score"] for s in data.get("scores", []) if s}
+     rows: list[str] = []
++    receipts: dict[str, str] = {}
+     for item in data["results"]:
+         reader, out = item["reader"], item["out"]
+         if not out:
+@@ -174,8 +305,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+             "reader read README.md from it and Track B copied the sample tree from it (no clone "
+             "was made by the reader). "
+             f"Files read: {scrub(', '.join(out.get('files_read', []))) or 'none listed'}. "
+-            f"Confusions: {sentence(' | '.join(out.get('confusions', []))) or 'none'}. "
+-            f"Reader notes: {sentence(out.get('notes', ''))}."
++            f"Confusions: {sent(' | '.join(out.get('confusions', [])))} "
++            f"Reader notes: {sent(out.get('notes', ''))}"
+         )
+         # Track A receipt
+         ra = base(template, reader, "demo", readme_commit)
+@@ -243,8 +374,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+         }
+         ra["comprehension"]["all_correct"] = sc.get("all_five_correct")
+         ra["notes"] = (
+-            f"Command used: {sentence(a.get('command_used'))}. Log: {scrub(a.get('log_path'))}. "
+-            f"Reader's verdict line for agent B: {sentence(a.get('verdict_for_agent_b'))}. "
++            f"Command used: {sent(a.get('command_used'))} Log: {scrub(a.get('log_path'))}. "
++            f"Reader's verdict line for agent B: {sent(a.get('verdict_for_agent_b'))} "
+             + "The stamped attempt's exit code was not captured (the facilitator's wrapper used "
+             "bash's PIPESTATUS under zsh), so exit_code and completed are null; "
+             + (
+@@ -255,13 +386,13 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+             )
+             + "interpretation_answered not stamped (answers given after both tracks). "
+             + common_notes
+-            + f" Scorer rationale: {sentence(sc.get('rationale', ''))}."
++            + f" Scorer rationale: {sent(sc.get('rationale', ''))}"
+         )
+         failures = [clean_failure(f) for f in out.get("failures", [])]
+         ra["failures"] = [f for f in failures if is_demo_failure(f)]
+         # Track B receipt
+         rb = base(template, reader, "own-agent", readme_commit)
+-        agent_exec = agent_execution(b.get("store_dir"))
++        agent_exec = agent_execution(b)
+         rb["project"] = {
+             "_comment": template["project"]["_comment"],
+             "kind": "sample",
+@@ -322,8 +453,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+         )
+         rb["comprehension"]["answered_on"] = f"2026-10-13-ai-{reader['id']}-demo.json"
+         rb["notes"] = (
+-            f"Install method: {sentence(b.get('install_method'))}. Commands: "
+-            f"{sentence(' ; '.join(b.get('commands_used', [])))}. "
++            f"Install method: {sent(b.get('install_method'))} Commands: "
++            f"{sent(' ; '.join(b.get('commands_used', [])))} "
+             f"Store: {scrub(b.get('store_dir'))} with {', '.join(b.get('store_files') or [])}; "
+             "gate line: "
+             f"{scrub(b.get('gate_verdict_line'))}. "
+@@ -346,8 +477,10 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+         )
+         rb["failures"] = [f for f in failures if not is_demo_failure(f)]
+         for rec, track in ((ra, "demo"), (rb, "own-agent")):
+-            path = out_dir / f"2026-10-13-ai-{reader['id']}-{track}.json"
+-            path.write_text(json.dumps(rec, indent=2) + "\n", encoding="utf-8")
++            name = f"2026-10-13-ai-{reader['id']}-{track}.json"
++            if name in receipts:
++                raise ValueError(f"two readers would write {name}")
++            receipts[name] = json.dumps(rec, indent=2) + "\n"
+         rows.append(
+             f"| ai-{reader['id']} ({model}) | A: {ra['durations_seconds']['install']}+"
+             f"{ra['durations_seconds']['run']}={ra['durations_seconds']['total']} s, "
+@@ -360,10 +493,38 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
+             f"own {sc.get('interpretation_own_run')} | "
+             f"failures {len(out.get('failures', []))} |"
+         )
++    write_all(out_dir, receipts, overwrite=overwrite)
+     print("| reader | Track A | Track B | comprehension | interpretation | failures |")
+     print("|---|---|---|---|---|---|")
+     print("\n".join(rows))
+ 
+ 
++def main(argv: list[str] | None = None) -> None:
++    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
++    ap.add_argument("result", type=Path, help="the Workflow result json (or a persisted copy)")
++    ap.add_argument("receipts_dir", nargs="?", type=Path)
++    ap.add_argument("readme_commit", nargs="?")
++    ap.add_argument("--persist", type=Path, metavar="OUT_JSON", help="write an augmented copy")
++    ap.add_argument("--legacy-sentence", action="store_true", help="v0.8.0 punctuation")
++    ap.add_argument(
++        "--overwrite", action="store_true", help="replace receipt files that already exist"
++    )
++    args = ap.parse_args(argv)
++    if args.persist is not None:
++        if args.receipts_dir is not None:
++            ap.error("--persist takes only the result json")
++        persist(args.result, args.persist)
++        return
++    if args.receipts_dir is None or args.readme_commit is None:
++        ap.error("building receipts needs <receipts dir> and <readme commit>")
++    build(
++        args.result,
++        args.receipts_dir,
++        args.readme_commit,
++        legacy=args.legacy_sentence,
++        overwrite=args.overwrite,
++    )
++
++
+ if __name__ == "__main__":
+-    build(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3])
++    main()
+diff --git a/plan/exec/scripts/test_cohort_receipts.py b/plan/exec/scripts/test_cohort_receipts.py
+new file mode 100644
+index 0000000..276fdca
+--- /dev/null
++++ b/plan/exec/scripts/test_cohort_receipts.py
+@@ -0,0 +1,333 @@
++"""Tests for the cohort receipt builder's text helpers and its persisted-store fallback.
++
++.venv/bin/pytest plan/exec/scripts/test_cohort_receipts.py -q -p no:cacheprovider
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import cohort_receipts as cr
++import pytest
++
++
++def _trial(wall: float) -> str:
++    return json.dumps({"trial_id": "t", "usage": {"wall_seconds": wall}})
++
++
++# --- scrub -----------------------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("raw", "want"),
++    [
++        (None, ""),
++        ("", ""),
++        ("no paths here", "no paths here"),
++        (cr.REPO + "README.md", "README.md"),
++        ("/var/folders/2k/b4x5/T/tmp.7Qzi7C36lY/python_agent/runs", "<tmp>/python_agent/runs"),
++        ("/private/var/folders/2k/b4x5/T/tmp.7Qzi7C36lY/demo.log", "<tmp>/demo.log"),
++        ("log at /tmp/ttfv-a.XYZ123/demo.log, done", "log at <tmp>/demo.log, done"),
++        ("[/tmp/abcdef]", "[<tmp>]"),
++        ("('/tmp/abcdef')", "('<tmp>')"),
++        ("cd /var/folders/.../T/x && ls", "cd <tmp> && ls"),
++        ("venv tmp.AbCdEf12 made", "venv <tmp> made"),
++        ("store arci-demo-ab12cd34", "store <tmp>"),
++        ("uvcache.abcdef and ttfv-b.Qw3rTy", "<tmp> and <tmp>"),
++        ("tmp.abc stays", "tmp.abc stays"),
++    ],
++)
++def test_scrub(raw: str | None, want: str) -> None:
++    assert cr.scrub(raw) == want
++
++
++# --- sentence --------------------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("raw", "want"),
++    [
++        (None, ""),
++        ("", ""),
++        ("   ", ""),
++        ("ok", "ok."),
++        ("ok.", "ok."),
++        ("ok  ", "ok."),
++        ("ok..", "ok.."),
++        ('said "stop"', 'said "stop".'),
++        ('said "stop."', 'said "stop."'),
++        ('see (it said "stop.")', 'see (it said "stop.")'),
++        ('{"notes": "done."}', '{"notes": "done."}'),
++        ("it said 'stop.'", "it said 'stop.'"),
++        ("(an aside.)", "(an aside.)"),
++        ("why?", "why?"),
++        ("wow!", "wow!"),
++        ("exit ${PIPESTATUS[0]}", "exit ${PIPESTATUS[0]}."),
++        ("log in /tmp/abcdef/x", "log in <tmp>/x."),
++    ],
++)
++def test_sentence(raw: str | None, want: str) -> None:
++    assert cr.sentence(raw) == want
++
++
++@pytest.mark.parametrize(
++    ("raw", "want"),
++    [
++        ("ok", "ok."),
++        ("ok.", "ok."),
++        ('said "stop."', 'said "stop.".'),
++        ('{"notes": "done."}', '{"notes": "done."}.'),
++        ("why?", "why?."),
++        ("", ""),
++    ],
++)
++def test_sentence_legacy_keeps_v080_punctuation(raw: str, want: str) -> None:
++    assert cr.sentence(raw, legacy=True) == want
++
++
++# --- verdict_of ------------------------------------------------------------------------------
++
++
++@pytest.mark.parametrize(
++    ("line", "want"),
++    [
++        (None, "ERROR"),
++        ("", "ERROR"),
++        ("no verdict printed", "ERROR"),
++        ("VERDICT: PASS (exit 0)", "PASS"),
++        ("VERDICT: BLOCK (exit 1)", "BLOCK"),
++        ("VERDICT: INCONCLUSIVE (exit 2)", "INCONCLUSIVE"),
++        ("VERDICT: ERROR (exit 3)", "ERROR"),
++        ("BLOCK for agent B; agent A got PASS", "BLOCK"),
++        ("PASSING tests, then VERDICT: INCONCLUSIVE", "INCONCLUSIVE"),
++        ("verdict: pass", "ERROR"),
++    ],
++)
++def test_verdict_of(line: str | None, want: str) -> None:
++    assert cr.verdict_of(line) == want
++
++
++# --- clean_failure ---------------------------------------------------------------------------
++
++
++def test_clean_failure_keeps_iso_at() -> None:
++    f = {"at": "2026-10-13T17:37:02Z", "milestone": "run", "what": "ERROR: x"}
++    assert cr.clean_failure(f) == f
++
++
++def test_clean_failure_moves_timestamp_remark_into_what() -> None:
++    got = cr.clean_failure(
++        {"at": "2026-10-13T17:37:02Z (approx.)", "milestone": "run", "what": "x"}
++    )
++    assert got == {"at": "2026-10-13T17:37:02Z", "milestone": "run", "what": "[at: approx.] x"}
++
++
++def test_clean_failure_non_iso_at_becomes_empty() -> None:
++    got = cr.clean_failure({"at": "before readme_opened", "milestone": "install", "what": "denied"})
++    assert got == {"at": "", "milestone": "install", "what": "[at: before readme_opened] denied"}
++
++
++def test_clean_failure_missing_keys_and_scrubbed_paths() -> None:
++    assert cr.clean_failure({}) == {"at": "", "milestone": "", "what": ""}
++    got = cr.clean_failure({"at": "", "milestone": "store", "what": "ls /tmp/abcdef/runs failed"})
++    assert got == {"at": "", "milestone": "store", "what": "ls <tmp>/runs failed"}
++
++
++# --- agent_execution and --persist -----------------------------------------------------------
++
++
++def _store(tmp_path: Path, walls: list[float]) -> Path:
++    store = tmp_path / "store"
++    store.mkdir()
++    lines = [_trial(w) for w in walls]
++    (store / "trials.jsonl").write_text("\n".join(lines) + "\n\n", encoding="utf-8")
++    return store
++
++
++def test_agent_execution_from_live_store(tmp_path: Path) -> None:
++    store = _store(tmp_path, [0.1, 0.2, 0.30049])
++    assert cr.agent_execution({"store_dir": str(store)}) == 0.6
++
++
++def test_agent_execution_gone_store_without_persisted_is_none(tmp_path: Path) -> None:
++    assert cr.agent_execution({"store_dir": str(tmp_path / "gone")}) is None
++    assert cr.agent_execution({}) is None
++
++
++def test_agent_execution_reads_persisted_lines_when_store_gone(tmp_path: Path) -> None:
++    b = {
++        "store_dir": str(tmp_path / "gone"),
++        cr.PERSISTED: {"agent_execution": 0.6, "trials_jsonl": [_trial(0.1), "", _trial(0.5)]},
++    }
++    assert cr.agent_execution(b) == 0.6
++    assert cr.agent_execution({"store_dir": "", cr.PERSISTED: {"agent_execution": 1.25}}) == 1.25
++
++
++def test_agent_execution_refuses_disagreeing_values(tmp_path: Path) -> None:
++    bad_sum = {cr.PERSISTED: {"agent_execution": 9.0, "trials_jsonl": [_trial(0.1)]}}
++    with pytest.raises(ValueError, match="persisted agent_execution"):
++        cr.agent_execution(bad_sum)
++    store = _store(tmp_path, [1.0])
++    live_vs_persisted = {"store_dir": str(store), cr.PERSISTED: {"trials_jsonl": [_trial(2.0)]}}
++    with pytest.raises(ValueError, match="live"):
++        cr.agent_execution(live_vs_persisted)
++
++
++def test_persist_round_trip_survives_store_removal(tmp_path: Path) -> None:
++    store = _store(tmp_path, [1.5, 2.25])
++    result = {
++        "results": [
++            {"reader": {"id": "r1"}, "out": {"track_b": {"store_dir": str(store)}}},
++            {"reader": {"id": "r2"}, "out": {"track_b": {"store_dir": str(tmp_path / "gone")}}},
++            {"reader": {"id": "r3"}, "out": None},
++        ],
++        "scores": [],
++    }
++    src = tmp_path / "result.json"
++    src.write_text(json.dumps(result), encoding="utf-8")
++    original = src.read_bytes()
++    out = tmp_path / "result.persisted.json"
++    cr.main([str(src), "--persist", str(out)])
++    assert src.read_bytes() == original
++    data = json.loads(out.read_text(encoding="utf-8"))
++    b1 = data["results"][0]["out"]["track_b"]
++    assert b1[cr.PERSISTED]["agent_execution"] == 3.75
++    assert b1[cr.PERSISTED]["trials_jsonl"] == [_trial(1.5), _trial(2.25), ""]
++    assert cr.PERSISTED not in data["results"][1]["out"]["track_b"]
++    (store / "trials.jsonl").unlink()
++    store.rmdir()
++    assert cr.agent_execution(b1) == 3.75
++    # Persisting again after the store is gone keeps what was persisted.
++    again = tmp_path / "again.json"
++    cr.main([str(out), "--persist", str(again)])
++    assert json.loads(again.read_text(encoding="utf-8"))["results"][0] == data["results"][0]
++
++
++def test_persist_refuses_to_overwrite_its_input(tmp_path: Path) -> None:
++    src = tmp_path / "result.json"
++    src.write_text('{"results": []}', encoding="utf-8")
++    with pytest.raises(SystemExit):
++        cr.main([str(src), "--persist", str(src)])
++
++
++# --- build: overwrite refusal and all-or-nothing writes ---------------------------------------
++
++TEMPLATE = Path(__file__).resolve().parents[3] / "docs" / "measurement" / "receipt.template.json"
++QUESTIONS = (
++    "q1_what_is_it",
++    "q2_who_for",
++    "q3_pass_means",
++    "q4_does_not_do",
++    "q5_first_three_commands",
++)
++
++
++def _reader(rid: str, track_b: dict[str, object] | None = None) -> dict[str, object]:
++    answers = {k: f"{k} answer" for k in QUESTIONS}
++    answers |= {"interpretation_demo_block": "blocks", "interpretation_own_run": "own"}
++    return {
++        "reader": {"id": rid, "persona": "tester", "model": "sonnet"},
++        "out": {"track_a": {}, "track_b": track_b or {}, "answers": answers},
++    }
++
++
++def _build_setup(tmp_path: Path, readers: list[dict[str, object]]) -> tuple[Path, Path]:
++    (tmp_path / "receipt.template.json").write_bytes(TEMPLATE.read_bytes())
++    out_dir = tmp_path / "receipts"
++    out_dir.mkdir()
++    result = tmp_path / "result.json"
++    result.write_text(json.dumps({"results": readers, "scores": []}), encoding="utf-8")
++    return result, out_dir
++
++
++def _snapshot(out_dir: Path) -> dict[str, bytes]:
++    return {p.name: p.read_bytes() for p in sorted(out_dir.iterdir())}
++
++
++NAMES = [f"2026-10-13-ai-r{i}-{t}.json" for i in (1, 2) for t in ("demo", "own-agent")]
++
++
++def test_build_writes_every_receipt(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    cr.main([str(result), str(out_dir), "abc1234"])
++    snap = _snapshot(out_dir)
++    assert sorted(snap) == sorted(NAMES)  # no staging directory left behind
++    rec = json.loads(snap["2026-10-13-ai-r1-demo.json"])
++    assert rec["reader"]["handle"] == "ai-r1"
++    assert rec["package"]["readme_url"].endswith("/blob/abc1234/README.md")
++
++
++def test_build_refuses_to_overwrite_and_names_the_files(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    (out_dir / NAMES[1]).write_text("committed\n", encoding="utf-8")
++    (out_dir / NAMES[3]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    with pytest.raises(SystemExit) as exc:
++        cr.main([str(result), str(out_dir), "abc1234"])
++    msg = str(exc.value.code)
++    assert "--overwrite" in msg
++    assert NAMES[1] in msg
++    assert NAMES[3] in msg
++    assert NAMES[0] not in msg
++    assert _snapshot(out_dir) == before  # nothing written, not even the new files
++
++
++def test_build_overwrite_replaces_existing_receipts(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    cr.main([str(result), str(out_dir), "abc1234"])
++    fresh = _snapshot(out_dir)
++    (out_dir / NAMES[0]).write_text("stale\n", encoding="utf-8")
++    cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    assert _snapshot(out_dir) == fresh
++
++
++def test_build_validation_error_leaves_receipts_dir_untouched(tmp_path: Path) -> None:
++    bad: dict[str, object] = {cr.PERSISTED: {"agent_execution": 9.0, "trials_jsonl": [_trial(0.1)]}}
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2", bad)])
++    (out_dir / NAMES[0]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    with pytest.raises(ValueError, match="persisted agent_execution"):
++        cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    assert _snapshot(out_dir) == before  # r1's receipts, built first, were not written
++
++
++def test_build_refuses_two_readers_with_one_id(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r1")])
++    with pytest.raises(ValueError, match="two readers"):
++        cr.main([str(result), str(out_dir), "abc1234"])
++    assert _snapshot(out_dir) == {}
++
++
++def test_build_staging_write_failure_leaves_receipts_dir_untouched(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    (out_dir / NAMES[0]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    real_write_text = Path.write_text
++    calls: list[str] = []
++
++    def failing_write_text(
++        self: Path,
++        data: str,
++        encoding: str | None = None,
++        errors: str | None = None,
++        newline: str | None = None,
++    ) -> int:
++        calls.append(self.name)
++        if len(calls) == 3:
++            raise OSError(28, "No space left on device")
++        return real_write_text(self, data, encoding, errors, newline)
++
++    monkeypatch.setattr(Path, "write_text", failing_write_text)
++    with pytest.raises(OSError, match="No space"):
++        cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    monkeypatch.undo()
++    assert _snapshot(out_dir) == before  # staging removed, nothing moved into place
++
++
++def test_build_needs_an_existing_receipts_dir(tmp_path: Path) -> None:
++    result, _ = _build_setup(tmp_path, [_reader("r1")])
++    with pytest.raises(SystemExit, match="does not exist"):
++        cr.main([str(result), str(tmp_path / "missing"), "abc1234"])
+diff --git a/plan/exec/scripts/ttfv_track_a.sh b/plan/exec/scripts/ttfv_track_a.sh
+index ec2ec4b..d3e93fa 100644
+--- a/plan/exec/scripts/ttfv_track_a.sh
++++ b/plan/exec/scripts/ttfv_track_a.sh
+@@ -10,8 +10,14 @@ export UV_NO_PROGRESS=1
+ T_README=$(stamp)                     # README on screen: the facilitator (this script) starts
+ T_CMD=$(stamp)
+ LOG="$WORK/demo.log"
+-uvx --from "$SPEC" arci demo 2>&1 | while IFS= read -r line; do printf '%s %s\n' "$(stamp)" "$line"; done > "$LOG"
+-EXIT=${PIPESTATUS[0]}
++# Exit status of `arci demo`, not of the stamping loop. `${PIPESTATUS[0]}` is bash-only: under zsh
++# (the shell the v0.8.0 cohort's wrapper ran in, or `zsh ttfv_track_a.sh`) it is unset, which
++# aborts under `set -u` or records nothing. Writing the status to a file from inside the brace
++# group is portable to bash, zsh and sh, and the stamping loop cannot overwrite it.
++EXIT_FILE="$WORK/demo.exit"
++{ uvx --from "$SPEC" arci demo 2>&1; echo $? > "$EXIT_FILE"; } | while IFS= read -r line; do printf '%s %s\n' "$(stamp)" "$line"; done > "$LOG"
++EXIT=$(cat "$EXIT_FILE" 2>/dev/null)
++EXIT=${EXIT:-127}
+ T_BANNER=$(grep -m1 ' arci demo: ' "$LOG" | cut -d' ' -f1)
+ T_VERDICT=$(grep -m1 ' VERDICT: ' "$LOG" | cut -d' ' -f1)
+ T_HELD=$(grep -m1 'All six steps held' "$LOG" | cut -d' ' -f1)
+diff --git a/plan/exec/scripts/ttfv_track_b.sh b/plan/exec/scripts/ttfv_track_b.sh
+index c263e75..6b38b67 100644
+--- a/plan/exec/scripts/ttfv_track_b.sh
++++ b/plan/exec/scripts/ttfv_track_b.sh
+@@ -26,18 +26,22 @@ T_VERDICT=$(stamp)
+ VERDICT_LINE=$(grep -m1 '^VERDICT: ' run.out)
+ STORE=runs/checkout-retry
+ ls "$STORE" > store.ls 2>&1; SHA1=$(shasum -a 256 "$STORE/decision.json" | cut -d' ' -f1)
+-GATE_LINE=$(arci gate "$STORE" 2>/dev/null | grep -m1 '^VERDICT: ')
++# No pipeline here: `arci gate | grep` would leave the gate's exit status in `${PIPESTATUS[0]}`,
++# which is bash-only (unset under zsh). Redirect to a file and read `$?` directly instead; protocol
++# 4.3 needs the gate's exit code to equal the run's.
++arci gate "$STORE" > gate.out 2> gate.err; GATE_EXIT=$?
++GATE_LINE=$(grep -m1 '^VERDICT: ' gate.out)
+ SHA2=$(shasum -a 256 "$STORE/decision.json" | cut -d' ' -f1)
+ T_STORE=$(stamp)
+ AGENT_EXEC=$(python3 -c "import json,sys; print(sum(json.loads(l)['usage']['wall_seconds'] for l in open(sys.argv[1]) if l.strip()))" "$STORE/trials.jsonl" 2>/dev/null || echo null)
+-python3 - "$OUT" "$T_README" "$T_INSTALL_START" "$T_INSTALL_DONE" "$T_SCAFFOLD_START" "$T_DESCRIPTOR" "$T_RUN_START" "$T_VERDICT" "$T_STORE" "$RUN_EXIT" "$VERDICT_LINE" "$GATE_LINE" "$SHA1" "$SHA2" "$AGENT_EXEC" "$SPEC" "$WORK" <<'PY'
++python3 - "$OUT" "$T_README" "$T_INSTALL_START" "$T_INSTALL_DONE" "$T_SCAFFOLD_START" "$T_DESCRIPTOR" "$T_RUN_START" "$T_VERDICT" "$T_STORE" "$RUN_EXIT" "$VERDICT_LINE" "$GATE_LINE" "$SHA1" "$SHA2" "$AGENT_EXEC" "$SPEC" "$WORK" "$GATE_EXIT" <<'PY'
+ import json, sys, datetime as dt, os
+-(out, readme, i0, i1, s0, s1, r0, r1, st, run_exit, vline, gline, sha1, sha2, agent_exec, spec, work) = sys.argv[1:]
++(out, readme, i0, i1, s0, s1, r0, r1, st, run_exit, vline, gline, sha1, sha2, agent_exec, spec, work, gate_exit) = sys.argv[1:]
+ p = lambda s: dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
+ d = lambda a, b: (p(b) - p(a)).total_seconds()
+ store = os.path.join(work, "checkout", "runs", "checkout-retry")
+ files_ok = all(os.path.exists(os.path.join(store, f)) for f in ("manifest.json", "trials.jsonl", "decision.json"))
+-validated = bool(vline) and vline == gline and sha1 == sha2 and files_ok and "ERROR" not in vline
++validated = bool(vline) and vline == gline and gate_exit == run_exit and sha1 == sha2 and files_ok and "ERROR" not in vline
+ rec = {"track": "B", "label": "maintainer/AI run (orchestrator); not a cold reader", "package": spec,
+        "project": "sample (examples/recipes/python_agent)",
+        "install_method": "uv venv + uv pip install (the uv tool route is denied in this harness)",

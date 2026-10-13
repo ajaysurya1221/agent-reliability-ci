@@ -1,0 +1,272 @@
+diff --git a/docs/measurement/ttfv-protocol.md b/docs/measurement/ttfv-protocol.md
+index e18cb7f..69438eb 100644
+--- a/docs/measurement/ttfv-protocol.md
++++ b/docs/measurement/ttfv-protocol.md
+@@ -44,6 +44,9 @@ Protocol; no cold-reader receipt yet (the receipts committed so far are maintain
+    uvx --from agent-reliability-ci python -c "import importlib.metadata as m; print(m.version('agent-reliability-ci'))"
+    ```
+ 
++   The facilitator runs it with the same uv cache (`UV_CACHE_DIR`, or the default cache) and the
++   same `UV_FIND_LINKS` the reader used, so it resolves the same release rather than a newer one.
++
+ 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
+ 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
+    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
+diff --git a/plan/exec/scripts/cohort_receipts.py b/plan/exec/scripts/cohort_receipts.py
+index 65333ed..6db9032 100644
+--- a/plan/exec/scripts/cohort_receipts.py
++++ b/plan/exec/scripts/cohort_receipts.py
+@@ -1,7 +1,7 @@
+ """Build TTFV receipts (one per reader per track) from the AI-cohort workflow result.
+ 
+     python plan/exec/scripts/cohort_receipts.py <result json> <receipts dir> <readme commit>
+-        [--legacy-sentence]
++        [--legacy-sentence] [--overwrite]
+     python plan/exec/scripts/cohort_receipts.py <result json> --persist <augmented json>
+ 
+ The result json is the Workflow tool's return value: {"results": [{"reader": {...}, "out": {...}}],
+@@ -17,6 +17,11 @@ uses them when the store is gone, so the receipts rebuild byte for byte without
+ reader text ending in a period inside closing quotes or brackets (`."`, `.")`, `."}`). The
+ 2026-10-13 cohort receipts were built that way and are never edited after merge, so rebuild them
+ with this flag.
++
++A build refuses to replace a receipt file that already exists in the receipts dir unless
++`--overwrite` is given (committed receipts are never edited; rebuild them into a scratch copy).
++It is all-or-nothing: every receipt is built in memory first, so an error leaves the receipts dir
++untouched, then written to a staging directory inside it and moved into place.
+ """
+ 
+ from __future__ import annotations
+@@ -24,8 +29,11 @@ from __future__ import annotations
+ import argparse
+ import datetime as dt
+ import json
++import os
+ import re
++import shutil
+ import sys
++import tempfile
+ from pathlib import Path
+ from typing import Any
+ 
+@@ -239,7 +247,35 @@ def persist(result_path: Path, out_path: Path) -> None:
+     out_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+ 
+ 
+-def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool = False) -> None:
++def write_all(out_dir: Path, receipts: dict[str, str], *, overwrite: bool) -> None:
++    """Write every receipt or none: refuse existing files unless `overwrite`, stage the files in
++    a temporary directory inside `out_dir`, then move each into place."""
++    if not out_dir.is_dir():
++        raise SystemExit(f"receipts dir {out_dir} does not exist")
++    existing = sorted(name for name in receipts if (out_dir / name).exists())
++    if existing and not overwrite:
++        raise SystemExit(
++            f"refusing to overwrite existing receipts in {out_dir} (pass --overwrite): "
++            + ", ".join(existing)
++        )
++    staging = Path(tempfile.mkdtemp(prefix=".cohort-receipts-", dir=out_dir))
++    try:
++        for name, text in receipts.items():
++            (staging / name).write_text(text, encoding="utf-8")
++        for name in receipts:
++            os.replace(staging / name, out_dir / name)
++    finally:
++        shutil.rmtree(staging, ignore_errors=True)
++
++
++def build(
++    result_path: Path,
++    out_dir: Path,
++    readme_commit: str,
++    *,
++    legacy: bool = False,
++    overwrite: bool = False,
++) -> None:
+     data: Json = json.loads(result_path.read_text(encoding="utf-8"))
+     template: Json = json.loads(
+         (out_dir.parent / "receipt.template.json").read_text(encoding="utf-8")
+@@ -250,6 +286,7 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool
+ 
+     scores = {s["id"]: s["score"] for s in data.get("scores", []) if s}
+     rows: list[str] = []
++    receipts: dict[str, str] = {}
+     for item in data["results"]:
+         reader, out = item["reader"], item["out"]
+         if not out:
+@@ -440,8 +477,10 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool
+         )
+         rb["failures"] = [f for f in failures if not is_demo_failure(f)]
+         for rec, track in ((ra, "demo"), (rb, "own-agent")):
+-            path = out_dir / f"2026-10-13-ai-{reader['id']}-{track}.json"
+-            path.write_text(json.dumps(rec, indent=2) + "\n", encoding="utf-8")
++            name = f"2026-10-13-ai-{reader['id']}-{track}.json"
++            if name in receipts:
++                raise ValueError(f"two readers would write {name}")
++            receipts[name] = json.dumps(rec, indent=2) + "\n"
+         rows.append(
+             f"| ai-{reader['id']} ({model}) | A: {ra['durations_seconds']['install']}+"
+             f"{ra['durations_seconds']['run']}={ra['durations_seconds']['total']} s, "
+@@ -454,6 +493,7 @@ def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool
+             f"own {sc.get('interpretation_own_run')} | "
+             f"failures {len(out.get('failures', []))} |"
+         )
++    write_all(out_dir, receipts, overwrite=overwrite)
+     print("| reader | Track A | Track B | comprehension | interpretation | failures |")
+     print("|---|---|---|---|---|---|")
+     print("\n".join(rows))
+@@ -466,6 +506,9 @@ def main(argv: list[str] | None = None) -> None:
+     ap.add_argument("readme_commit", nargs="?")
+     ap.add_argument("--persist", type=Path, metavar="OUT_JSON", help="write an augmented copy")
+     ap.add_argument("--legacy-sentence", action="store_true", help="v0.8.0 punctuation")
++    ap.add_argument(
++        "--overwrite", action="store_true", help="replace receipt files that already exist"
++    )
+     args = ap.parse_args(argv)
+     if args.persist is not None:
+         if args.receipts_dir is not None:
+@@ -474,7 +517,13 @@ def main(argv: list[str] | None = None) -> None:
+         return
+     if args.receipts_dir is None or args.readme_commit is None:
+         ap.error("building receipts needs <receipts dir> and <readme commit>")
+-    build(args.result, args.receipts_dir, args.readme_commit, legacy=args.legacy_sentence)
++    build(
++        args.result,
++        args.receipts_dir,
++        args.readme_commit,
++        legacy=args.legacy_sentence,
++        overwrite=args.overwrite,
++    )
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/plan/exec/scripts/test_cohort_receipts.py b/plan/exec/scripts/test_cohort_receipts.py
+index aa83691..276fdca 100644
+--- a/plan/exec/scripts/test_cohort_receipts.py
++++ b/plan/exec/scripts/test_cohort_receipts.py
+@@ -209,3 +209,125 @@ def test_persist_refuses_to_overwrite_its_input(tmp_path: Path) -> None:
+     src.write_text('{"results": []}', encoding="utf-8")
+     with pytest.raises(SystemExit):
+         cr.main([str(src), "--persist", str(src)])
++
++
++# --- build: overwrite refusal and all-or-nothing writes ---------------------------------------
++
++TEMPLATE = Path(__file__).resolve().parents[3] / "docs" / "measurement" / "receipt.template.json"
++QUESTIONS = (
++    "q1_what_is_it",
++    "q2_who_for",
++    "q3_pass_means",
++    "q4_does_not_do",
++    "q5_first_three_commands",
++)
++
++
++def _reader(rid: str, track_b: dict[str, object] | None = None) -> dict[str, object]:
++    answers = {k: f"{k} answer" for k in QUESTIONS}
++    answers |= {"interpretation_demo_block": "blocks", "interpretation_own_run": "own"}
++    return {
++        "reader": {"id": rid, "persona": "tester", "model": "sonnet"},
++        "out": {"track_a": {}, "track_b": track_b or {}, "answers": answers},
++    }
++
++
++def _build_setup(tmp_path: Path, readers: list[dict[str, object]]) -> tuple[Path, Path]:
++    (tmp_path / "receipt.template.json").write_bytes(TEMPLATE.read_bytes())
++    out_dir = tmp_path / "receipts"
++    out_dir.mkdir()
++    result = tmp_path / "result.json"
++    result.write_text(json.dumps({"results": readers, "scores": []}), encoding="utf-8")
++    return result, out_dir
++
++
++def _snapshot(out_dir: Path) -> dict[str, bytes]:
++    return {p.name: p.read_bytes() for p in sorted(out_dir.iterdir())}
++
++
++NAMES = [f"2026-10-13-ai-r{i}-{t}.json" for i in (1, 2) for t in ("demo", "own-agent")]
++
++
++def test_build_writes_every_receipt(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    cr.main([str(result), str(out_dir), "abc1234"])
++    snap = _snapshot(out_dir)
++    assert sorted(snap) == sorted(NAMES)  # no staging directory left behind
++    rec = json.loads(snap["2026-10-13-ai-r1-demo.json"])
++    assert rec["reader"]["handle"] == "ai-r1"
++    assert rec["package"]["readme_url"].endswith("/blob/abc1234/README.md")
++
++
++def test_build_refuses_to_overwrite_and_names_the_files(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    (out_dir / NAMES[1]).write_text("committed\n", encoding="utf-8")
++    (out_dir / NAMES[3]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    with pytest.raises(SystemExit) as exc:
++        cr.main([str(result), str(out_dir), "abc1234"])
++    msg = str(exc.value.code)
++    assert "--overwrite" in msg
++    assert NAMES[1] in msg
++    assert NAMES[3] in msg
++    assert NAMES[0] not in msg
++    assert _snapshot(out_dir) == before  # nothing written, not even the new files
++
++
++def test_build_overwrite_replaces_existing_receipts(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    cr.main([str(result), str(out_dir), "abc1234"])
++    fresh = _snapshot(out_dir)
++    (out_dir / NAMES[0]).write_text("stale\n", encoding="utf-8")
++    cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    assert _snapshot(out_dir) == fresh
++
++
++def test_build_validation_error_leaves_receipts_dir_untouched(tmp_path: Path) -> None:
++    bad: dict[str, object] = {cr.PERSISTED: {"agent_execution": 9.0, "trials_jsonl": [_trial(0.1)]}}
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2", bad)])
++    (out_dir / NAMES[0]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    with pytest.raises(ValueError, match="persisted agent_execution"):
++        cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    assert _snapshot(out_dir) == before  # r1's receipts, built first, were not written
++
++
++def test_build_refuses_two_readers_with_one_id(tmp_path: Path) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r1")])
++    with pytest.raises(ValueError, match="two readers"):
++        cr.main([str(result), str(out_dir), "abc1234"])
++    assert _snapshot(out_dir) == {}
++
++
++def test_build_staging_write_failure_leaves_receipts_dir_untouched(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    result, out_dir = _build_setup(tmp_path, [_reader("r1"), _reader("r2")])
++    (out_dir / NAMES[0]).write_text("committed\n", encoding="utf-8")
++    before = _snapshot(out_dir)
++    real_write_text = Path.write_text
++    calls: list[str] = []
++
++    def failing_write_text(
++        self: Path,
++        data: str,
++        encoding: str | None = None,
++        errors: str | None = None,
++        newline: str | None = None,
++    ) -> int:
++        calls.append(self.name)
++        if len(calls) == 3:
++            raise OSError(28, "No space left on device")
++        return real_write_text(self, data, encoding, errors, newline)
++
++    monkeypatch.setattr(Path, "write_text", failing_write_text)
++    with pytest.raises(OSError, match="No space"):
++        cr.main([str(result), str(out_dir), "abc1234", "--overwrite"])
++    monkeypatch.undo()
++    assert _snapshot(out_dir) == before  # staging removed, nothing moved into place
++
++
++def test_build_needs_an_existing_receipts_dir(tmp_path: Path) -> None:
++    result, _ = _build_setup(tmp_path, [_reader("r1")])
++    with pytest.raises(SystemExit, match="does not exist"):
++        cr.main([str(result), str(tmp_path / "missing"), "abc1234"])

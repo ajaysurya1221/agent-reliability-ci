@@ -1,0 +1,628 @@
+diff --git a/.github/scripts/wheel_smoke.sh b/.github/scripts/wheel_smoke.sh
+index f50e3f7..ae0cf04 100755
+--- a/.github/scripts/wheel_smoke.sh
++++ b/.github/scripts/wheel_smoke.sh
+@@ -85,6 +85,13 @@ grep -qx 'All six steps held.' "$root/demo.log" || fail "arci demo did not print
+ leftover="$(ls -A "$work")"
+ [ -z "$leftover" ] || fail "the working directory is not empty after the demo: $leftover"
+ 
++# The packaged JSON Schema prints and parses (written into the empty directory, removed on exit).
++echo "wheel_smoke: arci schema"
++start=$(now)
++arci schema >schema.json || fail "arci schema exited non-zero"
++python3 -c "import json; json.load(open('schema.json'))" || fail "arci schema did not print JSON"
++record "arci schema" "$start" "$(now)"
++
+ echo "wheel_smoke: timings"
+ cat "$root/timings"
+ echo "wheel_smoke: OK"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 5e9efa8..86edadd 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -205,3 +205,50 @@ jobs:
+           test "$OUTCOME" = failure
+           test -f arci-report.md
+           grep -q "VERDICT: BLOCK" arci-report.md
++      # $GITHUB_STEP_SUMMARY is a per-step file: the runner gives the next step a new, empty one,
++      # so the Action step's summary cannot be read from here. Instead run the Action's own gate
++      # script (read from action.yml) with fresh summary and output files and an `arci` stub that
++      # prints the report above and exits 1, and require the summary file to hold that report. The
++      # stub also writes a line to stderr, which must reach neither the summary nor the report file.
++      - name: Assert the Action's gate script writes the report to the step summary
++        run: |
++          work="$RUNNER_TEMP/summary-check"
++          mkdir -p "$work/bin"
++          cp arci-report.md "$work/report.md"
++          printf '#!/usr/bin/env bash\necho STUB-STDERR-LINE >&2\ncat "%s"\nexit 1\n' \
++            "$work/report.md" > "$work/bin/arci"
++          chmod +x "$work/bin/arci"
++          python - "$work/gate.sh" <<'PY'
++          import pathlib
++          import sys
++
++          import yaml  # installed with arci by the Action step
++
++          steps = yaml.safe_load(pathlib.Path("action.yml").read_text())["runs"]["steps"]
++          (gate,) = [step for step in steps if step.get("id") == "gate"]
++          assert gate["shell"] == "bash", gate["shell"]
++          pathlib.Path(sys.argv[1]).write_text(gate["run"])
++          PY
++          : > "$work/summary.md"
++          : > "$work/output"
++          set +e
++          (
++            cd "$work" &&
++              PATH="$work/bin:$PATH" GITHUB_STEP_SUMMARY="$work/summary.md" \
++              GITHUB_OUTPUT="$work/output" ARCI_MANIFEST=manifest.json ARCI_OUT=runs \
++              ARCI_WORKERS=1 ARCI_ALLOW_INCONCLUSIVE=false \
++              bash --noprofile --norc -eo pipefail "$work/gate.sh"
++          )
++          code=$?
++          set -e
++          echo "gate script exit=$code"
++          test "$code" = 1
++          grep -q "VERDICT: BLOCK" "$work/summary.md"
++          cmp "$work/summary.md" "$work/report.md"
++          grep -qx "verdict=BLOCK" "$work/output"
++          for file in "$work/summary.md" "$work/arci-report.md"; do
++            if grep -q STUB-STDERR-LINE "$file"; then
++              echo "::error::arci's stderr leaked into $file"
++              exit 1
++            fi
++          done
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 4f6ab8c..f501681 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -74,6 +74,56 @@ jobs:
+           PY
+       - name: Build the wheel and the sdist
+         run: uv build --no-sources
++      - name: List the sdist and refuse any entry outside the allowlist
++        run: |
++          shopt -s nullglob
++          sdists=(dist/*.tar.gz)
++          if [ "${#sdists[@]}" -ne 1 ]; then
++            echo "::error title=sdist allowlist::expected one sdist in dist/, found ${#sdists[@]}"
++            exit 1
++          fi
++          tar -tzf "${sdists[0]}" > "$RUNNER_TEMP/sdist-entries"
++          cat "$RUNNER_TEMP/sdist-entries"
++          python - "$RUNNER_TEMP/sdist-entries" <<'PY'
++          import pathlib
++          import sys
++          import tomllib
++
++          version = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
++          root = f"agent_reliability_ci-{version}/"
++          files = {
++              "README.md",
++              "LICENSE",
++              "NOTICE",
++              "CHANGELOG.md",
++              "pyproject.toml",
++              "PKG-INFO",
++              ".gitignore",
++          }
++
++
++          def allowed(entry: str) -> bool:
++              if entry == root:
++                  return True
++              if not entry.startswith(root):
++                  return False
++              rest = entry.removeprefix(root)
++              if "\\" in rest or ".." in rest.split("/"):
++                  return False
++              return rest in files or rest.startswith("src/arci/")
++
++
++          entries = pathlib.Path(sys.argv[1]).read_text().splitlines()
++          outside = [entry for entry in entries if not allowed(entry)]
++          if not entries:
++              print("::error title=sdist allowlist::the sdist is empty")
++              sys.exit(1)
++          if outside:
++              for entry in outside:
++                  print(f"::error title=sdist allowlist::outside the allowlist: {entry}")
++              sys.exit(1)
++          print(f"sdist allowlist: {len(entries)} entries, all under {root}")
++          PY
+       - name: List the wheel contents
+         run: python -m zipfile -l dist/*.whl
+       - name: Write SHA256SUMS to dist and to the job summary
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9dd5124..0191bd0 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,7 +2,11 @@
+ 
+ ## Unreleased
+ 
+-(nothing yet)
++- **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
++  stores are unchanged.
++- **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason
++  other than unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
++  the sdist against an allowlist and the CI Action fixture checks the step summary.
+ 
+ ## v0.8.0 (2026-10-13)
+ 
+diff --git a/README.md b/README.md
+index 26d88ed..795237d 100644
+--- a/README.md
++++ b/README.md
+@@ -253,7 +253,7 @@ Scaffold one experiment from four references, then run it:
+ 
+ ```bash
+ uv tool install agent-reliability-ci
+-arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed
++arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}'
+ arci run arci.yaml
+ ```
+ 
+@@ -265,10 +265,11 @@ total collapse cannot BLOCK below N=8, so expect INCONCLUSIVE, then plan a confi
+ `arci plan` before spending trials. Without `--fault` the scaffold writes one clean condition (no
+ injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `reserve` call, and `--task '{...}'`
+ sets the task. `arci init` calls your toolset factory once with that task, so a factory that reads
+-task data fails without it: the sample project's `make_world`
++task data needs `--task`: the sample project's `make_world`
+ ([examples/recipes/python_agent](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/examples/recipes/python_agent))
+-needs `--task '{"order_id": "order-7"}'`,
+-and the error message names the flag. A hand-written descriptor with one fault looks like this:
++reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`; without
++it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault
++looks like this:
+ 
+ ```yaml
+ experiment_id: checkout-retry
+diff --git a/examples/recipes/python_agent/README.md b/examples/recipes/python_agent/README.md
+index fa08572..7568fe2 100644
+--- a/examples/recipes/python_agent/README.md
++++ b/examples/recipes/python_agent/README.md
+@@ -44,7 +44,8 @@ The oracle reads only the world's final state, never the agent's own claim. The
+ 
+ ## What the smoke verdict means
+ 
+-Expect `VERDICT: INCONCLUSIVE (exit 2)` and two stderr lines that say so. Eight trials per arm is a
++Expect `VERDICT: INCONCLUSIVE (exit 2)`, two stderr lines that say so, and a third stderr line
++naming the run store. Eight trials per arm is a
+ smoke design: under the default rule (alpha 0.05, delta 0.10, Clopper-Pearson) two perfect arms
+ cannot PASS below N=42, and only a total collapse can BLOCK at N=8. Here v2 still confirms every
+ order that arrived held (two of the eight seeds 0-7, so expect 8/8 against 2/8), so it does not
+diff --git a/src/arci/cli.py b/src/arci/cli.py
+index 9eca881..5a61438 100644
+--- a/src/arci/cli.py
++++ b/src/arci/cli.py
+@@ -303,6 +303,7 @@ def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
+     if notice is not None and decision.verdict is Verdict.INCONCLUSIVE:
+         print(smoke_followup(manifest), file=sys.stderr)
+     # --- end smoke ---
++    print(f"run store: {run_dir.resolve()}", file=sys.stderr)
+     return decision.exit_code
+ 
+ 
+diff --git a/src/arci/init.py b/src/arci/init.py
+index 9d5d15e..8c69eab 100644
+--- a/src/arci/init.py
++++ b/src/arci/init.py
+@@ -13,11 +13,15 @@ re-loaded through the descriptor loader and seal-checked, then published atomica
+ by a rename; without it by a hard link only, so an existing file is never replaced and, where hard
+ links are unsupported, nothing is published (DECISIONS D-10). Errors are `InitError`, one line,
+ with nothing written.
++
++Durability is best effort: the staged file and its directory are fsynced, but on macOS `os.fsync`
++is not `F_FULLFSYNC`, so a published descriptor may not survive a power loss there.
+ """
+ 
+ from __future__ import annotations
+ 
+ import contextlib
++import errno
+ import json
+ import math
+ import os
+@@ -613,12 +617,32 @@ def _fsync_directory(directory: Path) -> None:
+             os.close(fd)
+ 
+ 
++# `os.link` errnos that mean "this filesystem does not do hard links" (on Linux ENOTSUP is
++# EOPNOTSUPP; EPERM is what some filesystems, FAT among them, return for link(2)).
++_LINKS_UNSUPPORTED: Final = frozenset({errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM})
++
++
++def _link_failure(request: InitRequest, exc: OSError) -> InitError:
++    """The hard-link publication failed: name unsupported links, otherwise the actual cause."""
++    shown = _show(request.out_text)
++    if exc.errno in _LINKS_UNSUPPORTED:
++        return InitError(
++            f"output {shown}: cannot publish atomically here "
++            "(hard links unsupported); choose another directory or pass --force"
++        )
++    name = errno.errorcode.get(exc.errno, str(exc.errno)) if exc.errno is not None else "unknown"
++    reason = exc.strerror or type(exc).__name__
++    return InitError(f"output {shown}: cannot publish: {reason} (errno {name})")
++
++
+ def publish(request: InitRequest, text: str) -> None:
+     """Stage beside the destination, verify, then publish atomically. Nothing is left on error.
+ 
+     The staged bytes are fsynced first. With --force the staged file replaces the destination by a
+     rename. Without it the only publication is a hard link, which refuses an existing destination;
+-    where hard links are unsupported nothing is published (no copy, no replacing rename).
++    where hard links are unsupported nothing is published (no copy, no replacing rename), and any
++    other link failure is reported with its errno, also publishing nothing. The fsyncs are best
++    effort: on macOS `os.fsync` is not `F_FULLFSYNC` (see the module docstring).
+     """
+     staged: Path | None = None
+     try:
+@@ -648,11 +672,8 @@ def publish(request: InitRequest, text: str) -> None:
+                 os.link(staged, request.out)
+             except FileExistsError:
+                 raise _exists(request) from None
+-            except OSError:
+-                raise InitError(
+-                    f"output {_show(request.out_text)}: cannot publish atomically here "
+-                    "(hard links unsupported); choose another directory or pass --force"
+-                ) from None
++            except OSError as exc:
++                raise _link_failure(request, exc) from None
+         _fsync_directory(request.out.parent)
+     except OSError as exc:
+         raise InitError(
+diff --git a/src/arci/mcp_boundary.py b/src/arci/mcp_boundary.py
+index 1bf4f68..935a799 100644
+--- a/src/arci/mcp_boundary.py
++++ b/src/arci/mcp_boundary.py
+@@ -26,7 +26,7 @@ from collections import Counter
+ from collections.abc import Callable
+ from dataclasses import dataclass
+ from datetime import UTC
+-from typing import cast
++from typing import BinaryIO, TextIO, cast
+ from urllib.parse import urlsplit
+ 
+ from pydantic import JsonValue
+@@ -67,7 +67,10 @@ _HTTP_REASONS = {
+     500: "Internal Server Error",
+     529: "Site is overloaded",
+ }
+-_PROTOCOL = sys.stdout.buffer
++# The binary stream carrying protocol frames to the runner; None means the process's original
++# stdout, looked up when a frame is written rather than at import, so importing this module does
++# not require a `sys.stdout` with a `buffer`. Tests replace it with a `BytesIO`.
++_PROTOCOL: BinaryIO | None = None
+ 
+ 
+ class _DecisionTransportError(RuntimeError):
+@@ -90,9 +93,24 @@ def upstream_diagnostic(detail: str | BaseException) -> str:
+     return _scrub_diagnostic(detail)[:299]
+ 
+ 
++def _protocol() -> BinaryIO:
++    """The frame stream: `sys.__stdout__`, which `redirect_stdout` never touches.
++
++    In the boundary child (`python -P -m arci.mcp_boundary`) nothing replaces stdout before this
++    module runs, so this is the stream the import-time `sys.stdout.buffer` used to be.
++    """
++    if _PROTOCOL is not None:
++        return _PROTOCOL
++    stdout = cast(TextIO | None, sys.__stdout__)  # typeshed: TextIOWrapper; .buffer is binary
++    if stdout is None:
++        raise RuntimeError("the MCP boundary has no stdout for its protocol frames")
++    return stdout.buffer
++
++
+ def _frame(nonce: str, kind: str, **payload: object) -> None:
+-    _PROTOCOL.write(canonical_json({"nonce": nonce, "kind": kind, **payload}) + b"\n")
+-    _PROTOCOL.flush()
++    protocol = _protocol()
++    protocol.write(canonical_json({"nonce": nonce, "kind": kind, **payload}) + b"\n")
++    protocol.flush()
+ 
+ 
+ def _valid_rpc_id(value: object) -> bool:
+diff --git a/tests/unit/cli/test_smoke_notice.py b/tests/unit/cli/test_smoke_notice.py
+index b37446c..2683cae 100644
+--- a/tests/unit/cli/test_smoke_notice.py
++++ b/tests/unit/cli/test_smoke_notice.py
+@@ -66,7 +66,7 @@ def _with(base: Manifest, **changes: object) -> Manifest:
+ # --- the real run -------------------------------------------------------------------------------
+ 
+ 
+-def test_n6_prints_two_stderr_lines_and_leaves_stdout_and_reports_alone(tmp_path: Path) -> None:
++def test_n6_prints_the_notice_lines_and_leaves_stdout_and_reports_alone(tmp_path: Path) -> None:
+     built = manifest(n_per_arm=6)  # 6/6 vs 0/6 under a timeout: INCONCLUSIVE
+     path = tmp_path / "manifest.json"
+     path.write_text(built.model_dump_json(), encoding="utf-8")
+@@ -74,13 +74,15 @@ def test_n6_prints_two_stderr_lines_and_leaves_stdout_and_reports_alone(tmp_path
+ 
+     done = arci("run", "manifest.json", "--out", "runs", "--workers", "8", cwd=tmp_path)
+     assert done.returncode == 2, done.stderr[-2000:]
+-    assert done.stderr == f"{DEFAULT_LINE}\n{FOLLOWUP_6}\n"
++    run_dir = tmp_path / "runs" / built.experiment_id
++    # The notice, its follow-up, then the run-store line (task 16).
++    store_line = f"run store: {run_dir.resolve()}"
++    assert done.stderr == f"{DEFAULT_LINE}\n{FOLLOWUP_6}\n{store_line}\n"
+     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
+     assert "SMOKE" not in done.stdout
+ 
+     # The Markdown report is byte-for-byte the renderer's, and so is what the Action summarises
+     # (it tees `arci run` stdout; `arci gate` writes GITHUB_STEP_SUMMARY).
+-    run_dir = tmp_path / "runs" / built.experiment_id
+     stored, trials = load_run(run_dir)
+     markdown = render_markdown(stored, decide(stored, trials), trials)
+     assert done.stdout == markdown + ("" if markdown.endswith("\n") else "\n")
+diff --git a/tests/unit/cli/test_store_path_line.py b/tests/unit/cli/test_store_path_line.py
+new file mode 100644
+index 0000000..01ba83e
+--- /dev/null
++++ b/tests/unit/cli/test_store_path_line.py
+@@ -0,0 +1,53 @@
++"""Task 16: `arci run` names its run store on stderr; stdout and other commands are unchanged."""
++
++from __future__ import annotations
++
++import os
++import subprocess
++import sys
++from pathlib import Path
++
++from arci.gate import decide
++from arci.report import render_markdown
++from arci.storage import load_run
++from tests.acceptance.helpers import manifest
++
++REPO = Path(__file__).resolve().parents[3]
++
++
++def arci(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
++    env = {**os.environ, "PYTHONPATH": str(REPO)}
++    env.pop("GITHUB_STEP_SUMMARY", None)
++    return subprocess.run(
++        [sys.executable, "-m", "arci.cli", *args],
++        cwd=cwd,
++        env=env,
++        capture_output=True,
++        text=True,
++        timeout=300,
++        check=False,
++    )
++
++
++def test_run_prints_the_store_path_on_stderr_only(tmp_path: Path) -> None:
++    built = manifest(n_per_arm=6)  # 6/6 vs 0/6 under a timeout: INCONCLUSIVE
++    (tmp_path / "manifest.json").write_text(built.model_dump_json(), encoding="utf-8")
++
++    done = arci("run", "manifest.json", "--out", "runs", "--workers", "8", cwd=tmp_path)
++    assert done.returncode == 2, done.stderr[-2000:]
++    run_dir = tmp_path / "runs" / built.experiment_id
++    store_line = f"run store: {run_dir.resolve()}"
++    assert Path(store_line.removeprefix("run store: ")).is_absolute()
++    # The line is stderr's last, and appears exactly once; stdout never carries it.
++    assert done.stderr.endswith(f"\n{store_line}\n")
++    assert done.stderr.count("run store:") == 1
++    assert "run store:" not in done.stdout
++    assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
++    stored, trials = load_run(run_dir)
++    markdown = render_markdown(stored, decide(stored, trials), trials)
++    assert done.stdout == markdown + ("" if markdown.endswith("\n") else "\n")
++
++    report = arci("report", str(run_dir), cwd=tmp_path)
++    assert (report.returncode, report.stdout, report.stderr) == (0, done.stdout, "")
++    gate = arci("gate", str(run_dir), cwd=tmp_path)
++    assert (gate.returncode, gate.stdout, gate.stderr) == (2, done.stdout, "")
+diff --git a/tests/unit/descriptor/test_run_yaml.py b/tests/unit/descriptor/test_run_yaml.py
+index aa4af61..8b5bdec 100644
+--- a/tests/unit/descriptor/test_run_yaml.py
++++ b/tests/unit/descriptor/test_run_yaml.py
+@@ -58,9 +58,12 @@ def test_run_yaml_matches_the_json_path(tmp_path: Path) -> None:
+ 
+     assert from_yaml.returncode == 2, from_yaml.stderr[-2000:]  # 6/6 vs 0/6: INCONCLUSIVE
+     assert from_json.returncode == 2, from_json.stderr[-2000:]
+-    # stderr carries only the smoke-design notice (task 05), identical for both paths.
+-    assert from_yaml.stderr == f"{smoke_notice(compiled)}\n{smoke_followup(compiled)}\n"
+-    assert from_yaml.stderr == from_json.stderr
++    # stderr carries the smoke-design notice (task 05), identical for both paths, then the line
++    # naming each run's own store (task 16).
++    notice = f"{smoke_notice(compiled)}\n{smoke_followup(compiled)}\n"
++    for done, workdir in ((from_yaml, yaml_dir), (from_json, json_dir)):
++        store_line = f"run store: {(workdir / 'runs' / compiled.experiment_id).resolve()}\n"
++        assert done.stderr == notice + store_line
+     last = from_yaml.stdout.strip().splitlines()[-1]
+     assert last.startswith("VERDICT: INCONCLUSIVE")
+     assert last == from_json.stdout.strip().splitlines()[-1]
+diff --git a/tests/unit/init/test_init.py b/tests/unit/init/test_init.py
+index 2bcd715..abafbd0 100644
+--- a/tests/unit/init/test_init.py
++++ b/tests/unit/init/test_init.py
+@@ -291,8 +291,10 @@ def test_init_then_run_from_the_sample_project(project: Path) -> None:
+     assert done.returncode == 2, done.stderr[-2000:]
+     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
+     manifest = compile_descriptor(project / "arci.yaml")
+-    assert done.stderr == f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\n"
+     run_dir = project / "runs" / "checkout-retry"
++    assert done.stderr == (
++        f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\nrun store: {run_dir.resolve()}\n"
++    )
+     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text())
+     assert stored.validate_seal()
+     assert stored == manifest
+diff --git a/tests/unit/init/test_publish.py b/tests/unit/init/test_publish.py
+index 7ed2ce5..7c29596 100644
+--- a/tests/unit/init/test_publish.py
++++ b/tests/unit/init/test_publish.py
+@@ -105,6 +105,55 @@ def test_without_links_a_destination_that_appears_before_publication_survives(
+     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
+ 
+ 
++def _link_raises(code: int) -> Callable[[object, object], None]:
++    def link(source: object, dest: object) -> None:
++        del source, dest
++        raise OSError(code, os.strerror(code))
++
++    return link
++
++
++@pytest.mark.parametrize("code", [errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM])
++def test_unsupported_link_errnos_say_hard_links_are_unsupported(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], code: int
++) -> None:
++    monkeypatch.setattr(os, "link", _link_raises(code))
++    assert _init(capsys) == (3, "", NO_LINKS_LINE)
++    assert set(workdir.iterdir()) == set()
++
++
++def test_another_link_error_names_its_cause_and_writes_nothing(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    monkeypatch.setattr(os, "link", _link_raises(errno.EIO))
++    line = f"{PREFIX}output arci.yaml: cannot publish: {os.strerror(errno.EIO)} (errno EIO)\n"
++    assert _init(capsys) == (3, "", line)
++    assert "hard links unsupported" not in line
++    assert set(workdir.iterdir()) == set()  # no destination, no staged file
++
++
++def test_another_link_error_preserves_a_competitor(
++    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
++) -> None:
++    real_check = REAL_CHECK_OUTPUT
++    competitor = b"a competitor's bytes\n"
++    calls: list[Path] = []
++
++    def check_then_race(out: Path, out_text: str, force: bool) -> None:
++        real_check(out, out_text, force)
++        calls.append(out)
++        if len(calls) == 2:  # the re-check in publish: the competitor lands right after it
++            out.write_bytes(competitor)
++
++    monkeypatch.setattr(init_module, "_check_output", check_then_race)
++    monkeypatch.setattr(os, "link", _link_raises(errno.EIO))
++    line = f"{PREFIX}output arci.yaml: cannot publish: {os.strerror(errno.EIO)} (errno EIO)\n"
++    assert _init(capsys) == (3, "", line)
++    assert len(calls) == 2
++    assert (workdir / "arci.yaml").read_bytes() == competitor
++    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
++
++
+ def test_with_force_and_no_links_the_rename_still_publishes(
+     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+ ) -> None:
+diff --git a/tests/unit/mcp/test_mcp_import.py b/tests/unit/mcp/test_mcp_import.py
+new file mode 100644
+index 0000000..a6312db
+--- /dev/null
++++ b/tests/unit/mcp/test_mcp_import.py
+@@ -0,0 +1,53 @@
++"""`arci.mcp_boundary` imports without a binary stdout; frames go to the original stdout."""
++
++from __future__ import annotations
++
++import contextlib
++import importlib
++import io
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++
++import arci
++import arci.mcp_boundary as original
++
++
++def test_import_succeeds_when_stdout_has_no_buffer(monkeypatch: pytest.MonkeyPatch) -> None:
++    replaced = io.StringIO()
++    assert not hasattr(replaced, "buffer")
++    # monkeypatch restores sys.stdout, the sys.modules entry and the package attribute afterwards.
++    monkeypatch.setattr(sys, "stdout", replaced)
++    monkeypatch.delitem(sys.modules, "arci.mcp_boundary")
++    monkeypatch.setattr(arci, "mcp_boundary", original)
++    fresh = importlib.import_module("arci.mcp_boundary")
++    assert fresh is not original
++    assert vars(fresh)["_PROTOCOL"] is None
++    assert replaced.getvalue() == ""
++
++
++def test_frames_go_to_the_original_stdout_even_under_redirect_stdout(
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    binary, diverted = io.BytesIO(), io.StringIO()
++    monkeypatch.setattr(sys, "__stdout__", io.TextIOWrapper(binary, encoding="utf-8"))
++    monkeypatch.setattr(original, "_PROTOCOL", None)
++    with contextlib.redirect_stdout(diverted):
++        vars(original)["_frame"]("nonce", "ready", ok=True)
++    assert binary.getvalue() == b'{"kind":"ready","nonce":"nonce","ok":true}\n'
++    assert diverted.getvalue() == ""
++    assert vars(original)["_PROTOCOL"] is None
++
++
++def test_a_fresh_interpreter_writes_frames_to_its_stdout_pipe(tmp_path: Path) -> None:
++    # As the runner starts the boundary: a new interpreter (`-P`) whose stdout is a pipe.
++    done = subprocess.run(
++        [sys.executable, "-P", "-c", "from arci.mcp_boundary import _frame; _frame('n', 'ready')"],
++        cwd=tmp_path,
++        capture_output=True,
++        timeout=60,
++        check=False,
++    )
++    assert (done.returncode, done.stdout) == (0, b'{"kind":"ready","nonce":"n"}\n'), done.stderr
+diff --git a/tests/unit/recipes/test_mcp_agent.py b/tests/unit/recipes/test_mcp_agent.py
+index 357fe39..40648d8 100644
+--- a/tests/unit/recipes/test_mcp_agent.py
++++ b/tests/unit/recipes/test_mcp_agent.py
+@@ -168,8 +168,8 @@ def test_the_faulted_run_blocks_with_a_sealed_store(run: Run) -> None:
+     assert done.returncode == 1, done.stderr[-2000:]
+     assert done.stdout.strip().splitlines()[-1] == "VERDICT: BLOCK (exit 1)"
+     manifest = compile_descriptor(run.copy / "arci.yaml")
+-    assert done.stderr == f"{smoke_notice(manifest)}\n"
+     run_dir = run.copy / "runs" / "mcp-fetch-retry"
++    assert done.stderr == f"{smoke_notice(manifest)}\nrun store: {run_dir.resolve()}\n"
+     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
+     assert stored.validate_seal() and stored == manifest
+     trials = [
+diff --git a/tests/unit/recipes/test_python_agent.py b/tests/unit/recipes/test_python_agent.py
+index 15e49a8..1c9fb29 100644
+--- a/tests/unit/recipes/test_python_agent.py
++++ b/tests/unit/recipes/test_python_agent.py
+@@ -193,8 +193,10 @@ def test_the_smoke_run_is_inconclusive_with_a_sealed_store(smoke: Smoke) -> None
+     assert done.returncode == 2, done.stderr[-2000:]
+     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
+     manifest = compile_descriptor(COMMITTED)
+-    assert done.stderr == f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\n"
+     run_dir = smoke.copy / "runs" / "checkout-retry"
++    assert done.stderr == (
++        f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\nrun store: {run_dir.resolve()}\n"
++    )
+     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text("utf-8"))
+     assert stored.validate_seal()
+     assert stored == manifest
+@@ -265,17 +267,22 @@ class Edited:
+ def edited(smoke: Smoke, tmp_path_factory: pytest.TempPathFactory) -> Iterator[Edited]:
+     """Bundle the failing trial twice, then change the working tree under both bundles.
+ 
+-    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. The
+-    edits would each turn the failure into something else if they ran: v2 raises instead of
+-    returning after the fault (same tool calls, so no recording miss, but a crash), and the oracle
+-    passes every final state. (v1's body is not used as the edit: its second `reserve` call is not
+-    in the recording, so replay would report INVALID, exit 3, whichever sources ran.)
++    `bundle.json` is the README's bundle (with both `__init__.py`); `bare.json` omits them. Before
++    any edit, `bare.json` reproduces on the unedited tree, so its later NOT_REPRODUCED comes from
++    the edits and not from the bundle itself. The edits would each turn the failure into something
++    else if they ran: v2 raises instead of returning after the fault (same tool calls, so no
++    recording miss, but a crash), and the oracle passes every final state. (v1's body is not used
++    as the edit: if the tree's v1 ran, its second `reserve` call would not be in the recording, so
++    replay would report INVALID, exit 3, a recording miss rather than a changed outcome.)
+     """
+     copy = tmp_path_factory.mktemp("edited") / "checkout"
+     shutil.copytree(smoke.copy, copy, ignore=shutil.ignore_patterns("__pycache__"))
+     for command in (DIAGNOSE[2], BARE_BUNDLE):
+         done = arci(command, copy)
+         assert done.returncode == 0, done.stderr[-2000:]
++    unedited = arci("arci replay bare.json", copy)
++    assert unedited.returncode == 0, unedited.stdout + unedited.stderr[-2000:]
++    assert unedited.stdout.startswith("REPRODUCED")
+     v2 = copy / "app" / "v2.py"
+     source = v2.read_text(encoding="utf-8")
+     assert source.count(GIVE_UP) == 1
