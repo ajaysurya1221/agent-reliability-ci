@@ -62,3 +62,10 @@ sketch. T09 stays first in the cut order. Rule: (c) the frozen design record 000
 docs/design/0006-cwd-on-the-child-import-path.md is Fable-authored and will be reviewed by Astra
 and the reviewer subagent together with T04's diff. Its hash is added to FROZEN.sha256 at the T12
 re-freeze.
+
+### D-05 (Task 01, corrected at 04:33Z): codex exec must have stdin closed
+The first three bias-control consults stalled for 45 minutes: `codex exec` printed "Reading
+additional input from stdin..." because the harness's background shell left stdin as an open pipe.
+Fix: every consult runs with `< /dev/null`, and long prompts live in `plan/exec/consults/<id>-prompt.md`
+("write it to a file and point Astra at the path"). The stalled runs produced no output and were
+killed; nothing was read from them. Rule: (a).
