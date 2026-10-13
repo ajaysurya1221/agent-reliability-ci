@@ -66,17 +66,17 @@ machine and current load (measured: 38 s on a 15-core Apple Silicon Mac with 8 w
 ```
 
 Copied from the unedited, committed log
-[hero-demo-2026-10-05.txt](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt), without
+[hero-demo-2026-10-05.txt](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt), without
 the `ok` lines. Step 1 passes both agents on one clean run; step 6 passes the repaired agent C on
 the exact reproducer and on its own frozen experiment; the run ends `All six steps held`, exit 0.
-The experiment is also a frozen acceptance test ([test_hero.py](tests/acceptance/test_hero.py)).
+The experiment is also a frozen acceptance test ([test_hero.py](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/tests/acceptance/test_hero.py)).
 
 Agent B is not rigged with dice. It is agent A with the retry around `reserve` removed, a plausible
 refactoring slip: when `reserve` times out it carries on to `confirm` and still reports success. Its
 failure rate comes from the environment. Reservations already exist with configured probability
 65% (135 of the default 200 seeds, plus 8 scenarios with a naturally flaky `confirm`; shares set in
-[world.py](src/arci/demo/world.py), counts asserted in
-[test_retry_example.py](tests/unit/examples/test_retry_example.py)), and in those the missing retry
+[world.py](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/src/arci/demo/world.py), counts asserted in
+[test_retry_example.py](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/tests/unit/examples/test_retry_example.py)), and in those the missing retry
 never matters. That is exactly why one run hides it.
 
 ### Recorded result and evidence
@@ -140,7 +140,7 @@ and may annotate its reasoning with `tools.note_model_step(...)`. Success is dec
 over the environment's final state, never by what the agent says about itself.
 
 **A gate that can say "I do not know".** The rule is fixed-sample and deliberately boring
-([docs/STATISTICS.md](docs/STATISTICS.md)): per arm, an exact Clopper-Pearson interval at tail
+([docs/STATISTICS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS.md)): per arm, an exact Clopper-Pearson interval at tail
 `alpha / (4K)`; bounds on the difference by Bonferroni; `PASS` iff the lower bound is above
 `-delta`, `BLOCK` iff the upper bound is below it. No peeking, no extending a run, no rerunning
 until green. The decision rule is bound into every trial's identity, so a manifest resealed after
@@ -160,7 +160,7 @@ your agent (any argv) --> arci.mcp_shim --> arci.mcp_boundary --> MCP server (th
                                             budgets, latches      python -m arci.mcp_toolset_server
 ```
 
-[docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) has the recipe and the local-model worked example.
+[docs/REAL_AGENTS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/REAL_AGENTS.md) has the recipe and the local-model worked example.
 
 **Decision calls.** A command agent may call a System One decision endpoint (TypeSafe's Jev
 API). The same boundary serves `POST /v1/systemone` on loopback, records each admitted request as
@@ -173,11 +173,11 @@ smoke decision before a live run.
 ![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/images/decision-boundary.png)
 
 **Run against Jev on 2026-10-03.** Built from documentation dated 2026-09-22, the boundary ran the
-pre-registered [day one](docs/design/0004-day-one.md) live. Four things did not survive contact
+pre-registered [day one](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/design/0004-day-one.md) live. Four things did not survive contact
 and are fixed: alias-only model lists (`arci preflight --allow-unlisted-model`), smoke questions
 needing `instructions`, CONNECT-only egress (`ARCI_HTTPS_PROXY`), and the console script needing
 the repository root on `PYTHONPATH`. Prices and provider limits are still as documented, not
-measured, and the gateway route is still untested. See [docs/DECISIONS.md](docs/DECISIONS.md).
+measured, and the gateway route is still untested. See [docs/DECISIONS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/DECISIONS.md).
 
 ## Where it has been run
 
@@ -185,40 +185,40 @@ All runs are the maintainer's own; no external users yet. Failed and invalid att
 the linked records.
 
 - **Seeded retry demo** (2026-09-23): the result above; A against itself and the repaired C both
-  PASS ([retry-demo-n200.md](docs/results/retry-demo-n200.md)).
+  PASS ([retry-demo-n200.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/retry-demo-n200.md)).
 - **Support-triage agent, live Jev endpoint** (2026-10-03, `jev-1.13.0` pinned, Python and Node
   SDKs unchanged; planted regression, the harness caps confidence and B stops escalating): A vs B
   at N=200, 200/200 vs 0/200, bounds [-1.000, -0.957], BLOCK; one minimised failure replays
-  REPRODUCED; 902 recorded decisions ([docs/results/jev](docs/results/jev/README.md)). Offline
+  REPRODUCED; 902 recorded decisions ([docs/results/jev](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/jev/README.md)). Offline
   against a seeded fixture: `.venv/bin/python examples/jev_triage_agent/hero_demo.py --n 50`.
 - **The tool-call guard of the maintainer's other project, frontier-scout** (2026-10-05,
   `hook_runtime.py` verbatim at `58b0b17`, run through the harness boundary, not inside a
   coding-agent session; outages injected): fail-closed against fail-open under
   `decision_unavailable` at N=200, 200/200 vs 130/200, bounds [-0.4304, -0.2537], BLOCK; diffed,
-  minimised (`reduced`) and replayed REPRODUCED ([docs/results/guardrail](docs/results/guardrail/README.md)).
+  minimised (`reduced`) and replayed REPRODUCED ([docs/results/guardrail](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/guardrail/README.md)).
 - **A local model, one sentence of prompt** (`qwen3.5:4b-mlx` through Ollama, one machine,
   exploratory): N=400, 376/400 vs 308/400, bounds [-0.2445, -0.0921], INCONCLUSIVE; BLOCK needed
   the upper bound below -0.10 and missed by 0.008. Not re-run until it blocks
-  ([docs/results](docs/results/README.md)).
+  ([docs/results](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/README.md)).
 
 **What went wrong and was kept.**
 
 - Ollama run 1: a harness bug (tools advertised with no parameters), found from the failure
-  clusters ([ollama-run1-n30-bridge-bug.md](docs/results/ollama-run1-n30-bridge-bug.md)). Run 3:
+  clusters ([ollama-run1-n30-bridge-bug.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/ollama-run1-n30-bridge-bug.md)). Run 3:
   the model server died and one ERROR trial invalidated the run
-  ([ollama-run3-n400-invalid.md](docs/results/ollama-run3-n400-invalid.md)); hence
+  ([ollama-run3-n400-invalid.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/ollama-run3-n400-invalid.md)); hence
   `infra_exit_codes` (75 by default), which turns an agent's own infrastructure failure into ERROR.
 - Jev attempt 1: every trial crashed on an import error, so equally broken arms "passed"; the
-  invalid stores are kept in [attempt-1-invalid](docs/results/jev/2026-10-03/attempt-1-invalid/).
+  invalid stores are kept in [attempt-1-invalid](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/results/jev/2026-10-03/attempt-1-invalid/).
 - Guardrail at N=50: 50/50 vs 38/50, bounds [-0.4016, -0.0348], INCONCLUSIVE against the
-  pre-registered BLOCK, reported as is ([docs/results/guardrail](docs/results/guardrail/README.md)).
+  pre-registered BLOCK, reported as is ([docs/results/guardrail](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/guardrail/README.md)).
 
 **Is the model's confidence something you can gate on?** A separate, pre-registered audit of
 `jev-1.13.0` on CLINC150 and Banking77 answers that for intent routing, not permission
 calibration: zero-shot accuracy 0.921 with ECE 0.024 on CLINC150, and 0.801 with ECE 0.084 on
 Banking77, where confidence is over-stated in the middle of the range. Write-up, full table and
-limits: [docs/results/jev-calibration](docs/results/jev-calibration/README.md); protocol and code:
-[bench/jev_calibration](bench/jev_calibration/PROTOCOL.md).
+limits: [docs/results/jev-calibration](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/jev-calibration/README.md); protocol and code:
+[bench/jev_calibration](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/bench/jev_calibration/PROTOCOL.md).
 
 ## The gate, measured against itself
 
@@ -244,8 +244,8 @@ PASS / BLOCK / INCONCLUSIVE:
   twenty-point drop from 0.95 to 0.75 BLOCKs only 36.5% of the time at N=200.
 - `interval_method: newcombe` (about twice the power, calibrated by exact enumeration rather than
   proved) and pre-registered `looks` must be frozen before the run; `arci plan` shows a design's
-  verdict probabilities before you spend trials. Details: [docs/STATISTICS.md](docs/STATISTICS.md),
-  [report section 3](docs/reports/ci-gate-2026-10-06/REPORT.md#3-operating-characteristics).
+  verdict probabilities before you spend trials. Details: [docs/STATISTICS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS.md),
+  [report section 3](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md#3-operating-characteristics).
 
 ## Gate your own agent
 
@@ -281,15 +281,15 @@ delta: 0.10
 n_per_arm: 8
 ```
 
-Every key maps to a field of the sealed manifest with the manifest's default (aliases: `id`, `fault`,
-`occurrence`, `oracle`); `arci schema` prints the JSON Schema, and [docs/DESCRIPTOR.md](docs/DESCRIPTOR.md)
+The descriptor expands documented shorthands (`id`, `fault`, `occurrence`, `oracle`) into a sealed
+manifest; the key reference lists its defaults. `arci schema` prints the JSON Schema, and [docs/DESCRIPTOR.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/DESCRIPTOR.md)
 has the key reference, command-agent experiments and the YAML quoting rule. The toolset is `(task, seed) -> object with .tools and .snapshot()`, the
 oracle `(task, final_state) -> bool`, and each agent a plain function `agent(task, tools, rng) -> dict`.
 
 ### Advanced: the Python manifest builder
 
 A manifest is a sealed JSON document built in Python. The retry example's builder,
-[examples/retry_agent/experiment.py](examples/retry_agent/experiment.py), is the template; its shape:
+[examples/retry_agent/experiment.py](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/examples/retry_agent/experiment.py), is the template; its shape:
 
 ```python
 Manifest.create(
@@ -326,7 +326,7 @@ for something the boundary cannot see is rejected, not silently skipped. Fault c
 and `empty_result` at the tool boundary, plus `decision_low_confidence` and `decision_unavailable`
 at the decision boundary; a `"module:function"` reference plugs in your own. For a command agent,
 replace `toolset` with `mcp_server` and the arms' `agent` with `command`, as
-[docs/REAL_AGENTS.md](docs/REAL_AGENTS.md) shows.
+[docs/REAL_AGENTS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/REAL_AGENTS.md) shows.
 
 ```bash
 arci init NAME --baseline M:F --candidate M:F --toolset M:F --oracle M:F   # write arci.yaml (smoke N=8)
@@ -353,7 +353,7 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 This example pins `v0.7.0`, the released feature set. The planner (`arci plan`), opt-in pass^k
 reporting (`arci report --pass-k`) and the later portability fixes are not in that tag; see the
-Unreleased section of [CHANGELOG.md](CHANGELOG.md).
+Unreleased section of [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
@@ -380,7 +380,7 @@ on a committed fixture that must BLOCK.
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
   boundary. Command agents use a separate harness-owned MCP boundary, which is isolation from
   accident, not containment. Both assume buggy, non-hostile agent code; a hostile agent could still
-  forge or bypass its record. See [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md).
+  forge or bypass its record. See [docs/TRUST_MODEL.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/TRUST_MODEL.md).
 - **It only sees the tool boundary.** Files, network and subprocesses the agent touches directly are
   invisible, as is any decision call that does not go through the injected base URL.
 - **It replays the boundary, not the model.** Deterministic replay is guaranteed for seeded,
@@ -411,7 +411,7 @@ on a committed fixture that must BLOCK.
 - No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only: on Windows the package
   installs and `arci --help` runs, but experiments are unsupported.
 
-**Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
+**Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
 
 **Independence.** ARCI's job is preregistered stochastic regression testing. The manifest is a
 prospective contract supplied by its author: it fixes the task, fault conditions, sample size and
@@ -424,7 +424,7 @@ maintainer's independent projects alongside the earlier
 [evalopt-graph](https://github.com/ajaysurya1221/evalopt-graph) experiment, whose standalone feature
 development has ended. ARCI declares no package or runtime dependency on evalopt and imports nothing
 from it, and it shares no runtime layer with the maintainer's sibling projects Actseal, Dorian and
-Frontier Scout. [NOTICE](NOTICE) records two adaptations from evalopt under MIT with attribution: the
+Frontier Scout. [NOTICE](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/NOTICE) records two adaptations from evalopt under MIT with attribution: the
 canonical JSON hashing helpers in `src/arci/hashing.py` and the self-sealing decision pattern in
 `src/arci/schema.py`, both attributed source adaptation inside the frozen manifest, not a dependency.
 ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing
@@ -435,7 +435,7 @@ here claims adoption, performance or superiority.
 Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
 decisions, if it can be done without overstating what a re-perturbed recording proves; extending
 the intent-routing calibration audit to labelled coding-agent permission decisions, with a
-separate protocol and explicit limits. Full list in [docs/ROADMAP.md](docs/ROADMAP.md).
+separate protocol and explicit limits. Full list in [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
 
 ## Development
 
@@ -456,9 +456,9 @@ python docs/assets/src/make_figures.py --check   # the README figures match thei
 
 The acceptance suite is hash-pinned in `FROZEN.sha256`. CI checks formatting, lint, strict typing
 and tests on Python 3.11 and 3.14, with separate macOS statistics checks. See
-[the workflow](.github/workflows/ci.yml) for coverage and
-[the evidence report](docs/reports/ci-gate-2026-10-06/REPORT.md) for measured results. Design
-records live in [docs/design](docs/design/), the changelog in [CHANGELOG.md](CHANGELOG.md).
+[the workflow](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/.github/workflows/ci.yml) for coverage and
+[the evidence report](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md) for measured results. Design
+records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/design/), the changelog in [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ### Availability and project status
 
@@ -474,4 +474,4 @@ relative non-inferiority, not absolute reliability. This is not a sandbox.
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
 [Security policy](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/SECURITY.md)
 
-[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for adapted code.
+[Apache-2.0](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE). See [NOTICE](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/NOTICE) for adapted code.
