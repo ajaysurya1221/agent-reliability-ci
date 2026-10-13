@@ -295,8 +295,9 @@ def _check_node(
 
     Problems: a tag that is not plain JSON (`_check_tag`), a malformed or non-finite number or
     boolean, a non-string key, a repeated key, a self-referencing alias, nesting deeper than
-    `MAX_DEPTH`. A merge key (`<<`) is not a duplicate: keys it brings in may be overridden, as
-    YAML intends. A node reached twice through an alias is checked once.
+    `MAX_DEPTH`. Keys a merge key (`<<`) brings in may be overridden by an explicit key, as YAML
+    intends, and `<<: [*a, *b]` merges several mappings; but `<<` itself given twice in ONE
+    mapping is a repeated key like any other. A node reached twice through an alias is checked once.
     """
     if id(node) in active:
         raise _SourceError(path, "a YAML alias contains itself; recursive values are not JSON")
@@ -310,8 +311,17 @@ def _check_node(
         _check_scalar(node, path)
     elif isinstance(node, yaml.MappingNode):
         keys: set[str] = set()
+        merged = False
         for key_node, value_node in cast(list[tuple[yaml.Node, yaml.Node]], node.value):
             if key_node.tag == _MERGE_TAG:
+                if merged:
+                    mark = key_node.start_mark
+                    raise _SourceError(
+                        path,
+                        f"duplicate merge key {_quote('<<')} at line {mark.line + 1}, column "
+                        f"{mark.column + 1}; merge several mappings with <<: [*a, *b]",
+                    )
+                merged = True
                 _check_node(loader, value_node, path, active, done)
                 continue
             key = _check_key(loader, key_node, path)

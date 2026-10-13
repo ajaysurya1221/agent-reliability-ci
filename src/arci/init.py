@@ -9,8 +9,9 @@ names it advertises; explicit fault tools are checked against them. Agents, the 
 and `snapshot` are never called, and this process never imports a reference (AGENT_SEMANTICS).
 
 The descriptor is rendered with every string value double-quoted, staged beside the destination,
-re-loaded through the descriptor loader and seal-checked, then published atomically. Errors are
-`InitError`, one line, with nothing written.
+re-loaded through the descriptor loader and seal-checked, then published: with `--force` by an
+atomic rename; without it by a hard link or, where links are unsupported, an exclusive create, so
+an existing file is never replaced. Errors are `InitError`, one line, with nothing written.
 """
 
 from __future__ import annotations
@@ -61,10 +62,15 @@ HEADER: Final = (
     "# Plan before trials: arci plan --help\n"
     "# Never extend this experiment based on its verdict.\n"
 )
+# From this N per arm a design is not a smoke design (the same bound as `arci run`'s notice).
+NON_SMOKE_N: Final = 100
 
 # The flags in validation order; the child resolves the references in this order too.
 _REFERENCE_FLAGS: Final = ("--baseline", "--candidate", "--toolset", "--oracle")
 _DETAIL_LIMIT: Final = 200
+EXPERIMENT_ID_MAX: Final = 200
+OCCURRENCE_MAX: Final = 10**9
+_ADVERTISED_MAX: Final = 20
 
 assert set(INIT_FAULTS) <= set(REGISTRY), "init offers only registered built-in faults"
 
@@ -124,7 +130,7 @@ def _one_line(text: str) -> str:
 
 
 def _parse_n(text: str) -> int:
-    if not (text.isascii() and text.isdecimal()) or not (
+    if not (text.isascii() and text.isdecimal() and len(text) <= len(str(N_PER_ARM_MAX))) or not (
         N_PER_ARM_MIN <= int(text) <= N_PER_ARM_MAX
     ):
         raise InitError(
@@ -142,6 +148,11 @@ def _check_out_suffix(out_text: str) -> None:
 
 
 def _check_experiment_id(experiment_id: str) -> None:
+    if len(experiment_id) > EXPERIMENT_ID_MAX:
+        raise InitError(
+            f"experiment id has {len(experiment_id)} characters; at most {EXPERIMENT_ID_MAX} "
+            "(it names the run directory)"
+        )
     if re.fullmatch(EXPERIMENT_ID_PATTERN, experiment_id) is None:
         raise InitError(
             f"experiment id {_show(experiment_id)} must match {EXPERIMENT_ID_PATTERN} "
@@ -204,8 +215,15 @@ def _parse_fault(text: str) -> InitFault:
     occurrence = 0
     if len(parts) == 3:
         occ = parts[2]
-        if not (occ.isascii() and occ.isdecimal()):
-            raise InitError(f"{flag}: occurrence {_show(occ)} must be a non-negative integer")
+        if not (
+            occ.isascii()
+            and occ.isdecimal()
+            and len(occ) <= len(str(OCCURRENCE_MAX))
+            and int(occ) <= OCCURRENCE_MAX
+        ):
+            raise InitError(
+                f"{flag}: occurrence {_show(occ)} must be an integer from 0 to {OCCURRENCE_MAX}"
+            )
         occurrence = int(occ)
     return InitFault(text=text, name=name, tool=tool, occurrence=occurrence)
 
@@ -296,7 +314,10 @@ os.dup2(2, 1)
 sys.stdout = sys.stderr
 
 def finish(result):
-    sys.stderr.flush()
+    try:
+        sys.stderr.flush()
+    except BaseException:
+        pass
     os.write(result_fd, (json.dumps(result) + "\n").encode("utf-8"))
     os._exit(0)
 
@@ -323,7 +344,8 @@ for flag, ref in request["references"]:
         finish({"ok": False, "kind": "callable", "flag": flag, "ref": ref,
                 "detail": describe(exc)})
     except BaseException as exc:
-        finish({"ok": False, "kind": "import", "flag": flag, "ref": ref, "detail": describe(exc)})
+        finish({"ok": False, "kind": "resolve", "flag": flag, "ref": ref,
+                "detail": type(exc).__name__})
 
 toolset = request["toolset"]
 try:
@@ -359,7 +381,12 @@ def _child_failure(result: dict[str, object]) -> InitError:
     detail = _one_line(str(result.get("detail", "")))
     module, _, attribute = ref.partition(":")
     if kind == "import":
-        return InitError(f"{flag} {ref}: module not importable; check module and dependencies")
+        return InitError(
+            f"{flag} {ref}: module not importable; importing {module} raised {detail}; "
+            "check module and dependencies"
+        )
+    if kind == "resolve":
+        return InitError(f"{flag} {ref}: importable but resolving {attribute} raised {detail}")
     if kind == "attribute":
         return InitError(
             f"{flag} {ref}: module {module} has no attribute {attribute}; check the function name"
@@ -396,7 +423,9 @@ def check_references(
 
     The child gets `deadline` seconds; on timeout its whole process group is killed. Its stdout
     and stderr go to temporary files, never pipes, so a descendant holding them open cannot stall
-    this process; the process group is killed on every path, so no descendant outlives the check.
+    this process. The child's process group is killed on every path, so no descendant that stays
+    in that group outlives the check; a descendant that starts its own session (or moves to
+    another process group) is outside that boundary and is not killed.
     """
     payload = json.dumps(
         {
@@ -448,7 +477,10 @@ def check_references(
     tools = tuple(str(name) for name in cast(list[object], result.get("tools", [])))
     for fault in request.faults:
         if fault.tool is not None and fault.tool not in tools:
-            advertised = ", ".join(tools) if tools else "none"
+            shown = [_show(name) for name in tools[:_ADVERTISED_MAX]]
+            if len(tools) > _ADVERTISED_MAX:
+                shown.append(f"and {len(tools) - _ADVERTISED_MAX} more")
+            advertised = ", ".join(shown) if shown else "none"
             raise InitError(
                 f"--fault {_show(fault.text)}: tool {_show(fault.tool)} absent from --toolset "
                 f"{request.toolset}; choose an advertised tool ({advertised})"
@@ -483,6 +515,21 @@ def _flow(value: JsonValue) -> str:
     return text.removesuffix("\n...\n").rstrip("\n")
 
 
+def header(n_per_arm: int) -> str:
+    """`HEADER` for a smoke design (N < `NON_SMOKE_N`); otherwise lines 2-3 name the chosen N."""
+    if n_per_arm < NON_SMOKE_N:
+        return HEADER
+    first, _, _, *rest = HEADER.splitlines(keepends=True)
+    return "".join(
+        [
+            first,
+            f"# design: {n_per_arm} trials per arm, chosen by you; plan it with arci plan\n",
+            "# This file was written by arci init; re-run init or edit to change the design.\n",
+            *rest,
+        ]
+    )
+
+
 def render_descriptor(request: InitRequest) -> str:
     """The header, then the descriptor keys; every string value is quoted."""
     lines = [
@@ -511,7 +558,7 @@ def render_descriptor(request: InitRequest) -> str:
     else:
         lines.append(f"  - id: {_flow(CLEAN_CONDITION)}")
     lines.append(f"n_per_arm: {request.n_per_arm}")
-    return HEADER + "\n".join(lines) + "\n"
+    return header(request.n_per_arm) + "\n".join(lines) + "\n"
 
 
 def _verify(request: InitRequest, staged: Path) -> Manifest:
@@ -551,21 +598,61 @@ def _umask() -> int:
     return mask
 
 
-def publish(request: InitRequest, text: str) -> None:
-    """Stage beside the destination, verify, then publish atomically. Nothing is left on error."""
-    fd, staged_name = tempfile.mkstemp(
-        prefix=f".{request.out.name}.", suffix=".tmp", dir=request.out.parent
-    )
-    staged = Path(staged_name)
+def _exists(request: InitRequest) -> InitError:
+    return InitError(f"output {_show(request.out_text)} exists; use --force to replace it")
+
+
+def _create_exclusive(dest: Path, data: bytes) -> None:
+    """Publish `data` at `dest` only if nothing is there; remove only what this call created.
+
+    For file systems without hard links. `O_EXCL` fails on any existing entry, a symlink
+    included, so an existing file is never replaced.
+    """
+    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+    created: os.stat_result | None = None
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+        try:
+            created = os.fstat(fd)
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view) :]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            now = os.lstat(dest)
+            # The entry is removed only while it is still the file this call created.
+            if created is None or (now.st_dev, now.st_ino) == (created.st_dev, created.st_ino):
+                os.unlink(dest)
+        raise
+
+
+def publish(request: InitRequest, text: str) -> None:
+    """Stage beside the destination, verify, then publish. Nothing is left on error.
+
+    With --force the staged file replaces the destination atomically. Without it the publication
+    fails closed: a hard link refuses an existing destination, and where hard links are
+    unsupported an exclusive create does; neither ever falls back to a replacing rename.
+    """
+    staged: Path | None = None
+    try:
+        fd, staged_name = tempfile.mkstemp(
+            prefix=f".{request.out.name}.", suffix=".tmp", dir=request.out.parent
+        )
+        staged = Path(staged_name)
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
+        except BaseException:
+            os.close(fd)
+            raise
+        with handle:
             handle.write(text)
         # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
         os.chmod(staged, 0o666 & ~_umask())
         _verify(request, staged)
         # Re-checked at the last moment: a directory or symlink is never replaced, and without
-        # --force a file that appeared meanwhile is not replaced either (a hard link refuses to
-        # overwrite; where links are unsupported, the check above is the guard).
+        # --force a file that appeared meanwhile is not replaced either.
         _check_output(request.out, request.out_text, request.force)
         if request.force:
             os.replace(staged, request.out)
@@ -573,22 +660,28 @@ def publish(request: InitRequest, text: str) -> None:
             try:
                 os.link(staged, request.out)
             except FileExistsError:
-                raise InitError(
-                    f"output {_show(request.out_text)} exists; use --force to replace it"
-                ) from None
+                raise _exists(request) from None
             except OSError:
-                os.replace(staged, request.out)
+                # No hard links here (EOPNOTSUPP, EPERM, ...): create exclusively instead; never
+                # fall back to a rename, which would replace a file that appeared meanwhile.
+                try:
+                    _create_exclusive(request.out, staged.read_bytes())
+                except FileExistsError:
+                    raise _exists(request) from None
     except OSError as exc:
         raise InitError(
             f"output {_show(request.out_text)}: cannot write: {exc.strerror or type(exc).__name__}"
         ) from None
     finally:
-        with contextlib.suppress(OSError):
-            staged.unlink()
+        if staged is not None:
+            with contextlib.suppress(OSError):
+                staged.unlink()
 
 
 def next_command(request: InitRequest) -> str:
-    return f"arci run {shlex.quote(request.out_text)}"
+    """`arci run PATH`, shell-quoted; `--` first when PATH starts with `-`, so it is not a flag."""
+    separator = "-- " if request.out_text.startswith("-") else ""
+    return f"arci run {separator}{shlex.quote(request.out_text)}"
 
 
 def run_init(request: InitRequest, *, deadline: float = REFERENCE_CHECK_SECONDS) -> str:

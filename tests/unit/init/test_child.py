@@ -177,7 +177,8 @@ def test_user_output_never_mixes_with_the_result_and_nothing_else_is_called(
         ),
         (
             "raise SystemExit(4)\n",
-            "--baseline init_bad_world:agent: module not importable; check module and dependencies",
+            "--baseline init_bad_world:agent: module not importable; importing init_bad_world "
+            "raised SystemExit: 4; check module and dependencies",
         ),
     ],
 )
@@ -187,3 +188,74 @@ def test_toolset_and_child_failures_are_one_line(workdir: Path, body: str, detai
         check_references(_request("init_bad_world"))
     assert str(caught.value) == detail
     assert "init_bad_world" not in sys.modules
+
+
+def test_a_resolve_error_other_than_a_missing_attribute_names_its_type(workdir: Path) -> None:
+    _write(
+        workdir,
+        "init_lazy_world",
+        "def __getattr__(name):\n    raise ValueError('lazy attributes fail')\n",
+    )
+    request = parse_request(
+        experiment_id="child-check",
+        baseline="init_lazy_world:lazy",
+        candidate="init_lazy_world:agent",
+        toolset="init_lazy_world:make_world",
+        oracle="init_lazy_world:oracle",
+        task=None,
+        task_file=None,
+        faults=(),
+        n="8",
+        out="arci.yaml",
+        force=False,
+    )
+    with pytest.raises(InitError) as caught:
+        check_references(request)
+    assert str(caught.value) == (
+        "--baseline init_lazy_world:lazy: importable but resolving lazy raised ValueError"
+    )
+
+
+def test_a_failing_import_names_the_module_and_the_exception_in_one_bounded_line(
+    workdir: Path,
+) -> None:
+    _write(workdir, "init_dep_world", "import init_missing_dependency\n")
+    with pytest.raises(InitError) as caught:
+        check_references(_request("init_dep_world"))
+    assert str(caught.value) == (
+        "--baseline init_dep_world:agent: module not importable; importing init_dep_world raised "
+        "ModuleNotFoundError: No module named 'init_missing_dependency'; check module and "
+        "dependencies"
+    )
+    _write(workdir, "init_long_world", "raise RuntimeError('x' * 5000 + '\\nsecond line')\n")
+    with pytest.raises(InitError) as caught:
+        check_references(_request("init_long_world"))
+    message = str(caught.value)
+    assert "\n" not in message
+    detail = message.split(" raised ", 1)[1].removesuffix("; check module and dependencies")
+    assert len(detail) == 200
+    assert detail.startswith("RuntimeError: xxx")
+    assert detail.endswith("...")
+
+
+MANY_TOOLS = """
+class World:
+    tools = {f"t{i:02d}": len for i in range(25)}
+
+    def snapshot(self):
+        return {}
+
+def make_world(task, seed):
+    return World()
+"""
+
+
+def test_the_advertised_tools_suffix_names_at_most_twenty(workdir: Path) -> None:
+    _write(workdir, "init_many_world", MANY_TOOLS)
+    with pytest.raises(InitError) as caught:
+        check_references(_request("init_many_world", faults=("tool_timeout:charge",)))
+    names = ", ".join(f"t{i:02d}" for i in range(20))
+    assert str(caught.value) == (
+        "--fault tool_timeout:charge: tool charge absent from --toolset "
+        f"init_many_world:make_world; choose an advertised tool ({names}, and 5 more)"
+    )

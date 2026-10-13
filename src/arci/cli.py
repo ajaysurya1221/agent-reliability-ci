@@ -247,8 +247,9 @@ def smoke_notice(manifest: Manifest) -> str | None:
     """The one stderr line `arci run` prints before a smoke design runs, or None.
 
     It fires when some gating condition has n_per_arm < 100. Inside the planner's domain
-    (clopper_pearson, K=1, one look) the thresholds are this manifest's; otherwise they are the
-    default rule's (alpha 0.05, delta 0.10, K=1, one look), and the line says so.
+    (clopper_pearson, K=1, one look) the thresholds are this manifest's own alpha and delta under
+    its fixed-sample Clopper-Pearson rule; otherwise they are given for reference only, under
+    Clopper-Pearson with alpha 0.05, delta 0.1, K=1 and one look, and the line says so.
     """
     k = _gating_conditions(manifest)
     n = manifest.n_per_arm
@@ -259,10 +260,10 @@ def smoke_notice(manifest: Manifest) -> str | None:
     )
     alpha, delta = (manifest.alpha, manifest.delta) if in_domain else (0.05, 0.10)
     rule = (
-        "under the default rule"
+        "under this design's fixed-sample Clopper\u2013Pearson rule"
         if in_domain
-        else "under the default rule (default rule: alpha 0.05, delta 0.1, K=1, one look; "
-        "this design is outside the planner's domain)"
+        else f"for reference only, under Clopper\u2013Pearson with alpha {alpha:g}, "
+        f"delta {delta:g}, K=1 and one look,"
     )
     return (
         f"SMOKE DESIGN: n_per_arm={n} (alpha {manifest.alpha:g}, delta {manifest.delta:g}, "

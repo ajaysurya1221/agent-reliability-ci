@@ -460,3 +460,21 @@ def test_a_merge_key_override_is_not_a_duplicate() -> None:
         "base": {"label": "A", "agent": "m.a:f"},
         "data": {"label": "B", "agent": "m.a:f"},
     }
+
+
+def test_a_merge_list_is_one_merge_key_and_is_allowed() -> None:
+    text = "a: &a {x: 1}\nb: &b {x: 2, y: 3}\nc:\n  <<: [*a, *b]\n  y: 4\n"
+    # The first mapping in the list wins for a key both give; an explicit key wins over both.
+    assert parse_yaml(text) == {"a": {"x": 1}, "b": {"x": 2, "y": 3}, "c": {"x": 1, "y": 4}}
+
+
+def test_a_repeated_merge_key_in_one_mapping_is_rejected() -> None:
+    text = "a: &a {x: 1}\nb: &b {y: 2}\nc:\n  <<: *a\n  <<: *b\n"
+    # PyYAML alone merges both silently; the descriptor loader refuses, as for any repeated key.
+    assert yaml.safe_load(text)["c"] == {"x": 1, "y": 2}
+    with pytest.raises(DescriptorError) as caught:
+        loads_descriptor(text)
+    assert str(caught.value) == (
+        'descriptor <descriptor>:c: duplicate merge key "<<" at line 5, column 3; merge several '
+        "mappings with <<: [*a, *b]"
+    )

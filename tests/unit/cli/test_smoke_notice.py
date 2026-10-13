@@ -20,11 +20,18 @@ from arci.storage import load_run
 from tests.acceptance.helpers import COND_CEILING, COND_CLEAN, COND_TIMEOUT, manifest
 
 REPO = Path(__file__).resolve().parents[3]
+PLAN = (
+    "Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK"
+)
 DEFAULT_LINE = (
-    "SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=1): under the default rule two "
-    "perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect "
-    "INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P "
-    "--target-verdict BLOCK"
+    "SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample "
+    "Clopper\u2013Pearson rule two perfect arms cannot PASS below N=42 and a total collapse "
+    f"cannot BLOCK below N=8; expect INCONCLUSIVE. {PLAN}"
+)
+REFERENCE_ONLY = (
+    "for reference only, under Clopper\u2013Pearson with alpha 0.05, delta 0.1, K=1 and one "
+    "look, two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; "
+    "expect INCONCLUSIVE."
 )
 FOLLOWUP_6 = (
     "INCONCLUSIVE at n_per_arm=6 is the expected smoke result; choose a confirmatory N with "
@@ -135,25 +142,42 @@ def test_the_notice_comes_before_the_run_only_below_100(
     assert _stderr_before_the_run(built, tmp_path, monkeypatch, capsys) == expected
 
 
-def test_a_design_outside_the_planner_uses_the_default_rule_and_says_so() -> None:
+def test_a_design_outside_the_planner_gives_reference_thresholds_and_says_so() -> None:
     two = manifest(n_per_arm=6, conditions=(COND_TIMEOUT, COND_CLEAN))
     newcombe = _with(manifest(n_per_arm=6), interval_method="newcombe")
     looks = _with(manifest(n_per_arm=6), looks=(3, 6))
-    default_rule = (
-        "under the default rule (default rule: alpha 0.05, delta 0.1, K=1, one look; this "
-        "design is outside the planner's domain) two perfect arms cannot PASS below N=42 and a "
-        "total collapse cannot BLOCK below N=8; expect INCONCLUSIVE."
-    )
     assert smoke_notice(two) == (
-        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=2): {default_rule} Plan a "
-        "confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK"
+        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.05, delta 0.1, K=2): {REFERENCE_ONLY} {PLAN}"
     )
     for design in (two, newcombe, looks):
         notice = smoke_notice(design)
         assert notice is not None
-        assert default_rule in notice
+        assert REFERENCE_ONLY in notice
+        assert "default rule" not in notice
     one_look = _with(manifest(n_per_arm=6), looks=(6,))
     assert smoke_notice(one_look) == DEFAULT_LINE
+
+
+def test_an_out_of_domain_design_with_its_own_parameters_names_them_and_the_reference() -> None:
+    # The header shows the manifest's own alpha and delta; the thresholds stay the reference
+    # design's 42 and 8, and the line says which rule they belong to.
+    design = _with(
+        manifest(n_per_arm=6, alpha=0.1, conditions=(COND_TIMEOUT, COND_CLEAN)), delta=0.2
+    )
+    assert smoke_notice(design) == (
+        f"SMOKE DESIGN: n_per_arm=6 (alpha 0.1, delta 0.2, K=2): {REFERENCE_ONLY} {PLAN}"
+    )
+
+
+def test_an_in_domain_design_with_its_own_parameters_uses_them() -> None:
+    design = _with(manifest(n_per_arm=6, alpha=0.1), delta=0.2)
+    # 17 and 8 are this design's own thresholds (test_printed_thresholds_agree_with_the_gate
+    # checks them against the gate), not the reference design's 42 and 8.
+    assert smoke_notice(design) == (
+        "SMOKE DESIGN: n_per_arm=6 (alpha 0.1, delta 0.2, K=1): under this design's fixed-sample "
+        "Clopper\u2013Pearson rule two perfect arms cannot PASS below N=17 and a total collapse "
+        f"cannot BLOCK below N=8; expect INCONCLUSIVE. {PLAN}"
+    )
 
 
 def test_the_followup_line() -> None:
