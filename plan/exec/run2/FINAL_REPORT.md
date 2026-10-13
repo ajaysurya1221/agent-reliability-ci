@@ -16,16 +16,24 @@ D1 deferred past 2026-11-12.
 |---|---|---|
 | T16 leftovers, code | merged (three review rounds) | `arci run` prints `run store: <path>` on stderr; `arci init` errno attribution and macOS fsync note; `mcp_boundary` frames via `sys.__stdout__` at call time; wheel smoke runs `arci schema`; release workflow sdist allowlist; CI Action-fixture summary check with a stderr-leak guard; recipe-test fixes; README own-agent command shows `--task`; CHANGELOG Unreleased entries. Isolated merge bar 1225 passed. Reviews: Fable, reviewer ×3, Astra ×3 (two REVISE on the guard's error handling and a CHANGELOG qualifier). |
 | T17 protocol and scripts | merged (two rounds) | Protocol §2.3 Track A version check, §4.6 multi-store `trials_started`, §5 q2 either-route sentence, §7.1 per attempt, §7.2 ISO-or-empty `at` and a six-stage failure taxonomy, §8.2–8.4 first-attempt rule; zsh-safe stopwatch scripts; cohort builder `--persist`, `--legacy-sentence`, overwrite refusal, all-or-nothing writes, 64 tests; persisted cohort result committed under `plan/exec/run2/data/`. Reviews: Fable, reviewer ×2. |
-| T18 reference-machine timing | <<state>> | `.github/workflows/ttfv-reference.yml` (five cold + two warm samples per OS, per-sample timeout, deadline arithmetic, robust journal), `plan/exec/scripts/reference_stats.py` (validated per-block stats), `docs/measurement/reference-machines/README.md`. Reviews: Astra REVISE ×2 → <<r3>>; reviewer REVISE (r1 on the first commit) → <<r2/r3>>. |
+| T18 reference-machine timing | merged (three review rounds + the D-12 tie-break delta; two coder hangs) | `.github/workflows/ttfv-reference.yml` (five cold + two warm samples per OS, per-sample timeout, deadline arithmetic, robust journal), `plan/exec/scripts/reference_stats.py` (validated per-block stats), `docs/measurement/reference-machines/README.md`. Reviews: Astra REVISE ×3 → ACCEPT on the tie-break delta; reviewer REVISE ×2 → ACCEPT (r3). Final run 38470699338: all seven samples on both runners; JSON committed under docs/measurement/reference-machines/. |
 | T19 Inspector compatibility check | done | D-11: no released MCP SDK (v1 1.32.1, v2 core 2.2.0 used by Inspector 2.10.1) supports revision 2026-07-28; the honest fix is an explicit standalone compatibility mode of the bridge (argv flag, never an environment variable), ADR 0011 for the next run once an MCP pilot or the MCP post commits; Astra agreed after one correction. |
 | T20 D2 import-record provenance model, design only | done | `plan/exec/run2/adr-0010-draft.md` v3 accepted by Astra after two REVISE rounds (purity of the import function with explicit provenance inputs; ordering evidence; recursive immutability; conservative capabilities; separate source-reported vs oracle outcomes). Fixture candidates in `plan/exec/run2/fixtures.md` (two offline-replay producers accepted conditionally; no fixture fetched; D3 not started). |
-| T21 wrap-up | <<state>> | this file; HUMAN_INBOX updated. |
+| T21 wrap-up | done | this file; HUMAN_INBOX section "Run 2"; plan/exec/run2/STATUS.md. |
 
 ## 2. Deviations from the plan, with the rule
 - T18 needed three rounds: the first commit had no per-sample timeout (the macOS job hit its
   25-minute limit live), the second's deadline arithmetic was still unbounded and its validator
   accepted contradictory samples (Astra); fixed in T18r1/T18r2 (rule c: honest measurement, and
-  rule e). <<final state>>
+  rule e). Astra's third round still found the reserve under-counted by 60 s; with the three
+  rounds exhausted, D-12 applied the fix as a minimal orchestrator delta (reserve 420 s, probe gated
+  on the whole reserve, the combined inequality asserted) and merged on the reviewer's round-3
+  ACCEPT plus Astra's ACCEPT of that delta only.
+- Two Opus coders on the T18 revision hung inside a Bash tool call after writing their edits (no
+  child process remained; the hung commands were ordinary PyYAML/shellcheck/shasum checks). The
+  orchestrator stopped them, verified the on-disk work in isolated child sessions with wall-clock
+  limits, and committed it (plan/exec/run2/reports/18r3.md). Cause not established; recorded as a
+  harness known issue.
 - T16 needed two extra delta rounds for the CI stderr-leak guard (grep error handling) and a
   CHANGELOG qualifier (Astra); accepted in round 3.
 - The T18 workflow's push trigger was narrowed to `sprint/t18-**` (orchestrator) so other lane
@@ -35,7 +43,7 @@ D1 deferred past 2026-11-12.
   hand-written spans; a producer counts only once its fixture shows useful tool identity and order.
 
 ## 3. Review coverage
-Product changes merged into main in this run: <<n>> (T16, T17<<, T18>>), each with two or more
+Product changes merged into main in this run: 3 (T16, T17, T18), each with two or more
 non-author reviews; Astra reviewed T16 (workflows and the publication path), T18 (workflow) and the
 two design records (D-11, ADR 0010 draft); T17 was reviewed by the reviewer subagent and the
 orchestrator. No author-only merge. Plan-only commits under `plan/exec/` are records.
@@ -62,7 +70,9 @@ D8 and all posting (user decision), R1–R8 (conditional on external evidence), 
 (ADR 0011 next run), `httpcore2` typo and hash pinning (next justified re-freeze).
 
 ## 6. Usage
-<<Opus workflow runs/transcripts/tokens; Astra consults count; from the transcripts at wrap-up>>
+- Claude workflow subagents in run 2: 12 workflow runs (6 coder runs incl. revisions and the two stopped hangs; 6 reviewer runs), 15 agent transcripts; models seen {'claude-opus-5-5': 749}; output tokens 386,269; cache reads 71.7 M; cache creation 3.3 M (summed from the transcripts at wrap-up).
+- Astra (`gpt-6-astra`, xhigh, read-only): 10 consults in run 2 (D2/D-11 design ×3, review 16 ×3, 18 ×4) plus the three planning consults (blind proposal, tie-break) recorded in plan/exec/run2/PLANNING-RECORD.md.
+- Fable 5.1 (orchestrator): one session continued from run 1; wrote the plan with Astra, the D2 design draft, D-11/D-12, all briefs, the T18 tie-break delta, every merge and verification run, and these records.
 
 ## 7. Known issues
 - macOS GitHub runners: the demo slows down monotonically across samples (235 → 453 s); cause unknown
@@ -75,7 +85,7 @@ D8 and all posting (user decision), R1–R8 (conditional on external evidence), 
 - `receipt.template.json` keeps the old "per reader per track" and "ERROR if none" wording because
   its `_comment`s are copied into every receipt (changing it would alter rebuilt receipts).
 - Inspector step still blocked (D-11); ADR 0011 pending.
-- <<T18 final>>
+- The reference-machine workflow's trigger is `sprint/t18-**` + `workflow_dispatch`; `gh workflow run` is denied for the orchestrator, so re-running it needs a push to such a branch or the user's click.
 
 ## 8. Next three steps
 1. Investigate the macOS runner slowdown with a process/disk snapshot before each sample (one small

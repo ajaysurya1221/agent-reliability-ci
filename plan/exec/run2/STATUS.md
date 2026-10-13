@@ -11,4 +11,4 @@ Budget clock start (Task 00 commit): 2026-10-13T18:12:20Z. Stop starting tasks a
 | 17 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT, reviewer ACCEPT (r1, r2) | sprint/t17-protocol 9b2e4b5 → main | lane CI green |
 | 16 | DONE, MERGED, PUSHED (main d152ea3) | Fable ACCEPT; reviewer ACCEPT ×3; Astra ACCEPT (r1, r3) | sprint/t16-code dfdb11f → main | lane CI green; isolated merge bar 1225 passed; main CI running |
 | V (19:53Z) | GREEN | Fable | main d152ea3 (T17 + T16 merged and pushed) | main CI run success; T18 still on its lane |
-| 18 | Astra ACCEPT (delta, after D-12); reviewer round 3 pending; lane 6cdb709 pushed with the run-38470699338 JSON files; lane CI running | Fable + reviewer + Astra | sprint/t18-refmachines 6cdb709 | final live run: all seven samples on both runners; ubuntu cold p50 232 s, macOS 220 s (over the memo target ~2×) |
+| 18 | MERGED locally (D-12 tie-break); push after lane CI on 1f67f8c; merge bar running | Fable ACCEPT; reviewer ACCEPT (r3); Astra ACCEPT (delta) | sprint/t18-refmachines 1f67f8c → main | final run 38470699338: ubuntu cold p50 232 s, macOS 220 s, warm ≈ cold; JSON committed |
