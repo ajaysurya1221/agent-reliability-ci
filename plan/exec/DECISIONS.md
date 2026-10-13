@@ -145,3 +145,17 @@ ensure the compatibility mode cannot activate through inherited environment vari
 boundary's server environment inherits the parent's (`src/arci/mcp_boundary.py` ~line 772): the mode
 must be an explicit argv flag the bridge is started with, never an environment variable.
 
+### D-12 (run 2, T18): review rounds exhausted on the timing workflow; tie-break applied
+
+T18 had three review rounds (Astra: REVISE, REVISE, REVISE on a last arithmetic point; reviewer:
+REVISE, REVISE, round 3 pending). The rule "at most three rounds, then tie-break" applies. The
+remaining dispute is a factual arithmetic point (the reserve must cover the combined timeouts of
+the post-sampling steps plus headroom), not a design disagreement; rule (c) (honest measurement:
+the JSON must always be written before the job deadline) and rule (e) (a constant and a test
+assertion are trivially reversible) both say: apply Astra's required change. Decision: the
+orchestrator applies it as a minimal delta (reserve raised to cover probe + parse + upload + final
+check + headroom; probe admitted only when that fits; the test asserts the combined inequality;
+README aligned), and T18 merges on the reviewer-subagent's round-3 verdict plus Astra's
+confirmation of that delta only. No fourth full round. Recorded here instead of a design record
+because no design changed.
+
