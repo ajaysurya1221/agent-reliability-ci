@@ -50,3 +50,30 @@
 - PyPI provenance: both files carry one PEP 740 attestation each (publisher GitHub
   ajaysurya1221/agent-reliability-ci, workflow release.yml, environment pypi), checked through
   https://pypi.org/integrity/… at 08:26Z.
+
+## AI-cohort TTFV pass (user request at ~12:05Z; five context-free AI readers; AI-agent labelled, never cold readers)
+
+- Readers: Claude Opus 5.5 ×2, Sonnet 5.5 ×2, Haiku 5.5 ×1 (Workflow subagents, fresh contexts,
+  personas from backend engineer to junior developer), run one after another from 12:05Z to 12:24Z;
+  each read README.md at main (718ce95 README bytes), ran Track A from PyPI with the README's exact
+  command and Track B on a copy of the python_agent sample tree, self-stamped milestones with
+  `date -u` under a facilitator wrapper, then answered the five questions and both interpretation
+  questions. A separate Sonnet agent scored each reader against the protocol §5 key; the
+  orchestrator spot-checked the rationales. Receipts: `docs/measurement/receipts/2026-10-13-ai-reader-*.json`
+  (ten files, one per reader per track).
+- Results: comprehension 5/5 for all five readers (25/25 answers); BLOCK interpretation 5/5;
+  own-run INCONCLUSIVE interpretation 5/5. Track A: 74, 73, 74, 74, 75 s from command start to
+  "All six steps held." (install 1 s each, warm uv cache). Track B: install 1 s (uv venv route),
+  scaffold 0–6 s, run 1–2 s; INCONCLUSIVE at N=8 with the store validated (gate reproduced the line,
+  decision sha unchanged) for all five.
+- Friction, 5/5 readers: the README's four-reference `arci init` command fails on the sample tree
+  with `KeyError: 'order_id'` (the factory needs task data); the error names `--task`, and every
+  reader recovered on the second attempt (init_attempts 2). Fixed in T15 by one README sentence and
+  by the recipe README's stale "until it is on PyPI" paragraph. Other remarks: the README is long
+  before "Gate your own agent" (3 readers); the smoke scaffold without `--fault` "tells nothing
+  about the retry" (3); `arci run` does not print the store path (1); jargon list from the junior
+  persona (toolset, oracle, delta, alpha, Clopper–Pearson).
+- Facilitator defects (not product): the timestamping wrapper used bash's `PIPESTATUS` under zsh,
+  so the demo exit code printed empty and four readers re-ran the demo under bash outside the
+  clock; `uv tool install` is denied in this harness (all readers used `uv venv` + `uv pip install`,
+  recorded as a coaching event and a failure in every receipt).
