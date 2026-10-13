@@ -33,7 +33,7 @@ dependencies, which measured 1–2 s on the hosted runners; nearly all of a samp
 demo's own computation (two experiments of 200 trials per arm, the diff, the minimisation, the
 replay, and the repaired agent's experiment). The warm samples are reported separately, for
 information, and never pooled with the cold ones. As an example, not a guarantee: on 2026-10-13
-(run 38451606669) the five cold samples took 222–227 s on `ubuntu-latest` and 213–227 s on
+(runs 38451606669 and 38470699338) the five cold samples took 222–232 s on `ubuntu-latest` and 208–244 s on
 `macos-latest`, over both targets on both runners.
 
 ## Network traffic
@@ -119,7 +119,9 @@ time-to-first-verdict that the package and the network control; a person's time 
 ## Reading p50 and p95
 
 ```
-python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/reference-*.json
+.venv/bin/python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/*.json
+
+(The script needs Python 3.10 or later; the repository's `.venv` has it.)
 ```
 
 For each file it first checks the structure and the timestamps (stamps present and in order
