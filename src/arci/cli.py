@@ -15,6 +15,16 @@ from typing import Literal, NoReturn, Protocol, cast
 from pydantic import JsonValue
 
 from arci.demo.run import check_keep, default_workers, run_demo
+
+# --- descriptor ---
+from arci.descriptor import (
+    DescriptorError,
+    compile_descriptor,
+    is_descriptor_path,
+    render_schema,
+)
+
+# --- end descriptor ---
 from arci.gate import decide
 from arci.mcp_boundary import (
     UpstreamResult,
@@ -118,10 +128,37 @@ def _find_spec(manifest: Manifest, trial_id: str) -> TrialSpec:
     return matches[0]
 
 
-def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
-    manifest = Manifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
+# --- descriptor ---
+def _run_manifest(path: str) -> Manifest:
+    """`arci.yaml`/`.yml` is compiled and sealed; anything else is sealed JSON, seal checked."""
+    if is_descriptor_path(path):
+        try:
+            return compile_descriptor(path)
+        except DescriptorError as exc:
+            raise CliError(str(exc)) from None
+    manifest = Manifest.model_validate_json(Path(path).read_text(encoding="utf-8"))
     if not manifest.validate_seal():
         raise CliError("manifest seal is invalid")
+    return manifest
+
+
+def _cmd_schema(out_path: str | None) -> int:
+    """Print the descriptor's JSON Schema, or write the identical bytes to `out_path`."""
+    text = render_schema()
+    if out_path is None:
+        sys.stdout.write(text)
+    else:
+        Path(out_path).write_bytes(text.encode("utf-8"))
+    return 0
+
+
+# --- end descriptor ---
+
+
+def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
+    # --- descriptor ---
+    manifest = _run_manifest(manifest_path)
+    # --- end descriptor ---
     trials = run_experiment(manifest, out_dir, max_workers=workers)
     decision = decide(manifest, trials)
     run_dir = Path(out_dir) / manifest.experiment_id
@@ -414,9 +451,18 @@ def _parser() -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    run = commands.add_parser("run", help="run a frozen experiment manifest")
-    run.add_argument("manifest_json", metavar="MANIFEST_JSON")
-    run.add_argument("--out", required=True, metavar="DIR")
+    # --- descriptor ---
+    run = commands.add_parser(
+        "run",
+        help="run an arci.yaml descriptor or a frozen manifest",
+        description=(
+            "Run an experiment. A .yaml/.yml path is an arci.yaml descriptor, compiled and "
+            "sealed before any trial; any other path is a sealed manifest JSON, seal checked."
+        ),
+    )
+    run.add_argument("manifest_json", metavar="PATH", help="arci.yaml descriptor or manifest JSON")
+    run.add_argument("--out", default="runs", metavar="DIR", help="run store (default: runs)")
+    # --- end descriptor ---
     run.add_argument("--workers", type=_positive_int, default=4, metavar="N")
 
     preflight = commands.add_parser("preflight", help="check an HTTP decision upstream")
@@ -523,6 +569,17 @@ def _parser() -> _Parser:
         help="write the run stores to DIR (empty or new) instead of a kept temporary directory",
     )
     # --- end demo ---
+    # --- descriptor ---
+    schema = commands.add_parser(
+        "schema",
+        help="print the arci.yaml JSON Schema",
+        description=(
+            "Print the JSON Schema of the arci.yaml descriptor, generated from the pydantic "
+            "models (which stay authoritative: the schema cannot express cross-field rules)."
+        ),
+    )
+    schema.add_argument("--out", metavar="PATH", help="write the schema to PATH instead")
+    # --- end descriptor ---
     return parser
 
 
@@ -601,6 +658,10 @@ def _dispatch(values: dict[str, object]) -> int:
             keep=None if keep is None else Path(keep),
         )
     # --- end demo ---
+    # --- descriptor ---
+    if command == "schema":
+        return _cmd_schema(cast(str | None, values["out"]))
+    # --- end descriptor ---
     raise CliError(f"unknown command: {command}")
 
 
