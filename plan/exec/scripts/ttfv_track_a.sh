@@ -10,8 +10,14 @@ export UV_NO_PROGRESS=1
 T_README=$(stamp)                     # README on screen: the facilitator (this script) starts
 T_CMD=$(stamp)
 LOG="$WORK/demo.log"
-uvx --from "$SPEC" arci demo 2>&1 | while IFS= read -r line; do printf '%s %s\n' "$(stamp)" "$line"; done > "$LOG"
-EXIT=${PIPESTATUS[0]}
+# Exit status of `arci demo`, not of the stamping loop. `${PIPESTATUS[0]}` is bash-only: under zsh
+# (the shell the v0.8.0 cohort's wrapper ran in, or `zsh ttfv_track_a.sh`) it is unset, which
+# aborts under `set -u` or records nothing. Writing the status to a file from inside the brace
+# group is portable to bash, zsh and sh, and the stamping loop cannot overwrite it.
+EXIT_FILE="$WORK/demo.exit"
+{ uvx --from "$SPEC" arci demo 2>&1; echo $? > "$EXIT_FILE"; } | while IFS= read -r line; do printf '%s %s\n' "$(stamp)" "$line"; done > "$LOG"
+EXIT=$(cat "$EXIT_FILE" 2>/dev/null)
+EXIT=${EXIT:-127}
 T_BANNER=$(grep -m1 ' arci demo: ' "$LOG" | cut -d' ' -f1)
 T_VERDICT=$(grep -m1 ' VERDICT: ' "$LOG" | cut -d' ' -f1)
 T_HELD=$(grep -m1 'All six steps held' "$LOG" | cut -d' ' -f1)

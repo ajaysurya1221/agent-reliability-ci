@@ -1,19 +1,35 @@
 """Build TTFV receipts (one per reader per track) from the AI-cohort workflow result.
 
     python plan/exec/scripts/cohort_receipts.py <result json> <receipts dir> <readme commit>
+        [--legacy-sentence]
+    python plan/exec/scripts/cohort_receipts.py <result json> --persist <augmented json>
 
 The result json is the Workflow tool's return value: {"results": [{"reader": {...}, "out": {...}}],
 "scores": [{"id": ..., "score": {...}}]}. Readers are AI agents: every receipt sets reader.kind to
 "ai-agent" and is never counted as a cold reader (protocol section 1.4).
+
+`--persist` writes a copy of the result json in which each reader's `track_b` gains
+`persisted_store`: the raw `trials.jsonl` lines of the reader's run store and their summed
+`agent_execution`, read while the temporary store still exists. A later build from that copy
+uses them when the store is gone, so the receipts rebuild byte for byte without the stores.
+
+`--legacy-sentence` keeps the v0.8.0 builder's punctuation, which put an extra period after
+reader text ending in a period inside closing quotes or brackets (`."`, `.")`, `."}`). The
+2026-10-13 cohort receipts were built that way and are never edited after merge, so rebuild them
+with this flag.
 """
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+Json = dict[str, Any]
 
 MACHINE = {
     "os": "Darwin 27.0.0 (macOS, arm64)",
@@ -63,10 +79,22 @@ def scrub(text: str | None) -> str:
     return LEAF_RE.sub("<tmp>", text)
 
 
-def sentence(text: str | None) -> str:
-    """Reader text followed by exactly one period."""
+# Text whose last sentence already ended inside closing quotes or brackets: `."`, `.")`, `."}`.
+CLOSED_SENTENCE_RE = re.compile(r"[.!?][\"')\]}]+$")
+
+
+def sentence(text: str | None, *, legacy: bool = False) -> str:
+    """Scrubbed reader text ending in exactly one terminal mark; "" when there is no text.
+
+    A period is appended unless the text already ends in one, or (unless `legacy`) in a terminal
+    mark followed by closing quotes or brackets. `legacy=True` reproduces the v0.8.0 builder.
+    """
     t = scrub(text).rstrip()
-    return t[:-1] if t.endswith(".") else t
+    if not t or t.endswith("."):
+        return t
+    if not legacy and (t.endswith(("?", "!")) or CLOSED_SENTENCE_RE.search(t)):
+        return t
+    return t + "."
 
 
 def parse(ts: str | None) -> dt.datetime | None:
@@ -85,8 +113,8 @@ def seconds(a: str | None, b: str | None) -> int | None:
     return int((pb - pa).total_seconds())
 
 
-def base(template: dict, reader: dict, track: str, readme_commit: str) -> dict:
-    r = json.loads(json.dumps(template))
+def base(template: Json, reader: Json, track: str, readme_commit: str) -> Json:
+    r: Json = json.loads(json.dumps(template))
     r["track"] = track
     r["date"] = "2026-10-13"
     r["reader"] = {
@@ -110,7 +138,7 @@ def base(template: dict, reader: dict, track: str, readme_commit: str) -> dict:
     return r
 
 
-def clean_failure(f: dict) -> dict:
+def clean_failure(f: Json) -> Json:
     """ISO `at` only; any remark attached to the timestamp moves into `what`; paths scrubbed."""
     at = str(f.get("at", ""))
     m = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)(.*)", at)
@@ -124,7 +152,7 @@ def clean_failure(f: dict) -> dict:
     return {"at": at, "milestone": scrub(f.get("milestone", "")), "what": what}
 
 
-def is_demo_failure(f: dict) -> bool:
+def is_demo_failure(f: Json) -> bool:
     text = (f.get("milestone", "") + " " + f.get("what", "")).lower()
     return "demo" in text or "all_steps_held" in text or "command_start" in text
 
@@ -138,22 +166,88 @@ def verdict_of(line: str | None) -> str:
     return m.group(1) if m else "ERROR"
 
 
-def agent_execution(store_dir: str | None) -> float | None:
+PERSISTED = "persisted_store"
+
+
+def read_trials(store_dir: str | None) -> list[str] | None:
+    """The raw lines of `<store>/trials.jsonl`, or None when the store is gone or unreadable."""
     if not store_dir:
         return None
     path = Path(store_dir) / "trials.jsonl"
-    if not path.exists():
+    try:
+        return path.read_text(encoding="utf-8").splitlines()
+    except OSError:
         return None
+
+
+def sum_wall_seconds(lines: list[str]) -> float:
+    """Protocol 4.5: the sum of usage.wall_seconds over the non-blank trials.jsonl lines."""
     total = 0.0
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in lines:
         if line.strip():
             total += float(json.loads(line)["usage"]["wall_seconds"])
     return round(total, 3)
 
 
-def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
-    data = json.loads(result_path.read_text(encoding="utf-8"))
-    template = json.loads((out_dir.parent / "receipt.template.json").read_text(encoding="utf-8"))
+def agent_execution(track_b: Json) -> float | None:
+    """Summed agent_execution from the live store, else from `persisted_store`, else None.
+
+    When both exist they must agree; a rebuild never silently changes a recorded value."""
+    lines = read_trials(track_b.get("store_dir"))
+    persisted: Json = track_b.get(PERSISTED) or {}
+    from_persisted: float | None = None
+    if persisted.get("trials_jsonl") is not None:
+        from_persisted = sum_wall_seconds(persisted["trials_jsonl"])
+        recorded = persisted.get("agent_execution")
+        if recorded is not None and float(recorded) != from_persisted:
+            msg = f"persisted agent_execution {recorded} != sum of persisted lines {from_persisted}"
+            raise ValueError(msg)
+    elif persisted.get("agent_execution") is not None:
+        from_persisted = float(persisted["agent_execution"])
+    if lines is None:
+        return from_persisted
+    live = sum_wall_seconds(lines)
+    if from_persisted is not None and live != from_persisted:
+        msg = f"store {track_b.get('store_dir')}: live {live} != persisted {from_persisted}"
+        raise ValueError(msg)
+    return live
+
+
+def persist(result_path: Path, out_path: Path) -> None:
+    """Write a copy of the result json with each readable store's trials lines and sum."""
+    if out_path.resolve() == result_path.resolve():
+        raise SystemExit("--persist writes a copy; give an output path other than the input")
+    data: Json = json.loads(result_path.read_text(encoding="utf-8"))
+    for item in data["results"]:
+        out = item.get("out")
+        if not out:
+            continue
+        b: Json = out["track_b"]
+        lines = read_trials(b.get("store_dir"))
+        rid = item["reader"]["id"]
+        if lines is not None:
+            total = sum_wall_seconds(lines)
+            b[PERSISTED] = {"agent_execution": total, "trials_jsonl": lines}
+            print(f"{rid}: persisted {len(lines)} lines, agent_execution {total}")
+        elif b.get(PERSISTED):
+            print(f"{rid}: store gone; keeping the already persisted values")
+        else:
+            print(
+                f"{rid}: store gone and nothing persisted; agent_execution stays null",
+                file=sys.stderr,
+            )
+    out_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def build(result_path: Path, out_dir: Path, readme_commit: str, *, legacy: bool = False) -> None:
+    data: Json = json.loads(result_path.read_text(encoding="utf-8"))
+    template: Json = json.loads(
+        (out_dir.parent / "receipt.template.json").read_text(encoding="utf-8")
+    )
+
+    def sent(text: str | None, fallback: str = "none.") -> str:
+        return sentence(text, legacy=legacy) or fallback
+
     scores = {s["id"]: s["score"] for s in data.get("scores", []) if s}
     rows: list[str] = []
     for item in data["results"]:
@@ -174,8 +268,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             "reader read README.md from it and Track B copied the sample tree from it (no clone "
             "was made by the reader). "
             f"Files read: {scrub(', '.join(out.get('files_read', []))) or 'none listed'}. "
-            f"Confusions: {sentence(' | '.join(out.get('confusions', []))) or 'none'}. "
-            f"Reader notes: {sentence(out.get('notes', ''))}."
+            f"Confusions: {sent(' | '.join(out.get('confusions', [])))} "
+            f"Reader notes: {sent(out.get('notes', ''))}"
         )
         # Track A receipt
         ra = base(template, reader, "demo", readme_commit)
@@ -243,8 +337,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         }
         ra["comprehension"]["all_correct"] = sc.get("all_five_correct")
         ra["notes"] = (
-            f"Command used: {sentence(a.get('command_used'))}. Log: {scrub(a.get('log_path'))}. "
-            f"Reader's verdict line for agent B: {sentence(a.get('verdict_for_agent_b'))}. "
+            f"Command used: {sent(a.get('command_used'))} Log: {scrub(a.get('log_path'))}. "
+            f"Reader's verdict line for agent B: {sent(a.get('verdict_for_agent_b'))} "
             + "The stamped attempt's exit code was not captured (the facilitator's wrapper used "
             "bash's PIPESTATUS under zsh), so exit_code and completed are null; "
             + (
@@ -255,13 +349,13 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             )
             + "interpretation_answered not stamped (answers given after both tracks). "
             + common_notes
-            + f" Scorer rationale: {sentence(sc.get('rationale', ''))}."
+            + f" Scorer rationale: {sent(sc.get('rationale', ''))}"
         )
         failures = [clean_failure(f) for f in out.get("failures", [])]
         ra["failures"] = [f for f in failures if is_demo_failure(f)]
         # Track B receipt
         rb = base(template, reader, "own-agent", readme_commit)
-        agent_exec = agent_execution(b.get("store_dir"))
+        agent_exec = agent_execution(b)
         rb["project"] = {
             "_comment": template["project"]["_comment"],
             "kind": "sample",
@@ -322,8 +416,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         )
         rb["comprehension"]["answered_on"] = f"2026-10-13-ai-{reader['id']}-demo.json"
         rb["notes"] = (
-            f"Install method: {sentence(b.get('install_method'))}. Commands: "
-            f"{sentence(' ; '.join(b.get('commands_used', [])))}. "
+            f"Install method: {sent(b.get('install_method'))} Commands: "
+            f"{sent(' ; '.join(b.get('commands_used', [])))} "
             f"Store: {scrub(b.get('store_dir'))} with {', '.join(b.get('store_files') or [])}; "
             "gate line: "
             f"{scrub(b.get('gate_verdict_line'))}. "
@@ -365,5 +459,23 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
     print("\n".join(rows))
 
 
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
+    ap.add_argument("result", type=Path, help="the Workflow result json (or a persisted copy)")
+    ap.add_argument("receipts_dir", nargs="?", type=Path)
+    ap.add_argument("readme_commit", nargs="?")
+    ap.add_argument("--persist", type=Path, metavar="OUT_JSON", help="write an augmented copy")
+    ap.add_argument("--legacy-sentence", action="store_true", help="v0.8.0 punctuation")
+    args = ap.parse_args(argv)
+    if args.persist is not None:
+        if args.receipts_dir is not None:
+            ap.error("--persist takes only the result json")
+        persist(args.result, args.persist)
+        return
+    if args.receipts_dir is None or args.readme_commit is None:
+        ap.error("building receipts needs <receipts dir> and <readme commit>")
+    build(args.result, args.receipts_dir, args.readme_commit, legacy=args.legacy_sentence)
+
+
 if __name__ == "__main__":
-    build(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3])
+    main()

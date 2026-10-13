@@ -26,18 +26,22 @@ T_VERDICT=$(stamp)
 VERDICT_LINE=$(grep -m1 '^VERDICT: ' run.out)
 STORE=runs/checkout-retry
 ls "$STORE" > store.ls 2>&1; SHA1=$(shasum -a 256 "$STORE/decision.json" | cut -d' ' -f1)
-GATE_LINE=$(arci gate "$STORE" 2>/dev/null | grep -m1 '^VERDICT: ')
+# No pipeline here: `arci gate | grep` would leave the gate's exit status in `${PIPESTATUS[0]}`,
+# which is bash-only (unset under zsh). Redirect to a file and read `$?` directly instead; protocol
+# 4.3 needs the gate's exit code to equal the run's.
+arci gate "$STORE" > gate.out 2> gate.err; GATE_EXIT=$?
+GATE_LINE=$(grep -m1 '^VERDICT: ' gate.out)
 SHA2=$(shasum -a 256 "$STORE/decision.json" | cut -d' ' -f1)
 T_STORE=$(stamp)
 AGENT_EXEC=$(python3 -c "import json,sys; print(sum(json.loads(l)['usage']['wall_seconds'] for l in open(sys.argv[1]) if l.strip()))" "$STORE/trials.jsonl" 2>/dev/null || echo null)
-python3 - "$OUT" "$T_README" "$T_INSTALL_START" "$T_INSTALL_DONE" "$T_SCAFFOLD_START" "$T_DESCRIPTOR" "$T_RUN_START" "$T_VERDICT" "$T_STORE" "$RUN_EXIT" "$VERDICT_LINE" "$GATE_LINE" "$SHA1" "$SHA2" "$AGENT_EXEC" "$SPEC" "$WORK" <<'PY'
+python3 - "$OUT" "$T_README" "$T_INSTALL_START" "$T_INSTALL_DONE" "$T_SCAFFOLD_START" "$T_DESCRIPTOR" "$T_RUN_START" "$T_VERDICT" "$T_STORE" "$RUN_EXIT" "$VERDICT_LINE" "$GATE_LINE" "$SHA1" "$SHA2" "$AGENT_EXEC" "$SPEC" "$WORK" "$GATE_EXIT" <<'PY'
 import json, sys, datetime as dt, os
-(out, readme, i0, i1, s0, s1, r0, r1, st, run_exit, vline, gline, sha1, sha2, agent_exec, spec, work) = sys.argv[1:]
+(out, readme, i0, i1, s0, s1, r0, r1, st, run_exit, vline, gline, sha1, sha2, agent_exec, spec, work, gate_exit) = sys.argv[1:]
 p = lambda s: dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
 d = lambda a, b: (p(b) - p(a)).total_seconds()
 store = os.path.join(work, "checkout", "runs", "checkout-retry")
 files_ok = all(os.path.exists(os.path.join(store, f)) for f in ("manifest.json", "trials.jsonl", "decision.json"))
-validated = bool(vline) and vline == gline and sha1 == sha2 and files_ok and "ERROR" not in vline
+validated = bool(vline) and vline == gline and gate_exit == run_exit and sha1 == sha2 and files_ok and "ERROR" not in vline
 rec = {"track": "B", "label": "maintainer/AI run (orchestrator); not a cold reader", "package": spec,
        "project": "sample (examples/recipes/python_agent)",
        "install_method": "uv venv + uv pip install (the uv tool route is denied in this harness)",
