@@ -2,42 +2,111 @@
 
 ## Unreleased
 
-- **Documentation:** the README opens with the recorded retry result (200 trials per arm,
-  192/200 vs 132/200, BLOCK), its boundary and availability, links to the evidence, and the
-  offline demo with lines from the committed demo log; a "Where it has been run" summary links
-  every campaign's records, including the guardrail run and the invalid and inconclusive
-  attempts; repeated presentations of the retry result are removed. The hero PNG is replaced by
+(nothing yet)
+
+## v0.8.0 (2026-10-13)
+
+The onboarding release: install from PyPI, run the recorded retry story with one `uvx` command, scaffold
+a first experiment from four references, and read the whole point on one screen. No change to the
+decision rule, its calibration, the schema (`arci/0.5`) or any recorded result.
+
+- **Added:** the PyPI package `agent-reliability-ci` and `.github/workflows/release.yml`: a version
+  tag builds the wheel and sdist once, smoke-tests that wheel on Ubuntu and macOS (Python 3.11 and
+  3.14) from an empty directory, and publishes the same files through PyPI trusted publishing with
+  attestations. The guard refuses a tag that is not `v` + the package version. `docs/RELEASING.md`
+  has the steps; `docs/design/0005-v0.8.0-packaging-and-version-bump.md` records the frozen-file
+  changes (version, project URLs, classifiers, keywords, an sdist restricted by `only-include` to
+  the package, README, LICENSE, NOTICE, CHANGELOG and pyproject, plus hatchling's own `PKG-INFO`
+  and `.gitignore`).
+- **Added:** `arci demo` (and `python -m arci`): the six-step retry story from an installed wheel with
+  no checkout, through the real `run`, `diff`, `minimize` and `replay`. The seeded world and agents
+  now live in `arci.demo` (`examples/retry_agent/{world,agents}.py` re-export them); the demo's
+  manifests use `arci.demo` references and an `arci-demo-` experiment id, so their seals differ from
+  the recorded run while the seeds, counts (192/200 vs 132/200) and verdicts are the same, and the
+  demo says whether its counts matched. Run stores go to a temporary directory unless `--keep DIR`.
+- **Added:** the `arci.yaml` descriptor (`src/arci/descriptor.py`, `docs/DESCRIPTOR.md`,
+  `docs/design/0007-descriptor.md`): a thin, `extra="forbid"` front-end whose keys are the `Manifest`'s
+  fields with the same defaults, compiled and sealed with `Manifest.create` exactly as the Python
+  builders do. `arci run` accepts a `.yaml`/`.yml` descriptor or a sealed `.json` manifest, and its
+  `--out` now defaults to `runs`. `arci schema` prints the JSON Schema generated from the model;
+  the bytes are committed at `docs/schema/arci.schema.json` and tested for staleness. Pydantic is
+  authoritative; the YAML loader resolves only `true`/`false` as booleans and decimal, `0x`, `0o`,
+  `0b` as integers, so `yes` and `on` stay strings and `010` is ten, not octal eight; explicit
+  `!!int`, `!!float` and `!!null` tags accept only those same forms, and alias expansion is capped.
+- **Added:** `arci init EXPERIMENT_ID --baseline --candidate --toolset --oracle [...]`
+  (`docs/design/0008-arci-init.md`): validates the four references in a child process with the
+  runner's import rule (the toolset factory is called once; agents and the oracle are only imported),
+  checks every `--fault` tool against the toolset's tools, and writes a smoke-design descriptor
+  (`n_per_arm` 8, the smallest N at which a total collapse can still BLOCK under the default rule;
+  two perfect arms cannot PASS below N=42). One line on stderr and exit 3 on the first problem. The
+  file is published atomically (a hard link, or a rename with `--force`); without `--force` an
+  existing file is never replaced.
+- **Added:** a smoke-design notice on stderr from `arci run` when a gating condition has fewer than
+  100 trials per arm, pointing at `arci plan`. stdout, reports, decisions and stores are unchanged.
+- **Changed:** the runner appends the current directory to the import path of every child it starts
+  (worker, grader, boundary, command agent, MCP server;
+  `docs/design/0006-cwd-on-the-child-import-path.md`), so references into the project directory
+  resolve under the `arci` console script as they already did under `python -m arci.cli`. Appended,
+  never prepended; an MCP server whose `env` sets `PYTHONPATH` keeps that configured value, as
+  before; records are unaffected.
+- **Added:** CI jobs that build the wheel and run `arci demo` from an empty directory on Ubuntu and
+  macOS, a Windows job that only installs the wheel and runs `arci --help` (execution stays
+  unsupported on Windows), and an Action fixture (`examples/action_fixture/`) that runs the composite
+  Action on the demo's A-vs-B manifest and asserts `BLOCK`. CI also runs on `sprint/**` branches.
+- **Added:** `docs/measurement/`: the time-to-first-verdict and cold-read protocol, a receipt
+  template and a receipts directory; maintainer measurements are labelled and never counted as
+  cold readers.
+- **Documentation:** the README opens with the question, one sentence, the two commands, the pipeline
+  line, what PASS means, what a small run means and the boundary (`docs/design/0009-readme-first-screen.md`);
+  the recorded result, the figure and the badges moved below the fold; "What it does not do" gains two
+  items (reference validation imports your code; a fault naming a tool the agent never calls silently
+  never fires). Links from the old first screen are absolute so the PyPI page renders them.
+- **Documentation:** two recipes, each a runnable tree under `examples/recipes/` with a narrative in
+  `docs/recipes/` and a test that runs it at smoke N from a copied directory without `PYTHONPATH`:
+  `python_agent` (a blank project with `app/v1.py`, `app/v2.py` and `tests/world.py`; `arci init`,
+  the smoke run, `arci plan`, the confirmatory run, then `diff`, `minimize` and `replay`, with the
+  recorded output) and `mcp_agent` (a stdlib newline-JSON-RPC client against
+  `arci.mcp_toolset_server`, a hand-written command-arm descriptor and an Inspector preflight). The
+  Inspector step is recorded as blocked on 2026-10-13: Inspector 2.10.1 (TypeScript SDK 1.29.0)
+  rejects the bridge's protocol revision `2026-07-28` at `initialize`; the recipe keeps the verbatim
+  result and the ARCI steps run without it.
+- Everything that was already on `main` and unreleased is in this version:
+  - **Documentation:** the README presents the recorded retry result once (200 trials per arm,
+  192/200 vs 132/200, BLOCK) with its boundary, links to the evidence, and the offline demo with
+  lines from the committed demo log (in this release these sections sit below the new first
+  screen); a "Where it has been run" summary links every campaign's records, including the
+  guardrail run and the invalid and inconclusive attempts. The hero PNG is replaced by
   generated light and dark SVGs (`docs/assets/hero-*.svg`) and the how-it-works exposition by a
   generated pipeline figure (`docs/assets/where-*.svg`), both written by
   `docs/assets/src/make_figures.py` (stdlib only), whose `--check` mode runs in CI and in
   `tests/unit/docs/test_figures.py`.
-- **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
+  - **Added:** the technical report package `docs/reports/ci-gate-2026-10-06/` (report, plan of
   record, enumerated operating-characteristics metrics for both interval methods, the Linux
   container re-derivation log for all 18 archived decisions, the offline replay probe log for
   both committed failure bundles, and the two-stage Docker reproduction recipe) and
   `CITATION.cff`.
-- **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
+  - **Fixed:** platform-dependent rounding in 95% Wilson intervals by pinning the inverse-normal
   value used by the existing Linux-produced records (CPython's C accelerator on arm64 macOS
   differs by one ulp from the pure-Python fallback). Restores reproducible decision seals for
   the archived Clopper-Pearson stores without changing any verdict. Regression tests re-derive
   every committed `docs/results/jev` decision byte for byte.
-- **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
+  - **Fixed:** platform-dependent Clopper-Pearson bounds by comparing binomial tails with exact
   integer arithmetic, including zero-success and all-success bounds. The existing 60-step
   bisection, statistical method, confidence allocation, and gate rules are unchanged. Re-derived
   six archived Jev decisions and five guardrail decisions from unchanged sealed manifests and
   trials. Only CP bounds, their derived difference bounds, and decision seals changed; verdicts,
   exit codes, counts, stopping histories, and rendered Markdown/JUnit reports are unchanged.
   Byte-for-byte regeneration is checked on macOS and Ubuntu.
-- **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
+  - **Added:** `arci plan` enumerates PASS, BLOCK and INCONCLUSIVE probabilities under the
   existing Clopper-Pearson gate for independent binomial arms, one gating condition, one
   fixed-sample look and N <= 400 per arm, reporting assumptions and the smallest tested N meeting
   a target or "target not reached"; probabilities are enumerated with exact integer arithmetic
   and converted to floating point once, so the output is identical on every platform.
-- **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
+  - **Added:** opt-in Markdown `arci report --pass-k` estimates using C(successes,k)/C(n,k)
   separately per arm and condition, with explicit IID assumptions and unavailability for n < k,
   ERROR verdicts and multi-look designs; default report output, gate decisions and stored records
   are unchanged.
-- **Guardrail experiment:** published the pre-registered live run of
+  - **Guardrail experiment:** published the pre-registered live run of
   `examples/guardrail_agent/` (2026-10-05, `run.sh` unchanged): the sealed stores of all six
   runs, the preflight receipt, per-run gate reports, and the N=200 failure diffed, minimised
   and replayed (REPRODUCED), in `docs/results/guardrail/`. The write-up and `metrics.json` are
@@ -46,12 +115,14 @@
   out INCONCLUSIVE rather than the pre-registered BLOCK. Added
   `tests/unit/examples/test_guardrail_results.py`, an offline test that re-derives every
   committed guardrail decision byte for byte with `arci gate`.
-- **Documentation:** the "Five minutes" section is renamed "Try the offline demo"; an availability
-  note separates `main` (planner, portability fixes) from the `v0.7.0` Action; unsupported
-  comparison and reviewer-count wording removed; the calibration roadmap item now extends the
-  published intent-routing audit. `CITATION.cff` gives the release date as 2026-10-05 and pins the
-  report URL to the `evidence-2026-10-06` tag. Added `SECURITY.md` (private reporting through GitHub
-  security advisories, the trusted-code assumption, no private stores or credentials in reports).
+  - **Documentation:** the offline demo section was renamed "Try the offline demo" (this release's
+  README now points it at `arci demo`); the availability note that separated `main` from the
+  `v0.7.0` Action is replaced by this release's Availability line; unsupported comparison and
+  reviewer-count wording removed; the calibration roadmap item now extends the published
+  intent-routing audit. `CITATION.cff` pins the report URL to the `evidence-2026-10-06` tag (its
+  version and date are now 0.8.0 and 2026-10-13). Added `SECURITY.md` (private reporting through
+  GitHub security advisories, the trusted-code assumption, no private stores or credentials in
+  reports).
 
 ## v0.7.0 (2026-10-05)
 
