@@ -11,7 +11,7 @@ Budget clock start (Task 00 commit): 2026-10-13T03:42:56Z. Hard stop for startin
 | 06+07 | MERGED | Fable ACCEPT, reviewer-subagent ACCEPT, Astra ACCEPT | 43b220b (+ NIT fix), merged 04:49Z | coder 9 min; CI on the lane all green (wheel smoke ×4, Windows install-only, Action fixture BLOCK); `pypi` environment restricted to tags v* |
 | 10 | MERGED | Fable ACCEPT, reviewer-subagent ACCEPT (round 2) | 961bae7 (merged 04:37Z) | coder 5 min + two revision rounds (1.5 + 1.2 min); docs only |
 | 03 | REVISE r1 pending | Fable ACCEPT (withdrawn pending r1), reviewer-subagent ACCEPT (minors), Astra REVISE (1 MAJOR: unordered YAML collections → nondeterministic seals; 3 MINOR) | isolated just check at e962259: exit 0 | e962259 on sprint/descriptor | coder 17 min; r1 to be dispatched after T04+T05 on the same lane |
-| 04+05 | REVISE r1 pending | Fable ACCEPT, reviewer-subagent REVISE (2 required), Astra running | 76523e5 on sprint/descriptor | coder 26 min; isolated just check at 76523e5: exit 0 (1035 passed); r1 after T03r1 |
+| 04+05 | REVISE r1 pending | Fable ACCEPT, reviewer-subagent REVISE (2 required), Astra REVISE (2 MAJOR, 3 MINOR; ADR 0006/0008 amended) | 76523e5 on sprint/descriptor | coder 26 min; isolated just check at 76523e5: exit 0 (1035 passed); r1 after T03r1 |
 | 03r1 | IN PROGRESS | — | — | descriptor REVISE round 1 dispatched 05:22Z on the same lane (wf_bbd63819-968) |
 | 08+09 | IN PROGRESS | — | — | recipes coder dispatched 05:23Z on sprint/recipes (= main + descriptor lane) |
 | 11 | ACCEPTED, awaiting lane C | reviewer-subagent ACCEPT, Astra ACCEPT (round 1) | b34dac1 on sprint/readme (pushed) | all links absolute; first screen 191 words; merge right after the descriptor lane |

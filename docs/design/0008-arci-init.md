@@ -52,7 +52,8 @@ those keys. Agents, oracle, tools and snapshot are never called. The parent neve
 reference (AGENT_SEMANTICS).
 
 Errors are one line on stderr, exit 3, nothing written, in the CLI's existing
-`error: CliError: init: ...` form, for example `--baseline app.v1:run: module not importable; check
+`error: CliError: init: ...` form (argparse usage errors, such as a missing required flag, keep the
+CLI's generic `error: CliError: <message>` form; amended 2026-10-13), for example `--baseline app.v1:run: module not importable; check
 module and dependencies`, `--fault tool_timeout:reserve:0: tool reserve absent from --toolset
 tests.world:make_world; choose an advertised tool (confirm, get_stock)` (the advertised names are
 appended, at most twenty), `output arci.yaml exists; use --force to replace it`.
