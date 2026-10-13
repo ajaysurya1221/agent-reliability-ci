@@ -32,7 +32,8 @@ Protocol only; no receipt collected yet. [Template](receipt.template.json), [rec
    the facilitator sets `UV_FIND_LINKS=<directory containing the wheel>` (and, for a cold cache,
    `UV_CACHE_DIR=<fresh empty directory>`) in the reader's shell, says nothing about it, and
    records both values in `notes`. `package.source` is then `wheel` and `package.wheel_sha256` is
-   filled.
+   filled. After a wheel attempt the facilitator checks that the installed version equals
+   `package.version` (`uv tool list` is enough) and records any mismatch in `failures`.
 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
@@ -78,7 +79,9 @@ uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.
 ```
 
 If the chain runs as one line, stamp `install_done` and `scaffold_start` at the first output of
-`arci init`, and `descriptor_written` and `run_start` at the first output of `arci run`.
+`arci init`, and `descriptor_written` at the first output of `arci run`. Stamp `run_start` there
+too only if that invocation printed a valid verdict; otherwise follow 4.1 and stamp it at the
+later `arci run` that does.
 
 `run_start` and `verdict_printed` refer to the `arci run` invocation that printed the first
 `PASS`, `BLOCK` or `INCONCLUSIVE` verdict line. An `ERROR` line is never stamped as
@@ -101,13 +104,13 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    first run is expected to print INCONCLUSIVE; that is a valid first verdict and counts in full.
    `ERROR` (exit 3) means the experiment is invalid: stamp it in `failures` and let the reader
    continue; if no valid verdict follows, the attempt failed.
-2. The clock stops only when all three hold: the verdict line is on screen; the run store exists
-   with `manifest.json`, `trials.jsonl` and `decision.json` (at `runs/<experiment_id>/` unless
-   `--out` names another directory); and the reader has answered "what does this verdict
-   mean?" correctly by the key in 5.3. A wrong answer is recorded and the attempt counts as a
-   failure for TTFV.
+2. The run store, written `<store>` below, is `runs/<experiment_id>/` unless `--out` names another
+   directory. The clock stops only when all three hold: the verdict line is on screen; the run
+   store exists with `manifest.json`, `trials.jsonl` and `decision.json`; and the reader has
+   answered "what does this verdict mean?" correctly by the key in 5.3. A wrong answer is
+   recorded and the attempt counts as a failure for TTFV.
 3. Store check, run by the facilitator right after the verdict line, inside the clock:
-   `ls runs/<id>`; `shasum -a 256 runs/<id>/decision.json`; `arci gate runs/<id>` must print the
+   `ls <store>`; `shasum -a 256 <store>/decision.json`; `arci gate <store>` must print the
    same verdict line and exit code; the sha256 must be unchanged. Any difference: set
    `store_validated: false` and the attempt counts as a failure.
 4. Durations: `install` = `install_start` → `install_done`; `scaffold` = `scaffold_start` →
@@ -115,13 +118,15 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    `store_validated` → `interpretation_answered`; `total` = `readme_opened` →
    `interpretation_answered`.
 5. Agent execution is reported separately and only in Track B: `agent_execution` = the sum of the
-   per-trial wall times ARCI records, `python3 -c "import json,sys; print(sum(json.loads(l)['usage']['wall_seconds'] for l in open(sys.argv[1]) if l.strip()))" runs/<id>/trials.jsonl`.
+   per-trial wall times ARCI records, `python3 -c "import json,sys; print(sum(json.loads(l)['usage']['wall_seconds'] for l in open(sys.argv[1]) if l.strip()))" <store>/trials.jsonl`.
    Trials run in parallel (`project.workers`), so this sum can exceed the `run` span. It is never
    subtracted from `total`.
 6. `outcome.init_attempts` counts `arci init` invocations. `descriptor_hand_edited` is true if the
-   reader edited `arci.yaml` by hand before the run that produced the verdict. Re-running
-   `arci init` with corrected flags is not hand editing. `outcome.trials_started` is true if
-   `runs/<id>/trials.jsonl` exists and is non-empty after the attempt.
+   reader edited `arci.yaml` by hand before the run that produced the verdict; for an attempt with
+   no valid verdict, true if the reader edited `arci.yaml` by hand before any `arci run` that
+   started trials. Re-running `arci init` with corrected flags is not hand editing.
+   `outcome.trials_started` is true if `trials.jsonl` in the run store (4.2) exists and is
+   non-empty after the attempt.
 
 ## 5. Comprehension
 
@@ -132,14 +137,15 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    template. The README may stay open. Answers are in the reader's own words.
 2. Scoring: a scorer other than the reader marks each answer correct only if it contains every key
    element marked required below; optional elements are not needed (paraphrase is fine; a wrong
-   extra claim, such as "PASS means the agent is reliable", makes it incorrect). `all_correct` is
-   true only when all five are correct.
+   extra claim, such as "PASS means the agent is reliable", makes it incorrect). An answer to q3
+   (or a PASS interpretation) that says only "not shown to be worse" describes INCONCLUSIVE too and
+   is scored incorrect. `all_correct` is true only when all five are correct.
 
 | # | Question | Key elements (all required unless marked optional) |
 |---|---|---|
 | q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict usable as a CI gate, naming at least PASS and BLOCK (required); naming all four, PASS, BLOCK, INCONCLUSIVE and ERROR (optional). |
 | q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
-| q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) not shown to be worse by more than the allowed drop (`delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
+| q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) shown not to be worse than the baseline by more than the allowed drop (`delta`), i.e. non-inferior within `delta` (the lower bound on the candidate-minus-baseline difference is above `-delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
 | q4 | What does it not do? Name two. | Two distinct items, each a limit stated in the README version under test (`package.readme_url`) under "What it does not do" or in the first-screen boundary sentence. For example: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
 | q5 | What are the first three commands for your own agent? | In order: install the `agent-reliability-ci` package (for example `uv tool install agent-reliability-ci`); `arci init <id>` with `--baseline`, `--candidate`, `--toolset`, `--oracle`; `arci run arci.yaml`. |
 
