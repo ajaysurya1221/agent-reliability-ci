@@ -79,3 +79,17 @@ fault names only; no --task-id) and flagged a sixth: repeated --fault flags form
 (K=1). Adopted in full. Rule: (d). Consequence: T05's notice wording must say "two perfect arms
 cannot PASS below N=42; a total collapse cannot BLOCK below N=8" (Astra's correction of the plan's
 looser sentence).
+
+### D-07 (E2, ADR 0007): the descriptor shape
+Proposals agreed on nearly everything; Fable adopted Astra's positions on fixtures_sha256 exposure,
+"exactly one of oracle or contract", alias-collision rejection, the versioned schema $id, the
+deterministic `arci schema` output, and the error line through main(). The tie-break chose Fable's
+position on the three remaining items (task_id defaults to experiment_id; bare-arm label
+<module tail>.<function>; a YAML-1.2-style isolated resolver). Rule: (d).
+
+### D-08 (E3, ADR 0009): the README first screen
+Tie-break chose Astra on all six differences plus a merged "what" sentence: question as H1; PASS
+stated as the positive non-inferiority finding ("the evidence supports that any reliability drop ...
+is smaller than the allowed drop") because "not shown to be worse" also describes INCONCLUSIVE;
+demo first with the recorded result beneath it; no runtime promise; no link row (word count 190).
+Rule: (d); (c) STATISTICS.md for the PASS sentence.
