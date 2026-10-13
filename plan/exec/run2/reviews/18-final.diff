@@ -1,0 +1,2245 @@
+diff --git a/.github/workflows/ttfv-reference.yml b/.github/workflows/ttfv-reference.yml
+new file mode 100644
+index 0000000..00039c4
+--- /dev/null
++++ b/.github/workflows/ttfv-reference.yml
+@@ -0,0 +1,513 @@
++name: TTFV reference machines
++
++# Times the packaged demo (`uvx --from agent-reliability-ci==0.8.0 arci demo`) on clean
++# GitHub-hosted runners: no checkout, no secrets, no telemetry. Per OS: five cold samples, each
++# with its own fresh, empty uv cache (the case the memo target is about: a first-time user), then
++# two warm samples that reuse the cache the last cold sample filled. Every sample is bounded
++# (SAMPLE_TIMEOUT_S, and the whole loop by the deadline arithmetic below, inside the 40-minute
++# job); a sample that hits the bound is killed, kept, and recorded as timed out. The JSON and the
++# timestamped logs are uploaded as an artifact; the orchestrator commits the JSON under
++# docs/measurement/reference-machines/. These are machine timings, not receipts, and never count
++# as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
++
++on:
++  push:
++    branches:
++      - 'sprint/t18-**'
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++env:
++  UV_VERSION: "0.12.5"
++  PACKAGE: "agent-reliability-ci==0.8.0"
++  UV_NO_PROGRESS: "1"
++  COLD_SAMPLES: "5"
++  WARM_SAMPLES: "2"
++  # Deadline arithmetic (README, "Deadline"). The first step records the job start (date +%s);
++  # the job is killed at JOB_TIMEOUT_S (timeout-minutes: 40). Setup is bounded by its own step
++  # timeouts (setup-python 5 min, uv install 5 min). When the timing step starts it gives the
++  # sampling loop
++  #     budget = min(TIMING_BUDGET_S, JOB_TIMEOUT_S - (now - job_start) - RESERVE_S)
++  # so RESERVE_S (420 s) is always left after sampling for the Python probe, the JSON, the upload
++  # and the final check, however long setup took. TIMING_BUDGET_S (2400 s) is only a ceiling: in a
++  # 40-minute job the remaining time is always smaller, so the loop gets 1980 s minus the setup
++  # time. Each sample is bounded by min(SAMPLE_TIMEOUT_S, time left in the loop): a hang killed at
++  # SAMPLE_TIMEOUT_S is recorded with timeout_reason "sample", a sample cut short by the loop
++  # deadline with "budget", and a sample with under a second left is not started (timed out,
++  # "budget"). What this guarantees: not seven 600 s samples (7 x 600 = 4200 s > 1980 s), but
++  # seven samples of the measured ~225 s (1575 s) plus the 120 s probe and the 420 s reserve fit
++  # when setup takes under 4 minutes (240 + 1575 + 120 + 420 = 2355 s <= 2400 s). After sampling,
++  # the probe (PROBE_TIMEOUT_S) runs only if at least PROBE_MIN_LEFT_S remain before the job
++  # deadline, else it is recorded as skipped. The step timeouts are backstops behind this.
++  JOB_TIMEOUT_S: "2400"
++  RESERVE_S: "420"
++  SAMPLE_TIMEOUT_S: "600"
++  TIMING_BUDGET_S: "2400"
++  PROBE_TIMEOUT_S: "120"
++  PROBE_MIN_LEFT_S: "420"
++
++jobs:
++  reference:
++    name: reference machine / ${{ matrix.os }}
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 40
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest]
++    defaults:
++      run:
++        shell: bash
++    steps:
++      - name: Record the job start
++        id: start
++        timeout-minutes: 1
++        run: echo "job_start=$(date +%s)" >> "$GITHUB_OUTPUT"
++      - name: Set up Python
++        timeout-minutes: 5
++        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
++        with:
++          python-version: "3.12"
++      - name: Install uv
++        timeout-minutes: 5
++        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
++      - name: Time the demo (five cold samples, then two warm)
++        # Backstop only. The loop ends RESERVE_S before the job deadline (plus the kill/join of a
++        # last timed-out sample, ~10 s) and the probe takes at most 120 s, so this step ends by job
++        # time 2400 - 420 + 10 + 120 s; counted from the step's start that is under 38 minutes.
++        # The job timeout comes first whenever setup took longer than 2 minutes.
++        timeout-minutes: 38
++        shell: python
++        env:
++          OUT_DIR: ${{ runner.temp }}/ttfv-reference
++          JOB_START: ${{ steps.start.outputs.job_start }}
++        run: |
++          import datetime as dt
++          import json
++          import os
++          import platform
++          import signal
++          import subprocess
++          import sys
++          import tempfile
++          import threading
++          import time
++          from pathlib import Path
++
++          PACKAGE = os.environ["PACKAGE"]
++          OUT_DIR = Path(os.environ["OUT_DIR"])
++          COLD = int(os.environ["COLD_SAMPLES"])
++          WARM = int(os.environ["WARM_SAMPLES"])
++          SAMPLE_TIMEOUT = int(os.environ["SAMPLE_TIMEOUT_S"])
++          JOB_TIMEOUT = int(os.environ["JOB_TIMEOUT_S"])
++          RESERVE = int(os.environ["RESERVE_S"])
++          TIMING_BUDGET = int(os.environ["TIMING_BUDGET_S"])
++          PROBE_TIMEOUT = int(os.environ["PROBE_TIMEOUT_S"])
++          PROBE_MIN_LEFT = int(os.environ["PROBE_MIN_LEFT_S"])
++          assert COLD >= 1 and WARM >= 0
++          try:
++              JOB_START = int(os.environ.get("JOB_START", ""))
++          except ValueError:
++              print("::error title=ttfv-reference::JOB_START is not set: the first step did not run")
++              sys.exit(1)
++
++          # Deadline arithmetic (see the env block): the loop gets what is left of the job after
++          # RESERVE (probe, JSON, upload, final check), capped at TIMING_BUDGET, never negative.
++          before_sampling = time.time() - JOB_START
++          remaining = JOB_TIMEOUT - before_sampling - RESERVE
++          budget = max(0, min(TIMING_BUDGET, int(remaining)))
++          loop_start = time.monotonic()
++          DEADLINE = loop_start + budget
++
++
++          def stamp():
++              return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
++          def kill_group(pid):
++              try:
++                  os.killpg(pid, signal.SIGKILL)
++              except (ProcessLookupError, PermissionError):
++                  pass
++
++
++          def run(cmd, log_path, env, cwd, timeout):
++              """Run cmd, prefixing each output line with its UTC arrival time; kill it at timeout.
++
++              Returns (exit code or None, timed_out). A last line without a newline is kept.
++              """
++              with log_path.open("w", encoding="utf-8") as log:
++                  proc = subprocess.Popen(
++                      cmd,
++                      stdout=subprocess.PIPE,
++                      stderr=subprocess.STDOUT,
++                      env=env,
++                      cwd=cwd,
++                      start_new_session=True,
++                  )
++                  assert proc.stdout is not None
++                  stdout = proc.stdout
++
++                  def pump():
++                      for raw in stdout:
++                          line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
++                          log.write(f"{stamp()} {line}\n")
++                          log.flush()
++
++                  reader = threading.Thread(target=pump, daemon=True)
++                  reader.start()
++                  try:
++                      code, timed_out = proc.wait(timeout=timeout), False
++                  except subprocess.TimeoutExpired:
++                      kill_group(proc.pid)
++                      proc.wait()
++                      code, timed_out = None, True
++                  kill_group(proc.pid)  # stragglers holding the pipe open
++                  reader.join(timeout=10)
++                  if timed_out:
++                      log.write(f"{stamp()} [ttfv-reference] killed after {timeout:g} s\n")
++              return code, timed_out
++
++
++          OUT_DIR.mkdir(parents=True, exist_ok=True)
++          timing = {
++              "job_start": JOB_START,
++              "seconds_before_sampling": round(before_sampling),
++              "budget_seconds_used": budget,
++              "sampling_seconds": None,
++              "seconds_left_after_sampling": None,
++              "python_probe": None,
++          }
++
++
++          def write_timing():
++              (OUT_DIR / "timing.json").write_text(json.dumps(timing) + "\n", encoding="utf-8")
++
++
++          write_timing()  # now, so a crash or a cancelled job still leaves the budget on record
++          print(f"{before_sampling:.0f} s since job start; sampling budget {budget} s", flush=True)
++          work = Path(tempfile.mkdtemp(prefix="ttfv-work-"))  # empty, no checkout
++          uv_version = subprocess.run(["uv", "--version"], capture_output=True, text=True)
++          (OUT_DIR / "uv-version.txt").write_text(uv_version.stdout, encoding="utf-8")
++          (OUT_DIR / "setup-python.txt").write_text(platform.python_version() + "\n", encoding="utf-8")
++
++          rows = OUT_DIR / "samples.jsonl"
++          rows.write_text("", encoding="utf-8")
++          warm_cache = None
++          for n in range(1, COLD + WARM + 1):
++              kind = "cold" if n <= COLD else "warm"
++              if kind == "cold":
++                  # A new, empty uv cache per cold sample; the last one becomes the warm cache.
++                  cache = Path(tempfile.mkdtemp(prefix="uv-cache-"))
++                  warm_cache = cache
++              else:
++                  cache = warm_cache
++              entries = len(os.listdir(cache))
++              if kind == "cold" and entries:
++                  print(f"::error title=ttfv-reference::fresh uv cache {cache} is not empty")
++                  sys.exit(1)
++              env = {**os.environ, "UV_CACHE_DIR": str(cache)}
++              log = OUT_DIR / f"sample-{n}.log"
++              # Whole seconds, rounded down, so "budget" is exactly timeout_seconds < SAMPLE_TIMEOUT.
++              timeout = max(0, min(SAMPLE_TIMEOUT, int(DEADLINE - time.monotonic())))
++              start = stamp()
++              if timeout < 1:
++                  message = f"{start} [ttfv-reference] not started: timing budget used up\n"
++                  log.write_text(message, encoding="utf-8")
++                  code, timed_out, started = None, True, False
++              else:
++                  cmd = ["uvx", "--from", PACKAGE, "arci", "demo"]
++                  code, timed_out = run(cmd, log, env, work, timeout)
++                  started = True
++              # "sample": the per-sample limit killed a hang; "budget": the loop deadline cut the
++              # sample short (or left it no time to start). Both are failures.
++              reason = None
++              if timed_out:
++                  reason = "sample" if timeout >= SAMPLE_TIMEOUT else "budget"
++              record = {
++                  "sample": n,
++                  "uv_cache": kind,
++                  "uv_cache_entries_at_start": entries,
++                  "command_start": start,
++                  "started": started,
++                  "exit_code": code,
++                  "timed_out": timed_out,
++                  "timeout_reason": reason,
++                  "timeout_seconds": timeout,
++              }
++              # Appended per sample, so a later crash or a cancelled job keeps what was measured.
++              with rows.open("a", encoding="utf-8") as f:
++                  f.write(json.dumps(record) + "\n")
++              if not started:
++                  state = "not started (timing budget used up)"
++              elif timed_out:
++                  cause = "per-sample limit" if reason == "sample" else "loop budget"
++                  state = f"timed out after {timeout} s ({cause})"
++              else:
++                  state = f"exit {code}"
++              print(f"sample {n} ({kind}): {state}", flush=True)
++
++          timing["sampling_seconds"] = round(time.monotonic() - loop_start)
++          left = JOB_TIMEOUT - (time.time() - JOB_START)
++          timing["seconds_left_after_sampling"] = round(left)
++
++          # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
++          # Only if the job deadline leaves room for it and for what follows; else skipped.
++          python = ""
++          if left < PROBE_MIN_LEFT:
++              timing["python_probe"] = "skipped"
++              print(f"python probe skipped: {left:.0f} s left before the job deadline", flush=True)
++          else:
++              probe = ["uvx", "--from", PACKAGE, "python", "-c", "import platform; print(platform.python_version())"]
++              try:
++                  done = subprocess.run(
++                      probe,
++                      capture_output=True,
++                      text=True,
++                      env={**os.environ, "UV_CACHE_DIR": str(warm_cache)},
++                      cwd=work,
++                      timeout=PROBE_TIMEOUT,
++                  )
++                  python = done.stdout if done.returncode == 0 else ""
++                  timing["python_probe"] = "ran" if done.returncode == 0 else "failed"
++              except subprocess.TimeoutExpired:
++                  timing["python_probe"] = "timed out"
++          (OUT_DIR / "python.txt").write_text(python, encoding="utf-8")
++          write_timing()
++      - name: Parse the logs into reference-${{ matrix.os }}.json
++        if: always()
++        timeout-minutes: 1
++        shell: python
++        env:
++          OUT_DIR: ${{ runner.temp }}/ttfv-reference
++          OUT_JSON: reference-${{ matrix.os }}.json
++          JOB_START: ${{ steps.start.outputs.job_start }}
++          REF_RUNNER_OS: ${{ runner.os }}
++          REF_RUNNER_ARCH: ${{ runner.arch }}
++          REF_RUNNER_LABEL: ${{ matrix.os }}
++          REF_RUN_ID: ${{ github.run_id }}
++          REF_RUN_ATTEMPT: ${{ github.run_attempt }}
++          REF_SHA: ${{ github.sha }}
++        run: |
++          # Never raises on what the timing step left behind: a journal cut off mid-line, a row
++          # that is not a record, a missing timing.json. Every complete row is kept; every other
++          # non-blank line becomes one {"sample": null, "incomplete": true, "raw_prefix": ...}
++          # entry; every designed sample with no complete row becomes a "missing" entry.
++          import json
++          import os
++          from pathlib import Path
++
++          out_dir = Path(os.environ["OUT_DIR"])
++          out_dir.mkdir(parents=True, exist_ok=True)
++          MARKERS = {
++              "demo_banner": "arci demo:",
++              "demo_verdict": "VERDICT:",
++              "all_steps_held": "All six steps held",
++          }
++          env = os.environ.get
++          COLD = int(env("COLD_SAMPLES", "0"))
++          EXPECTED = COLD + int(env("WARM_SAMPLES", "0"))
++
++
++          def text(name):
++              path = out_dir / name
++              if not path.is_file():
++                  return None
++              return path.read_text(encoding="utf-8", errors="replace").strip() or None
++
++
++          def loads(raw):
++              try:
++                  return json.loads(raw)
++              except (ValueError, RecursionError):
++                  return None
++
++
++          def is_int(value):
++              return isinstance(value, int) and not isinstance(value, bool)
++
++
++          def first_stamps(log):
++              found = dict.fromkeys(MARKERS)
++              if not log.is_file():
++                  return found
++              for raw in log.read_text(encoding="utf-8", errors="replace").splitlines():
++                  stamp, _, line = raw.partition(" ")
++                  for key, marker in MARKERS.items():
++                      if found[key] is None and marker in line:
++                          found[key] = stamp
++              return found
++
++
++          rows = out_dir / "samples.jsonl"
++          samples, incomplete = [], []
++          if rows.is_file():
++              with rows.open(encoding="utf-8", errors="replace") as journal:
++                  for raw in journal:
++                      line = raw.rstrip("\r\n")
++                      if not line.strip():
++                          continue
++                      record = loads(line)
++                      n = record.get("sample") if isinstance(record, dict) else None
++                      if not is_int(n):
++                          incomplete.append({"sample": None, "incomplete": True, "raw_prefix": line[:80]})
++                          continue
++                      log = out_dir / f"sample-{n}.log"
++                      stamps = first_stamps(log)
++                      if record.get("timed_out") is True:
++                          stamps["all_steps_held"] = None  # killed: never counts as held
++                      samples.append(
++                          {
++                              "sample": n,
++                              "uv_cache": record.get("uv_cache"),
++                              "command_start": record.get("command_start"),
++                              **stamps,
++                              "exit_code": record.get("exit_code"),
++                              "log": log.name,
++                              "timed_out": record.get("timed_out"),
++                              "timeout_reason": record.get("timeout_reason"),
++                              "started": record.get("started"),
++                              "missing": False,
++                              "timeout_seconds": record.get("timeout_seconds"),
++                              "uv_cache_entries_at_start": record.get("uv_cache_entries_at_start"),
++                          }
++                      )
++          # A designed sample with no complete journal row: the timing step died, was cancelled or
++          # cut its row off. It is kept as a failure, never dropped.
++          seen = {s["sample"] for s in samples}
++          for n in range(1, EXPECTED + 1):
++              if n not in seen:
++                  log = out_dir / f"sample-{n}.log"
++                  samples.append(
++                      {
++                          "sample": n,
++                          "uv_cache": "cold" if n <= COLD else "warm",
++                          "command_start": None,
++                          **dict.fromkeys(MARKERS),
++                          "exit_code": None,
++                          "log": log.name if log.is_file() else None,
++                          "timed_out": False,
++                          "timeout_reason": None,
++                          "started": False,
++                          "missing": True,
++                          "timeout_seconds": None,
++                          "uv_cache_entries_at_start": None,
++                      }
++                  )
++          samples.sort(key=lambda s: s["sample"])
++
++          timing = loads(text("timing.json") or "null")
++          timing = timing if isinstance(timing, dict) else {}
++          job_start = timing.get("job_start")
++          if not is_int(job_start):
++              job_start = loads(env("JOB_START") or "null")
++              job_start = job_start if is_int(job_start) else None
++          doc = {
++              "kind": "reference-machine timing",
++              "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
++              "package": env("PACKAGE"),
++              "command": f"uvx --from {env('PACKAGE')} arci demo",
++              "runner": {
++                  "os": env("REF_RUNNER_OS"),
++                  "arch": env("REF_RUNNER_ARCH"),
++                  "label": env("REF_RUNNER_LABEL"),
++                  "image": env("ImageOS"),
++                  "image_version": env("ImageVersion"),
++              },
++              "python": text("python.txt"),
++              "setup_python": text("setup-python.txt"),
++              "uv": text("uv-version.txt"),
++              "workflow_run": {
++                  "run_id": env("REF_RUN_ID"),
++                  "run_attempt": env("REF_RUN_ATTEMPT"),
++                  "sha": env("REF_SHA"),
++              },
++              "timestamp_resolution_seconds": 1,
++              "design": {
++                  "cold_samples": COLD,
++                  "warm_samples": EXPECTED - COLD,
++                  "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
++                  "warm": "warm samples reuse the cache the last cold sample filled",
++                  "sample_timeout_seconds": int(env("SAMPLE_TIMEOUT_S", "0")),
++                  "timing_budget_seconds": int(env("TIMING_BUDGET_S", "0")),
++                  "job_timeout_seconds": int(env("JOB_TIMEOUT_S", "0")),
++                  "reserve_seconds": int(env("RESERVE_S", "0")),
++                  "job_start": job_start,
++                  "seconds_before_sampling": timing.get("seconds_before_sampling"),
++                  "budget_seconds_used": timing.get("budget_seconds_used"),
++                  "sampling_seconds": timing.get("sampling_seconds"),
++                  "seconds_left_after_sampling": timing.get("seconds_left_after_sampling"),
++                  "python_probe": timing.get("python_probe"),
++                  "probe_timeout_seconds": int(env("PROBE_TIMEOUT_S", "0")),
++                  "probe_min_left_seconds": int(env("PROBE_MIN_LEFT_S", "0")),
++              },
++              "journal_incomplete": bool(incomplete),
++              "samples": samples + incomplete,
++          }
++          out = out_dir / os.environ["OUT_JSON"]
++          out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
++          print(out.read_text(encoding="utf-8"))
++      - name: Upload the JSON and the logs
++        if: always()
++        timeout-minutes: 2
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: ttfv-reference-${{ matrix.os }}
++          path: ${{ runner.temp }}/ttfv-reference/
++          if-no-files-found: error
++          retention-days: 30
++      - name: Fail if any sample did not hold
++        timeout-minutes: 1
++        shell: python
++        env:
++          OUT_JSON: ${{ runner.temp }}/ttfv-reference/reference-${{ matrix.os }}.json
++        run: |
++          import json
++          import os
++          import sys
++
++          with open(os.environ["OUT_JSON"], encoding="utf-8") as f:
++              doc = json.load(f)
++          samples = [s for s in doc["samples"] if s.get("incomplete") is not True]
++          expected = int(os.environ["COLD_SAMPLES"]) + int(os.environ["WARM_SAMPLES"])
++
++
++          def held(s):
++              return (
++                  s.get("started") is True
++                  and s.get("timed_out") is False
++                  and s.get("missing") is not True
++                  and s.get("exit_code") == 0
++                  and bool(s.get("all_steps_held"))
++              )
++
++
++          def which(test):
++              return [s.get("sample") for s in samples if test(s)]
++
++
++          bad = which(lambda s: not held(s))
++          # A hang killed at the per-sample limit, a sample cut short by the loop budget, and a
++          # sample never started are reported apart; all three are failures.
++          hung = which(lambda s: s.get("timeout_reason") == "sample")
++          cut = which(lambda s: s.get("timeout_reason") == "budget" and s.get("started") is True)
++          not_started = which(lambda s: s.get("started") is False and s.get("missing") is not True)
++          missing = which(lambda s: s.get("missing") is True)
++          incomplete = doc.get("journal_incomplete") is True
++          if len(samples) != expected or bad or incomplete:
++              message = f"{len(samples)} of {expected} samples; not held: {bad}"
++              for label, found in (
++                  ("timed out (hang)", hung),
++                  ("cut off by budget", cut),
++                  ("not started", not_started),
++                  ("missing", missing),
++              ):
++                  if found:
++                      message += f"; {label}: {found}"
++              if incomplete:
++                  message += "; journal incomplete"
++              print(f"::error title=ttfv-reference::{message}")
++              sys.exit(1)
++          print(f"all {expected} samples held")
+diff --git a/docs/measurement/reference-machines/2026-10-13-run38470699338-macos-latest.json b/docs/measurement/reference-machines/2026-10-13-run38470699338-macos-latest.json
+new file mode 100644
+index 0000000..d03162b
+--- /dev/null
++++ b/docs/measurement/reference-machines/2026-10-13-run38470699338-macos-latest.json
+@@ -0,0 +1,155 @@
++{
++  "kind": "reference-machine timing",
++  "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
++  "package": "agent-reliability-ci==0.8.0",
++  "command": "uvx --from agent-reliability-ci==0.8.0 arci demo",
++  "runner": {
++    "os": "macOS",
++    "arch": "ARM64",
++    "label": "macos-latest",
++    "image": "macos26",
++    "image_version": "20260907.0351.1"
++  },
++  "python": "3.12.10",
++  "setup_python": "3.12.10",
++  "uv": "uv 0.12.5 (210d1f678 2026-08-14 aarch64-apple-darwin)",
++  "workflow_run": {
++    "run_id": "38470699338",
++    "run_attempt": "1",
++    "sha": "2684e2493987beb991d7cc65c221360810686243"
++  },
++  "timestamp_resolution_seconds": 1,
++  "design": {
++    "cold_samples": 5,
++    "warm_samples": 2,
++    "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
++    "warm": "warm samples reuse the cache the last cold sample filled",
++    "sample_timeout_seconds": 600,
++    "timing_budget_seconds": 2400,
++    "job_timeout_seconds": 2400,
++    "reserve_seconds": 300,
++    "job_start": 1791926838,
++    "seconds_before_sampling": 4,
++    "budget_seconds_used": 2095,
++    "sampling_seconds": 1583,
++    "seconds_left_after_sampling": 813,
++    "python_probe": "ran",
++    "probe_timeout_seconds": 120,
++    "probe_min_left_seconds": 180
++  },
++  "journal_incomplete": false,
++  "samples": [
++    {
++      "sample": 1,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:27:22Z",
++      "demo_banner": "2026-10-13T21:27:23Z",
++      "demo_verdict": "2026-10-13T21:28:43Z",
++      "all_steps_held": "2026-10-13T21:31:20Z",
++      "exit_code": 0,
++      "log": "sample-1.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 2,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:31:20Z",
++      "demo_banner": "2026-10-13T21:31:21Z",
++      "demo_verdict": "2026-10-13T21:32:25Z",
++      "all_steps_held": "2026-10-13T21:34:48Z",
++      "exit_code": 0,
++      "log": "sample-2.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 3,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:34:48Z",
++      "demo_banner": "2026-10-13T21:34:49Z",
++      "demo_verdict": "2026-10-13T21:35:57Z",
++      "all_steps_held": "2026-10-13T21:38:28Z",
++      "exit_code": 0,
++      "log": "sample-3.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 4,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:38:28Z",
++      "demo_banner": "2026-10-13T21:38:29Z",
++      "demo_verdict": "2026-10-13T21:39:38Z",
++      "all_steps_held": "2026-10-13T21:42:02Z",
++      "exit_code": 0,
++      "log": "sample-4.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 5,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:42:02Z",
++      "demo_banner": "2026-10-13T21:42:04Z",
++      "demo_verdict": "2026-10-13T21:43:15Z",
++      "all_steps_held": "2026-10-13T21:46:06Z",
++      "exit_code": 0,
++      "log": "sample-5.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 6,
++      "uv_cache": "warm",
++      "command_start": "2026-10-13T21:46:06Z",
++      "demo_banner": "2026-10-13T21:46:06Z",
++      "demo_verdict": "2026-10-13T21:47:24Z",
++      "all_steps_held": "2026-10-13T21:49:57Z",
++      "exit_code": 0,
++      "log": "sample-6.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 10
++    },
++    {
++      "sample": 7,
++      "uv_cache": "warm",
++      "command_start": "2026-10-13T21:49:57Z",
++      "demo_banner": "2026-10-13T21:49:57Z",
++      "demo_verdict": "2026-10-13T21:51:16Z",
++      "all_steps_held": "2026-10-13T21:53:45Z",
++      "exit_code": 0,
++      "log": "sample-7.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 10
++    }
++  ]
++}
+diff --git a/docs/measurement/reference-machines/2026-10-13-run38470699338-ubuntu-latest.json b/docs/measurement/reference-machines/2026-10-13-run38470699338-ubuntu-latest.json
+new file mode 100644
+index 0000000..d7d603f
+--- /dev/null
++++ b/docs/measurement/reference-machines/2026-10-13-run38470699338-ubuntu-latest.json
+@@ -0,0 +1,155 @@
++{
++  "kind": "reference-machine timing",
++  "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
++  "package": "agent-reliability-ci==0.8.0",
++  "command": "uvx --from agent-reliability-ci==0.8.0 arci demo",
++  "runner": {
++    "os": "Linux",
++    "arch": "X64",
++    "label": "ubuntu-latest",
++    "image": "ubuntu24",
++    "image_version": "20261004.327.1"
++  },
++  "python": "3.12.15",
++  "setup_python": "3.12.15",
++  "uv": "uv 0.12.5 (x86_64-unknown-linux-gnu)",
++  "workflow_run": {
++    "run_id": "38470699338",
++    "run_attempt": "1",
++    "sha": "2684e2493987beb991d7cc65c221360810686243"
++  },
++  "timestamp_resolution_seconds": 1,
++  "design": {
++    "cold_samples": 5,
++    "warm_samples": 2,
++    "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
++    "warm": "warm samples reuse the cache the last cold sample filled",
++    "sample_timeout_seconds": 600,
++    "timing_budget_seconds": 2400,
++    "job_timeout_seconds": 2400,
++    "reserve_seconds": 300,
++    "job_start": 1791926831,
++    "seconds_before_sampling": 3,
++    "budget_seconds_used": 2097,
++    "sampling_seconds": 1621,
++    "seconds_left_after_sampling": 777,
++    "python_probe": "ran",
++    "probe_timeout_seconds": 120,
++    "probe_min_left_seconds": 180
++  },
++  "journal_incomplete": false,
++  "samples": [
++    {
++      "sample": 1,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:27:13Z",
++      "demo_banner": "2026-10-13T21:27:14Z",
++      "demo_verdict": "2026-10-13T21:28:30Z",
++      "all_steps_held": "2026-10-13T21:31:05Z",
++      "exit_code": 0,
++      "log": "sample-1.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 2,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:31:05Z",
++      "demo_banner": "2026-10-13T21:31:06Z",
++      "demo_verdict": "2026-10-13T21:32:21Z",
++      "all_steps_held": "2026-10-13T21:34:57Z",
++      "exit_code": 0,
++      "log": "sample-2.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 3,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:34:57Z",
++      "demo_banner": "2026-10-13T21:34:58Z",
++      "demo_verdict": "2026-10-13T21:36:13Z",
++      "all_steps_held": "2026-10-13T21:38:48Z",
++      "exit_code": 0,
++      "log": "sample-3.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 4,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:38:48Z",
++      "demo_banner": "2026-10-13T21:38:49Z",
++      "demo_verdict": "2026-10-13T21:40:04Z",
++      "all_steps_held": "2026-10-13T21:42:40Z",
++      "exit_code": 0,
++      "log": "sample-4.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 5,
++      "uv_cache": "cold",
++      "command_start": "2026-10-13T21:42:40Z",
++      "demo_banner": "2026-10-13T21:42:41Z",
++      "demo_verdict": "2026-10-13T21:43:56Z",
++      "all_steps_held": "2026-10-13T21:46:32Z",
++      "exit_code": 0,
++      "log": "sample-5.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 0
++    },
++    {
++      "sample": 6,
++      "uv_cache": "warm",
++      "command_start": "2026-10-13T21:46:32Z",
++      "demo_banner": "2026-10-13T21:46:32Z",
++      "demo_verdict": "2026-10-13T21:47:48Z",
++      "all_steps_held": "2026-10-13T21:50:23Z",
++      "exit_code": 0,
++      "log": "sample-6.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 10
++    },
++    {
++      "sample": 7,
++      "uv_cache": "warm",
++      "command_start": "2026-10-13T21:50:23Z",
++      "demo_banner": "2026-10-13T21:50:23Z",
++      "demo_verdict": "2026-10-13T21:51:38Z",
++      "all_steps_held": "2026-10-13T21:54:14Z",
++      "exit_code": 0,
++      "log": "sample-7.log",
++      "timed_out": false,
++      "timeout_reason": null,
++      "started": true,
++      "missing": false,
++      "timeout_seconds": 600,
++      "uv_cache_entries_at_start": 10
++    }
++  ]
++}
+diff --git a/docs/measurement/reference-machines/README.md b/docs/measurement/reference-machines/README.md
+new file mode 100644
+index 0000000..81ef0e6
+--- /dev/null
++++ b/docs/measurement/reference-machines/README.md
+@@ -0,0 +1,150 @@
++# Reference-machine demo timings
++
++How long the packaged demo takes on a clean machine, measured by CI rather than by a person. It
++backs the memo target for the packaged demo: p50 ≤ 2 min and p95 ≤ 3 min "on clean reference
++machines" (`plan/research/forward-plan-2026-10-13.md`, adoption metrics).
++
++## What a reference machine is
++
++A fresh GitHub-hosted runner (`ubuntu-latest` and `macos-latest`) with:
++
++- no ARCI checkout: the job never checks out this repository, and the demo runs in an empty
++  temporary directory;
++- Python 3.12 from `actions/setup-python` and uv from PyPI at the version CI pins;
++- no secrets and no telemetry.
++
++The command is the README's first-screen command pinned to the release under test,
++`uvx --from agent-reliability-ci==0.8.0 arci demo`.
++
++## Cold and warm samples
++
++Per OS the job takes seven samples, in this order:
++
++- **five cold samples**, each with its own new `UV_CACHE_DIR` (a fresh temporary directory,
++  checked empty before the sample starts; `uv_cache_entries_at_start` records the count, 0). uv
++  has nothing cached, so each one resolves and downloads the package and its dependencies and
++  builds the tool environment, as a first-time user's machine would;
++- **two warm samples** that reuse the cache the fifth cold sample filled, so they measure a
++  repeat run.
++
++Only the cold samples are compared with the memo target, because the target is about a
++first-time user. Cold and warm differ by uv resolving and downloading the package and its
++dependencies, which measured 1–2 s on the hosted runners; nearly all of a sample's total is the
++demo's own computation (two experiments of 200 trials per arm, the diff, the minimisation, the
++replay, and the repaired agent's experiment). The warm samples are reported separately, for
++information, and never pooled with the cold ones. As an example, not a guarantee: on 2026-10-13
++(run 38451606669) the five cold samples took 222–227 s on `ubuntu-latest` and 213–227 s on
++`macos-latest`, over both targets on both runners.
++
++## Network traffic
++
++The job touches the network only for:
++
++1. `actions/setup-python` fetching the Python 3.12 build (from the runner's tool cache or
++   GitHub's python-versions releases);
++2. `pip install uv==<pinned>`: uv's wheel from PyPI;
++3. each cold sample: uv resolving `agent-reliability-ci==0.8.0` against PyPI and downloading it
++   and its dependencies (`pydantic`, `pyyaml` and their own dependencies) into that sample's
++   empty cache; a warm sample may still query the PyPI index but finds the files cached; uv may
++   also fetch a managed Python if it does not use the runner's interpreter;
++4. one last `uvx … python` call (after the samples, timing nothing, skipped when the deadline
++   leaves no room for it) that records the Python uvx ran arci with;
++5. `actions/upload-artifact` uploading the JSON and the logs to GitHub.
++
++The cold totals therefore include PyPI and the runner's network on that day.
++
++## How the JSON is produced
++
++[`.github/workflows/ttfv-reference.yml`](../../../.github/workflows/ttfv-reference.yml) runs on
++pushes to `sprint/t18-**` branches and on manual dispatch (`workflow_dispatch`). For each OS it:
++
++1. stamps `command_start` (UTC, whole seconds) and runs the command, prefixing every line of its
++   stdout and stderr with its arrival time into `sample-<n>.log`;
++2. bounds every sample by the smaller of `SAMPLE_TIMEOUT_S` (600 s) and the time left in the
++   sampling loop (see [Deadline](#deadline)). A sample still running at its bound is killed with
++   its whole process group, its log is kept and ends with a `killed after` line, and it is
++   recorded with `timed_out: true`, `exit_code: null`, `all_steps_held: null` and a
++   `timeout_reason`: `sample` when the 600 s per-sample limit killed it (a hang), `budget` when
++   the loop's deadline cut it short (`timeout_seconds` < 600). A sample with under a second left
++   is not started: `started: false`, `timed_out: true`, `timeout_reason: budget`;
++3. parses the logs into `reference-<os>.json` (this step runs even if the timing step failed):
++   per sample `command_start`, `demo_banner` (first line containing `arci demo:`),
++   `demo_verdict` (first `VERDICT:`), `all_steps_held` (first `All six steps held`),
++   `exit_code`, `uv_cache` (`cold` or `warm`), `timed_out`, `timeout_reason`, `started`,
++   `missing`, `timeout_seconds` and `uv_cache_entries_at_start`; plus the runner (OS,
++   architecture, image), the Python uvx ran arci with, `uv --version`, the package and the design
++   (`cold_samples`, `warm_samples`, the timeouts, `job_start`, `reserve_seconds`,
++   `budget_seconds_used`, `sampling_seconds`, whether the Python probe ran). It reads the
++   per-sample journal line by line and never fails on it: every complete row is kept, a line cut
++   off mid-write (a killed or cancelled step) becomes one
++   `{"sample": null, "incomplete": true, "raw_prefix": <first 80 characters>}` entry with
++   `journal_incomplete: true` at the top level, and every designed sample without a complete row
++   is recorded as `missing: true` (not started, not timed out);
++4. uploads the JSON and the logs as the artifact `ttfv-reference-<os>`, and fails the job if
++   there are not seven samples, the journal is incomplete, or any sample is missing, was not
++   started, was cut off by the budget, timed out, exited non-zero or never printed
++   `All six steps held`.
++
++The maintainer downloads the artifact and commits the JSON here, whatever it shows. Failed and
++timed-out samples are kept. The JSON files are never edited after commit.
++
++### Deadline
++
++The job is killed at 40 minutes (`timeout-minutes: 40`, 2400 s), and the JSON must be written
++before that. The first step records the job's start (`date +%s`); setup-python and the uv
++install each have a 5-minute step timeout. When the timing step starts, the sampling loop gets
++
++    budget = min(TIMING_BUDGET_S, 2400 − (now − job_start) − 420)
++
++so a 420 s reserve is always left after sampling for the Python probe (120 s), the parse (60 s), the
++upload (120 s), the final check (60 s) and 60 s of headroom for cleanup and the reader join, i.e.
++the final check, however long setup took. `TIMING_BUDGET_S` is 2400 s, a ceiling that never
++binds in a 40-minute job: the loop gets 1980 s less the setup time. The 120 s probe runs only if at
++least 420 s remain before the job deadline (the whole reserve, so the steps after it still fit),
++else it is recorded as skipped. The JSON's `design`
++block records `job_start`, `reserve_seconds` and `budget_seconds_used`.
++
++What this does and does not guarantee: seven samples at their full 600 s limit (4200 s) cannot fit
++in 1980 s, so a slow enough run ends with samples cut off by the budget or not started, recorded
++as such and failing the job. Seven samples of the measured ~225 s (1575 s), the probe and the
++reserve fit when setup takes under 4 minutes (240 + 1575 + 120 + 420 = 2355 s ≤ 2400 s).
++
++## Not receipts
++
++These are machine timings. They are not TTFV receipts (`../receipts/`) and never count as cold
++readers ([protocol](../ttfv-protocol.md) section 1.4): nobody reads the README, so the time to
++open it, find the command and interpret the verdict is not in them. They bound the part of
++time-to-first-verdict that the package and the network control; a person's time is longer.
++
++## Reading p50 and p95
++
++```
++python plan/exec/scripts/reference_stats.py docs/measurement/reference-machines/reference-*.json
++```
++
++For each file it first checks the structure and the timestamps (stamps present and in order
++`command_start` ≤ `demo_banner` ≤ `demo_verdict` ≤ `all_steps_held`, no negative duration, no
++null or duplicate sample) and that no sample contradicts itself: `exit_code` null only for a
++timed-out, not-started or missing sample; exit 0 only with all four stamps; no held stamp on a
++timed-out sample; `uv_cache` `cold` or `warm`, and a cold cache empty at start; a
++`timeout_reason` exactly when timed out, and consistent with `timeout_seconds`; a sample that was
++not started is timed out by the budget unless it is missing from the journal; a missing sample
++carries no stamps. A file that fails any check is reported as INVALID with its problems and no
++figures.
++
++Otherwise it prints two blocks, never pooled. The **cold** block lists the totals
++(`command_start` to `all_steps_held`, in seconds), then p50 and p95 by nearest rank and a
++one-line verdict, each figure within or over its target (120 s and 180 s). With five samples,
++nearest rank makes p50 the third-fastest sample and p95 the slowest. A sample succeeds only if it
++started, did not time out, exited 0 and carries all four stamps in order. Every other sample has
++no total and is listed by what happened to it (`failed`, `timed out (hang)`, `cut off by budget`,
++`not started`, `missing`); each ranks above every successful one, and a percentile that lands on
++it is "not reached", which is never within target. With fewer than five cold samples it lists the raw values
++and makes no percentile claim ([protocol](../ttfv-protocol.md) section 8.3). The **warm** block
++lists its totals the same way (two samples: raw values only) and is never compared with the
++target. The script always exits 0: it reports, it does not gate.
++
++Timestamps have one-second resolution, so each total is good to about ±1 s. Five cold samples on
++one runner image are a spot check of that image on that day, not a distribution over users'
++machines: GitHub-hosted runners vary in CPU and network, and a reader's laptop may be faster or
++slower.
+diff --git a/plan/exec/scripts/reference_stats.py b/plan/exec/scripts/reference_stats.py
+new file mode 100644
+index 0000000..8b6670c
+--- /dev/null
++++ b/plan/exec/scripts/reference_stats.py
+@@ -0,0 +1,348 @@
++"""Summarise reference-machine demo timings (docs/measurement/reference-machines/).
++
++    python plan/exec/scripts/reference_stats.py reference-ubuntu-latest.json [more.json ...]
++
++For each file (one OS per file, written by .github/workflows/ttfv-reference.yml) it first
++validates the structure, the timestamps and that no sample contradicts itself. An invalid file
++is reported as INVALID with its problems and no figures. A valid file gets two blocks, never
++pooled:
++
++- cold (each sample with its own empty uv cache, a first-time user): the `total` values
++  (command_start -> all_steps_held, whole seconds), then p50 and p95 by nearest rank, each
++  within or over the memo target (p50 <= 120 s, p95 <= 180 s). Fewer than five cold samples:
++  raw values only, no percentile claim (protocol section 8.3).
++- warm (cache already filled): the same figures, never compared with the memo target.
++
++A sample succeeds only if it started, did not time out, exited 0 and carries all four stamps
++(command_start, demo_banner, demo_verdict, all_steps_held) in order. Every other sample has no
++total and is shown by what happened to it: "failed" (non-zero exit), "timed out (hang)" (killed
++at the per-sample limit, timeout_reason "sample"), "cut off by budget" (killed early by the
++loop's deadline, timeout_reason "budget"), "not started" (no time left) or "missing" (no
++complete journal row). Each ranks above every successful sample, so it can only push a
++percentile up; a percentile that lands on it is "not reached". Incomplete journal lines are
++listed, not counted (their sample is counted as missing). A sample whose fields contradict each
++other (exit 0 without a stamp, a timeout without a reason, a cold cache that was not empty, not
++started yet not timed out, ...) makes the whole file INVALID. It reports; it does not gate: the
++exit status is always 0.
++"""
++
++from __future__ import annotations
++
++import datetime as dt
++import itertools
++import json
++import math
++import sys
++from pathlib import Path
++from typing import Any, TypeGuard, cast
++
++TARGETS = {50: 120.0, 95: 180.0}  # percentile -> memo target in seconds
++MIN_FOR_PERCENTILES = 5
++STAMP = "%Y-%m-%dT%H:%M:%SZ"
++CACHES = ("cold", "warm")
++REASONS = ("sample", "budget")  # timeout_reason of a timed-out sample
++# Stamps a sample may carry, in the order they must occur.
++ORDERED_STAMPS = ("command_start", "demo_banner", "demo_verdict", "all_steps_held")
++DEMO_STAMPS = ORDERED_STAMPS[1:]
++
++
++def parse(stamp: object) -> dt.datetime | None:
++    if not isinstance(stamp, str):
++        return None
++    try:
++        return dt.datetime.strptime(stamp, STAMP)
++    except ValueError:
++        return None
++
++
++def is_int(value: object) -> TypeGuard[int]:
++    return isinstance(value, int) and not isinstance(value, bool)
++
++
++def flag(sample: dict[str, Any], key: str, where: str, out: list[str]) -> bool | None:
++    """The sample's true/false field `key` (`missing` defaults to false); None if malformed."""
++    value = sample.get(key, False if key == "missing" else None)
++    if isinstance(value, bool):
++        return value
++    out.append(f"{where}: {key!r} is {value!r}, not true or false")
++    return None
++
++
++def reason_problems(
++    where: str, sample: dict[str, Any], timed_out: bool | None, limit: int | None
++) -> list[str]:
++    """`timeout_reason` against `timed_out`, `started` and the per-sample limit `limit`."""
++    reason = sample.get("timeout_reason")
++    if reason is not None and reason not in REASONS:
++        return [f"{where}: 'timeout_reason' is {reason!r}, not 'sample', 'budget' or null"]
++    out: list[str] = []
++    if timed_out and reason is None:
++        out.append(f"{where}: timed out but 'timeout_reason' is null")
++    if timed_out is False and reason is not None:
++        out.append(f"{where}: not timed out but 'timeout_reason' is {reason!r}")
++    if sample.get("started") is False and reason == "sample":
++        out.append(f"{where}: not started but 'timeout_reason' is 'sample'")
++    seconds = sample.get("timeout_seconds")
++    if seconds is not None and (not is_int(seconds) or seconds < 0):
++        out.append(f"{where}: 'timeout_seconds' is {seconds!r}, not a whole number of seconds")
++    elif is_int(seconds) and limit is not None and reason is not None:
++        if reason == "sample" and seconds < limit:
++            out.append(
++                f"{where}: 'timeout_reason' is 'sample' but its limit {seconds} s < {limit} s"
++            )
++        if reason == "budget" and seconds >= limit:
++            out.append(
++                f"{where}: 'timeout_reason' is 'budget' but its limit {seconds} s >= {limit} s"
++            )
++    return out
++
++
++def contradictions(where: str, sample: dict[str, Any], limit: int | None = None) -> list[str]:
++    """Fields of one sample that cannot all be true at once.
++
++    `limit` is the design's per-sample timeout in seconds, when the file records it.
++    """
++    out: list[str] = []
++    started = flag(sample, "started", where, out)
++    timed_out = flag(sample, "timed_out", where, out)
++    missing = flag(sample, "missing", where, out)
++    out.extend(reason_problems(where, sample, timed_out, limit))
++    code = sample.get("exit_code", "missing")
++    present = {key: sample.get(key) is not None for key in ORDERED_STAMPS}
++    if code is None:
++        if not (timed_out or started is False or missing):
++            out.append(
++                f"{where}: 'exit_code' is None"
++                " (null only for a timed-out, not-started or missing sample)"
++            )
++    elif not is_int(code):
++        out.append(f"{where}: 'exit_code' is {code!r}, not an integer or null")
++    else:
++        if timed_out:
++            out.append(f"{where}: timed out but 'exit_code' is {code}")
++        if started is False:
++            out.append(f"{where}: not started but 'exit_code' is {code}")
++        if code == 0:
++            out.extend(
++                f"{where}: exit 0 but {k!r} is missing" for k in DEMO_STAMPS if not present[k]
++            )
++    if missing:
++        if started:
++            out.append(f"{where}: missing from the journal but 'started' is true")
++        if timed_out:
++            out.append(f"{where}: missing from the journal but 'timed_out' is true")
++        out.extend(
++            f"{where}: missing from the journal but {k!r} is set"
++            for k in ORDERED_STAMPS
++            if present[k]
++        )
++        return out
++    if not present["command_start"]:
++        out.append(f"{where}: 'command_start' is missing")
++    if started is False:
++        if timed_out is False:
++            # The loop leaves a sample unstarted only when its budget is used up, and records it
++            # as timed out (timeout_reason "budget"); only a missing sample has neither.
++            out.append(f"{where}: not started but 'timed_out' is false (and not missing)")
++        out.extend(f"{where}: not started but {k!r} is set" for k in DEMO_STAMPS if present[k])
++    if timed_out and present["all_steps_held"]:
++        out.append(f"{where}: timed out but 'all_steps_held' is set")
++    entries = sample.get("uv_cache_entries_at_start")
++    if entries is not None:
++        if not is_int(entries) or entries < 0:
++            out.append(f"{where}: 'uv_cache_entries_at_start' is {entries!r}, not a count")
++        elif sample.get("uv_cache") == "cold" and entries > 0:
++            out.append(f"{where}: cold sample but its uv cache had {entries} entries at start")
++    return out
++
++
++def sample_problems(where: str, sample: dict[str, Any], limit: int | None = None) -> list[str]:
++    out: list[str] = []
++    if not is_int(sample.get("sample")):
++        out.append(f"{where}: 'sample' is not an integer")
++    if sample.get("uv_cache") not in CACHES:
++        out.append(f"{where}: 'uv_cache' is {sample.get('uv_cache')!r}, not cold or warm")
++    if "all_steps_held" not in sample:
++        out.append(f"{where}: 'all_steps_held' is missing")
++    out.extend(contradictions(where, sample, limit))
++    stamps: list[tuple[str, dt.datetime]] = []
++    for key in ORDERED_STAMPS:
++        value = sample.get(key)
++        if value is None:
++            continue
++        when = parse(value)
++        if when is None:
++            out.append(f"{where}: {key!r} is {value!r}, not a UTC timestamp")
++            continue
++        stamps.append((key, when))
++    for (k1, t1), (k2, t2) in itertools.pairwise(stamps):
++        if t2 < t1:
++            seconds = (t2 - t1).total_seconds()
++            out.append(f"{where}: {k2} is before {k1} ({seconds:g} s, out of order)")
++    return out
++
++
++def incomplete_problems(where: str, entry: dict[str, Any]) -> list[str]:
++    out: list[str] = []
++    if entry.get("sample") is not None:
++        out.append(f"{where}: incomplete journal line but 'sample' is {entry.get('sample')!r}")
++    if not isinstance(entry.get("raw_prefix"), str):
++        out.append(f"{where}: incomplete journal line without a 'raw_prefix'")
++    return out
++
++
++def is_incomplete(sample: dict[str, Any]) -> bool:
++    return sample.get("incomplete") is True
++
++
++def problems(doc: object) -> list[str]:
++    """Everything wrong with a reference JSON; empty when it can be summarised."""
++    if not isinstance(doc, dict):
++        return ["the top level is not an object"]
++    top = cast("dict[str, Any]", doc)
++    samples = top.get("samples")
++    if not isinstance(samples, list):
++        return ["'samples' is missing or not a list"]
++    out: list[str] = []
++    design = top.get("design")
++    limit = (
++        cast("dict[str, Any]", design).get("sample_timeout_seconds")
++        if isinstance(design, dict)
++        else None
++    )
++    limit = limit if is_int(limit) and limit > 0 else None
++    journal_incomplete = top.get("journal_incomplete", False)
++    if not isinstance(journal_incomplete, bool):
++        out.append(f"'journal_incomplete' is {journal_incomplete!r}, not true or false")
++    seen: set[int] = set()
++    lines = 0
++    for i, sample in enumerate(cast("list[Any]", samples)):
++        where = f"samples[{i}]"
++        if not isinstance(sample, dict):
++            out.append(f"{where} is {json.dumps(sample)}, not an object")
++            continue
++        typed = cast("dict[str, Any]", sample)
++        if not isinstance(typed.get("incomplete", False), bool):
++            out.append(f"{where}: 'incomplete' is {typed.get('incomplete')!r}, not true or false")
++            continue
++        if is_incomplete(typed):
++            lines += 1
++            out.extend(incomplete_problems(where, typed))
++            continue
++        out.extend(sample_problems(where, typed, limit))
++        n = typed.get("sample")
++        if isinstance(n, int) and not isinstance(n, bool):
++            if n in seen:
++                out.append(f"{where}: sample number {n} appears twice")
++            seen.add(n)
++    if lines and journal_incomplete is not True:
++        out.append(f"{lines} incomplete journal line(s) but 'journal_incomplete' is not true")
++    if journal_incomplete is True and not lines:
++        out.append("'journal_incomplete' is true but no entry is an incomplete journal line")
++    return out
++
++
++def total(sample: dict[str, Any]) -> float | None:
++    """Seconds from command_start to all_steps_held for a successful sample, else None.
++
++    Successful: started, not timed out, not missing, exit 0, all four stamps present and ordered.
++    """
++    if sample.get("started") is not True or sample.get("timed_out") is not False:
++        return None
++    if sample.get("missing", False) is not False or is_incomplete(sample):
++        return None
++    code = sample.get("exit_code")
++    if not is_int(code) or code != 0:
++        return None
++    stamps = [parse(sample.get(key)) for key in ORDERED_STAMPS]
++    ordered: list[dt.datetime] = [t for t in stamps if t is not None]
++    if len(ordered) != len(ORDERED_STAMPS):
++        return None
++    if any(t2 < t1 for t1, t2 in itertools.pairwise(ordered)):
++        return None
++    return (ordered[-1] - ordered[0]).total_seconds()
++
++
++def nearest_rank(values: list[float | None], p: int) -> float | None:
++    """Nearest-rank percentile; None (a failed sample) ranks above every number."""
++    if not values:
++        return None
++    ranked = sorted(values, key=lambda v: math.inf if v is None else v)
++    return ranked[max(1, math.ceil(p / 100 * len(ranked))) - 1]
++
++
++def shown(sample: dict[str, Any], value: float | None) -> str:
++    if value is not None:
++        return f"{value:g} s"
++    if sample.get("missing") is True:
++        return "missing"
++    if sample.get("started") is False:
++        return "not started"
++    if sample.get("timed_out") is True:
++        return (
++            "cut off by budget" if sample.get("timeout_reason") == "budget" else "timed out (hang)"
++        )
++    return "failed"
++
++
++def block(name: str, samples: list[dict[str, Any]], *, compare: bool) -> list[str]:
++    totals = [total(s) for s in samples]
++    raw = ", ".join(shown(s, t) for s, t in zip(samples, totals, strict=True)) or "none"
++    lines = [f"  {name} totals ({len(samples)}): {raw}"]
++    if len(samples) < MIN_FOR_PERCENTILES:
++        claim = f"fewer than {MIN_FOR_PERCENTILES} samples, raw values only, no percentile claim"
++    else:
++        parts: list[str] = []
++        for p, target in TARGETS.items():
++            value = nearest_rank(totals, p)
++            figure = "not reached" if value is None else f"{value:g} s"
++            if compare:
++                within = value is not None and value <= target
++                figure += f" {'within' if within else 'over'} target (<= {target:g} s)"
++            parts.append(f"p{p} {figure}")
++        claim = "; ".join(parts)
++        if len(samples) < 20:
++            claim += f"; p95 of {len(samples)} is the maximum"
++    if not compare:
++        claim += "; warm samples are never compared with the memo target"
++    return [*lines, f"  {name}: {claim}"]
++
++
++def report(path: Path) -> list[str]:
++    try:
++        doc: object = json.loads(path.read_text(encoding="utf-8"))
++    except (OSError, ValueError) as exc:
++        return [f"{path.name}: unreadable ({exc.__class__.__name__}: {exc})"]
++    found = problems(doc)
++    if found:
++        return [f"{path.name}: INVALID, no figures reported", *(f"  - {p}" for p in found)]
++    data = cast("dict[str, Any]", doc)  # validated by problems()
++    runner = data.get("runner")
++    info = cast("dict[str, Any]", runner) if isinstance(runner, dict) else {}
++    where = " ".join(str(info.get(k)) for k in ("os", "arch", "label") if info.get(k))
++    lines = [f"{path.name}: {where or 'unknown runner'}, {data.get('package', '?')}"]
++    entries: list[dict[str, Any]] = data["samples"]
++    samples = [s for s in entries if not is_incomplete(s)]
++    for cache in CACHES:
++        chosen = [s for s in samples if s["uv_cache"] == cache]
++        lines.extend(block(cache, chosen, compare=cache == "cold"))
++    cut = len(entries) - len(samples)
++    if cut:
++        lines.append(
++            f"  journal: {cut} incomplete line(s), not counted;"
++            " a sample with no complete journal row is counted as missing"
++        )
++    return lines
++
++
++def main(argv: list[str]) -> int:
++    if not argv:
++        print((__doc__ or "").strip())
++        return 0
++    for arg in argv:
++        print("\n".join(report(Path(arg))))
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main(sys.argv[1:]))
+diff --git a/plan/exec/scripts/test_reference_stats.py b/plan/exec/scripts/test_reference_stats.py
+new file mode 100644
+index 0000000..fede8c5
+--- /dev/null
++++ b/plan/exec/scripts/test_reference_stats.py
+@@ -0,0 +1,888 @@
++"""Dry run of .github/workflows/ttfv-reference.yml and reference_stats.py, no network.
++
++The workflow's own `run:` bodies are lifted from the YAML and executed: the job-start step, the
++timing step against a fake `uv`/`uvx` on PATH (sample 3 fails, sample 6 hangs until the
++per-sample timeout kills it), the parse step on the logs that produced, and the final check step.
++Further runs put the job start far enough back that the deadline arithmetic shrinks the loop
++budget, cuts a hanging sample off at the loop deadline (timeout_reason "budget", not a hang) or
++leaves no budget at all (nothing starts, the probe is skipped), cut the journal's last line off,
++and feed the parse step journals it must survive. reference_stats.py is then run on those JSONs
++and on hand-written ones with known stamps, valid, contradictory and otherwise invalid.
++
++    .venv/bin/pytest -p no:cacheprovider plan/exec/scripts/test_reference_stats.py
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import os
++import re
++import subprocess
++import sys
++import time
++from pathlib import Path
++from types import ModuleType
++from typing import Any
++
++import pytest
++import yaml
++
++HERE = Path(__file__).resolve().parent
++WORKFLOW = HERE.parents[2] / ".github" / "workflows" / "ttfv-reference.yml"
++STAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
++PACKAGE = "agent-reliability-ci==0.8.0"
++# Short enough to keep the test quick, far above the fake's millisecond samples.
++SAMPLE_TIMEOUT_S = "5"
++
++FAKE_UV = """#!/usr/bin/env bash
++echo "uv 0.12.5 (fake)"
++"""
++# Sample 3 fails; sample FAKE_HANG_AT (default 6) prints every marker, then hangs. Every demo
++# call records its number, the cache it saw and how many entries that cache had at start.
++FAKE_UVX = """#!/usr/bin/env bash
++set -u
++if [ "$1" != --from ] || [ "$2" != "agent-reliability-ci==0.8.0" ]; then
++  echo "bad args: $*" >&2
++  exit 90
++fi
++if [ "$3" = python ]; then echo 3.12.99; exit 0; fi
++[ "$3 $4" = "arci demo" ] || { echo "bad args: $*" >&2; exit 91; }
++n=$(( $(cat "$FAKE_STATE/count" 2>/dev/null || echo 0) + 1 ))
++echo "$n" >"$FAKE_STATE/count"
++printf '%s %s %s\\n' "$n" "$UV_CACHE_DIR" "$(ls -A "$UV_CACHE_DIR" | wc -l | tr -d ' ')" \\
++  >>"$FAKE_STATE/calls"
++touch "$UV_CACHE_DIR/filled"
++echo "Installed 3 packages in 5ms" >&2
++echo "arci demo: the retry story, 8 workers, run stores in /tmp/x"
++echo "  VERDICT: BLOCK (exit 1)   [A vs agent_b]"
++echo "  VERDICT: PASS (exit 0)   [A vs agent_a]"
++if [ "$n" = 3 ]; then echo "Traceback: boom" >&2; exit 3; fi
++echo "All six steps held."
++if [ "$n" = "${FAKE_HANG_AT:-6}" ]; then sleep 300; fi
++printf 'Run stores: /tmp/x'
++"""
++
++
++def load_stats() -> ModuleType:
++    spec = importlib.util.spec_from_file_location("reference_stats", HERE / "reference_stats.py")
++    assert spec is not None and spec.loader is not None
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++stats = load_stats()
++
++
++def step(name_prefix: str) -> dict[str, Any]:
++    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
++    steps: list[dict[str, Any]] = doc["jobs"]["reference"]["steps"]
++    matches = [s for s in steps if str(s.get("name", "")).startswith(name_prefix)]
++    assert len(matches) == 1, name_prefix
++    return matches[0]
++
++
++def workflow() -> dict[str, Any]:
++    return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
++
++
++def workflow_env() -> dict[str, str]:
++    return {str(k): str(v) for k, v in workflow()["env"].items()}
++
++
++def job_start_ago(seconds: int) -> str:
++    return str(int(time.time()) - seconds)
++
++
++def write_exe(path: Path, body: str) -> None:
++    path.write_text(body, encoding="utf-8")
++    path.chmod(0o755)
++
++
++def run_step(
++    name_prefix: str, tmp_path: Path, env: dict[str, str]
++) -> subprocess.CompletedProcess[str]:
++    body = step(name_prefix)
++    assert body["shell"] == "python", name_prefix
++    script = tmp_path / f"step-{len(list(tmp_path.glob('step-*.py')))}.py"
++    script.write_text(body["run"], encoding="utf-8")
++    return subprocess.run(
++        [sys.executable, str(script)], env=env, capture_output=True, text=True, check=False
++    )
++
++
++def fake_env(tmp_path: Path, **overrides: str) -> dict[str, str]:
++    bin_dir, state, tmp = (tmp_path / d for d in ("bin", "state", "tmp"))
++    for d in (bin_dir, state, tmp):
++        d.mkdir()
++    write_exe(bin_dir / "uv", FAKE_UV)
++    write_exe(bin_dir / "uvx", FAKE_UVX)
++    return (
++        workflow_env()
++        | {
++            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
++            "HOME": str(tmp_path),
++            "TMPDIR": str(tmp),
++            "FAKE_STATE": str(state),
++            "OUT_DIR": str(tmp_path / "out"),
++            "OUT_JSON": "reference-test.json",
++            "REF_RUNNER_OS": "Linux",
++            "REF_RUNNER_ARCH": "X64",
++            "REF_RUNNER_LABEL": "ubuntu-latest",
++            "REF_RUN_ID": "1",
++            "REF_RUN_ATTEMPT": "1",
++            "REF_SHA": "0" * 40,
++            "JOB_START": job_start_ago(0),
++        }
++        | overrides
++    )
++
++
++def test_workflow_design_values() -> None:
++    env = workflow_env()
++    assert env["PACKAGE"] == PACKAGE
++    assert (env["COLD_SAMPLES"], env["WARM_SAMPLES"]) == ("5", "2")
++    assert env["SAMPLE_TIMEOUT_S"] == "600"
++    assert env["TIMING_BUDGET_S"] == "2400"
++    assert (env["RESERVE_S"], env["PROBE_TIMEOUT_S"], env["PROBE_MIN_LEFT_S"]) == (
++        "420",
++        "120",
++        "420",
++    )
++    job = workflow()["jobs"]["reference"]
++    assert job["timeout-minutes"] == 40
++    assert int(env["JOB_TIMEOUT_S"]) == job["timeout-minutes"] * 60
++    steps: list[dict[str, Any]] = job["steps"]
++    assert steps[0]["id"] == "start" and "date +%s" in steps[0]["run"]
++    assert step("Set up Python")["timeout-minutes"] == 5
++    assert step("Install uv")["timeout-minutes"] == 5
++    assert all("timeout-minutes" in s for s in steps)  # every step is bounded
++    job_s, reserve = int(env["JOB_TIMEOUT_S"]), int(env["RESERVE_S"])
++    sample_s, probe = int(env["SAMPLE_TIMEOUT_S"]), int(env["PROBE_TIMEOUT_S"])
++    # The loop budget is min(TIMING_BUDGET_S, job - elapsed - reserve): the reserve is always
++    # left, and in a 40-minute job the 2400 s ceiling never binds (the loop gets at most 1980 s).
++    assert job_s - reserve < int(env["TIMING_BUDGET_S"])
++    # What the bounds do NOT guarantee: seven samples at their full 600 s limit (4200 s > 1980 s).
++    # A sample the loop cannot give its full limit is cut off (timeout_reason "budget").
++    assert job_s - reserve - 600 < 7 * sample_s
++    # What they do guarantee: seven samples of the measured ~225 s (run 38451606669: 213-227 s on
++    # both runners), the probe and the reserve fit when setup takes under 4 minutes.
++    assert 4 * 60 + 7 * 225 + probe + reserve <= job_s
++    # The reserve covers everything after sampling COMBINED: the probe (which only runs with
++    # PROBE_MIN_LEFT_S left, itself at least the reserve), the parse, upload and final-check
++    # steps at their full timeouts, and 60 s of headroom for cleanup and the reader join.
++    after = ("Parse the logs", "Upload the JSON", "Fail if any sample")
++    after_s = sum(60 * step(name)["timeout-minutes"] for name in after)
++    assert probe + after_s + 60 <= reserve
++    assert probe < int(env["PROBE_MIN_LEFT_S"]) <= reserve
++    assert int(env["PROBE_MIN_LEFT_S"]) >= probe + after_s + 60
++    # The timing step's own timeout is only a backstop: the step ends by job time
++    # job - reserve + probe (+ the kill/join of a last sample), well inside it, and the job
++    # timeout still comes first.
++    timing_s = step("Time the demo")["timeout-minutes"] * 60
++    assert job_s - reserve + probe + 60 <= timing_s < job_s
++    ref = "${{ steps.start.outputs.job_start }}"
++    assert step("Time the demo")["env"]["JOB_START"] == ref
++    assert step("Parse the logs")["env"]["JOB_START"] == ref
++    assert step("Parse the logs")["if"] == "always()"
++    assert step("Upload the JSON")["if"] == "always()"
++
++
++def test_job_start_step(tmp_path: Path) -> None:
++    out = tmp_path / "github_output"
++    before = int(time.time())
++    done = subprocess.run(
++        ["bash", "-c", step("Record the job start")["run"]],
++        env={"PATH": os.environ.get("PATH", ""), "GITHUB_OUTPUT": str(out)},
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    assert done.returncode == 0, done.stderr
++    key, _, value = out.read_text().strip().partition("=")
++    assert key == "job_start"
++    assert before <= int(value) <= int(time.time())
++
++
++def test_workflow_steps_dry_run(tmp_path: Path) -> None:
++    env = fake_env(tmp_path, SAMPLE_TIMEOUT_S=SAMPLE_TIMEOUT_S)
++    out_dir, state = Path(env["OUT_DIR"]), Path(env["FAKE_STATE"])
++
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert "sample 3 (cold): exit 3" in done.stdout
++    assert (
++        f"sample 6 (warm): timed out after {SAMPLE_TIMEOUT_S} s (per-sample limit)" in done.stdout
++    )
++
++    calls = [line.split() for line in (state / "calls").read_text().splitlines()]
++    assert [c[0] for c in calls] == ["1", "2", "3", "4", "5", "6", "7"]
++    caches = [c[1] for c in calls]
++    assert len(set(caches[:5])) == 5  # a new uv cache for every cold sample
++    assert caches[5] == caches[6] == caches[4]  # warm samples reuse the last cold cache
++    assert [c[2] for c in calls] == ["0", "0", "0", "0", "0", "1", "1"]
++
++    log3 = (out_dir / "sample-3.log").read_text().splitlines()
++    assert all(STAMP_RE.match(line.split(" ", 1)[0]) for line in log3)
++    assert log3[-1].endswith(" Traceback: boom")
++    # The unterminated last line survives the timestamping.
++    assert (out_dir / "sample-1.log").read_text().splitlines()[-1].endswith(" Run stores: /tmp/x")
++    log6 = (out_dir / "sample-6.log").read_text().splitlines()
++    assert log6[-1].endswith(f"[ttfv-reference] killed after {SAMPLE_TIMEOUT_S} s")
++
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    out = out_dir / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["package"] == PACKAGE
++    assert doc["runner"]["os"] == "Linux" and doc["runner"]["arch"] == "X64"
++    assert doc["python"] == "3.12.99"
++    assert doc["uv"] == "uv 0.12.5 (fake)"
++    assert doc["setup_python"]
++    assert doc["design"]["cold_samples"] == 5 and doc["design"]["warm_samples"] == 2
++    assert doc["design"]["sample_timeout_seconds"] == int(SAMPLE_TIMEOUT_S)
++    design = doc["design"]
++    assert design["job_start"] == int(env["JOB_START"])
++    assert design["job_timeout_seconds"] == 2400 and design["reserve_seconds"] == 420
++    # The job just started: the loop gets the 40 minutes less the 300 s reserve.
++    assert 1980 - 5 <= design["budget_seconds_used"] <= 1980
++    assert design["timing_budget_seconds"] == 2400
++    assert design["python_probe"] == "ran"
++    assert isinstance(design["sampling_seconds"], int)
++    assert design["seconds_left_after_sampling"] >= 2400 - 60
++    assert doc["journal_incomplete"] is False
++    samples = doc["samples"]
++    assert not any(s["missing"] for s in samples)
++    assert [s["sample"] for s in samples] == [1, 2, 3, 4, 5, 6, 7]
++    assert [s["uv_cache"] for s in samples] == ["cold"] * 5 + ["warm"] * 2
++    assert [s["uv_cache_entries_at_start"] for s in samples] == [0, 0, 0, 0, 0, 1, 1]
++    assert [s["exit_code"] for s in samples] == [0, 0, 3, 0, 0, None, 0]
++    assert [s["timed_out"] for s in samples] == [False] * 5 + [True, False]
++    assert [s["timeout_reason"] for s in samples] == [None] * 5 + ["sample", None]
++    assert [s["timeout_seconds"] for s in samples] == [int(SAMPLE_TIMEOUT_S)] * 7
++    assert all(s["started"] for s in samples)
++    for s in samples:
++        for key in ("command_start", "demo_banner", "demo_verdict"):
++            assert STAMP_RE.match(s[key]), (s["sample"], key)
++        assert s["log"] == f"sample-{s['sample']}.log"
++    # Sample 6 printed the marker before hanging; a timed-out sample never counts as held.
++    assert samples[2]["all_steps_held"] is None and samples[5]["all_steps_held"] is None
++    assert all(STAMP_RE.match(s["all_steps_held"]) for s in samples if s["sample"] not in (3, 6))
++
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "7 of 7 samples; not held: [3, 6]; timed out (hang): [6]\n" in done.stdout
++
++    assert stats.problems(doc) == []
++    lines = stats.report(out)
++    assert lines[0] == "reference-test.json: Linux X64 ubuntu-latest, agent-reliability-ci==0.8.0"
++    assert lines[1].startswith("  cold totals (5): ") and "failed" in lines[1]
++    assert lines[2].startswith("  cold: p50 ") and "p95 not reached over target" in lines[2]
++    assert lines[3].startswith("  warm totals (2): timed out (hang), ")
++    assert lines[4].startswith("  warm: fewer than 5 samples")
++    assert len(lines) == 5
++
++
++def test_workflow_budget_used_up(tmp_path: Path) -> None:
++    """2300 s into the 2400 s job: below the reserve, so no sample starts and the probe (only
++    100 s left, under 420) is skipped; every sample is recorded as not started (timed out by the
++    budget), the JSON still comes.
++    """
++    env = fake_env(tmp_path, JOB_START=job_start_ago(2300))
++    out_dir, state = Path(env["OUT_DIR"]), Path(env["FAKE_STATE"])
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert "python probe skipped" in done.stdout
++    assert not (state / "calls").exists()  # neither a sample nor the probe ran
++    assert "not started" in (out_dir / "sample-7.log").read_text()
++    assert run_step("Parse the logs", tmp_path, env).returncode == 0
++    out = out_dir / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["design"]["budget_seconds_used"] == 0
++    assert doc["design"]["python_probe"] == "skipped"
++    assert doc["python"] is None
++    samples = doc["samples"]
++    assert [
++        (s["timed_out"], s["timeout_reason"], s["started"], s["exit_code"], s["timeout_seconds"])
++        for s in samples
++    ] == [(True, "budget", False, None, 0)] * 7
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "; not started: [1, 2, 3, 4, 5, 6, 7]\n" in done.stdout
++    assert "hang" not in done.stdout and "cut off" not in done.stdout
++    assert stats.problems(doc) == []
++    lines = stats.report(out)
++    assert lines[1] == "  cold totals (5): " + ", ".join(["not started"] * 5)
++    assert lines[2].startswith("  cold: p50 not reached over target (<= 120 s)")
++
++
++def test_workflow_budget_shrunk_by_setup(tmp_path: Path) -> None:
++    """1500 s into the job (a slow setup), the loop gets 2400 - 1500 - 420 = 480 s, not 1980."""
++    env = fake_env(tmp_path, JOB_START=job_start_ago(1500), FAKE_HANG_AT="0")
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert run_step("Parse the logs", tmp_path, env).returncode == 0
++    doc = json.loads((Path(env["OUT_DIR"]) / "reference-test.json").read_text())
++    assert 470 <= doc["design"]["budget_seconds_used"] <= 480
++    assert doc["design"]["seconds_before_sampling"] >= 1500
++    assert doc["design"]["python_probe"] == "ran"
++    samples = doc["samples"]
++    assert [s["timeout_seconds"] <= 600 for s in samples] == [True] * 7
++    assert [s["exit_code"] for s in samples] == [0, 0, 3, 0, 0, 0, 0]
++
++
++def test_workflow_budget_cut_off(tmp_path: Path) -> None:
++    """1976 s into the job the loop gets about 4 s (2400 - 1976 - 420). Samples 1-6 take
++    milliseconds; sample 7 hangs and is killed at the loop deadline, well before its 5 s
++    per-sample limit: recorded as cut off by the budget, not as a hang."""
++    env = fake_env(
++        tmp_path, JOB_START=job_start_ago(1976), SAMPLE_TIMEOUT_S=SAMPLE_TIMEOUT_S, FAKE_HANG_AT="7"
++    )
++    out_dir = Path(env["OUT_DIR"])
++    done = run_step("Time the demo", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    assert re.search(r"sample 7 \(warm\): timed out after [1-4] s \(loop budget\)", done.stdout)
++    assert run_step("Parse the logs", tmp_path, env).returncode == 0
++    out = out_dir / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["design"]["budget_seconds_used"] <= 4
++    seventh = doc["samples"][6]
++    assert seventh["started"] is True and seventh["timed_out"] is True
++    assert seventh["timeout_reason"] == "budget"
++    assert seventh["timeout_seconds"] < int(SAMPLE_TIMEOUT_S)
++    assert seventh["exit_code"] is None and seventh["all_steps_held"] is None
++    assert [s["timeout_reason"] for s in doc["samples"][:6]] == [None] * 6
++
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "7 of 7 samples; not held: [3, 7]; cut off by budget: [7]\n" in done.stdout
++
++    assert stats.problems(doc) == []
++    lines = stats.report(out)
++    assert lines[3].startswith("  warm totals (2): ") and lines[3].endswith(", cut off by budget")
++
++
++def test_workflow_truncated_journal(tmp_path: Path) -> None:
++    """The journal's last row is cut off mid-line (a killed or cancelled step): the complete rows
++    are kept, the partial line is one incomplete entry, and its sample is counted as missing."""
++    env = fake_env(tmp_path, FAKE_HANG_AT="0")
++    out_dir = Path(env["OUT_DIR"])
++    assert run_step("Time the demo", tmp_path, env).returncode == 0
++    journal = out_dir / "samples.jsonl"
++    rows = journal.read_text().splitlines()
++    assert len(rows) == 7
++    partial = rows[-1][: len(rows[-1]) // 2]
++    journal.write_text("\n".join(rows[:-1]) + "\n" + partial)
++
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    out = out_dir / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["journal_incomplete"] is True
++    samples = doc["samples"]
++    assert [s["sample"] for s in samples] == [1, 2, 3, 4, 5, 6, 7, None]
++    assert samples[-1] == {"sample": None, "incomplete": True, "raw_prefix": partial[:80]}
++    seventh = samples[6]
++    assert seventh["missing"] is True and seventh["started"] is False
++    assert seventh["timed_out"] is False and seventh["timeout_reason"] is None
++    assert seventh["uv_cache"] == "warm"
++    assert seventh["exit_code"] is None and seventh["all_steps_held"] is None
++    assert seventh["log"] == "sample-7.log"  # its log is kept and named
++    assert not any(s["missing"] for s in samples[:6])
++
++    done = run_step("Fail if any sample", tmp_path, env | {"OUT_JSON": str(out)})
++    assert done.returncode == 1
++    assert "7 of 7 samples; not held: [3, 7]; missing: [7]; journal incomplete\n" in done.stdout
++
++    assert stats.problems(doc) == []
++    lines = stats.report(out)
++    assert lines[3].startswith("  warm totals (2): ") and lines[3].endswith(", missing")
++    assert lines[-1] == (
++        "  journal: 1 incomplete line(s), not counted;"
++        " a sample with no complete journal row is counted as missing"
++    )
++
++
++JOURNALS: dict[str, bytes] = {
++    "partial row": b'{"sample": 1, "uv_cache": "cold", "comm',
++    "not a record": b"42\n[]\nnull\n",
++    "sample number not an integer": b'{"sample": "1"}\n{"sample": true}\n',
++    "row without fields": b'{"sample": 1}\n',
++    "invalid utf-8": b"\xff\xfe\x00garbage\n",
++    "deep nesting": b"[" * 200_000 + b"\n",
++    "blank lines only": b"\n\n  \n",
++}
++
++
++@pytest.mark.parametrize("case", sorted(JOURNALS))
++def test_parse_step_survives_any_journal(case: str, tmp_path: Path) -> None:
++    env = fake_env(tmp_path)
++    out_dir = Path(env["OUT_DIR"])
++    out_dir.mkdir()
++    (out_dir / "samples.jsonl").write_bytes(JOURNALS[case])
++    (out_dir / "timing.json").write_text("{not json")
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    doc = json.loads((out_dir / "reference-test.json").read_text())
++    numbered = [s for s in doc["samples"] if s["sample"] is not None]
++    assert [s["sample"] for s in numbered] == [1, 2, 3, 4, 5, 6, 7]
++    incomplete = [s for s in doc["samples"] if s.get("incomplete")]
++    assert doc["journal_incomplete"] is bool(incomplete)
++    assert all(len(s["raw_prefix"]) <= 80 for s in incomplete)
++    assert doc["design"]["job_start"] == int(env["JOB_START"])  # from env, timing.json unreadable
++    assert doc["design"]["budget_seconds_used"] is None
++    stats.problems(doc)  # never raises either
++    done = run_step(
++        "Fail if any sample", tmp_path, env | {"OUT_JSON": str(out_dir / "reference-test.json")}
++    )
++    assert done.returncode == 1
++
++
++def test_parse_step_without_samples(tmp_path: Path) -> None:
++    """The timing step died before writing anything: the JSON step still writes a file, with
++    every designed sample recorded as missing."""
++    env = fake_env(tmp_path)
++    done = run_step("Parse the logs", tmp_path, env)
++    assert done.returncode == 0, done.stderr
++    out = Path(env["OUT_DIR"]) / "reference-test.json"
++    doc = json.loads(out.read_text())
++    assert doc["journal_incomplete"] is False
++    assert [(s["sample"], s["missing"], s["started"]) for s in doc["samples"]] == [
++        (n, True, False) for n in range(1, 8)
++    ]
++    assert [s["log"] for s in doc["samples"]] == [None] * 7
++    assert stats.problems(doc) == []
++    assert stats.report(out)[1] == "  cold totals (5): " + ", ".join(["missing"] * 5)
++
++
++T0 = "2026-10-14T10:00:00Z"
++
++
++def at(seconds: int) -> str:
++    return f"2026-10-14T10:{seconds // 60:02d}:{seconds % 60:02d}Z"
++
++
++def sample(
++    n: int,
++    cache: str,
++    held: int | None,
++    exit_code: int | None = 0,
++    *,
++    timed_out: bool = False,
++    reason: str | None = None,
++) -> dict[str, Any]:
++    """A sample that started at T0 and held `held` seconds later (None: never held).
++
++    A timed-out sample is a hang (timeout_reason "sample") unless `reason` says otherwise.
++    """
++    return {
++        "sample": n,
++        "uv_cache": cache,
++        "command_start": T0,
++        "demo_banner": at(1),
++        "demo_verdict": at(2),
++        "all_steps_held": None if held is None else at(held),
++        "exit_code": exit_code,
++        "timed_out": timed_out,
++        "timeout_reason": (reason or "sample") if timed_out else reason,
++        "started": True,
++    }
++
++
++def write_doc(path: Path, samples: list[Any]) -> Path:
++    doc = {
++        "package": PACKAGE,
++        "runner": {"os": "macOS", "arch": "ARM64", "label": "macos-latest"},
++        "samples": samples,
++    }
++    path.write_text(json.dumps(doc), encoding="utf-8")
++    return path
++
++
++# A designed sample with no complete journal row, as the parse step writes it.
++MISSING: dict[str, Any] = {
++    "sample": 1,
++    "uv_cache": "cold",
++    "command_start": None,
++    "demo_banner": None,
++    "demo_verdict": None,
++    "all_steps_held": None,
++    "exit_code": None,
++    "log": None,
++    "timed_out": False,
++    "timeout_reason": None,
++    "started": False,
++    "missing": True,
++}
++# A sample the loop had no time left for, as the timing step writes it.
++NOT_STARTED: dict[str, Any] = {
++    "started": False,
++    "timed_out": True,
++    "timeout_reason": "budget",
++    "timeout_seconds": 0,
++    "demo_banner": None,
++    "demo_verdict": None,
++}
++NO_REASON: dict[str, Any] = {"timeout_reason": None}
++INCOMPLETE: dict[str, Any] = {"sample": None, "incomplete": True, "raw_prefix": '{"sample": 7, "u'}
++
++HEADER = "reference-macos-latest.json: macOS ARM64 macos-latest, agent-reliability-ci==0.8.0"
++
++
++def test_cold_and_warm_blocks_are_separate(tmp_path: Path) -> None:
++    cold = [sample(n, "cold", t) for n, t in zip(range(1, 6), (185, 40, 30, 50, 20), strict=True)]
++    warm = [sample(6, "warm", 12), sample(7, "warm", 10)]
++    path = write_doc(tmp_path / "reference-macos-latest.json", cold + warm)
++    assert stats.report(path) == [
++        HEADER,
++        "  cold totals (5): 185 s, 40 s, 30 s, 50 s, 20 s",
++        "  cold: p50 40 s within target (<= 120 s); p95 185 s over target (<= 180 s);"
++        " p95 of 5 is the maximum",
++        "  warm totals (2): 12 s, 10 s",
++        "  warm: fewer than 5 samples, raw values only, no percentile claim;"
++        " warm samples are never compared with the memo target",
++    ]
++
++
++def test_warm_samples_never_rescue_a_slow_cold_one(tmp_path: Path) -> None:
++    """Review 18 finding 1: one cold 150 s and four warm 10 s used to read as within target."""
++    samples = [sample(1, "cold", 150), *(sample(n, "warm", 10) for n in range(2, 6))]
++    lines = stats.report(write_doc(tmp_path / "reference-macos-latest.json", samples))
++    assert lines == [
++        HEADER,
++        "  cold totals (1): 150 s",
++        "  cold: fewer than 5 samples, raw values only, no percentile claim",
++        "  warm totals (4): 10 s, 10 s, 10 s, 10 s",
++        "  warm: fewer than 5 samples, raw values only, no percentile claim;"
++        " warm samples are never compared with the memo target",
++    ]
++    assert not any("within" in line for line in lines)
++
++
++def test_five_warm_samples_get_percentiles_but_no_target(tmp_path: Path) -> None:
++    samples = [sample(n, "cold", 100) for n in range(1, 6)]
++    samples += [sample(n, "warm", 10) for n in range(6, 11)]
++    lines = stats.report(write_doc(tmp_path / "r.json", samples))
++    assert lines[2] == (
++        "  cold: p50 100 s within target (<= 120 s); p95 100 s within target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++    assert lines[4] == (
++        "  warm: p50 10 s; p95 10 s; p95 of 5 is the maximum;"
++        " warm samples are never compared with the memo target"
++    )
++
++
++def test_failed_and_timed_out_cold_samples(tmp_path: Path) -> None:
++    samples = [
++        sample(1, "cold", 60),
++        sample(2, "cold", None, exit_code=1),
++        sample(3, "cold", None, exit_code=None, timed_out=True),
++        sample(4, "cold", 70),
++        sample(5, "cold", 80),
++    ]
++    lines = stats.report(write_doc(tmp_path / "r.json", samples))
++    assert lines[1] == "  cold totals (5): 60 s, failed, timed out (hang), 70 s, 80 s"
++    assert lines[2] == (
++        "  cold: p50 80 s within target (<= 120 s); p95 not reached over target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++
++
++INVALID_CASES: dict[str, tuple[object, str]] = {
++    "top level not an object": ([1, 2], "the top level is not an object"),
++    "no samples key": ({"package": PACKAGE}, "'samples' is missing or not a list"),
++    "samples not a list": ({"samples": {"1": {}}}, "'samples' is missing or not a list"),
++    "null sample": ({"samples": [None]}, "samples[0] is null, not an object"),
++    "negative duration": (
++        {"samples": [sample(1, "cold", None) | {"all_steps_held": "2026-10-14T09:59:00Z"}]},
++        "samples[0]: all_steps_held is before demo_verdict",
++    ),
++    "out of order markers": (
++        {"samples": [sample(1, "cold", 60) | {"demo_banner": at(5)}]},
++        "samples[0]: demo_verdict is before demo_banner (-3 s, out of order)",
++    ),
++    "bad timestamp": (
++        {"samples": [sample(1, "cold", 60) | {"command_start": "yesterday"}]},
++        "samples[0]: 'command_start' is 'yesterday', not a UTC timestamp",
++    ),
++    "missing command_start": (
++        {"samples": [sample(1, "cold", 60) | {"command_start": None}]},
++        "samples[0]: 'command_start' is missing",
++    ),
++    "unknown cache": (
++        {"samples": [sample(1, "lukewarm", 60)]},
++        "samples[0]: 'uv_cache' is 'lukewarm', not cold or warm",
++    ),
++    "null exit code without timeout": (
++        {"samples": [sample(1, "cold", None, exit_code=None)]},
++        "samples[0]: 'exit_code' is None"
++        " (null only for a timed-out, not-started or missing sample)",
++    ),
++    "timed out but held": (
++        {"samples": [sample(1, "cold", 60, exit_code=None, timed_out=True)]},
++        "samples[0]: timed out but 'all_steps_held' is set",
++    ),
++    "duplicate sample": (
++        {"samples": [sample(1, "cold", 60), sample(1, "warm", 10)]},
++        "samples[1]: sample number 1 appears twice",
++    ),
++    "sample number not an integer": (
++        {"samples": [sample(1, "cold", 60) | {"sample": "1"}]},
++        "samples[0]: 'sample' is not an integer",
++    ),
++    # Contradictions (review 18 round 2, finding 3): fields of one sample that cannot all hold.
++    "exit 0 without banner": (
++        {"samples": [sample(1, "cold", 60) | {"demo_banner": None}]},
++        "samples[0]: exit 0 but 'demo_banner' is missing",
++    ),
++    "exit 0 without verdict": (
++        {"samples": [sample(1, "cold", 60) | {"demo_verdict": None}]},
++        "samples[0]: exit 0 but 'demo_verdict' is missing",
++    ),
++    "exit 0 without all steps held": (
++        {"samples": [sample(1, "cold", None)]},
++        "samples[0]: exit 0 but 'all_steps_held' is missing",
++    ),
++    "not started but exit 0": (
++        {"samples": [sample(1, "cold", 60) | {"started": False}]},
++        "samples[0]: not started but 'exit_code' is 0",
++    ),
++    "not started but stamped": (
++        {"samples": [sample(1, "cold", None, exit_code=None) | {"started": False}]},
++        "samples[0]: not started but 'demo_banner' is set",
++    ),
++    "started missing": (
++        {"samples": [{k: v for k, v in sample(1, "cold", 60).items() if k != "started"}]},
++        "samples[0]: 'started' is None, not true or false",
++    ),
++    "started not a bool": (
++        {"samples": [sample(1, "cold", 60) | {"started": "yes"}]},
++        "samples[0]: 'started' is 'yes', not true or false",
++    ),
++    "timed_out missing": (
++        {"samples": [{k: v for k, v in sample(1, "cold", 60).items() if k != "timed_out"}]},
++        "samples[0]: 'timed_out' is None, not true or false",
++    ),
++    "timed out with exit code": (
++        {"samples": [sample(1, "cold", None, exit_code=0, timed_out=True)]},
++        "samples[0]: timed out but 'exit_code' is 0",
++    ),
++    "exit code not an integer": (
++        {"samples": [sample(1, "cold", 60) | {"exit_code": "0"}]},
++        "samples[0]: 'exit_code' is '0', not an integer or null",
++    ),
++    "missing but started": (
++        {"samples": [MISSING | {"started": True}]},
++        "samples[0]: missing from the journal but 'started' is true",
++    ),
++    "missing but timed out": (
++        {"samples": [MISSING | {"timed_out": True}]},
++        "samples[0]: missing from the journal but 'timed_out' is true",
++    ),
++    "missing but stamped": (
++        {"samples": [MISSING | {"command_start": T0}]},
++        "samples[0]: missing from the journal but 'command_start' is set",
++    ),
++    "missing not a bool": (
++        {"samples": [sample(1, "cold", 60) | {"missing": "no"}]},
++        "samples[0]: 'missing' is 'no', not true or false",
++    ),
++    "uv_cache missing": (
++        {"samples": [{k: v for k, v in sample(1, "cold", 60).items() if k != "uv_cache"}]},
++        "samples[0]: 'uv_cache' is None, not cold or warm",
++    ),
++    "cold cache not empty": (
++        {"samples": [sample(1, "cold", 60) | {"uv_cache_entries_at_start": 3}]},
++        "samples[0]: cold sample but its uv cache had 3 entries at start",
++    ),
++    # Review 18r2: a sample left unstarted is recorded as timed out by the budget; only a sample
++    # missing from the journal is neither started nor timed out.
++    "not started and not timed out": (
++        {"samples": [sample(1, "cold", None, exit_code=None) | NOT_STARTED | {"timed_out": False}]},
++        "samples[0]: not started but 'timed_out' is false (and not missing)",
++    ),
++    "timed out without a reason": (
++        {"samples": [sample(1, "cold", None, exit_code=None, timed_out=True) | NO_REASON]},
++        "samples[0]: timed out but 'timeout_reason' is null",
++    ),
++    "reason without a timeout": (
++        {"samples": [sample(1, "cold", 60, reason="budget")]},
++        "samples[0]: not timed out but 'timeout_reason' is 'budget'",
++    ),
++    "unknown reason": (
++        {"samples": [sample(1, "cold", None, exit_code=None, timed_out=True, reason="slow")]},
++        "samples[0]: 'timeout_reason' is 'slow', not 'sample', 'budget' or null",
++    ),
++    "not started by a hang": (
++        {
++            "samples": [
++                sample(1, "cold", None, exit_code=None) | NOT_STARTED | {"timeout_reason": "sample"}
++            ]
++        },
++        "samples[0]: not started but 'timeout_reason' is 'sample'",
++    ),
++    "hang below the per-sample limit": (
++        {
++            "design": {"sample_timeout_seconds": 600},
++            "samples": [
++                sample(1, "cold", None, exit_code=None, timed_out=True) | {"timeout_seconds": 77}
++            ],
++        },
++        "samples[0]: 'timeout_reason' is 'sample' but its limit 77 s < 600 s",
++    ),
++    "budget cut-off at the full limit": (
++        {
++            "design": {"sample_timeout_seconds": 600},
++            "samples": [
++                sample(1, "cold", None, exit_code=None, timed_out=True, reason="budget")
++                | {"timeout_seconds": 600}
++            ],
++        },
++        "samples[0]: 'timeout_reason' is 'budget' but its limit 600 s >= 600 s",
++    ),
++    "timeout seconds not a count": (
++        {"samples": [sample(1, "cold", 60) | {"timeout_seconds": 1.5}]},
++        "samples[0]: 'timeout_seconds' is 1.5, not a whole number of seconds",
++    ),
++    "cache entries not a count": (
++        {"samples": [sample(1, "warm", 60) | {"uv_cache_entries_at_start": -1}]},
++        "samples[0]: 'uv_cache_entries_at_start' is -1, not a count",
++    ),
++    "incomplete line without the journal flag": (
++        {"samples": [INCOMPLETE]},
++        "1 incomplete journal line(s) but 'journal_incomplete' is not true",
++    ),
++    "journal flag without an incomplete line": (
++        {"journal_incomplete": True, "samples": [sample(1, "cold", 60)]},
++        "'journal_incomplete' is true but no entry is an incomplete journal line",
++    ),
++    "journal flag not a bool": (
++        {"journal_incomplete": "yes", "samples": [sample(1, "cold", 60)]},
++        "'journal_incomplete' is 'yes', not true or false",
++    ),
++    "incomplete line with a sample number": (
++        {"journal_incomplete": True, "samples": [INCOMPLETE | {"sample": 3}]},
++        "samples[0]: incomplete journal line but 'sample' is 3",
++    ),
++    "incomplete line without raw prefix": (
++        {"journal_incomplete": True, "samples": [{"sample": None, "incomplete": True}]},
++        "samples[0]: incomplete journal line without a 'raw_prefix'",
++    ),
++    "incomplete not a bool": (
++        {"samples": [sample(1, "cold", 60) | {"incomplete": 1}]},
++        "samples[0]: 'incomplete' is 1, not true or false",
++    ),
++}
++
++
++@pytest.mark.parametrize("case", sorted(INVALID_CASES))
++def test_invalid_files_are_reported_without_figures(
++    case: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
++) -> None:
++    doc, expected = INVALID_CASES[case]
++    path = tmp_path / "reference-bad.json"
++    path.write_text(json.dumps(doc), encoding="utf-8")
++    assert any(problem.startswith(expected) for problem in stats.problems(doc)), stats.problems(doc)
++    assert stats.main([str(path)]) == 0
++    out = capsys.readouterr().out
++    assert out.startswith("reference-bad.json: INVALID, no figures reported\n")
++    assert expected in out
++    assert "p50" not in out and "within" not in out and "totals" not in out
++
++
++def test_astra_repro_unstamped_successes_are_invalid(tmp_path: Path) -> None:
++    """Review 18 round 2, finding 3: five 10 s "successes" with no banner or verdict stamp (and
++    the same with started: false) used to report both targets "within"."""
++    unstamped = [
++        sample(n, "cold", 10) | {"demo_banner": None, "demo_verdict": None} for n in range(1, 6)
++    ]
++    not_started = [sample(n, "cold", 10) | {"started": False} for n in range(1, 6)]
++    for name, samples in (("unstamped", unstamped), ("not-started", not_started)):
++        lines = stats.report(write_doc(tmp_path / f"reference-{name}.json", samples))
++        assert lines[0] == f"reference-{name}.json: INVALID, no figures reported"
++        assert not any("within" in line or "p50" in line for line in lines)
++        for s in samples:
++            assert stats.total(s) is None
++
++
++def test_missing_and_not_started_samples_are_failures(tmp_path: Path) -> None:
++    samples = [
++        sample(1, "cold", 60),
++        MISSING | {"sample": 2},
++        sample(3, "cold", None, exit_code=None) | NOT_STARTED,
++        sample(4, "cold", 70),
++        sample(5, "cold", 80),
++    ]
++    path = write_doc(tmp_path / "r.json", samples)
++    assert stats.problems(json.loads(path.read_text())) == []
++    lines = stats.report(path)
++    assert lines[1] == "  cold totals (5): 60 s, missing, not started, 70 s, 80 s"
++    assert lines[2] == (
++        "  cold: p50 80 s within target (<= 120 s); p95 not reached over target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++
++
++def test_hang_budget_cut_off_and_not_started_are_told_apart(tmp_path: Path) -> None:
++    """Review 18r2: a budget cut-off used to read exactly like a hang. All three are failures
++    that rank above every success."""
++    samples = [
++        sample(1, "cold", 50),
++        sample(2, "cold", 60),
++        sample(3, "cold", None, exit_code=None, timed_out=True) | {"timeout_seconds": 600},
++        sample(4, "cold", None, exit_code=None, timed_out=True, reason="budget")
++        | {"timeout_seconds": 77},
++        sample(5, "cold", None, exit_code=None) | NOT_STARTED,
++    ]
++    doc = {"design": {"sample_timeout_seconds": 600}, "samples": samples}
++    assert stats.problems(doc) == []
++    path = tmp_path / "r.json"
++    path.write_text(json.dumps(doc), encoding="utf-8")
++    lines = stats.report(path)
++    assert lines[1] == (
++        "  cold totals (5): 50 s, 60 s, timed out (hang), cut off by budget, not started"
++    )
++    assert lines[2] == (
++        "  cold: p50 not reached over target (<= 120 s); p95 not reached over target (<= 180 s);"
++        " p95 of 5 is the maximum"
++    )
++    assert all(stats.total(s) is None for s in samples[2:])
++
++
++def test_failed_samples_rank_last() -> None:
++    assert stats.nearest_rank([10.0, None, 30.0, 20.0, 40.0], 50) == 30.0
++    assert stats.nearest_rank([10.0, None, 30.0, 20.0, 40.0], 95) is None
++    assert stats.nearest_rank([None, None, None, 5.0, 6.0], 50) is None
++    assert stats.nearest_rank([], 50) is None
++
++
++def test_total() -> None:
++    assert stats.total(sample(1, "cold", 60)) == 60.0
++    assert stats.total(sample(1, "cold", 60, exit_code=1)) is None
++    assert stats.total(sample(1, "cold", None)) is None
++    assert stats.total(sample(1, "cold", 60, exit_code=None, timed_out=True)) is None
++    assert (
++        stats.total(sample(1, "cold", 60, exit_code=None, timed_out=True, reason="budget")) is None
++    )
++    assert stats.total(sample(1, "cold", 60) | {"command_start": "garbage"}) is None
++    assert stats.total(sample(1, "cold", 60) | {"demo_banner": None}) is None
++    assert stats.total(sample(1, "cold", 60) | {"demo_verdict": at(70)}) is None  # out of order
++    assert stats.total(sample(1, "cold", 60) | {"started": False}) is None
++    assert stats.total(sample(1, "cold", 60) | {"started": None}) is None
++    assert stats.total(sample(1, "cold", 60) | {"missing": True}) is None
++    assert stats.total(sample(1, "cold", 60) | {"exit_code": False}) is None
++    assert stats.total({k: v for k, v in sample(1, "cold", 60).items() if k != "timed_out"}) is None
++
++
++def test_main_always_exits_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
++    bad = tmp_path / "reference-broken.json"
++    bad.write_text("{not json", encoding="utf-8")
++    empty = write_doc(tmp_path / "reference-empty.json", [])
++    assert stats.main([str(bad), str(empty), str(tmp_path / "missing.json")]) == 0
++    assert stats.main([]) == 0
++    out = capsys.readouterr().out
++    assert "reference-broken.json: unreadable" in out
++    assert "missing.json: unreadable" in out
++    assert "  cold totals (0): none" in out

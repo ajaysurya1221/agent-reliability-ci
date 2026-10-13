@@ -46,3 +46,21 @@ command_start → "All six steps held", 1 s resolution; package agent-reliabilit
   budget-cut warm samples) and fail the final validator, so they are not committed under
   `docs/measurement/reference-machines/`; their cold values are recorded above and in the
   scratchpad only. The run of the final workflow (2684e24) provides the committed files.
+
+## Reference-machine demo timing, final (T18 workflow at 2684e24, run 38470699338, 2026-10-13 21:27–21:54Z; committed under docs/measurement/reference-machines/)
+
+All seven samples ran on both runners (five cold with fresh caches, two warm sharing the fifth cold cache):
+
+| Runner | cold totals (s) | cold p50 | cold p95 (= max of 5) | warm totals (s) | vs target (p50 ≤ 120, p95 ≤ 180) |
+|---|---|---|---|---|---|
+| ubuntu-latest (Linux x64) | 232, 232, 231, 232, 232 | 232 s | 232 s | 231, 231 | over, over |
+| macos-latest (macOS arm64) | 238, 208, 220, 214, 244 | 220 s | 244 s | 231, 228 | over, over |
+
+- Warm equals cold within a few seconds: the uv resolve/download is ~1 s; the demo's computation
+  is the whole time. Hosted runners take ~2× the memo's p50 target (120 s) and exceed its p95
+  (180 s) on every sample; the maintainer's 15-core machine (73–80 s) is the only machine that
+  meets it. Decision needed (HUMAN_INBOX R2-1): machine class in the target, a smaller hosted-runner
+  demo, or both.
+- The earlier 38451606669 numbers (213–227 s) and this run agree; the first run's monotonic macOS
+  slowdown (235 → 453 s with one shared cache and no per-sample timeout) did not recur with fresh
+  caches per sample; its cause stays unexplained but is no longer reproducible by this workflow.

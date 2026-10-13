@@ -42,10 +42,11 @@ orchestrator. No author-only merge. Plan-only commits under `plan/exec/` are rec
 
 ## 4. Measurements
 - **Reference machines (memo target: demo p50 ≤ 2 min, p95 ≤ 3 min on clean reference machines).**
-  Revised workflow, run 38451606669, five cold samples per OS: ubuntu-latest 222–227 s (p50 224 s,
-  p95 227 s), macos-latest 213–227 s (p50 213 s, p95 227 s): **both over the target by about 2×**;
-  the two warm samples per OS did not fit the 1200 s loop budget (fixed in T18r2). Preliminary (first
-  run, old schema):
+  Final workflow (2684e24), run 38470699338, committed under `docs/measurement/reference-machines/`:
+  ubuntu-latest cold 231–232 s (p50 232, p95 232), warm 231/231; macos-latest cold 208–244 s (p50
+  220, p95 244), warm 231/228: **both runners over the memo's target by about 2×**, warm equal to
+  cold within seconds (the resolve/download is ~1 s; the demo's computation is the time). Earlier
+  runs agreed (run 38451606669: 213–227 s cold). Preliminary (first run, old schema):
   ubuntu-latest cold 169 s, warm 156/146/141/137 s (p50 146 s misses the 120 s target; p95 169 s
   within 180 s); macos-latest 235 s cold then 336, 417, 453 s, job timed out (far over target, and
   slowing monotonically for an unknown reason). The package resolve is ~1 s on both; the demo's
