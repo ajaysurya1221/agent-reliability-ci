@@ -45,8 +45,10 @@ TMP_ROOT_RE = re.compile(
     r"/(?:private/)?(?:var/folders/[^/\s]+/[^/\s]+/T/[^/\s,;)'\"\]]+|tmp/[^/\s,;)'\"\]]+)"
 )
 # Generated directory names that may appear on their own (uv venvs, demo stores, caches).
+# Abbreviated temp paths typed by readers (`/var/folders/.../T/x`): the whole token goes.
+TMP_ABBREV_RE = re.compile(r"/(?:private/)?var/folders/[^\s,;)'\"\]]*")
 LEAF_RE = re.compile(
-    r"\b(?:tmp\.[A-Za-z0-9]{6,}|arci-demo-[a-z0-9]{6,}|uvcache\.[A-Za-z0-9]{6,}|ttfv-[ab]\.[A-Za-z0-9]{6,})\b"
+    r"\b(?:tmp\.[A-Za-z0-9]{6,}|arci-demo-[A-Za-z0-9_]{6,}|uvcache\.[A-Za-z0-9]{6,}|ttfv-[ab]\.[A-Za-z0-9]{6,})\b"
 )
 
 
@@ -57,6 +59,7 @@ def scrub(text: str | None) -> str:
         return ""
     text = text.replace(REPO, "")
     text = TMP_ROOT_RE.sub("<tmp>", text)
+    text = TMP_ABBREV_RE.sub("<tmp>", text)
     return LEAF_RE.sub("<tmp>", text)
 
 
