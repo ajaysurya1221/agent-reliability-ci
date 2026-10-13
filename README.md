@@ -170,7 +170,7 @@ while any real key stays in the harness; the official Python and JavaScript SDKs
 unchanged by the acceptance tests. `arci preflight` checks key, endpoint, pinned model and one
 smoke decision before a live run.
 
-![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](docs/images/decision-boundary.png)
+![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/images/decision-boundary.png)
 
 **Run against Jev on 2026-10-03.** Built from documentation dated 2026-09-22, the boundary ran the
 pre-registered [day one](docs/design/0004-day-one.md) live. Four things did not survive contact
@@ -234,7 +234,7 @@ PASS / BLOCK / INCONCLUSIVE:
 | 0.95 -> 0.65 | .000 / .008 / .992 | .000 / .685 / .315 | .000 / .985 / .015 | .000 / 1.000 / .000 |
 | 0.80 -> 0.80 | .003 / .000 / .997 | .059 / .000 / .941 | .218 / .000 / .782 | .615 / .000 / .385 |
 
-![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](docs/images/calibration.png)
+![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/images/calibration.png)
 
 - False PASS at the margin and false BLOCK under no change are both far below `alpha` (worst
   0.004 and 0.001 over the boundary sweep). The price is conservatism: two equal agents at 80%
