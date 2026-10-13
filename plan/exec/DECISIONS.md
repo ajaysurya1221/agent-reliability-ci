@@ -26,3 +26,14 @@ Tie-break order: (a) the run prompt; (b) the memo; (c) the repo's rules; (d) an 
 ## Decisions made during execution
 
 (appended as they happen: id, decision, positions, rule, consequence)
+
+### D-01 (Task 01): coder dispatch mechanism
+Decision: coder and reviewer dispatches run through the Workflow tool's `agent()` with
+`model: 'opus'`, `effort: 'high'`, `agentType: 'general-purpose'` and the agent definition's system
+prompt embedded in the dispatch text. Reason: `.claude/agents/coder.md` and `reviewer.md` were
+created mid-session and the Agent tool does not register new agent types until the next session
+(error: "Agent type 'coder' not found"). The probe transcript
+(`subagents/workflows/wf_9cf6455a-ca5/agent-aec7c2fa636fb1c41.jsonl`) shows `message.model =
+claude-opus-5-5` and `effort = high`, so the pinned model and effort hold. The agent files stay in
+the repo for future sessions. Rule: (a) the prompt's intent (Opus 5.5 at high, verified in the
+transcript) over its literal mechanism; (e).
