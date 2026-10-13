@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "sprint/**"
   pull_request:
     branches:
       - main
@@ -111,3 +112,96 @@ jobs:
           .venv/bin/pytest -p no:cacheprovider \
             tests/unit/stats \
             tests/unit/examples/test_guardrail_results.py
+
+  wheel-smoke:
+    name: wheel smoke / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.14"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Build the wheel and the sdist
+        run: uv build --no-sources
+      - name: Smoke-test the built wheel from an empty directory
+        env:
+          PYTHON: python
+        run: bash .github/scripts/wheel_smoke.sh dist/*.whl
+
+  windows-smoke:
+    name: windows / Python 3.12 / install/--help only; execution unsupported
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Build the wheel and the sdist
+        run: uv build --no-sources
+      - name: Create a fresh virtual environment
+        run: python -m venv .smoke-venv
+      - name: Install the built wheel into it
+        run: .smoke-venv/Scripts/python -m pip install --disable-pip-version-check dist/*.whl
+      - name: Import arci and its CLI from an empty directory
+        run: |
+          venv="$PWD/.smoke-venv"
+          cd "$(mktemp -d)"
+          "$venv/Scripts/python" -c "import arci, arci.cli; print(arci.__version__, arci.__file__)"
+      - name: Print the CLI help from an empty directory
+        run: |
+          venv="$PWD/.smoke-venv"
+          cd "$(mktemp -d)"
+          "$venv/Scripts/arci" --help
+
+  action-fixture:
+    name: action fixture / A vs B must BLOCK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Run the Action on the committed A-vs-B fixture
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          manifest: examples/action_fixture/manifest.json
+          workers: "4"
+      - name: Assert the gate blocked and wrote its Markdown report
+        env:
+          VERDICT: ${{ steps.gate.outputs.verdict }}
+          OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          echo "verdict=$VERDICT outcome=$OUTCOME"
+          test "$VERDICT" = BLOCK
+          test "$OUTCOME" = failure
+          test -f arci-report.md
+          grep -q "VERDICT: BLOCK" arci-report.md
