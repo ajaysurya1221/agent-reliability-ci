@@ -45,3 +45,20 @@ minimal fixture tree under tests/unit/init/fixtures/ instead of borrowing T08's 
 depends on 02–07 and 11; a cut task (08–10) never blocks the release and is listed in CHANGELOG as
 not shipped. Astra's first risk (scope vs 10 h) is accepted as is: the cut order S8 → S9 → reduced
 S7 applies at the 4 h mark if lane C has not merged by then. Rule: (d) on a plan defect, (a) on scope.
+
+### D-03 (before T09): MCP Inspector cannot talk to the ARCI bridge today
+Measured 2026-10-13: `npx -y @modelcontextprotocol/inspector@latest --cli --config mcp.json --server env
+--method tools/list` against `python -P -m arci.mcp_toolset_server …` returns
+`{"error":{"code":"error","message":"Server's protocol version is not supported: 2026-07-28"}}`
+(Inspector 2.10.1, TypeScript SDK 1.29.0, which accepts up to 2025-11-25). Decision: T09 ships with
+the Inspector step recorded verbatim as blocked by the SDK version and documents the manual
+alternative (the bridge answers newline-delimited JSON-RPC on stdin, so `initialize`/`tools/list`
+can be driven by hand); the bridge's version handling is not changed in this sprint (plan decision
+H12), and "protocol-version negotiation in the bridge" goes to the next-steps list with an ADR
+sketch. T09 stays first in the cut order. Rule: (c) the frozen design record 0002 names revision
+2026-07-28; (e) a doc is reversible, a protocol change is not.
+
+### D-04 (Task 04): ADR 0006 written before dispatch
+docs/design/0006-cwd-on-the-child-import-path.md is Fable-authored and will be reviewed by Astra
+and the reviewer subagent together with T04's diff. Its hash is added to FROZEN.sha256 at the T12
+re-freeze.
