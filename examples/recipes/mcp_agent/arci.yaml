@@ -1,0 +1,25 @@
+# arci experiment descriptor. Schema: `arci schema`.
+# Written by hand: `arci init` scaffolds Python arms only (ADR 0008); see docs/DESCRIPTOR.md,
+# "Command experiments". "python" is resolved on PATH and must be an interpreter with
+# agent-reliability-ci installed (the bridge imports arci); otherwise write an absolute path.
+# smoke design: 8 trials per arm; run arci plan before a confirmatory N.
+# Never extend this experiment based on its verdict.
+experiment_id: "mcp-fetch-retry"
+task: {"key": "answer"}
+oracle: "world:passed"
+baseline:
+  label: "retry"
+  command:
+    argv: ["python", "-P", "-m", "agent", "--mcp-config", "{mcp_config}", "--task-file", "{task_file}", "--variant", "retry"]
+candidate:
+  label: "fragile"
+  command:
+    argv: ["python", "-P", "-m", "agent", "--mcp-config", "{mcp_config}", "--task-file", "{task_file}", "--variant", "fragile"]
+mcp_server:
+  name: "env"
+  argv: ["python", "-P", "-m", "arci.mcp_toolset_server", "--toolset", "world:make_world", "--workdir", "{workdir}", "--seed", "{seed}", "--task-file", "{task_file}"]
+  snapshot: "arci.mcp_toolset_server:snapshot"
+conditions:
+  - id: "fetch-error"
+    fault: {name: "tool_error_once", tool: "fetch", occurrence: 0}
+n_per_arm: 8
