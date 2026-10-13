@@ -6,6 +6,8 @@ The full N=200 demo is not run here (CI time); the step logic is exercised with 
 
 from __future__ import annotations
 
+import json
+import random
 import subprocess
 import sys
 import textwrap
@@ -145,6 +147,139 @@ def test_the_step_logic_holds_on_the_noisy_run(
     assert "  kept: tool_timeout\n" in out
     assert "minimality: 1-minimal" in out
     assert "REPRODUCED: failure reproduced" in out
+
+    baseline, candidate = demo_run._candidate_passes(run_dir)  # pyright: ignore[reportPrivateUsage]
+    rows = [
+        json.loads(line)
+        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(rows) == 2 * demo_run.NOISY_N_PER_ARM
+    assert baseline == sum(r["arm"] == "baseline" and r["outcome"] == "PASS" for r in rows)
+    assert candidate == sum(r["arm"] == "candidate" and r["outcome"] == "PASS" for r in rows)
+    assert 0 <= candidate < baseline <= demo_run.NOISY_N_PER_ARM
+
+
+def _write_trials(run_dir: Path, rows: list[dict[str, str]]) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    text = "".join(json.dumps(row) + "\n" for row in rows)
+    (run_dir / "trials.jsonl").write_text(text, encoding="utf-8")
+
+
+def _pair(index: int, baseline: str, candidate: str) -> list[dict[str, str]]:
+    pair_id = f"reserve-timeout:{index:05d}"
+    return [
+        {
+            "trial_id": f"{pair_id}:baseline",
+            "pair_id": pair_id,
+            "arm": "baseline",
+            "outcome": baseline,
+        },
+        {
+            "trial_id": f"{pair_id}:candidate",
+            "pair_id": pair_id,
+            "arm": "candidate",
+            "outcome": candidate,
+        },
+    ]
+
+
+def test_candidate_passes_counts_each_arm(tmp_path: Path) -> None:
+    rows = [
+        *_pair(0, "PASS", "PASS"),
+        *_pair(1, "PASS", "FAIL"),
+        *_pair(2, "FAIL", "PASS"),
+        *_pair(3, "PASS", "ERROR"),
+    ]
+    _write_trials(tmp_path, rows)
+    assert demo_run._candidate_passes(tmp_path) == (3, 2)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_failing_trial_is_the_smallest_pair_index_in_any_row_order(
+    tmp_path: Path, seed: int
+) -> None:
+    rows = [
+        *_pair(0, "PASS", "PASS"),
+        *_pair(1, "FAIL", "FAIL"),  # baseline fails too: not a usable pair
+        *_pair(2, "PASS", "ERROR"),  # candidate errored, not FAIL
+        *_pair(3, "PASS", "FAIL"),
+        *_pair(7, "PASS", "FAIL"),
+        *_pair(11, "PASS", "FAIL"),
+    ]
+    random.Random(seed).shuffle(rows)
+    _write_trials(tmp_path, rows)
+    assert demo_run.failing_trial(tmp_path) == "reserve-timeout:00003:candidate"
+
+
+def test_failing_trial_is_none_without_an_a_pass_b_fail_pair(tmp_path: Path) -> None:
+    _write_trials(tmp_path, [*_pair(0, "PASS", "PASS"), *_pair(1, "FAIL", "FAIL")])
+    assert demo_run.failing_trial(tmp_path) is None
+
+
+@pytest.mark.parametrize("matched", [True, False])
+def test_the_last_line_names_the_store_and_the_recorded_comparison(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    matched: bool,
+) -> None:
+    def frozen(work: Path, workers: int) -> bool:
+        return matched
+
+    def divergence(work: Path, workers: int) -> tuple[Path, str]:
+        return work / "runs" / "noisy", "reserve-timeout:00003:candidate"
+
+    def shrunk(work: Path, run_dir: Path, failing: str) -> object:
+        return object()
+
+    def nothing(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr(demo_run, "illustrative_run", nothing)
+    monkeypatch.setattr(demo_run, "frozen_experiment", frozen)
+    monkeypatch.setattr(demo_run, "first_divergence", divergence)
+    monkeypatch.setattr(demo_run, "shrink", shrunk)
+    monkeypatch.setattr(demo_run, "replay_offline", nothing)
+    monkeypatch.setattr(demo_run, "repaired_reproducer", nothing)
+    monkeypatch.setattr(demo_run, "repaired_experiment", nothing)
+    keep = tmp_path / "stores"
+
+    assert demo_run.run_demo(workers=1, keep=keep) == 0
+    lines = capsys.readouterr().out.splitlines()
+    comparison = (
+        "they matched the recorded run (A 192/200, B 132/200)."
+        if matched
+        else "they did not all match the recorded run (see step 2)."
+    )
+    assert lines[-2] == "All six steps held."
+    assert lines[-1] == (
+        f"Run stores: {keep.resolve()}. Every count above was computed fresh on this machine, "
+        f"not replayed from evidence; {comparison}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("candidate", "counts", "line"),
+    [
+        ("agent_b", (192, 132), "  matches the recorded run (A 192/200, agent_b 132/200)"),
+        ("agent_a", (192, 192), "  matches the recorded run (A 192/200, agent_a 192/200)"),
+        (
+            "agent_b",
+            (191, 132),
+            "  differs from the recorded run (recorded A 192/200, agent_b 132/200)",
+        ),
+        (
+            "agent_a",
+            None,
+            "  differs from the recorded run (recorded A 192/200, agent_a 192/200)",
+        ),
+    ],
+)
+def test_step_two_compares_with_the_recorded_run(
+    candidate: str, counts: tuple[int, int] | None, line: str
+) -> None:
+    assert demo_run.recorded_comparison(candidate, counts) == (line.startswith("  matches"), line)
 
 
 def test_a_failed_step_exits_one_and_names_the_store(
