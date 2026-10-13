@@ -14,6 +14,7 @@ from typing import Literal, NoReturn, Protocol, cast
 
 from pydantic import JsonValue
 
+from arci.demo.run import check_keep, default_workers, run_demo
 from arci.gate import decide
 from arci.mcp_boundary import (
     UpstreamResult,
@@ -497,6 +498,31 @@ def _parser() -> _Parser:
     minimize.add_argument("run_dir", metavar="RUN_DIR")
     minimize.add_argument("trial_id", metavar="TRIAL_ID")
     minimize.add_argument("--out", required=True, metavar="PATH")
+
+    # --- demo ---
+    demo = commands.add_parser(
+        "demo",
+        help="run the packaged six-step retry story (no clone, no model call)",
+        description=(
+            "The retry story end to end through the real run, diff, minimize and replay: "
+            "agent B drops a retry and is BLOCKed at N=200 per arm, the failure shrinks to "
+            "one fault and replays offline, and the repaired agent C passes. Every count is "
+            "computed fresh; exit 0 when all six steps hold, 1 when one does not."
+        ),
+    )
+    demo.add_argument(
+        "--workers",
+        type=_positive_int,
+        default=default_workers(),
+        metavar="N",
+        help="parallel trials (default: min(8, CPU count))",
+    )
+    demo.add_argument(
+        "--keep",
+        metavar="DIR",
+        help="write the run stores to DIR (empty or new) instead of a temporary directory",
+    )
+    # --- end demo ---
     return parser
 
 
@@ -562,6 +588,19 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["trial_id"]),
             cast(str, values["out"]),
         )
+    # --- demo ---
+    if command == "demo":
+        keep = cast(str | None, values["keep"])
+        if keep is not None:
+            try:
+                check_keep(Path(keep))
+            except ValueError as exc:
+                raise CliError(str(exc)) from None
+        return run_demo(
+            workers=cast(int, values["workers"]),
+            keep=None if keep is None else Path(keep),
+        )
+    # --- end demo ---
     raise CliError(f"unknown command: {command}")
 
 
