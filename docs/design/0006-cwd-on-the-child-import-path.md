@@ -40,6 +40,13 @@ Consequences:
   the agent already ran the project's code. What changes is only where that code may be found.
 - A project that relied on the current directory being *absent* (none known) would now see it
   last on the path.
+- Amended 2026-10-13 after the consultant's review: "appended, never prepended" bounds shadowing
+  of ordinary modules and regular packages, but Python's import system lets a *regular* package found
+  later on the path supersede *namespace-package* portions found earlier, including portions inside a
+  replay bundle. A project directory holding a regular package with the same name as a namespace
+  package used by an experiment can therefore change what resolves. No known experiment does this;
+  it is documented here rather than denied. The rule applies to the children the runner starts; an
+  MCP server whose `McpServerSpec.env` sets `PYTHONPATH` keeps that configured value, as before.
 
 ## Options considered
 

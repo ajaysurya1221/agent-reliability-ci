@@ -1,0 +1,64 @@
+{
+  "record_sha256": "f1bf62842b697506b6a5c8600aca078ade58205c35b7731fbe2ac57161fe8fa3",
+  "schema_version": "arci/0.5",
+  "experiment_id": "arci-demo-agent_b-reserve-timeout-200",
+  "created_at": "",
+  "task_id": "confirm-inventory-order",
+  "task": {
+    "order_id": "order-7",
+    "sku": "widget",
+    "quantity": 2,
+    "stock": 10
+  },
+  "toolset": "arci.demo.world:make_world",
+  "mcp_server": null,
+  "decisions": null,
+  "contract": {
+    "oracle": "arci.demo.world:oracle",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "agent_a",
+    "agent": "arci.demo.agents:agent_a",
+    "command": null,
+    "candidate_id": "baseline-a"
+  },
+  "candidate": {
+    "label": "agent_b",
+    "agent": "arci.demo.agents:agent_b",
+    "command": null,
+    "candidate_id": "candidate-agent_b"
+  },
+  "conditions": [
+    {
+      "condition_id": "reserve-timeout",
+      "faults": [
+        {
+          "name": "tool_timeout",
+          "bucket": "falsify",
+          "tool": "reserve",
+          "at_occurrence": 0,
+          "params": {}
+        }
+      ]
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 200,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 12000,
+  "budgets": {
+    "max_tool_calls": 10,
+    "max_model_steps": 10,
+    "max_seconds": 15.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}
