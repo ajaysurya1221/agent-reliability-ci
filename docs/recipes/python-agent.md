@@ -116,7 +116,39 @@ arci replay bundle.json
 
 The orchestrator's machine, one smoke run and one confirmatory run, with wall-clock times:
 
-<<recorded run>>
+```text
+$ arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}' --fault tool_timeout:reserve:0
+arci run arci.yaml
+exit 0
+$ arci run arci.yaml
+- None recorded.
+
+## Reasons
+
+- Experiment: no global errors.
+- `faults`: bounds cross the margin
+
+VERDICT: INCONCLUSIVE (exit 2)
+exit 2
+--- stderr ---
+SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under the default rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
+INCONCLUSIVE at n_per_arm=8 is the expected smoke result; choose a confirmatory N with arci plan before re-running.
+$ arci plan --baseline-rate 0.95 --candidate-rate 0.75 --target-verdict BLOCK
+|---:|---:|---:|---:|---:|---|
+| 20 | 40 | 0.000 | 0.000 | 1.000 | no |
+| 50 | 100 | 0.000 | 0.016 | 0.984 | no |
+| 100 | 200 | 0.000 | 0.093 | 0.907 | no |
+| 200 | 400 | 0.000 | 0.365 | 0.635 | no |
+| 400 | 800 | 0.000 | 0.828 | 0.172 | yes |
+
+Result: smallest tested N per arm meeting P(BLOCK) >= 0.8: 400 (800 trials in total).
+
+```
+
+Recorded by the orchestrator on 2026-10-13 from a fresh copy of this directory, `PYTHONPATH` unset,
+ARCI at the sprint's descriptor lane (the `arci run` output is cut to its last lines; the smoke run took 1.6 s
+on a 15-core Apple Silicon Mac; the baseline passed 8/8 and the candidate 2/8). Counts depend on the seeds
+in `arci.yaml`, so your run prints the same numbers; the verdict is INCONCLUSIVE because 8 pairs cannot decide.
 
 ## What this does not show
 

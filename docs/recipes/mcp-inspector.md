@@ -41,7 +41,18 @@ sees is recorded, budgeted or fault-injected.
 Recorded on the orchestrator's machine:
 
 ```text
-<<Inspector result recorded by the orchestrator on 2026-10-13>>
+```text
+$ npx -y @modelcontextprotocol/inspector@latest --cli --config mcp.inspector.json --server env --method tools/list
+{"error":{"code":"error","message":"Server's protocol version is not supported: 2026-07-28"}}
+exit: 1
+```
+
+Recorded by the orchestrator on 2026-10-13 with Inspector 2.10.1 (its bundled `@modelcontextprotocol/sdk`
+1.29.0 accepts protocol revisions up to 2025-11-25). ARCI's bridge answers the revision it supports,
+2026-07-28, and does not negotiate, so Inspector refuses the session before `tools/list`. The step is
+therefore **blocked** until Inspector's SDK accepts that revision or ARCI's bridge negotiates older ones;
+neither was changed in this release (see the design note in `plan/exec/DECISIONS.md`, D-03). The manual
+preflight below exercises the same three messages by hand and is what the test runs.
 ```
 
 The bridge speaks MCP revision `2026-07-28` (the boundary's supported subset,
