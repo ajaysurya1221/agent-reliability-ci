@@ -5,7 +5,7 @@
 - **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
   stores are unchanged.
 - **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason
-  other than unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
+  other than an existing file or unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
   the sdist against an allowlist and the CI Action fixture checks the step summary.
 
 ## v0.8.0 (2026-10-13)

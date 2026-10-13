@@ -247,8 +247,12 @@ jobs:
           cmp "$work/summary.md" "$work/report.md"
           grep -qx "verdict=BLOCK" "$work/output"
           for file in "$work/summary.md" "$work/arci-report.md"; do
-            if grep -q STUB-STDERR-LINE "$file"; then
-              echo "::error::arci's stderr leaked into $file"
-              exit 1
-            fi
+            # grep exit 1 is the only acceptable outcome (the line is absent); 0 means a leak,
+            # anything else (2: unreadable or missing file) is a failed check, not a pass.
+            grep -q STUB-STDERR-LINE "$file" && status=0 || status=$?
+            case "$status" in
+              0) echo "::error::arci's stderr leaked into $file"; exit 1 ;;
+              1) ;;
+              *) echo "::error::could not check $file for leaked stderr (grep exit $status)"; exit 1 ;;
+            esac
           done
