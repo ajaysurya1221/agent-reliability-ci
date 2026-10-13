@@ -13,3 +13,9 @@
   the p50 target and the warm samples are 1:57–2:36. Proper figures (five cold samples per OS,
   separate warm block) come from the revised workflow (T18r1/r2) once a run completes without being
   superseded; those are reported in the final report whichever way they fall.
+- macOS reference machine, same first run (from the uploaded logs; the parse step did not run):
+  samples 1–4 held with totals 235 s (cold), 336, 417, 453 s; sample 5 was cut off at step 2 by the
+  25-minute job limit. The warm samples are slower than the cold one and slow down monotonically,
+  so the cache state is not what drives these timings; the cause (leftover processes, accumulating
+  stores, runner throttling) is unknown and is a follow-up before any macOS number is called a
+  reference timing. ubuntu samples got faster run to run (169 → 137 s).
