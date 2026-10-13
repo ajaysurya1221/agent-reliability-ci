@@ -39,15 +39,31 @@ COACHING = [
 
 
 REPO = "/Users/ajay/Developer/agent-reliability-ci/"
-TMP_RE = re.compile(r"/(?:private/)?(?:var/folders/[^ ,;)'\"]+|tmp/[^ ,;)'\"]+)")
+# A macOS per-user temp root (`/var/folders/xx/yyyy/T/<generated name>`) or a `/tmp/<name>` root;
+# the path tail after the root is kept, so `<tmp>/demo.log` stays readable.
+TMP_ROOT_RE = re.compile(
+    r"/(?:private/)?(?:var/folders/[^/\s]+/[^/\s]+/T/[^/\s,;)'\"\]]+|tmp/[^/\s,;)'\"\]]+)"
+)
+# Generated directory names that may appear on their own (uv venvs, demo stores, caches).
+LEAF_RE = re.compile(
+    r"\b(?:tmp\.[A-Za-z0-9]{6,}|arci-demo-[a-z0-9]{6,}|uvcache\.[A-Za-z0-9]{6,}|ttfv-[ab]\.[A-Za-z0-9]{6,})\b"
+)
 
 
 def scrub(text: str | None) -> str:
-    """Trim the maintainer checkout to repository-relative paths; replace temp paths."""
+    """Trim the maintainer checkout to repository-relative paths; replace temp roots and
+    generated directory names with `<tmp>`."""
     if not text:
         return ""
     text = text.replace(REPO, "")
-    return TMP_RE.sub("<tmp>", text)
+    text = TMP_ROOT_RE.sub("<tmp>", text)
+    return LEAF_RE.sub("<tmp>", text)
+
+
+def sentence(text: str | None) -> str:
+    """Reader text followed by exactly one period."""
+    t = scrub(text).rstrip()
+    return t[:-1] if t.endswith(".") else t
 
 
 def parse(ts: str | None) -> dt.datetime | None:
@@ -155,8 +171,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             "reader read README.md from it and Track B copied the sample tree from it (no clone "
             "was made by the reader). "
             f"Files read: {scrub(', '.join(out.get('files_read', []))) or 'none listed'}. "
-            f"Confusions: {scrub(' | '.join(out.get('confusions', []))) or 'none'}. "
-            f"Reader notes: {scrub(out.get('notes', ''))}"
+            f"Confusions: {sentence(' | '.join(out.get('confusions', []))) or 'none'}. "
+            f"Reader notes: {sentence(out.get('notes', ''))}."
         )
         # Track A receipt
         ra = base(template, reader, "demo", readme_commit)
@@ -224,8 +240,8 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         }
         ra["comprehension"]["all_correct"] = sc.get("all_five_correct")
         ra["notes"] = (
-            f"Command used: {scrub(a.get('command_used'))}. Log: {scrub(a.get('log_path'))}. "
-            f"Reader's verdict line for agent B: {scrub(a.get('verdict_for_agent_b'))}. "
+            f"Command used: {sentence(a.get('command_used'))}. Log: {scrub(a.get('log_path'))}. "
+            f"Reader's verdict line for agent B: {sentence(a.get('verdict_for_agent_b'))}. "
             + "The stamped attempt's exit code was not captured (the facilitator's wrapper used "
             "bash's PIPESTATUS under zsh), so exit_code and completed are null; "
             + (
@@ -236,7 +252,7 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             )
             + "interpretation_answered not stamped (answers given after both tracks). "
             + common_notes
-            + f" Scorer rationale: {scrub(sc.get('rationale', ''))}"
+            + f" Scorer rationale: {sentence(sc.get('rationale', ''))}."
         )
         failures = [clean_failure(f) for f in out.get("failures", [])]
         ra["failures"] = [f for f in failures if is_demo_failure(f)]
@@ -303,9 +319,10 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         )
         rb["comprehension"]["answered_on"] = f"2026-10-13-ai-{reader['id']}-demo.json"
         rb["notes"] = (
-            f"Install method: {scrub(b.get('install_method'))}. Commands: "
-            f"{scrub(' ; '.join(b.get('commands_used', [])))}. Store: {scrub(b.get('store_dir'))} "
-            f"with {', '.join(b.get('store_files') or [])}; gate line: "
+            f"Install method: {sentence(b.get('install_method'))}. Commands: "
+            f"{sentence(' ; '.join(b.get('commands_used', [])))}. "
+            f"Store: {scrub(b.get('store_dir'))} with {', '.join(b.get('store_files') or [])}; "
+            "gate line: "
             f"{scrub(b.get('gate_verdict_line'))}. "
             + (
                 "scaffold_start is null: the reader's stamp was taken at the failed first "
