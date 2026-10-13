@@ -1,0 +1,34 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 86edadd..431dfac 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -247,8 +247,12 @@ jobs:
+           cmp "$work/summary.md" "$work/report.md"
+           grep -qx "verdict=BLOCK" "$work/output"
+           for file in "$work/summary.md" "$work/arci-report.md"; do
+-            if grep -q STUB-STDERR-LINE "$file"; then
+-              echo "::error::arci's stderr leaked into $file"
+-              exit 1
+-            fi
++            # grep exit 1 is the only acceptable outcome (the line is absent); 0 means a leak,
++            # anything else (2: unreadable or missing file) is a failed check, not a pass.
++            grep -q STUB-STDERR-LINE "$file" && status=0 || status=$?
++            case "$status" in
++              0) echo "::error::arci's stderr leaked into $file"; exit 1 ;;
++              1) ;;
++              *) echo "::error::could not check $file for leaked stderr (grep exit $status)"; exit 1 ;;
++            esac
+           done
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0191bd0..d1eee42 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,7 +5,7 @@
+ - **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
+   stores are unchanged.
+ - **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason
+-  other than unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
++  other than an existing file or unsupported links; the fail-closed behaviour is unchanged. The release workflow checks
+   the sdist against an allowlist and the CI Action fixture checks the step summary.
+ 
+ ## v0.8.0 (2026-10-13)

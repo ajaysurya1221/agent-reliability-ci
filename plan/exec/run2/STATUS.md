@@ -9,4 +9,4 @@ Budget clock start (Task 00 commit): 2026-10-13T18:12:20Z. Stop starting tasks a
 | 20 | DONE (design accepted) | Astra: REVISE, REVISE, ACCEPT (three rounds) | plan/exec/run2/adr-0010-draft.md v3, fixtures.md | D2 design done; D3 (importer + fixtures + re-freeze) not in this run |
 | 18 | r1: Astra REVISE → T18r1 done (108a5a1 pushed 19:02Z; revised workflow running live); r2 reviews dispatched | Fable + reviewer + Astra | sprint/t18-refmachines 108a5a1 | five cold + two warm samples, per-sample timeout, validated per-block stats; 24 tests |
 | 17 | MERGED locally (c8f047b); push after lane CI on 9b2e4b5 | Fable ACCEPT, reviewer ACCEPT (r1, r2) | sprint/t17-protocol 9b2e4b5 → main | quick checks on merged main green (ruff, 69 tests) |
-| 16 | reviewer ACCEPT (r1, r2), Astra ACCEPT (r1); Astra delta review pending; lane CI on 209f78c running | Fable + reviewer + Astra | sprint/t16-code 209f78c | merge after Astra's delta verdict and CI |
+| 16 | r2: reviewer ACCEPT, Astra REVISE (guard grep errors; CHANGELOG EEXIST) → T16r2 dfdb11f pushed; round-3 confirmations and lane CI running | Fable + reviewer + Astra | sprint/t16-code dfdb11f | merge after round 3 and CI |
