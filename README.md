@@ -42,8 +42,8 @@ seeds and sample size as the recorded run below, so it computes **192/200** base
 **132/200** retry-removed successes fresh on your machine and says whether they matched the recorded
 run. It is a reproduction, not the recorded evidence. The six steps go through the real CLI and the
 Python API, each trial in a fresh process with a separate grader process. Runtime depends on the
-machine and current load (measured: 38 s on a 15-core laptop with 8 workers; about 70 s through `uvx`
-including environment creation; CI runners are slower). `just demo` runs the checkout script
+machine and current load (measured: 38 s on a 15-core Apple Silicon Mac with 8 workers; 72 s through
+`uvx` from a local wheel including environment creation; CI runners are slower). `just demo` runs the checkout script
 `examples/retry_agent/hero_demo.py`, the same six steps. Lines from the recorded run:
 
 ```text
@@ -103,8 +103,7 @@ run is turned green ([reproduction recipe](https://github.com/ajaysurya1221/agen
 >
 > Scaffold your own experiment with `arci init` (below), or start from the example’s manifest builder. Define the oracle, fault conditions, margin and sample size before running. A small experiment may remain INCONCLUSIVE.
 
-Manifest builder: [examples/retry_agent/experiment.py](examples/retry_agent/experiment.py).
-Recorded run: [hero-demo-2026-10-05.txt](docs/reports/ci-gate-2026-10-06/logs/hero-demo-2026-10-05.txt).
+Manifest builder of the recorded run: [examples/retry_agent/experiment.py](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/examples/retry_agent/experiment.py).
 
 ## Verdicts and exit codes
 
@@ -263,7 +262,9 @@ fault names a tool the toolset provides, and writes `arci.yaml`: a thin, schema-
 `arci run` seals into the same JSON manifest the Python builder produces. The scaffold is a **smoke
 design** (8 trials per arm): under the default rule two perfect arms cannot PASS below N=42 and a
 total collapse cannot BLOCK below N=8, so expect INCONCLUSIVE, then plan a confirmatory N with
-`arci plan` before spending trials. A descriptor looks like this:
+`arci plan` before spending trials. Without `--fault` the scaffold writes one clean condition (no
+injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `reserve` call, and `--task '{...}'`
+sets the task. A hand-written descriptor with one fault looks like this:
 
 ```yaml
 experiment_id: checkout-retry
@@ -280,9 +281,9 @@ delta: 0.10
 n_per_arm: 8
 ```
 
-Every key is a field of the sealed manifest with the same default; `arci schema` prints the JSON
-Schema, and [docs/DESCRIPTOR.md](docs/DESCRIPTOR.md) has the key reference, command-agent experiments
-and the YAML quoting rule. The toolset is `(task, seed) -> object with .tools and .snapshot()`, the
+Every key maps to a field of the sealed manifest with the manifest's default (aliases: `id`, `fault`,
+`occurrence`, `oracle`); `arci schema` prints the JSON Schema, and [docs/DESCRIPTOR.md](docs/DESCRIPTOR.md)
+has the key reference, command-agent experiments and the YAML quoting rule. The toolset is `(task, seed) -> object with .tools and .snapshot()`, the
 oracle `(task, final_state) -> bool`, and each agent a plain function `agent(task, tools, rng) -> dict`.
 
 ### Advanced: the Python manifest builder
@@ -333,7 +334,7 @@ arci schema                                        # the descriptor's JSON Schem
 arci demo                                          # the packaged six-step retry story, no clone
 arci plan --help                                   # verdict probabilities of a design, before any trial
 arci preflight manifest.json                       # live decision upstreams: key, model, smoke call
-arci run arci.yaml --workers 8                     # run + gate; exit code is the verdict (--out runs)
+arci run arci.yaml --workers 8                     # run + gate; exit code is the verdict (--out defaults to runs)
 arci gate runs/<experiment> --junit junit.xml --markdown report.md
 arci report runs/<experiment>                      # gate, failure clusters, tokens, estimated cost
 arci diff runs/<experiment> <passing_trial> <failing_trial>    # --all-steps to include annotations
@@ -373,6 +374,7 @@ stderr). `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it unless
 there for steps that run after the gate. This repository's own CI runs the test suite,
 re-derives the archived decisions, smoke-tests the built wheel on Linux and macOS, and runs the Action
 on a committed fixture that must BLOCK.
+
 ## What it does not do
 
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
@@ -427,6 +429,7 @@ canonical JSON hashing helpers in `src/arci/hashing.py` and the self-sealing dec
 `src/arci/schema.py`, both attributed source adaptation inside the frozen manifest, not a dependency.
 ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing
 here claims adoption, performance or superiority.
+
 ## Roadmap
 
 Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
@@ -457,8 +460,6 @@ and tests on Python 3.11 and 3.14, with separate macOS statistics checks. See
 [the evidence report](docs/reports/ci-gate-2026-10-06/REPORT.md) for measured results. Design
 records live in [docs/design](docs/design/), the changelog in [CHANGELOG.md](CHANGELOG.md).
 
-[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for adapted code.
-
 ### Availability and project status
 
 **Availability:** main adds the packaged demo (`arci demo`), the descriptor (`arci.yaml`, `arci schema`),
@@ -472,3 +473,5 @@ relative non-inferiority, not absolute reliability. This is not a sandbox.
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
 [Security policy](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/SECURITY.md)
+
+[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for adapted code.
