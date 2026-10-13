@@ -21,7 +21,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from arci.demo.experiment import build_manifest, clean_manifest
 from arci.replay import replay
@@ -41,6 +41,8 @@ from arci.schema import (
 N_PER_ARM = 200
 NOISY_N_PER_ARM = 12
 RECORDED_COUNTS = "A 192/200, B 132/200"
+# Passes under the fault in the recorded N=200 run: (A, candidate) per step-2 experiment.
+RECORDED_PASSES: dict[str, tuple[int, int]] = {"agent_b": (192, 132), "agent_a": (192, 192)}
 
 
 class StepFailed(Exception):
@@ -131,14 +133,17 @@ def _run(work: Path, manifest_path: Path, workers: int) -> CliResult:
     return arci("run", str(manifest_path), "--out", str(work / "runs"), "--workers", str(workers))
 
 
-def _candidate_passes(run_dir: Path) -> tuple[int, int]:
-    trials = [
+def _trials(run_dir: Path) -> list[dict[str, Any]]:
+    return [
         json.loads(line)
         for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def _candidate_passes(run_dir: Path) -> tuple[int, int]:
     counts = {"baseline": 0, "candidate": 0}
-    for trial in trials:
+    for trial in _trials(run_dir):
         if trial["outcome"] == "PASS":
             counts[trial["arm"]] += 1
     return counts["baseline"], counts["candidate"]
@@ -158,24 +163,67 @@ def illustrative_run() -> None:
     )
 
 
-def frozen_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> None:
-    """Step 2: A vs B BLOCKs, A vs A PASSes."""
+def recorded_comparison(candidate: str, counts: tuple[int, int] | None) -> tuple[bool, str]:
+    """Compare fresh step-2 passes with the recorded run; the line says which, never fails."""
+    baseline, passed = RECORDED_PASSES[candidate]
+    recorded = f"A {baseline}/{N_PER_ARM}, {candidate} {passed}/{N_PER_ARM}"
+    if counts == (baseline, passed):
+        return True, f"  matches the recorded run ({recorded})"
+    return False, f"  differs from the recorded run (recorded {recorded})"
+
+
+def frozen_experiment(work: Path, workers: int, n_per_arm: int = N_PER_ARM) -> bool:
+    """Step 2: A vs B BLOCKs, A vs A PASSes; True when both counts match the recorded run.
+
+    A count that differs from the recorded run is reported, not failed: the verdict
+    expectations decide whether the step holds.
+    """
     step(2, f"The frozen experiment, N={n_per_arm} per arm, fault: tool_timeout on reserve")
     verdicts: dict[str, int] = {}
+    matched = True
     for candidate in ("agent_b", "agent_a"):
         manifest = build_manifest(n_per_arm=n_per_arm, candidate=candidate)
         done = _run(work, _write_manifest(work, candidate, manifest), workers)
         verdicts[candidate] = done.code
         print(f"  {done.last_line}   [A vs {candidate}]", flush=True)
+        counts: tuple[int, int] | None = None
         if done.code in (0, 1):
-            baseline, passed = _candidate_passes(work / "runs" / manifest.experiment_id)
+            counts = _candidate_passes(work / "runs" / manifest.experiment_id)
             print(
-                f"  passed under the fault: A {baseline}/{n_per_arm}, "
-                f"{candidate} {passed}/{n_per_arm}",
+                f"  passed under the fault: A {counts[0]}/{n_per_arm}, "
+                f"{candidate} {counts[1]}/{n_per_arm}",
                 flush=True,
             )
+        same, line = recorded_comparison(candidate, counts)
+        matched = matched and same
+        print(line, flush=True)
     expect(verdicts["agent_b"] == 1, "A vs B is BLOCKED (exit 1)")
     expect(verdicts["agent_a"] == 0, "A vs A PASSES (exit 0)")
+    return matched
+
+
+def _pair_index(pair_id: str) -> int:
+    return int(pair_id.rsplit(":", 1)[1])
+
+
+def failing_trial(run_dir: Path) -> str | None:
+    """The candidate FAIL whose paired baseline PASSes, with the smallest pair index.
+
+    Chosen by pair index, not by row order: trials.jsonl is written in completion order,
+    which varies with the worker count and the scheduler.
+    """
+    trials = _trials(run_dir)
+    by_id = {trial["trial_id"]: trial for trial in trials}
+    candidates = [
+        trial
+        for trial in trials
+        if trial["arm"] == "candidate"
+        and trial["outcome"] == "FAIL"
+        and by_id.get(trial["pair_id"] + ":baseline", {}).get("outcome") == "PASS"
+    ]
+    if not candidates:
+        return None
+    return str(min(candidates, key=lambda trial: _pair_index(trial["pair_id"]))["trial_id"])
 
 
 def first_divergence(work: Path, workers: int) -> tuple[Path, str]:
@@ -186,27 +234,12 @@ def first_divergence(work: Path, workers: int) -> tuple[Path, str]:
     if done.code not in (0, 1, 2):
         fail(f"the noisy run did not complete: {done.last_line}")
     run_dir = work / "runs" / noisy.experiment_id
-    trials = [
-        json.loads(line)
-        for line in (run_dir / "trials.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    by_id = {trial["trial_id"]: trial for trial in trials}
-    failing = next(
-        (
-            trial["trial_id"]
-            for trial in trials
-            if trial["arm"] == "candidate"
-            and trial["outcome"] == "FAIL"
-            and by_id[trial["pair_id"] + ":baseline"]["outcome"] == "PASS"
-        ),
-        None,
-    )
+    failing = failing_trial(run_dir)
     if failing is None:
         fail("no pair where A passes and B fails")
     passing = failing.rsplit(":", 1)[0] + ":baseline"
     diffed = arci("diff", str(run_dir), passing, failing)
-    print(indented(diffed.stdout), flush=True)
+    print(indented(diffed.stdout or diffed.stderr), flush=True)
     expect(
         diffed.code == 0 and "tool_timeout" in diffed.stdout,
         "the divergence sits right after the injected tool_timeout",
@@ -280,7 +313,7 @@ def run_demo(*, workers: int | None = None, keep: Path | None = None) -> int:
     print(f"arci demo: the retry story, {workers} workers, run stores in {work}", flush=True)
     try:
         illustrative_run()
-        frozen_experiment(work, workers)
+        matched = frozen_experiment(work, workers)
         run_dir, failing = first_divergence(work, workers)
         reduced = shrink(work, run_dir, failing)
         replay_offline(work)
@@ -291,10 +324,17 @@ def run_demo(*, workers: int | None = None, keep: Path | None = None) -> int:
         print(f"\nA step did not hold: {failed}. Run stores: {work}", flush=True)
         return 1
     print("\nAll six steps held.", flush=True)
-    print(
-        f"Run stores: {work}. Every count above was computed fresh on this machine, "
-        f"not replayed from evidence; they are expected to match the recorded run "
-        f"({RECORDED_COUNTS}).",
-        flush=True,
-    )
+    print(final_line(work, matched=matched), flush=True)
     return 0
+
+
+def final_line(work: Path, *, matched: bool) -> str:
+    comparison = (
+        f"they matched the recorded run ({RECORDED_COUNTS})"
+        if matched
+        else "they did not all match the recorded run (see step 2)"
+    )
+    return (
+        f"Run stores: {work}. Every count above was computed fresh on this machine, "
+        f"not replayed from evidence; {comparison}."
+    )

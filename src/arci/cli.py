@@ -520,7 +520,7 @@ def _parser() -> _Parser:
     demo.add_argument(
         "--keep",
         metavar="DIR",
-        help="write the run stores to DIR (empty or new) instead of a temporary directory",
+        help="write the run stores to DIR (empty or new) instead of a kept temporary directory",
     )
     # --- end demo ---
     return parser
