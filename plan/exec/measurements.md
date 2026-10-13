@@ -63,9 +63,13 @@
   (ten files, one per reader per track).
 - Results: comprehension 5/5 for all five readers (25/25 answers); BLOCK interpretation 5/5;
   own-run INCONCLUSIVE interpretation 5/5. Track A: 74, 73, 74, 74, 75 s from command start to
-  "All six steps held." (install 1 s each, warm uv cache). Track B: install 1 s (uv venv route),
-  scaffold 0–6 s, run 1–2 s; INCONCLUSIVE at N=8 with the store validated (gate reproduced the line,
-  decision sha unchanged) for all five.
+  "All six steps held." (resolve/install 1 s for readers 1–4 and 0 s for reader 5, warm uv cache); the
+  stamped attempt's exit code was not captured for any reader (facilitator wrapper defect), so the
+  demo receipts carry exit_code/completed null and the bash re-runs (exit 0, readers 1–4) in notes.
+  Track B: install 1 s via the uv venv route (reader 5's install_start not stamped), scaffold 0–1 s
+  where the successful `arci init` was stamped (readers 1, 4; null for 2, 3, 5 whose stamp was the
+  failed first init), run 1–2 s; INCONCLUSIVE at N=8 with the store validated (gate reproduced the
+  line, decision sha unchanged) for all five; agent execution 5.8–6.3 s per store.
 - Friction, 5/5 readers: the README's four-reference `arci init` command fails on the sample tree
   with `KeyError: 'order_id'` (the factory needs task data); the error names `--task`, and every
   reader recovered on the second attempt (init_attempts 2). Fixed in T15 by one README sentence and
@@ -76,4 +80,4 @@
 - Facilitator defects (not product): the timestamping wrapper used bash's `PIPESTATUS` under zsh,
   so the demo exit code printed empty and four readers re-ran the demo under bash outside the
   clock; `uv tool install` is denied in this harness (all readers used `uv venv` + `uv pip install`,
-  recorded as a coaching event and a failure in every receipt).
+  recorded as a coaching event in every receipt and as a failure in every own-agent receipt).

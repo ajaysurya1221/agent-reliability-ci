@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -21,16 +22,32 @@ MACHINE = {
     "uv": "uv 0.12.5",
     "uv_cache": "warm",
 }
+# Readers whose scaffold_start stamp belongs to the failed first `arci init` (protocol 4 wants the
+# invocation that produced the descriptor used for the run); their successful start was not stamped.
+SCAFFOLD_START_UNKNOWN = {"reader-2-opus", "reader-3-sonnet", "reader-5-haiku"}
 COACHING = [
     {
-        "at": "pre-attempt",
+        "at": "",
         "what": (
-            "Facilitator prompt stated, before the clock, that this harness blocks "
-            "`uv tool install` and that uvx or a uv venv are alternatives; it also prescribed the "
-            "timestamping wrapper and the milestone names. No explanation of ARCI was given."
+            "Before readme_opened (not stamped): the facilitator prompt stated that this harness "
+            "blocks `uv tool install` and that uvx or a uv venv are alternatives; it also "
+            "prescribed the timestamping wrapper and the milestone names. No explanation of ARCI "
+            "was given."
         ),
     }
 ]
+
+
+REPO = "/Users/ajay/Developer/agent-reliability-ci/"
+TMP_RE = re.compile(r"/(?:private/)?(?:var/folders/[^ ,;)'\"]+|tmp/[^ ,;)'\"]+)")
+
+
+def scrub(text: str | None) -> str:
+    """Trim the maintainer checkout to repository-relative paths; replace temp paths."""
+    if not text:
+        return ""
+    text = text.replace(REPO, "")
+    return TMP_RE.sub("<tmp>", text)
 
 
 def parse(ts: str | None) -> dt.datetime | None:
@@ -74,13 +91,45 @@ def base(template: dict, reader: dict, track: str, readme_commit: str) -> dict:
     return r
 
 
+def clean_failure(f: dict) -> dict:
+    """ISO `at` only; any remark attached to the timestamp moves into `what`; paths scrubbed."""
+    at = str(f.get("at", ""))
+    m = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)(.*)", at)
+    if m:
+        at, remark = m.group(1), m.group(2).strip(" ()")
+    else:
+        at, remark = "", at
+    what = scrub(f.get("what", ""))
+    if remark:
+        what = f"[at: {remark}] {what}"
+    return {"at": at, "milestone": scrub(f.get("milestone", "")), "what": what}
+
+
+def is_demo_failure(f: dict) -> bool:
+    text = (f.get("milestone", "") + " " + f.get("what", "")).lower()
+    return "demo" in text or "all_steps_held" in text or "command_start" in text
+
+
 def verdict_of(line: str | None) -> str:
+    """The first whole-word verdict token in the reader's text (their own run's verdict comes
+    first; later tokens are other lines they quoted)."""
     if not line:
         return "ERROR"
-    for v in ("PASS", "BLOCK", "INCONCLUSIVE", "ERROR"):
-        if v in line:
-            return v
-    return "ERROR"
+    m = re.search(r"\b(PASS|BLOCK|INCONCLUSIVE|ERROR)\b", line)
+    return m.group(1) if m else "ERROR"
+
+
+def agent_execution(store_dir: str | None) -> float | None:
+    if not store_dir:
+        return None
+    path = Path(store_dir) / "trials.jsonl"
+    if not path.exists():
+        return None
+    total = 0.0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            total += float(json.loads(line)["usage"]["wall_seconds"])
+    return round(total, 3)
 
 
 def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
@@ -102,9 +151,12 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
             "self-stamped milestones with `date -u` under the facilitator's wrapper; machine "
             "shared with the orchestrator session (not controlled). Never counted as a cold "
             "reader. "
-            f"Files read: {', '.join(out.get('files_read', [])) or 'none listed'}. "
-            f"Confusions: {' | '.join(out.get('confusions', [])) or 'none'}. "
-            f"Reader notes: {out.get('notes', '')}"
+            "Protocol 2.1 deviation: the maintainer checkout was present on the machine; the "
+            "reader read README.md from it and Track B copied the sample tree from it (no clone "
+            "was made by the reader). "
+            f"Files read: {scrub(', '.join(out.get('files_read', []))) or 'none listed'}. "
+            f"Confusions: {scrub(' | '.join(out.get('confusions', []))) or 'none'}. "
+            f"Reader notes: {scrub(out.get('notes', ''))}"
         )
         # Track A receipt
         ra = base(template, reader, "demo", readme_commit)
@@ -128,12 +180,15 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
                 "total": seconds(a.get("readme_opened"), a.get("all_steps_held")),
             }
         )
-        held = bool(a.get("all_steps_held")) and a.get("exit_code") == 0
+        # The stamped attempt's exit code was never captured (the facilitator's wrapper used
+        # bash's PIPESTATUS under zsh); readers 1-4 re-ran the demo under bash outside the clock
+        # and reported that exit code. The receipt keeps the stamped attempt only.
+        rerun_exit = a.get("exit_code")
         ra["outcome"].update(
             {
-                "completed": held and bool(sc.get("interpretation_demo_block")),
-                "verdict": a.get("verdict_for_agent_b") or ("BLOCK" if held else "ERROR"),
-                "exit_code": a.get("exit_code"),
+                "completed": None,
+                "verdict": verdict_of(a.get("verdict_for_agent_b")),
+                "exit_code": None,
                 "store_validated": None,
                 "decision_sha256": "",
                 "init_attempts": None,
@@ -169,30 +224,42 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         }
         ra["comprehension"]["all_correct"] = sc.get("all_five_correct")
         ra["notes"] = (
-            f"Command used: {a.get('command_used')}. Log: {a.get('log_path')}. "
-            "interpretation_answered not stamped (answers given after both tracks). "
+            f"Command used: {scrub(a.get('command_used'))}. Log: {scrub(a.get('log_path'))}. "
+            f"Reader's verdict line for agent B: {scrub(a.get('verdict_for_agent_b'))}. "
+            + "The stamped attempt's exit code was not captured (the facilitator's wrapper used "
+            "bash's PIPESTATUS under zsh), so exit_code and completed are null; "
+            + (
+                "the reader re-ran the demo under bash outside the clock and reported exit "
+                f"{rerun_exit} (see failures). "
+                if rerun_exit is not None
+                else "the reader did not re-run it. "
+            )
+            + "interpretation_answered not stamped (answers given after both tracks). "
             + common_notes
-            + f" Scorer rationale: {sc.get('rationale', '')}"
+            + f" Scorer rationale: {scrub(sc.get('rationale', ''))}"
         )
-        ra["failures"] = [f for f in out.get("failures", []) if "demo" in f.get("what", "").lower()]
+        failures = [clean_failure(f) for f in out.get("failures", [])]
+        ra["failures"] = [f for f in failures if is_demo_failure(f)]
         # Track B receipt
         rb = base(template, reader, "own-agent", readme_commit)
+        agent_exec = agent_execution(b.get("store_dir"))
         rb["project"] = {
             "_comment": template["project"]["_comment"],
             "kind": "sample",
             "description": (
                 "examples/recipes/python_agent copied to a temporary directory, arci.yaml removed; "
-                f"project dir {b.get('project_dir')}"
+                f"project dir {scrub(b.get('project_dir'))}"
             ),
             "refs_preexisting": True,
             "workers": None,
         }
+        scaffold_start = None if reader["id"] in SCAFFOLD_START_UNKNOWN else b.get("scaffold_start")
         rb["timestamps"].update(
             {
                 "readme_opened": a.get("readme_opened"),
                 "install_start": b.get("install_start"),
                 "install_done": b.get("install_done"),
-                "scaffold_start": b.get("scaffold_start"),
+                "scaffold_start": scaffold_start,
                 "descriptor_written": b.get("descriptor_written"),
                 "run_start": b.get("run_start"),
                 "verdict_printed": b.get("verdict_printed"),
@@ -203,20 +270,21 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         rb["durations_seconds"].update(
             {
                 "install": seconds(b.get("install_start"), b.get("install_done")),
-                "scaffold": seconds(b.get("scaffold_start"), b.get("descriptor_written")),
+                "scaffold": seconds(scaffold_start, b.get("descriptor_written")),
                 "run": seconds(b.get("run_start"), b.get("verdict_printed")),
-                "agent_execution": None,
+                "agent_execution": agent_exec,
                 "interpretation": None,
                 "total": None,
             }
         )
+        v = verdict_of(b.get("verdict_line"))
         validated = (
             bool(b.get("verdict_line"))
-            and b.get("gate_verdict_line") == b.get("verdict_line")
-            and b.get("decision_sha256_before")
+            and verdict_of(b.get("gate_verdict_line")) == v
+            and v != "ERROR"
+            and bool(b.get("decision_sha256_before"))
             and b.get("decision_sha256_before") == b.get("decision_sha256_after")
         )
-        v = verdict_of(b.get("verdict_line"))
         rb["outcome"].update(
             {
                 "completed": bool(validated)
@@ -235,15 +303,28 @@ def build(result_path: Path, out_dir: Path, readme_commit: str) -> None:
         )
         rb["comprehension"]["answered_on"] = f"2026-10-13-ai-{reader['id']}-demo.json"
         rb["notes"] = (
-            f"Install method: {b.get('install_method')}. Commands: "
-            f"{' ; '.join(b.get('commands_used', []))}. Store: {b.get('store_dir')} with "
-            f"{', '.join(b.get('store_files') or [])}; gate line: {b.get('gate_verdict_line')}. "
-            "store_validated stamp and the protocol 4.4 total are null (the reader validated the "
-            "store itself; the facilitator did not stamp it). " + common_notes
+            f"Install method: {scrub(b.get('install_method'))}. Commands: "
+            f"{scrub(' ; '.join(b.get('commands_used', [])))}. Store: {scrub(b.get('store_dir'))} "
+            f"with {', '.join(b.get('store_files') or [])}; gate line: "
+            f"{scrub(b.get('gate_verdict_line'))}. "
+            + (
+                "scaffold_start is null: the reader's stamp was taken at the failed first "
+                f"`arci init` ({b.get('scaffold_start')}), and the successful second invocation "
+                "was not stamped, so the scaffold duration is unknown. "
+                if reader["id"] in SCAFFOLD_START_UNKNOWN
+                else ""
+            )
+            + "readme_opened is the Track A stamp (one README "
+            "read for both tracks). store_validated stamp and the protocol 4.4 total are null (the "
+            "reader validated the store itself; the facilitator did not stamp it). "
+            + (
+                "agent_execution summed from the store's trials.jsonl by the builder. "
+                if agent_exec is not None
+                else "agent_execution null: the temporary store was no longer readable. "
+            )
+            + common_notes
         )
-        rb["failures"] = [
-            f for f in out.get("failures", []) if "demo" not in f.get("what", "").lower()
-        ]
+        rb["failures"] = [f for f in failures if not is_demo_failure(f)]
         for rec, track in ((ra, "demo"), (rb, "own-agent")):
             path = out_dir / f"2026-10-13-ai-{reader['id']}-{track}.json"
             path.write_text(json.dumps(rec, indent=2) + "\n", encoding="utf-8")
