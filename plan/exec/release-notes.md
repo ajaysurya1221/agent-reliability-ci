@@ -10,11 +10,10 @@ uvx --from agent-reliability-ci arci demo            # the recorded retry story,
 uv tool install agent-reliability-ci                  # the arci command
 ```
 
-PyPI status at release time: the release workflow built the wheel and the sdist, smoke-tested the
-wheel on Ubuntu and macOS (Python 3.11 and 3.14) from an empty directory, and then failed at the
-publish step because PyPI has no trusted publisher registered for this repository yet. Until the
-maintainer registers it and re-runs the publish job, install from the files attached to this
-release (checksums below): `uvx --from <wheel URL or path> arci demo`.
+PyPI status: the release workflow built the wheel and the sdist from the tag, smoke-tested the wheel
+on Ubuntu and macOS (Python 3.11 and 3.14) from an empty directory, and published both files to PyPI
+with PEP 740 attestations through trusted publishing (run 38365660814; the publish job succeeded on
+its re-run at 08:25Z, after the trusted publisher was registered).
 
 ## What is new
 
@@ -82,7 +81,7 @@ not do" in the README and `docs/TRUST_MODEL.md`.
 
 ```bash
 shasum -a 256 -c SHA256SUMS                                   # the attached files
-uvx --from agent_reliability_ci-0.8.0-py3-none-any.whl arci demo   # or, once on PyPI: uvx --from agent-reliability-ci==0.8.0 arci demo
+uvx --from agent-reliability-ci==0.8.0 arci demo
 ```
 
 Built by release workflow run 38365660814 from tag `v0.8.0` (commit 48e60ac):

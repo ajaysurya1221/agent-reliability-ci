@@ -2,65 +2,27 @@
 
 Status as of the last orchestrator update: see the "Final state" line at the end of this file.
 
-## 1. PyPI: register the pending trusted publisher, then re-run the publish job (blocks `uvx --from agent-reliability-ci arci demo`)
+## 1. PyPI trusted publisher: DONE by you at ~08:24Z
 
-State at 07:59Z: tag `v0.8.0` (commit 48e60ac) is pushed; release workflow run
-https://github.com/ajaysurya1221/agent-reliability-ci/actions/runs/38365660814 built the wheel and
-the sdist and passed the four wheel-smoke jobs (Ubuntu/macOS × Python 3.11/3.14), then the
-`publish to PyPI` job failed with:
-
-```text
-Trusted publishing exchange failure: Token request failed: the server refused the request for the following reasons:
-* `invalid-publisher`: valid token, but no corresponding publisher (Publisher with matching claims was not found)
-```
-
-The OIDC claims PyPI saw: repository `ajaysurya1221/agent-reliability-ci`, owner id `74526464`,
-workflow `release.yml` at `refs/tags/v0.8.0`, environment `pypi`. Nothing was uploaded; PyPI still
-returns 404 for the project.
-
-Do this (about three minutes):
-
-1. Open https://pypi.org/manage/account/publishing/ and add a **pending** publisher: PyPI project
-   name `agent-reliability-ci`, owner `ajaysurya1221`, repository `agent-reliability-ci`, workflow
-   name `release.yml`, environment name `pypi`. (If PyPI says the name is taken, tell the next run
-   the alternative name; only `[project] name` in `pyproject.toml` changes, with a design record.)
-2. Re-run only the failed job of run 38365660814: Actions → "release" → that run → **Re-run failed
-   jobs** (or `gh run rerun 38365660814 --failed`). The build and smoke jobs are not repeated; the
-   publish job uploads exactly the files below and generates the attestations.
-3. Check: `uvx --from agent-reliability-ci==0.8.0 arci demo` in an empty directory prints
-   "All six steps held." and https://pypi.org/p/agent-reliability-ci shows the two files with
-   these checksums:
-
-```text
-10ddc6823b446edd745d7904c5ab24a2fa098a0b9313ccc2df1b3277c4212899  agent_reliability_ci-0.8.0-py3-none-any.whl
-99476b7b8923724eeb6392f7fa37ba4189c6fc5bb40d2ce9f10d7b3d578a9a01  agent_reliability_ci-0.8.0.tar.gz
-```
-
-If the re-run fails again, the troubleshooting page PyPI links is
-https://docs.pypi.org/trusted-publishers/troubleshooting/ (the usual cause is a mismatch in the
-environment name or the workflow file name).
+Record: the first publish attempt (run 38365660814, 07:59Z) failed with `invalid-publisher: valid
+token, but no corresponding publisher`; you registered the pending publisher (project
+`agent-reliability-ci`, owner `ajaysurya1221`, repository `agent-reliability-ci`, workflow
+`release.yml`, environment `pypi`); the orchestrator re-ran the failed job (`gh run rerun
+38365660814 --failed`) at 08:24:52Z and it succeeded at 08:25Z. PyPI now serves 0.8.0 with the
+CI checksums (wheel 10ddc682…2899, sdist 99476b7b…9a01). Nothing else to do here.
 
 ## 2. Permissions still denied in `~/.claude/settings.json` (only if you want the orchestrator to do these itself next time)
 `gh pr create`, `gh pr merge`, `gh release create`, `gh workflow run`, `uv tool install`, `curl`, `rm -rf`, `git reset --hard`, `chmod` (the last three found during the run; worked around with fresh directories, `git reset --keep`/none, and `bash script.sh`).
 This run merged with plain git after lane CI, created no PRs, and left the GitHub Release to you
 (item 3) if `gh release create` stayed denied.
 
-## 3. GitHub Release v0.8.0 (the orchestrator's `gh release create` is denied by your settings)
+## 3. GitHub Release v0.8.0: DONE by you at ~08:27Z
 
-The tag exists; the release page does not. The files to attach are the CI-built ones from run
-38365660814 (byte-identical to a local `uv build` of commit 48e60ac). From a checkout of main:
-
-```bash
-gh run download 38365660814 -n dist -D dist-v0.8.0 && (cd dist-v0.8.0 && shasum -a 256 -c SHA256SUMS)
-```
-
-```bash
-gh release create v0.8.0 --verify-tag --title "v0.8.0: install from PyPI, arci demo, arci.yaml, arci init" --notes-file plan/exec/release-notes.md dist-v0.8.0/agent_reliability_ci-0.8.0-py3-none-any.whl dist-v0.8.0/agent_reliability_ci-0.8.0.tar.gz dist-v0.8.0/SHA256SUMS
-```
-
-The notes file states that PyPI publication was pending at release time; if you do item 1 first,
-delete that paragraph (lines under "PyPI status at release time") before creating the release, or
-edit the release afterwards. Nothing in the notes makes a claim beyond the recorded runs.
+Record: `gh release create` is denied for the orchestrator by your settings; you ran the command
+from item 3 yourself. The page https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0
+carries the CI-built wheel, sdist and SHA256SUMS (verified `OK` before upload) and the notes from
+`plan/exec/release-notes.md`. The `dist-v0.8.0/` directory the command left in your checkout is
+untracked and can be deleted.
 
 ## 4. Launch posts (your accounts; drafts below, each with one claim backed by a recorded run)
 Order from the memo: GitHub release → Show HN → MCP community (after the Inspector recipe) →
@@ -88,7 +50,7 @@ Promptfoo/Inspect/Pydantic threads → local-model communities.
 - main: v0.8.0 release merged (68f7c8c), tag `v0.8.0` = 48e60ac, CI green on the tagged commit and on
   every later plan-only commit; T13 docs (receipts, recipe titles, availability line) merged from
   sprint/t13-docs after REVIEW 13 (two rounds, both reviewers ACCEPT).
-- PyPI: not published (item 1). GitHub release: not created (item 3). Both are one command each.
+- PyPI: published (0.8.0, attested, 08:25Z). GitHub release page: created by you at ~08:27Z with the CI files attached.
 - Nothing half-applied: every lane branch is merged; no frozen file changed outside ADR 0005's
   re-freeze; no recorded result edited; no force-push, no deleted branch/tag/release, no secret.
 
