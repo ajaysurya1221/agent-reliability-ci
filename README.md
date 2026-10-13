@@ -253,7 +253,7 @@ Scaffold one experiment from four references, then run it:
 
 ```bash
 uv tool install agent-reliability-ci
-arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed
+arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed --task '{"order_id": "order-7"}'
 arci run arci.yaml
 ```
 
@@ -265,10 +265,10 @@ total collapse cannot BLOCK below N=8, so expect INCONCLUSIVE, then plan a confi
 `arci plan` before spending trials. Without `--fault` the scaffold writes one clean condition (no
 injected fault); `--fault tool_timeout:reserve` adds a timeout on the first `reserve` call, and `--task '{...}'`
 sets the task. `arci init` calls your toolset factory once with that task, so a factory that reads
-task data fails without it: the sample project's `make_world`
+task data needs `--task`: the sample project's `make_world`
 ([examples/recipes/python_agent](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/examples/recipes/python_agent))
-needs `--task '{"order_id": "order-7"}'`,
-and the error message names the flag. A hand-written descriptor with one fault looks like this:
+reads `order_id`, which is why the command above passes `--task '{"order_id": "order-7"}'`;
+without it `arci init` fails and the error message names the flag. A hand-written descriptor with one fault looks like this:
 
 ```yaml
 experiment_id: checkout-retry

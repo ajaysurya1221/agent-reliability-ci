@@ -105,6 +105,55 @@ def test_without_links_a_destination_that_appears_before_publication_survives(
     assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
 
 
+def _link_raises(code: int) -> Callable[[object, object], None]:
+    def link(source: object, dest: object) -> None:
+        del source, dest
+        raise OSError(code, os.strerror(code))
+
+    return link
+
+
+@pytest.mark.parametrize("code", [errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM])
+def test_unsupported_link_errnos_say_hard_links_are_unsupported(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], code: int
+) -> None:
+    monkeypatch.setattr(os, "link", _link_raises(code))
+    assert _init(capsys) == (3, "", NO_LINKS_LINE)
+    assert set(workdir.iterdir()) == set()
+
+
+def test_another_link_error_names_its_cause_and_writes_nothing(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(os, "link", _link_raises(errno.EIO))
+    line = f"{PREFIX}output arci.yaml: cannot publish: {os.strerror(errno.EIO)} (errno EIO)\n"
+    assert _init(capsys) == (3, "", line)
+    assert "hard links unsupported" not in line
+    assert set(workdir.iterdir()) == set()  # no destination, no staged file
+
+
+def test_another_link_error_preserves_a_competitor(
+    workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    real_check = REAL_CHECK_OUTPUT
+    competitor = b"a competitor's bytes\n"
+    calls: list[Path] = []
+
+    def check_then_race(out: Path, out_text: str, force: bool) -> None:
+        real_check(out, out_text, force)
+        calls.append(out)
+        if len(calls) == 2:  # the re-check in publish: the competitor lands right after it
+            out.write_bytes(competitor)
+
+    monkeypatch.setattr(init_module, "_check_output", check_then_race)
+    monkeypatch.setattr(os, "link", _link_raises(errno.EIO))
+    line = f"{PREFIX}output arci.yaml: cannot publish: {os.strerror(errno.EIO)} (errno EIO)\n"
+    assert _init(capsys) == (3, "", line)
+    assert len(calls) == 2
+    assert (workdir / "arci.yaml").read_bytes() == competitor
+    assert {path.name for path in workdir.iterdir()} == {"arci.yaml"}  # nothing staged is left
+
+
 def test_with_force_and_no_links_the_rename_still_publishes(
     workdir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

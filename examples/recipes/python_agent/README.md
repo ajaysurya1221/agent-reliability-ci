@@ -44,7 +44,8 @@ The oracle reads only the world's final state, never the agent's own claim. The 
 
 ## What the smoke verdict means
 
-Expect `VERDICT: INCONCLUSIVE (exit 2)` and two stderr lines that say so. Eight trials per arm is a
+Expect `VERDICT: INCONCLUSIVE (exit 2)`, two stderr lines that say so, and a third stderr line
+naming the run store. Eight trials per arm is a
 smoke design: under the default rule (alpha 0.05, delta 0.10, Clopper-Pearson) two perfect arms
 cannot PASS below N=42, and only a total collapse can BLOCK at N=8. Here v2 still confirms every
 order that arrived held (two of the eight seeds 0-7, so expect 8/8 against 2/8), so it does not

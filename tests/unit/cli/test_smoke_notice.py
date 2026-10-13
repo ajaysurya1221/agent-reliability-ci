@@ -66,7 +66,7 @@ def _with(base: Manifest, **changes: object) -> Manifest:
 # --- the real run -------------------------------------------------------------------------------
 
 
-def test_n6_prints_two_stderr_lines_and_leaves_stdout_and_reports_alone(tmp_path: Path) -> None:
+def test_n6_prints_the_notice_lines_and_leaves_stdout_and_reports_alone(tmp_path: Path) -> None:
     built = manifest(n_per_arm=6)  # 6/6 vs 0/6 under a timeout: INCONCLUSIVE
     path = tmp_path / "manifest.json"
     path.write_text(built.model_dump_json(), encoding="utf-8")
@@ -74,13 +74,15 @@ def test_n6_prints_two_stderr_lines_and_leaves_stdout_and_reports_alone(tmp_path
 
     done = arci("run", "manifest.json", "--out", "runs", "--workers", "8", cwd=tmp_path)
     assert done.returncode == 2, done.stderr[-2000:]
-    assert done.stderr == f"{DEFAULT_LINE}\n{FOLLOWUP_6}\n"
+    run_dir = tmp_path / "runs" / built.experiment_id
+    # The notice, its follow-up, then the run-store line (task 16).
+    store_line = f"run store: {run_dir.resolve()}"
+    assert done.stderr == f"{DEFAULT_LINE}\n{FOLLOWUP_6}\n{store_line}\n"
     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
     assert "SMOKE" not in done.stdout
 
     # The Markdown report is byte-for-byte the renderer's, and so is what the Action summarises
     # (it tees `arci run` stdout; `arci gate` writes GITHUB_STEP_SUMMARY).
-    run_dir = tmp_path / "runs" / built.experiment_id
     stored, trials = load_run(run_dir)
     markdown = render_markdown(stored, decide(stored, trials), trials)
     assert done.stdout == markdown + ("" if markdown.endswith("\n") else "\n")

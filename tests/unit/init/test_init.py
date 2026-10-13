@@ -291,8 +291,10 @@ def test_init_then_run_from_the_sample_project(project: Path) -> None:
     assert done.returncode == 2, done.stderr[-2000:]
     assert done.stdout.strip().splitlines()[-1] == "VERDICT: INCONCLUSIVE (exit 2)"
     manifest = compile_descriptor(project / "arci.yaml")
-    assert done.stderr == f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\n"
     run_dir = project / "runs" / "checkout-retry"
+    assert done.stderr == (
+        f"{smoke_notice(manifest)}\n{smoke_followup(manifest)}\nrun store: {run_dir.resolve()}\n"
+    )
     stored = Manifest.model_validate_json((run_dir / "manifest.json").read_text())
     assert stored.validate_seal()
     assert stored == manifest

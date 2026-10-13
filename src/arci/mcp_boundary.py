@@ -26,7 +26,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC
-from typing import cast
+from typing import BinaryIO, TextIO, cast
 from urllib.parse import urlsplit
 
 from pydantic import JsonValue
@@ -67,7 +67,10 @@ _HTTP_REASONS = {
     500: "Internal Server Error",
     529: "Site is overloaded",
 }
-_PROTOCOL = sys.stdout.buffer
+# The binary stream carrying protocol frames to the runner; None means the process's original
+# stdout, looked up when a frame is written rather than at import, so importing this module does
+# not require a `sys.stdout` with a `buffer`. Tests replace it with a `BytesIO`.
+_PROTOCOL: BinaryIO | None = None
 
 
 class _DecisionTransportError(RuntimeError):
@@ -90,9 +93,24 @@ def upstream_diagnostic(detail: str | BaseException) -> str:
     return _scrub_diagnostic(detail)[:299]
 
 
+def _protocol() -> BinaryIO:
+    """The frame stream: `sys.__stdout__`, which `redirect_stdout` never touches.
+
+    In the boundary child (`python -P -m arci.mcp_boundary`) nothing replaces stdout before this
+    module runs, so this is the stream the import-time `sys.stdout.buffer` used to be.
+    """
+    if _PROTOCOL is not None:
+        return _PROTOCOL
+    stdout = cast(TextIO | None, sys.__stdout__)  # typeshed: TextIOWrapper; .buffer is binary
+    if stdout is None:
+        raise RuntimeError("the MCP boundary has no stdout for its protocol frames")
+    return stdout.buffer
+
+
 def _frame(nonce: str, kind: str, **payload: object) -> None:
-    _PROTOCOL.write(canonical_json({"nonce": nonce, "kind": kind, **payload}) + b"\n")
-    _PROTOCOL.flush()
+    protocol = _protocol()
+    protocol.write(canonical_json({"nonce": nonce, "kind": kind, **payload}) + b"\n")
+    protocol.flush()
 
 
 def _valid_rpc_id(value: object) -> bool:
