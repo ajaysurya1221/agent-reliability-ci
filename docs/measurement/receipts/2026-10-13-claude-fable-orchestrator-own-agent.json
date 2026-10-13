@@ -8,7 +8,7 @@
     "handle": "claude-fable-orchestrator",
     "kind": "ai-agent"
   },
-  "facilitator": "claude-fable-orchestrator (stopwatch script plan/exec/scripts/ttfv_track_b.sh)",
+  "facilitator": "claude-fable-orchestrator",
   "machine": {
     "_comment": "os and cpu as reported by the system (e.g. uname -sr, CPU model and core count); python and uv are `python3 --version` and `uv --version`. uv_cache: cold (fresh UV_CACHE_DIR) or warm.",
     "os": "Darwin 27.0.0 (macOS, arm64)",
@@ -30,7 +30,7 @@
     "kind": "sample",
     "description": "examples/recipes/python_agent copied to a temporary directory outside the checkout, arci.yaml removed; the README's command with --task and --fault as in the recipe",
     "refs_preexisting": true,
-    "workers": null
+    "workers": 4
   },
   "timestamps": {
     "_comment": "ISO 8601 with timezone, e.g. 2026-10-20T09:15:02Z. Track A uses readme_opened, command_start, demo_banner, demo_verdict, all_steps_held, interpretation_answered. Track B uses readme_opened, install_start, install_done, scaffold_start, descriptor_written, run_start, verdict_printed, store_validated, interpretation_answered. Leave the others null.",
@@ -46,7 +46,7 @@
     "run_start": "2026-10-13T07:31:45Z",
     "verdict_printed": "2026-10-13T07:31:47Z",
     "store_validated": "2026-10-13T07:31:47Z",
-    "interpretation_answered": "2026-10-13T07:31:47Z"
+    "interpretation_answered": null
   },
   "durations_seconds": {
     "_comment": "Whole seconds derived from the timestamps as the protocol defines per track (sections 3 and 4). agent_execution is Track B only: the sum of usage.wall_seconds over trials.jsonl in the run store (protocol 4.2), never subtracted from total.",
@@ -54,8 +54,8 @@
     "scaffold": 1,
     "run": 2,
     "agent_execution": 5.893,
-    "interpretation": 0,
-    "total": 3
+    "interpretation": null,
+    "total": null
   },
   "outcome": {
     "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR; Track B: the verdict stamped as verdict_printed; ERROR if none; Track A: the verdict for agent B. store_validated, decision_sha256, init_attempts, descriptor_hand_edited, trials_started: Track B only (protocol 4.3 and 4.6). descriptor_hand_edited: arci.yaml edited by hand before the run that produced the verdict, or, with no valid verdict, before any arci run that started trials. trials_started: trials.jsonl in the run store (protocol 4.2) exists and is non-empty. interpretation_correct is scored with the key in protocol 5.3.",
@@ -68,7 +68,7 @@
     "descriptor_hand_edited": false,
     "trials_started": true,
     "interpretation_answer": "INCONCLUSIVE at N=8: not enough evidence either way; no regression and no pass is claimed; a larger run sized with arci plan is needed before a confirmatory verdict.",
-    "interpretation_correct": null
+    "interpretation_correct": true
   },
   "comprehension": {
     "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader and is a handle only, no personal data. q2_who_for keeps its name for schema stability; it holds the whole q2 answer (who it is for and what the agent must expose).",
@@ -91,6 +91,6 @@
     "all_correct": null
   },
   "coaching_events": [],
-  "notes": "Maintainer-machine run by the AI orchestrator that wrote the documentation; never a cold reader. Deviations from the protocol: (1) the install step was `uv venv` + `uv pip install <wheel>` because the harness denies the README's `uv tool install` route, so `install` measures a local wheel install (0 s, warm cache) and not a PyPI resolve; (2) the wheel was built locally from main 48e60ac (sha256 above), before the v0.8.0 tag and the CI build; (3) `readme_opened` is the script start, so `total` excludes reading and excludes writing the references (refs_preexisting: true); (4) the interpretation answer is the orchestrator's and is left unscored because no scorer other than the reader was available at the time. Comprehension: not asked of this reader (it wrote the README); a separate context-free Opus 5.5 subagent cold-read the README at main 6f52431 and scored 5/5 with a correct BLOCK interpretation (plan/exec/cold-read-2026-10-13.json; scorer: the orchestrator); that reader made no attempt, so it has no receipt. Store: runs/checkout-retry with manifest.json, trials.jsonl (16 trials), decision.json; `arci gate` reproduced the verdict line and the decision sha256 was unchanged.",
+  "notes": "Maintainer-machine run by the AI orchestrator that wrote the documentation; never a cold reader. Deviations from the protocol: (1) the install step was `uv venv` + `uv pip install <wheel>` because the harness denies the README's `uv tool install` route, so `install` measures a local wheel install (0 s, warm cache) and not a PyPI resolve; (2) the wheel was built locally from main 48e60ac (sha256 above), before the v0.8.0 tag and the CI build; (3) `readme_opened` is the script start; the protocol 4.4 total (to interpretation_answered) is null because that milestone was not stamped; readme_opened \u2192 store_validated took 3 s, excluding reading and excluding writing the references (refs_preexisting: true); (4) the interpretation answer is the orchestrator's; see the scoring note below. Comprehension: not asked of this reader (it wrote the README); a separate context-free Opus 5.5 subagent cold-read the README at main 6f52431 and scored 5/5 with a correct BLOCK interpretation (plan/exec/cold-read-2026-10-13.json; scorer: the orchestrator); that reader made no attempt, so it has no receipt. Store: runs/checkout-retry with manifest.json, trials.jsonl (16 trials), decision.json; `arci gate` reproduced the verdict line and the decision sha256 was unchanged. Stopwatch: plan/exec/scripts/ttfv_track_b.sh (readme_opened = script start; workers 4, the `arci run` default). The interpretation answer's time was not stamped (the script records no interpretation milestone), so interpretation_answered and interpretation are null. Interpretation scored correct against protocol 5.3 by a scorer other than the reader: reviewer-subagent (Claude Opus 5.5), REVIEW 13, 2026-10-13 (plan/exec/reviews/13.md).",
   "failures": []
 }
