@@ -1,0 +1,96 @@
+{
+  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. facilitator: a handle only, no personal data. network: yes | no, whether the machine had internet access during the attempt; required yes for Track A and for uv tool install; checked once before the clock starts (protocol 2.7). coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
+  "schema": "arci.ttfv.receipt.v1",
+  "track": "own-agent",
+  "date": "2026-10-13",
+  "reader": {
+    "_comment": "handle: a public handle, no other personal data. kind: cold | maintainer | ai-agent; only cold receipts without coaching events count toward cold-reader metrics.",
+    "handle": "claude-fable-orchestrator",
+    "kind": "ai-agent"
+  },
+  "facilitator": "claude-fable-orchestrator (stopwatch script plan/exec/scripts/ttfv_track_b.sh)",
+  "machine": {
+    "_comment": "os and cpu as reported by the system (e.g. uname -sr, CPU model and core count); python and uv are `python3 --version` and `uv --version`. uv_cache: cold (fresh UV_CACHE_DIR) or warm.",
+    "os": "Darwin 27.0.0 (macOS, arm64)",
+    "cpu": "Apple M5 Pro, 15 cores",
+    "python": "Python 3.14.6",
+    "uv": "uv 0.12.5",
+    "uv_cache": "warm"
+  },
+  "network": "yes",
+  "package": {
+    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel (record UV_FIND_LINKS and any UV_CACHE_DIR in notes, protocol 2.3). readme_url: the README read, at a fixed commit.",
+    "version": "0.8.0",
+    "source": "wheel",
+    "wheel_sha256": "10ddc6823b446edd745d7904c5ab24a2fa098a0b9313ccc2df1b3277c4212899",
+    "readme_url": "https://github.com/ajaysurya1221/agent-reliability-ci/blob/48e60ac/README.md"
+  },
+  "project": {
+    "_comment": "Track B only; null for demo. kind: own | sample. description: what the agent is, or which recipe the sample tree came from. refs_preexisting: baseline, candidate, toolset and oracle were importable before the clock started. workers: worker count of the run.",
+    "kind": "sample",
+    "description": "examples/recipes/python_agent copied to a temporary directory outside the checkout, arci.yaml removed; the README's command with --task and --fault as in the recipe",
+    "refs_preexisting": true,
+    "workers": null
+  },
+  "timestamps": {
+    "_comment": "ISO 8601 with timezone, e.g. 2026-10-20T09:15:02Z. Track A uses readme_opened, command_start, demo_banner, demo_verdict, all_steps_held, interpretation_answered. Track B uses readme_opened, install_start, install_done, scaffold_start, descriptor_written, run_start, verdict_printed, store_validated, interpretation_answered. Leave the others null.",
+    "readme_opened": "2026-10-13T07:31:44Z",
+    "command_start": null,
+    "demo_banner": null,
+    "demo_verdict": null,
+    "all_steps_held": null,
+    "install_start": "2026-10-13T07:31:44Z",
+    "install_done": "2026-10-13T07:31:44Z",
+    "scaffold_start": "2026-10-13T07:31:44Z",
+    "descriptor_written": "2026-10-13T07:31:45Z",
+    "run_start": "2026-10-13T07:31:45Z",
+    "verdict_printed": "2026-10-13T07:31:47Z",
+    "store_validated": "2026-10-13T07:31:47Z",
+    "interpretation_answered": "2026-10-13T07:31:47Z"
+  },
+  "durations_seconds": {
+    "_comment": "Whole seconds derived from the timestamps as the protocol defines per track (sections 3 and 4). agent_execution is Track B only: the sum of usage.wall_seconds over trials.jsonl in the run store (protocol 4.2), never subtracted from total.",
+    "install": 0,
+    "scaffold": 1,
+    "run": 2,
+    "agent_execution": 5.893,
+    "interpretation": 0,
+    "total": 3
+  },
+  "outcome": {
+    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR; Track B: the verdict stamped as verdict_printed; ERROR if none; Track A: the verdict for agent B. store_validated, decision_sha256, init_attempts, descriptor_hand_edited, trials_started: Track B only (protocol 4.3 and 4.6). descriptor_hand_edited: arci.yaml edited by hand before the run that produced the verdict, or, with no valid verdict, before any arci run that started trials. trials_started: trials.jsonl in the run store (protocol 4.2) exists and is non-empty. interpretation_correct is scored with the key in protocol 5.3.",
+    "completed": true,
+    "verdict": "INCONCLUSIVE",
+    "exit_code": 2,
+    "store_validated": true,
+    "decision_sha256": "22445a31db915f957c588526a21d354e9b7e8c52ae2de7d030107f8f9fd6f79c",
+    "init_attempts": 1,
+    "descriptor_hand_edited": false,
+    "trials_started": true,
+    "interpretation_answer": "INCONCLUSIVE at N=8: not enough evidence either way; no regression and no pass is claimed; a larger run sized with arci plan is needed before a confirmatory verdict.",
+    "interpretation_correct": null
+  },
+  "comprehension": {
+    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader and is a handle only, no personal data. q2_who_for keeps its name for schema stability; it holds the whole q2 answer (who it is for and what the agent must expose).",
+    "answered_on": "",
+    "scorer": "",
+    "answers": {
+      "q1_what_is_it": "",
+      "q2_who_for": "",
+      "q3_pass_means": "",
+      "q4_does_not_do": "",
+      "q5_first_three_commands": ""
+    },
+    "scores": {
+      "q1_what_is_it": null,
+      "q2_who_for": null,
+      "q3_pass_means": null,
+      "q4_does_not_do": null,
+      "q5_first_three_commands": null
+    },
+    "all_correct": null
+  },
+  "coaching_events": [],
+  "notes": "Maintainer-machine run by the AI orchestrator that wrote the documentation; never a cold reader. Deviations from the protocol: (1) the install step was `uv venv` + `uv pip install <wheel>` because the harness denies the README's `uv tool install` route, so `install` measures a local wheel install (0 s, warm cache) and not a PyPI resolve; (2) the wheel was built locally from main 48e60ac (sha256 above), before the v0.8.0 tag and the CI build; (3) `readme_opened` is the script start, so `total` excludes reading and excludes writing the references (refs_preexisting: true); (4) the interpretation answer is the orchestrator's and is left unscored because no scorer other than the reader was available at the time. Comprehension: not asked of this reader (it wrote the README); a separate context-free Opus 5.5 subagent cold-read the README at main 6f52431 and scored 5/5 with a correct BLOCK interpretation (plan/exec/cold-read-2026-10-13.json; scorer: the orchestrator); that reader made no attempt, so it has no receipt. Store: runs/checkout-retry with manifest.json, trials.jsonl (16 trials), decision.json; `arci gate` reproduced the verdict line and the decision sha256 was unchanged.",
+  "failures": []
+}

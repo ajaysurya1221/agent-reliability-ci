@@ -1,4 +1,9 @@
-# Gate a retry-policy change in ten minutes
+# Gate a retry-policy change
+
+Ten minutes from the README to a validated first verdict is this path's target, not a measured
+fact: [the TTFV protocol](../measurement/ttfv-protocol.md) measures it, and no cold-reader receipt
+exists yet (the maintainer-machine run in `docs/measurement/receipts/` took 3 s from scaffold to a
+validated smoke verdict, which says nothing about a person reading and writing references).
 
 You changed an agent: a teammate removed a "pointless" retry around a flaky tool. Every unit test
 still passes, because a unit test calls the tool once and the tool works. This recipe asks the

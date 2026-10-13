@@ -1,4 +1,7 @@
-# Recipe: gate a retry-policy change in ten minutes
+# Recipe: gate a retry-policy change
+
+Ten minutes from the README to a validated first verdict is the target for this path, measured by
+[the TTFV protocol](../../../docs/measurement/ttfv-protocol.md); no cold-reader receipt exists yet.
 
 `app/v1.py` reserves an order with a bounded retry; `app/v2.py` is the same agent with the retry
 removed. This recipe asks ARCI whether v2 is less reliable than v1 when the first `reserve` call
