@@ -10,7 +10,7 @@ only place these measurements live.
 - **Failures are kept.** An attempt that stalled, errored, was abandoned or was coached is
   committed like a successful one, with what went wrong in `failures` or `coaching_events`.
   Receipts are never edited after merge except to fix a transcription error, stated in the PR.
-- **No personal data** beyond a public handle. No names, emails, hostnames, usernames in paths or
+- **No personal data** beyond a public handle, for the reader, the facilitator and the scorer. No names, emails, hostnames, usernames in paths or
   machine serials; trim paths in pasted errors to the part after your project directory.
 - **Contributing:** fork, add your file here, open a PR titled `receipt: <handle> <track>`. The
   maintainer checks the file parses and follows the template; it is merged whatever it shows.

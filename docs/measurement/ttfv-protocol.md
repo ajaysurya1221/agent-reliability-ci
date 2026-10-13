@@ -26,8 +26,13 @@ Protocol only; no receipt collected yet. [Template](receipt.template.json), [rec
    `agent-reliability-ci`. Record whether the uv cache already held the package (`uv_cache`: `cold`
    if run with a fresh `UV_CACHE_DIR`, else `warm`).
 3. The package under test is published (PyPI) or a named wheel; record its version or wheel
-   sha256. The README read is the one for that version, and its URL at a fixed commit is recorded.
-   It must show both first-screen commands; if it does not, do not start.
+   sha256. The README read is the one for that version, and its URL at a fixed commit is recorded
+   in `package.readme_url`. It must show both first-screen commands; if it does not, do not start.
+   For a wheel, the README commands must resolve to it without coaching: before the clock starts,
+   the facilitator sets `UV_FIND_LINKS=<directory containing the wheel>` (and, for a cold cache,
+   `UV_CACHE_DIR=<fresh empty directory>`) in the reader's shell, says nothing about it, and
+   records both values in `notes`. `package.source` is then `wheel` and `package.wheel_sha256` is
+   filled.
 4. The reader has not been coached: no walkthrough, prior demo or explanation of terms.
 5. Track B only: a project directory, outside any ARCI checkout, in which a baseline, a candidate,
    a toolset factory and an oracle are importable (`module:function`), and each trial finishes in
@@ -36,6 +41,8 @@ Protocol only; no receipt collected yet. [Template](receipt.template.json), [rec
    writes them during the attempt, set `refs_preexisting: false` and keep the time in the total.
 6. The facilitator stamps each milestone as ISO 8601 with a timezone (e.g. `date -u
    +%Y-%m-%dT%H:%M:%SZ` in a second terminal), to a few seconds; `notes` says how.
+7. `network` records whether the machine had internet access during the attempt. It must be `yes`
+   for Track A and for `uv tool install`, and is checked once before the clock starts.
 
 ## 3. Track A, packaged demo
 
@@ -53,8 +60,13 @@ The reader follows the README to run `uvx --from agent-reliability-ci arci demo`
 Durations: `install` = `command_start` → `demo_banner`; `run` = `demo_banner` → `all_steps_held`;
 `interpretation` = `all_steps_held` → `interpretation_answered`; `total` = `readme_opened` →
 `all_steps_held`; `scaffold`, `agent_execution` and `outcome.store_validated` are null (the demo
-checks its own stores). Track A's total excludes the interpretation span, which is recorded beside
-it. A step that does not hold (exit 1) ends the attempt as a failure.
+checks its own stores). A step that does not hold (exit 1) ends the attempt as a failure.
+
+Deviation from the memo: the memo's time-to-first-verdict runs to an interpreted verdict, but
+Track A's `total` stops at `all_steps_held`, because the demo prints several verdicts and the
+interpretation question comes after the command exits. So the demo target is compared with the
+install-and-run time. Section 8 reports, beside it, the memo-definition figure `readme_opened` →
+`interpretation_answered`, in which a wrong interpretation counts as a failure.
 
 ## 4. Track B, own fast agent
 
@@ -68,6 +80,11 @@ uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.
 If the chain runs as one line, stamp `install_done` and `scaffold_start` at the first output of
 `arci init`, and `descriptor_written` and `run_start` at the first output of `arci run`.
 
+`run_start` and `verdict_printed` refer to the `arci run` invocation that printed the first
+`PASS`, `BLOCK` or `INCONCLUSIVE` verdict line. An `ERROR` line is never stamped as
+`verdict_printed`; it goes to `failures`, and so does a retry refused with
+`run directory is not empty`.
+
 | Milestone (`timestamps.*`) | When it is stamped |
 |---|---|
 | `readme_opened` | The README is on screen. **Clock starts.** |
@@ -75,8 +92,8 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
 | `install_done` | The install returns and `arci` is on `PATH`. |
 | `scaffold_start` | Enter on the `arci init ...` that produces the descriptor used for the run. |
 | `descriptor_written` | `arci init` exits 0 and `arci.yaml` exists. |
-| `run_start` | Enter on `arci run arci.yaml`. |
-| `verdict_printed` | The terminal shows `VERDICT: <X> (exit <n>)`. |
+| `run_start` | Enter on the `arci run arci.yaml` that printed the first valid verdict. |
+| `verdict_printed` | That invocation shows `VERDICT: <X> (exit <n>)` with X not `ERROR`. |
 | `store_validated` | The facilitator's check in 4.3 completes. |
 | `interpretation_answered` | The reader answers the question in 5.3. **Clock stops.** |
 
@@ -86,7 +103,7 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    continue; if no valid verdict follows, the attempt failed.
 2. The clock stops only when all three hold: the verdict line is on screen; the run store exists
    with `manifest.json`, `trials.jsonl` and `decision.json` (at `runs/<experiment_id>/` unless
-   the descriptor names another directory); and the reader has answered "what does this verdict
+   `--out` names another directory); and the reader has answered "what does this verdict
    mean?" correctly by the key in 5.3. A wrong answer is recorded and the attempt counts as a
    failure for TTFV.
 3. Store check, run by the facilitator right after the verdict line, inside the clock:
@@ -103,32 +120,37 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    subtracted from `total`.
 6. `outcome.init_attempts` counts `arci init` invocations. `descriptor_hand_edited` is true if the
    reader edited `arci.yaml` by hand before the run that produced the verdict. Re-running
-   `arci init` with corrected flags is not hand editing.
+   `arci init` with corrected flags is not hand editing. `outcome.trials_started` is true if
+   `runs/<id>/trials.jsonl` exists and is non-empty after the attempt.
 
 ## 5. Comprehension
 
-1. Asked in writing once per reader, after the last milestone of the first track they complete;
-   a second-track receipt sets `comprehension.answered_on` to the first receipt's file name and
-   leaves the rest as in the template. The README may stay open. Answers are in the reader's own words.
+1. Asked in writing once per reader, after the last milestone of the first track they complete,
+   or at the end of the attempt if they complete no track (they are still asked all five and
+   count in the "k of n readers" denominator); a second-track receipt sets
+   `comprehension.answered_on` to the first receipt's file name and leaves the rest as in the
+   template. The README may stay open. Answers are in the reader's own words.
 2. Scoring: a scorer other than the reader marks each answer correct only if it contains every key
-   element below (paraphrase is fine; a wrong extra claim, such as "PASS means the agent is
-   reliable", makes it incorrect). `all_correct` is true only when all five are correct.
+   element marked required below; optional elements are not needed (paraphrase is fine; a wrong
+   extra claim, such as "PASS means the agent is reliable", makes it incorrect). `all_correct` is
+   true only when all five are correct.
 
-| # | Question | Key elements (all required) |
+| # | Question | Key elements (all required unless marked optional) |
 |---|---|---|
-| q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict (PASS, BLOCK, INCONCLUSIVE or ERROR) usable as a CI gate. |
-| q2 | Who is it for? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
+| q1 | What is ARCI? | (a) compares a baseline and a candidate version of an agent; (b) runs both repeatedly under the same conditions, including injected tool faults, fixed before the run; (c) returns a verdict usable as a CI gate, naming at least PASS and BLOCK (required); naming all four, PASS, BLOCK, INCONCLUSIVE and ERROR (optional). |
+| q2 | Who is it for, and what must their agent expose for ARCI to test it? | (a) people changing an agent who want to know whether the change made it less reliable before merging; (b) ARCI must be able to call the agent so its tool calls cross ARCI's boundary: a Python function `agent(task, tools, rng)` or a command that speaks MCP over stdio. |
 | q3 | What does PASS mean exactly? | (a) relative to the baseline; (b) not shown to be worse by more than the allowed drop (`delta`); (c) only on this predeclared experiment, and not a claim of absolute reliability. |
-| q4 | What does it not do? Name two. | Two distinct items from: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
+| q4 | What does it not do? Name two. | Two distinct items, each a limit stated in the README version under test (`package.readme_url`) under "What it does not do" or in the first-screen boundary sentence. For example: not a sandbox or security boundary; sees only calls across its tool boundary (not files, network, subprocesses the agent touches directly); does not replay model inference; a divergence shows where runs differ, not why; PASS is not absolute reliability; does not discover earlier runs or enforce an error budget across runs. |
 | q5 | What are the first three commands for your own agent? | In order: install the `agent-reliability-ci` package (for example `uv tool install agent-reliability-ci`); `arci init <id>` with `--baseline`, `--candidate`, `--toolset`, `--oracle`; `arci run arci.yaml`. |
 
 3. The interpretation question, "What does this verdict mean?", is asked once per attempt (Track
-   A: about the `BLOCK` line for agent B). Correct iff, for the verdict shown: **PASS** meets q3's
-   key; **BLOCK** says the candidate is worse than the baseline by more than the allowed drop (or
-   broke a hard invariant) under these conditions; **INCONCLUSIVE** says there is not enough
-   evidence either way, with no regression and no pass claimed (a larger run planned with
-   `arci plan` would be needed); **ERROR** says the experiment is invalid and says nothing about
-   the agents.
+   A: about the `BLOCK` line for agent B). Correct iff, for the verdict shown, the answer has every
+   required element: **PASS** meets q3's key; **BLOCK** says the candidate is worse than the
+   baseline by more than the allowed drop (required), "or broke a hard invariant" (optional), and
+   that this holds under these conditions, on this experiment (required); **INCONCLUSIVE** says
+   there is not enough evidence either way, with no regression and no pass claimed (required),
+   and that a larger run planned with `arci plan` would be needed (optional); **ERROR** says the
+   experiment is invalid and says nothing about the agents (required).
 
 ## 6. Facilitation without coaching
 
@@ -152,7 +174,8 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    `{"at", "milestone", "what"}` with the first line of any error verbatim. Failed attempts are
    kept and contributed like successful ones.
 3. Path: `docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json`, the date of the attempt.
-   No personal data beyond the handle.
+   No personal data beyond the handle; `facilitator` and `comprehension.scorer` are handles only,
+   with no personal data.
 
 ## 8. Reporting
 
@@ -166,6 +189,9 @@ If the chain runs as one line, stamp `install_done` and `scaffold_start` at the 
    cold-read metric as k of n readers with `all_correct: true`.
 5. Report `agent_execution` beside Track B totals (never subtracted), and Track A's
    interpretation correctness (k of n) beside Track A totals.
+6. Beside Track A's `total`, report the memo-definition figure `readme_opened` →
+   `interpretation_answered` with the same ranking rules, where a wrong interpretation
+   (`interpretation_correct: false`) counts as a failure.
 
 ## 9. Kill criteria these receipts feed
 
@@ -173,8 +199,8 @@ From the memo's "Adoption plan":
 
 1. `arci init`: if fewer than 7 of 10 cold users produce a runnable descriptor without syntax
    surgery by 2026-11-12, replace the interface rather than adding options. A Track B receipt
-   counts as runnable without syntax surgery when `arci run` started trials on the `arci.yaml`
-   that `arci init` wrote and `descriptor_hand_edited` is false.
+   counts as runnable without syntax surgery when `outcome.descriptor_hand_edited` is false AND
+   `outcome.trials_started` is true.
 2. Cookbook: if a recipe cannot get a fresh user to a valid verdict within its stated time
    budget, fix or remove it before adding more recipes. Receipts with `project.kind: sample`
    name the recipe in `project.description`.

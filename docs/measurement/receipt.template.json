@@ -1,5 +1,5 @@
 {
-  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. network: yes | no. coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
+  "_comment": "One TTFV receipt per reader per track. Fill by hand following docs/measurement/ttfv-protocol.md; delete no keys. Null means not reached, not applicable, or unknown. Save as docs/measurement/receipts/YYYY-MM-DD-<handle>-<track>.json. track: demo | own-agent. date: YYYY-MM-DD of the attempt. facilitator: a handle only, no personal data. network: yes | no, whether the machine had internet access during the attempt; required yes for Track A and for uv tool install; checked once before the clock starts (protocol 2.7). coaching_events: list of {\"at\", \"what\"}. failures: list of {\"at\", \"milestone\", \"what\"}, kept even when the attempt failed.",
   "schema": "arci.ttfv.receipt.v1",
   "track": "",
   "date": "",
@@ -19,7 +19,7 @@
   },
   "network": "",
   "package": {
-    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel. readme_url: the README read, at a fixed commit.",
+    "_comment": "version: the agent-reliability-ci version installed. source: pypi or wheel. wheel_sha256: required when source is wheel (record UV_FIND_LINKS and any UV_CACHE_DIR in notes, protocol 2.3). readme_url: the README read, at a fixed commit.",
     "version": "",
     "source": "",
     "wheel_sha256": "",
@@ -58,7 +58,7 @@
     "total": null
   },
   "outcome": {
-    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR as printed (Track A: the verdict for agent B). store_validated, decision_sha256, init_attempts, descriptor_hand_edited: Track B only (protocol 4.3 and 4.6). interpretation_correct is scored with the key in protocol 5.3.",
+    "_comment": "completed: every stop condition of the track held. verdict: PASS | BLOCK | INCONCLUSIVE | ERROR as printed (Track A: the verdict for agent B). store_validated, decision_sha256, init_attempts, descriptor_hand_edited, trials_started: Track B only (protocol 4.3 and 4.6). trials_started: runs/<id>/trials.jsonl exists and is non-empty. interpretation_correct is scored with the key in protocol 5.3.",
     "completed": null,
     "verdict": "",
     "exit_code": null,
@@ -66,11 +66,12 @@
     "decision_sha256": "",
     "init_attempts": null,
     "descriptor_hand_edited": null,
+    "trials_started": null,
     "interpretation_answer": "",
     "interpretation_correct": null
   },
   "comprehension": {
-    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader.",
+    "_comment": "Answered once per reader, on the first track's receipt; on a second-track receipt set answered_on to that file name and leave the rest empty. Answers verbatim; scores per the key in protocol section 5; scorer is not the reader and is a handle only, no personal data.",
     "answered_on": "",
     "scorer": "",
     "answers": {
