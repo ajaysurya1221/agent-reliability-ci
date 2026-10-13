@@ -4,9 +4,9 @@ name: TTFV reference machines
 # GitHub-hosted runners: no checkout, no secrets, no telemetry. Per OS: five cold samples, each
 # with its own fresh, empty uv cache (the case the memo target is about: a first-time user), then
 # two warm samples that reuse the cache the last cold sample filled. Every sample is bounded
-# (SAMPLE_TIMEOUT_S, and the whole loop by TIMING_BUDGET_S, inside the 25-minute job); a sample
-# that hits the bound is killed, kept, and recorded as timed out. The JSON and the timestamped logs
-# are uploaded as an artifact; the orchestrator commits the JSON under
+# (SAMPLE_TIMEOUT_S, and the whole loop by the deadline arithmetic below, inside the 40-minute
+# job); a sample that hits the bound is killed, kept, and recorded as timed out. The JSON and the
+# timestamped logs are uploaded as an artifact; the orchestrator commits the JSON under
 # docs/measurement/reference-machines/. These are machine timings, not receipts, and never count
 # as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
 
@@ -25,17 +25,34 @@ env:
   UV_NO_PROGRESS: "1"
   COLD_SAMPLES: "5"
   WARM_SAMPLES: "2"
-  # Per-sample bound, and a bound on the whole sampling loop that leaves the 25-minute job time
-  # for setup, the JSON and the upload. A sample the loop has no time left for is recorded as
-  # timed out and not started.
+  # Deadline arithmetic (README, "Deadline"). The first step records the job start (date +%s);
+  # the job is killed at JOB_TIMEOUT_S (timeout-minutes: 40). Setup is bounded by its own step
+  # timeouts (setup-python 5 min, uv install 5 min). When the timing step starts it gives the
+  # sampling loop
+  #     budget = min(TIMING_BUDGET_S, JOB_TIMEOUT_S - (now - job_start) - RESERVE_S)
+  # so RESERVE_S (300 s) is always left after sampling for the Python probe, the JSON, the upload
+  # and the final check, however long setup took. TIMING_BUDGET_S (2400 s) is only a ceiling: in a
+  # 40-minute job the remaining time is always smaller, so the loop gets 2100 s minus the setup
+  # time. Each sample is bounded by min(SAMPLE_TIMEOUT_S, time left in the loop): a hang killed at
+  # SAMPLE_TIMEOUT_S is recorded with timeout_reason "sample", a sample cut short by the loop
+  # deadline with "budget", and a sample with under a second left is not started (timed out,
+  # "budget"). What this guarantees: not seven 600 s samples (7 x 600 = 4200 s > 2100 s), but
+  # seven samples of the measured ~225 s (1575 s) plus the 120 s probe and the 300 s reserve fit
+  # when setup takes under 6 minutes (360 + 1575 + 120 + 300 = 2355 s <= 2400 s). After sampling,
+  # the probe (PROBE_TIMEOUT_S) runs only if at least PROBE_MIN_LEFT_S remain before the job
+  # deadline, else it is recorded as skipped. The step timeouts are backstops behind this.
+  JOB_TIMEOUT_S: "2400"
+  RESERVE_S: "300"
   SAMPLE_TIMEOUT_S: "600"
-  TIMING_BUDGET_S: "1200"
+  TIMING_BUDGET_S: "2400"
+  PROBE_TIMEOUT_S: "120"
+  PROBE_MIN_LEFT_S: "180"
 
 jobs:
   reference:
     name: reference machine / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -44,16 +61,28 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Record the job start
+        id: start
+        timeout-minutes: 1
+        run: echo "job_start=$(date +%s)" >> "$GITHUB_OUTPUT"
       - name: Set up Python
+        timeout-minutes: 5
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install uv
+        timeout-minutes: 5
         run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
       - name: Time the demo (five cold samples, then two warm)
+        # Backstop only. The loop ends RESERVE_S before the job deadline (plus the kill/join of a
+        # last timed-out sample, ~10 s) and the probe takes at most 120 s, so this step ends by job
+        # time 2400 - 300 + 10 + 120 s; counted from the step's start that is under 38 minutes.
+        # The job timeout comes first whenever setup took longer than 2 minutes.
+        timeout-minutes: 38
         shell: python
         env:
           OUT_DIR: ${{ runner.temp }}/ttfv-reference
+          JOB_START: ${{ steps.start.outputs.job_start }}
         run: |
           import datetime as dt
           import json
@@ -71,9 +100,26 @@ jobs:
           OUT_DIR = Path(os.environ["OUT_DIR"])
           COLD = int(os.environ["COLD_SAMPLES"])
           WARM = int(os.environ["WARM_SAMPLES"])
-          SAMPLE_TIMEOUT = float(os.environ["SAMPLE_TIMEOUT_S"])
-          DEADLINE = time.monotonic() + float(os.environ["TIMING_BUDGET_S"])
+          SAMPLE_TIMEOUT = int(os.environ["SAMPLE_TIMEOUT_S"])
+          JOB_TIMEOUT = int(os.environ["JOB_TIMEOUT_S"])
+          RESERVE = int(os.environ["RESERVE_S"])
+          TIMING_BUDGET = int(os.environ["TIMING_BUDGET_S"])
+          PROBE_TIMEOUT = int(os.environ["PROBE_TIMEOUT_S"])
+          PROBE_MIN_LEFT = int(os.environ["PROBE_MIN_LEFT_S"])
           assert COLD >= 1 and WARM >= 0
+          try:
+              JOB_START = int(os.environ.get("JOB_START", ""))
+          except ValueError:
+              print("::error title=ttfv-reference::JOB_START is not set: the first step did not run")
+              sys.exit(1)
+
+          # Deadline arithmetic (see the env block): the loop gets what is left of the job after
+          # RESERVE (probe, JSON, upload, final check), capped at TIMING_BUDGET, never negative.
+          before_sampling = time.time() - JOB_START
+          remaining = JOB_TIMEOUT - before_sampling - RESERVE
+          budget = max(0, min(TIMING_BUDGET, int(remaining)))
+          loop_start = time.monotonic()
+          DEADLINE = loop_start + budget
 
 
           def stamp():
@@ -126,6 +172,22 @@ jobs:
 
 
           OUT_DIR.mkdir(parents=True, exist_ok=True)
+          timing = {
+              "job_start": JOB_START,
+              "seconds_before_sampling": round(before_sampling),
+              "budget_seconds_used": budget,
+              "sampling_seconds": None,
+              "seconds_left_after_sampling": None,
+              "python_probe": None,
+          }
+
+
+          def write_timing():
+              (OUT_DIR / "timing.json").write_text(json.dumps(timing) + "\n", encoding="utf-8")
+
+
+          write_timing()  # now, so a crash or a cancelled job still leaves the budget on record
+          print(f"{before_sampling:.0f} s since job start; sampling budget {budget} s", flush=True)
           work = Path(tempfile.mkdtemp(prefix="ttfv-work-"))  # empty, no checkout
           uv_version = subprocess.run(["uv", "--version"], capture_output=True, text=True)
           (OUT_DIR / "uv-version.txt").write_text(uv_version.stdout, encoding="utf-8")
@@ -148,15 +210,22 @@ jobs:
                   sys.exit(1)
               env = {**os.environ, "UV_CACHE_DIR": str(cache)}
               log = OUT_DIR / f"sample-{n}.log"
-              timeout = min(SAMPLE_TIMEOUT, DEADLINE - time.monotonic())
+              # Whole seconds, rounded down, so "budget" is exactly timeout_seconds < SAMPLE_TIMEOUT.
+              timeout = max(0, min(SAMPLE_TIMEOUT, int(DEADLINE - time.monotonic())))
               start = stamp()
               if timeout < 1:
-                  log.write_text(f"{start} [ttfv-reference] not started: timing budget used up\n")
-                  code, timed_out, started, timeout = None, True, False, 0.0
+                  message = f"{start} [ttfv-reference] not started: timing budget used up\n"
+                  log.write_text(message, encoding="utf-8")
+                  code, timed_out, started = None, True, False
               else:
                   cmd = ["uvx", "--from", PACKAGE, "arci", "demo"]
                   code, timed_out = run(cmd, log, env, work, timeout)
                   started = True
+              # "sample": the per-sample limit killed a hang; "budget": the loop deadline cut the
+              # sample short (or left it no time to start). Both are failures.
+              reason = None
+              if timed_out:
+                  reason = "sample" if timeout >= SAMPLE_TIMEOUT else "budget"
               record = {
                   "sample": n,
                   "uv_cache": kind,
@@ -165,35 +234,56 @@ jobs:
                   "started": started,
                   "exit_code": code,
                   "timed_out": timed_out,
-                  "timeout_seconds": round(timeout),
+                  "timeout_reason": reason,
+                  "timeout_seconds": timeout,
               }
               # Appended per sample, so a later crash or a cancelled job keeps what was measured.
               with rows.open("a", encoding="utf-8") as f:
                   f.write(json.dumps(record) + "\n")
-              state = f"timed out after {timeout:g} s" if timed_out else f"exit {code}"
+              if not started:
+                  state = "not started (timing budget used up)"
+              elif timed_out:
+                  cause = "per-sample limit" if reason == "sample" else "loop budget"
+                  state = f"timed out after {timeout} s ({cause})"
+              else:
+                  state = f"exit {code}"
               print(f"sample {n} ({kind}): {state}", flush=True)
 
+          timing["sampling_seconds"] = round(time.monotonic() - loop_start)
+          left = JOB_TIMEOUT - (time.time() - JOB_START)
+          timing["seconds_left_after_sampling"] = round(left)
+
           # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
-          probe = ["uvx", "--from", PACKAGE, "python", "-c", "import platform; print(platform.python_version())"]
-          try:
-              done = subprocess.run(
-                  probe,
-                  capture_output=True,
-                  text=True,
-                  env={**os.environ, "UV_CACHE_DIR": str(warm_cache)},
-                  cwd=work,
-                  timeout=120,
-              )
-              python = done.stdout if done.returncode == 0 else ""
-          except subprocess.TimeoutExpired:
-              python = ""
+          # Only if the job deadline leaves room for it and for what follows; else skipped.
+          python = ""
+          if left < PROBE_MIN_LEFT:
+              timing["python_probe"] = "skipped"
+              print(f"python probe skipped: {left:.0f} s left before the job deadline", flush=True)
+          else:
+              probe = ["uvx", "--from", PACKAGE, "python", "-c", "import platform; print(platform.python_version())"]
+              try:
+                  done = subprocess.run(
+                      probe,
+                      capture_output=True,
+                      text=True,
+                      env={**os.environ, "UV_CACHE_DIR": str(warm_cache)},
+                      cwd=work,
+                      timeout=PROBE_TIMEOUT,
+                  )
+                  python = done.stdout if done.returncode == 0 else ""
+                  timing["python_probe"] = "ran" if done.returncode == 0 else "failed"
+              except subprocess.TimeoutExpired:
+                  timing["python_probe"] = "timed out"
           (OUT_DIR / "python.txt").write_text(python, encoding="utf-8")
+          write_timing()
       - name: Parse the logs into reference-${{ matrix.os }}.json
         if: always()
+        timeout-minutes: 1
         shell: python
         env:
           OUT_DIR: ${{ runner.temp }}/ttfv-reference
           OUT_JSON: reference-${{ matrix.os }}.json
+          JOB_START: ${{ steps.start.outputs.job_start }}
           REF_RUNNER_OS: ${{ runner.os }}
           REF_RUNNER_ARCH: ${{ runner.arch }}
           REF_RUNNER_LABEL: ${{ matrix.os }}
@@ -201,6 +291,10 @@ jobs:
           REF_RUN_ATTEMPT: ${{ github.run_attempt }}
           REF_SHA: ${{ github.sha }}
         run: |
+          # Never raises on what the timing step left behind: a journal cut off mid-line, a row
+          # that is not a record, a missing timing.json. Every complete row is kept; every other
+          # non-blank line becomes one {"sample": null, "incomplete": true, "raw_prefix": ...}
+          # entry; every designed sample with no complete row becomes a "missing" entry.
           import json
           import os
           from pathlib import Path
@@ -212,6 +306,9 @@ jobs:
               "demo_verdict": "VERDICT:",
               "all_steps_held": "All six steps held",
           }
+          env = os.environ.get
+          COLD = int(env("COLD_SAMPLES", "0"))
+          EXPECTED = COLD + int(env("WARM_SAMPLES", "0"))
 
 
           def text(name):
@@ -219,6 +316,17 @@ jobs:
               if not path.is_file():
                   return None
               return path.read_text(encoding="utf-8", errors="replace").strip() or None
+
+
+          def loads(raw):
+              try:
+                  return json.loads(raw)
+              except (ValueError, RecursionError):
+                  return None
+
+
+          def is_int(value):
+              return isinstance(value, int) and not isinstance(value, bool)
 
 
           def first_stamps(log):
@@ -234,29 +342,68 @@ jobs:
 
 
           rows = out_dir / "samples.jsonl"
-          samples = []
-          for row in rows.read_text(encoding="utf-8").splitlines() if rows.is_file() else []:
-              record = json.loads(row)
-              log = out_dir / f"sample-{record['sample']}.log"
-              stamps = first_stamps(log)
-              if record["timed_out"]:
-                  stamps["all_steps_held"] = None  # killed: never counts as held
-              samples.append(
-                  {
-                      "sample": record["sample"],
-                      "uv_cache": record["uv_cache"],
-                      "command_start": record["command_start"],
-                      **stamps,
-                      "exit_code": record["exit_code"],
-                      "log": log.name,
-                      "timed_out": record["timed_out"],
-                      "started": record["started"],
-                      "timeout_seconds": record["timeout_seconds"],
-                      "uv_cache_entries_at_start": record["uv_cache_entries_at_start"],
-                  }
-              )
+          samples, incomplete = [], []
+          if rows.is_file():
+              with rows.open(encoding="utf-8", errors="replace") as journal:
+                  for raw in journal:
+                      line = raw.rstrip("\r\n")
+                      if not line.strip():
+                          continue
+                      record = loads(line)
+                      n = record.get("sample") if isinstance(record, dict) else None
+                      if not is_int(n):
+                          incomplete.append({"sample": None, "incomplete": True, "raw_prefix": line[:80]})
+                          continue
+                      log = out_dir / f"sample-{n}.log"
+                      stamps = first_stamps(log)
+                      if record.get("timed_out") is True:
+                          stamps["all_steps_held"] = None  # killed: never counts as held
+                      samples.append(
+                          {
+                              "sample": n,
+                              "uv_cache": record.get("uv_cache"),
+                              "command_start": record.get("command_start"),
+                              **stamps,
+                              "exit_code": record.get("exit_code"),
+                              "log": log.name,
+                              "timed_out": record.get("timed_out"),
+                              "timeout_reason": record.get("timeout_reason"),
+                              "started": record.get("started"),
+                              "missing": False,
+                              "timeout_seconds": record.get("timeout_seconds"),
+                              "uv_cache_entries_at_start": record.get("uv_cache_entries_at_start"),
+                          }
+                      )
+          # A designed sample with no complete journal row: the timing step died, was cancelled or
+          # cut its row off. It is kept as a failure, never dropped.
+          seen = {s["sample"] for s in samples}
+          for n in range(1, EXPECTED + 1):
+              if n not in seen:
+                  log = out_dir / f"sample-{n}.log"
+                  samples.append(
+                      {
+                          "sample": n,
+                          "uv_cache": "cold" if n <= COLD else "warm",
+                          "command_start": None,
+                          **dict.fromkeys(MARKERS),
+                          "exit_code": None,
+                          "log": log.name if log.is_file() else None,
+                          "timed_out": False,
+                          "timeout_reason": None,
+                          "started": False,
+                          "missing": True,
+                          "timeout_seconds": None,
+                          "uv_cache_entries_at_start": None,
+                      }
+                  )
+          samples.sort(key=lambda s: s["sample"])
 
-          env = os.environ.get
+          timing = loads(text("timing.json") or "null")
+          timing = timing if isinstance(timing, dict) else {}
+          job_start = timing.get("job_start")
+          if not is_int(job_start):
+              job_start = loads(env("JOB_START") or "null")
+              job_start = job_start if is_int(job_start) else None
           doc = {
               "kind": "reference-machine timing",
               "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
@@ -279,20 +426,32 @@ jobs:
               },
               "timestamp_resolution_seconds": 1,
               "design": {
-                  "cold_samples": int(env("COLD_SAMPLES", "0")),
-                  "warm_samples": int(env("WARM_SAMPLES", "0")),
+                  "cold_samples": COLD,
+                  "warm_samples": EXPECTED - COLD,
                   "cold": "each cold sample has its own new, empty UV_CACHE_DIR",
                   "warm": "warm samples reuse the cache the last cold sample filled",
                   "sample_timeout_seconds": int(env("SAMPLE_TIMEOUT_S", "0")),
                   "timing_budget_seconds": int(env("TIMING_BUDGET_S", "0")),
+                  "job_timeout_seconds": int(env("JOB_TIMEOUT_S", "0")),
+                  "reserve_seconds": int(env("RESERVE_S", "0")),
+                  "job_start": job_start,
+                  "seconds_before_sampling": timing.get("seconds_before_sampling"),
+                  "budget_seconds_used": timing.get("budget_seconds_used"),
+                  "sampling_seconds": timing.get("sampling_seconds"),
+                  "seconds_left_after_sampling": timing.get("seconds_left_after_sampling"),
+                  "python_probe": timing.get("python_probe"),
+                  "probe_timeout_seconds": int(env("PROBE_TIMEOUT_S", "0")),
+                  "probe_min_left_seconds": int(env("PROBE_MIN_LEFT_S", "0")),
               },
-              "samples": samples,
+              "journal_incomplete": bool(incomplete),
+              "samples": samples + incomplete,
           }
           out = out_dir / os.environ["OUT_JSON"]
           out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
           print(out.read_text(encoding="utf-8"))
       - name: Upload the JSON and the logs
         if: always()
+        timeout-minutes: 2
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ttfv-reference-${{ matrix.os }}
@@ -300,6 +459,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Fail if any sample did not hold
+        timeout-minutes: 1
         shell: python
         env:
           OUT_JSON: ${{ runner.temp }}/ttfv-reference/reference-${{ matrix.os }}.json
@@ -309,18 +469,45 @@ jobs:
           import sys
 
           with open(os.environ["OUT_JSON"], encoding="utf-8") as f:
-              samples = json.load(f)["samples"]
+              doc = json.load(f)
+          samples = [s for s in doc["samples"] if s.get("incomplete") is not True]
           expected = int(os.environ["COLD_SAMPLES"]) + int(os.environ["WARM_SAMPLES"])
-          bad = [
-              s["sample"]
-              for s in samples
-              if s["timed_out"] or s["exit_code"] != 0 or not s["all_steps_held"]
-          ]
-          timed_out = [s["sample"] for s in samples if s["timed_out"]]
-          if len(samples) != expected or bad:
-              print(
-                  f"::error title=ttfv-reference::{len(samples)} of {expected} samples; "
-                  f"not held: {bad}; timed out: {timed_out}"
+
+
+          def held(s):
+              return (
+                  s.get("started") is True
+                  and s.get("timed_out") is False
+                  and s.get("missing") is not True
+                  and s.get("exit_code") == 0
+                  and bool(s.get("all_steps_held"))
               )
+
+
+          def which(test):
+              return [s.get("sample") for s in samples if test(s)]
+
+
+          bad = which(lambda s: not held(s))
+          # A hang killed at the per-sample limit, a sample cut short by the loop budget, and a
+          # sample never started are reported apart; all three are failures.
+          hung = which(lambda s: s.get("timeout_reason") == "sample")
+          cut = which(lambda s: s.get("timeout_reason") == "budget" and s.get("started") is True)
+          not_started = which(lambda s: s.get("started") is False and s.get("missing") is not True)
+          missing = which(lambda s: s.get("missing") is True)
+          incomplete = doc.get("journal_incomplete") is True
+          if len(samples) != expected or bad or incomplete:
+              message = f"{len(samples)} of {expected} samples; not held: {bad}"
+              for label, found in (
+                  ("timed out (hang)", hung),
+                  ("cut off by budget", cut),
+                  ("not started", not_started),
+                  ("missing", missing),
+              ):
+                  if found:
+                      message += f"; {label}: {found}"
+              if incomplete:
+                  message += "; journal incomplete"
+              print(f"::error title=ttfv-reference::{message}")
               sys.exit(1)
           print(f"all {expected} samples held")
