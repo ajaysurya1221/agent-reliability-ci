@@ -1,0 +1,3 @@
+SMOKE DESIGN: n_per_arm=1 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper–Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK
+INCONCLUSIVE at n_per_arm=1 is the expected smoke result; choose a confirmatory N with arci plan before re-running.
+run store: /Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03

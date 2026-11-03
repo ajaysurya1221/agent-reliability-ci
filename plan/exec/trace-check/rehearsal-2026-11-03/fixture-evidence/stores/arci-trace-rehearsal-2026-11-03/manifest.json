@@ -1,0 +1,56 @@
+{
+  "record_sha256": "1dfcd7f8a34eefacc53af85f5a2379d58f37b8dd4cbcea7366f2b1b23f5536b0",
+  "schema_version": "arci/0.5",
+  "experiment_id": "arci-trace-rehearsal-2026-11-03",
+  "created_at": "",
+  "task_id": "confirm-inventory-order",
+  "task": {
+    "order_id": "order-7",
+    "sku": "widget",
+    "quantity": 2,
+    "stock": 10
+  },
+  "toolset": "arci.demo.world:make_world",
+  "mcp_server": null,
+  "decisions": null,
+  "contract": {
+    "oracle": "arci.demo.world:oracle",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "agent_a",
+    "agent": "arci.demo.agents:agent_a",
+    "command": null,
+    "candidate_id": "baseline-a"
+  },
+  "candidate": {
+    "label": "variant",
+    "agent": "rehearsal_fixture:variant",
+    "command": null,
+    "candidate_id": "rehearsal-candidate"
+  },
+  "conditions": [
+    {
+      "condition_id": "clean",
+      "faults": []
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 1,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 12000,
+  "budgets": {
+    "max_tool_calls": 10,
+    "max_model_steps": 10,
+    "max_seconds": 15.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}
