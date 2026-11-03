@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Added:** read-only `arci trace-check BASE_RUN BASE_TRIAL CAND_RUN CAND_TRIAL`
+  compares normalized tool/result events and terminal state across compatible native
+  stores: `MATCH`/0, `DRIFT`/1, `INVALID`/3. Text and `arci-trace-check/1` JSON separate
+  diagnostics from re-derived statistical verdicts. The offline recipe preserves
+  both exits in CI; installed-wheel checks exercise all three statuses. No schema,
+  statistical, replay or historical-evidence changes. Not included in v0.8.0.
 - **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
   stores are unchanged.
 - **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason

@@ -120,6 +120,19 @@ An agent crash, timeout, blown budget or uncaught tool fault is a `FAIL`. A brok
 injector, grader or event sink is an `ERROR`, and it invalidates the experiment instead of quietly
 leaving the denominator. `arci replay` uses its own codes: 0 reproduced, 1 not reproduced, 3 invalid.
 
+## Compare traces across runs (main / unreleased)
+
+`arci trace-check BASE_RUN BASE_TRIAL CAND_RUN CAND_TRIAL` compares selected recorded
+tool behavior across compatible native stores and reports `MATCH` (0), `DRIFT` (1),
+or `INVALID` (3). It reads sealed records without executing agents; `--format json`
+includes source hashes, the re-derived statistical verdicts, and the first difference.
+
+This is a diagnostic result: a match does not establish reliability or successful replay,
+and drift does not prove a regression. The [offline recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/trace-check.md)
+shows the missing-retry example and preserves both statistical and comparison exits in CI.
+**Available on main, unreleased:** PyPI and Action tag v0.8.0 do not contain this command.
+Non-author adoption remains unmeasured.
+
 ## How it works
 
 <picture>

@@ -19,6 +19,11 @@ fi
 # Absolute, so a relative $PYTHON (.venv/bin/python) still resolves after the cd below.
 python="$("${PYTHON:-python3}" -c 'import sys; print(sys.executable)')"
 wheel="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+trace_smoke="$(cd "$(dirname "$0")" && pwd)/trace_check_smoke.py"
+
+# No inherited checkout import paths may satisfy this installed-wheel test.
+unset PYTHONPATH
+export PYTHONSAFEPATH=1
 
 tmpbase=${TMPDIR:-/tmp}
 root="$(mktemp -d "${tmpbase%/}/arci-wheel-smoke.XXXXXX")"
@@ -74,13 +79,16 @@ timed "arci --help" arci --help
 timed "python -m arci --help" python -m arci --help
 
 # The demo's run stores go to a temp dir under $root (removed on exit), never to the cwd.
-echo "wheel_smoke: arci demo --workers 4"
+echo "wheel_smoke: arci demo --workers 4 --keep DEMO_DIR"
 start=$(now)
-if ! TMPDIR="$root/tmp" arci demo --workers 4 | tee "$root/demo.log"; then
+if ! TMPDIR="$root/tmp" arci demo --workers 4 --keep "$root/demo" | tee "$root/demo.log"; then
   fail "arci demo --workers 4 exited non-zero"
 fi
 record "arci demo --workers 4" "$start" "$(now)"
 grep -qx 'All six steps held.' "$root/demo.log" || fail "arci demo did not print 'All six steps held.'"
+
+timed "installed trace-check statuses and read-only stores" \
+  "$venv/bin/python" -P "$trace_smoke" "$root/demo"
 
 leftover="$(ls -A "$work")"
 [ -z "$leftover" ] || fail "the working directory is not empty after the demo: $leftover"
