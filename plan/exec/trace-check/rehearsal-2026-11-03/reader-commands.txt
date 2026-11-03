@@ -1,0 +1,155 @@
+# Reader command ledger
+
+Automated non-author usability QA. Commands below were actually executed. Setup reads and independent CLI cases were batched where possible; listing is grouped by purpose, not a claim about exact interleaving. Shell was zsh. No recorded command, agent, oracle, replay, or gate was executed. All CLI uses cleared PYTHONPATH and the assigned installed-wheel interpreter with -P. The JSON scripts used only Python standard-library modules.
+
+Clock tool readings: 2026-11-03 14:13:47 UTC (start), 14:15:00 UTC, 14:15:29 UTC, 2026-11-03 14:16:10 UTC (observation end). Clock calls use clock__curr_time({}); they are not shell commands.
+
+1. Setup read; cwd=/Users/ajay/Developer/.arci-worktrees/trace-check; exit 0
+
+pwd
+
+2. Repository instructions; same cwd; exit 0
+
+cat AGENTS.md
+
+3. Memory search; cwd=/Users/ajay/Developer; exit 1 (no hits)
+
+rg -n 'trace-check' /Users/ajay/.codex/memories/MEMORY.md
+
+4. Case assignment; repo cwd; exit 0
+
+cat plan/exec/trace-check/rehearsal-2026-11-03/cases.json
+
+5. CLI help; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check --help
+
+6. Allowed recipe; repo cwd; exit 0
+
+cat docs/recipes/trace-check.md
+
+7. Instruction discovery only; repo cwd; exit 1 (no nested AGENTS.md)
+
+rg --files -g AGENTS.md plan docs
+
+8. Default trace output case-1; cwd=/tmp; exit 1
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50 clean:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50 clean:00000:candidate
+
+9. Default trace output case-2; cwd=/tmp; exit 1
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03 clean:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03 clean:00000:candidate
+
+10. Default trace output case-3; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-50 provider_down:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200 provider_down:00000:baseline
+
+11. JSON trace output case-1; cwd=/tmp; exit 1
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50 clean:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50 clean:00000:candidate --format json
+
+12. JSON trace output case-2; cwd=/tmp; exit 1
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03 clean:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03 clean:00000:candidate --format json
+
+13. JSON trace output case-3; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P -m arci trace-check /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-50 provider_down:00000:baseline /Users/ajay/Developer/.arci-worktrees/trace-check/docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200 provider_down:00000:baseline --format json
+
+14. Run-store immediate filename listing only; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P - <<'PY'
+import json
+from pathlib import Path
+root = Path('/Users/ajay/Developer/.arci-worktrees/trace-check')
+cases = json.loads((root / 'plan/exec/trace-check/rehearsal-2026-11-03/cases.json').read_text())
+seen = set()
+for case in cases:
+    for key in ('base_run', 'candidate_run'):
+        run = root / case[key]
+        if run in seen:
+            continue
+        seen.add(run)
+        print(str(run))
+        print('\n'.join(sorted(p.name + ('/' if p.is_dir() else '') for p in run.iterdir())))
+PY
+
+15. Selected raw trial dump; cwd=/tmp; exit 0; tool output was truncated
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P - <<'PY'
+import json
+from pathlib import Path
+root = Path('/Users/ajay/Developer/.arci-worktrees/trace-check')
+cases = json.loads((root / 'plan/exec/trace-check/rehearsal-2026-11-03/cases.json').read_text())
+for case in cases:
+    print('CASE', case['case'])
+    for side, run_key, trial_key in [('baseline', 'base_run', 'base_trial'), ('candidate', 'candidate_run', 'candidate_trial')]:
+        path = root / case[run_key] / 'trials.jsonl'
+        records = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        selected = [record for record in records if record.get('trial_id') == case[trial_key]]
+        print(side, 'selected_count', len(selected))
+        for record in selected:
+            print(json.dumps(record, indent=2, sort_keys=True))
+PY
+
+16. Targeted event/terminal read and source-file hashes; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+root = Path('/Users/ajay/Developer/.arci-worktrees/trace-check')
+cases = json.loads((root / 'plan/exec/trace-check/rehearsal-2026-11-03/cases.json').read_text())
+for case in cases:
+    print('CASE', case['case'])
+    for side, run_key, trial_key in [('baseline', 'base_run', 'base_trial'), ('candidate', 'candidate_run', 'candidate_trial')]:
+        run = root / case[run_key]
+        manifest_bytes = (run / 'manifest.json').read_bytes()
+        manifest = json.loads(manifest_bytes)
+        trial_bytes = (run / 'trials.jsonl').read_bytes()
+        record = next(json.loads(line) for line in trial_bytes.splitlines() if json.loads(line).get('trial_id') == case[trial_key])
+        print(side, json.dumps({'manifest_file_sha256': hashlib.sha256(manifest_bytes).hexdigest(), 'manifest_declared_hash_fields': {k:v for k,v in manifest.items() if 'sha256' in k}, 'trials_file_sha256': hashlib.sha256(trial_bytes).hexdigest(), 'selected_record_sha256': record['record_sha256']}, sort_keys=True))
+        print('events', json.dumps([{'seq': e['seq'], 'kind': e['kind'], 'tool': e['payload'].get('tool'), 'arguments': (e['payload'].get('arguments') if e['payload'].get('tool') != 'decision:systemone' else {'keys': sorted(e['payload'].get('arguments', {}))}), 'result': e['payload'].get('result')} for e in record['events'] if e['kind'] in ('tool_start', 'agent_result')], sort_keys=True))
+        print('terminal', json.dumps({k:record[k] for k in ('outcome', 'termination', 'agent_claimed_success', 'contract', 'final_state')}, sort_keys=True))
+PY
+
+17. Case-2 targeted comparison of documented fields; cwd=/tmp; exit 0
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P - <<'PY'
+import json
+from pathlib import Path
+root = Path('/Users/ajay/Developer/.arci-worktrees/trace-check')
+case = json.loads((root / 'plan/exec/trace-check/rehearsal-2026-11-03/cases.json').read_text())[1]
+rows = [json.loads(line) for line in (root / case['base_run'] / 'trials.jsonl').read_text().splitlines() if line.strip()]
+base = next(row for row in rows if row['trial_id'] == case['base_trial'])
+cand = next(row for row in rows if row['trial_id'] == case['candidate_trial'])
+def selected_events(row):
+    return [{'kind': event['kind'], 'payload': {key: value for key, value in event['payload'].items() if key != 'call_id'}} for event in row['events'] if event['kind'] in ('tool_start', 'tool_finish', 'agent_result')]
+b = selected_events(base)
+c = selected_events(cand)
+print('selected_event_counts', len(b), len(c))
+print('first_four_tool_events_equal', b[:4] == c[:4])
+print('baseline_agent_result', json.dumps(b[4], sort_keys=True))
+print('candidate_agent_result', json.dumps(c[4], sort_keys=True))
+terminal_keys = ['outcome', 'termination', 'agent_claimed_success', 'contract', 'failure_fingerprint', 'failure_detail', 'final_state']
+print('documented_terminal_fields_equal', {k:base[k] for k in terminal_keys} == {k:cand[k] for k in terminal_keys})
+PY
+
+Report and this ledger were written only through apply_patch to the two assigned files; that write is documentation, not a source-store command. Final file readback, if performed, is reported in the final agent message.
+
+18. Final owned-file readback; cwd=/tmp; exit 0. Clock tool concurrently returned 2026-11-03 14:18:05 UTC. The readback preceded the appended filing receipt and this command entry, so the printed file hashes apply to the initial report/ledger, not these append-only additions.
+
+env -u PYTHONPATH /var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-trace-installed-5dpunht_/venv/bin/python -P - <<'PY'
+import hashlib
+from pathlib import Path
+root = Path('/Users/ajay/Developer/.arci-worktrees/trace-check/plan/exec/trace-check/rehearsal-2026-11-03')
+for name in ('reader-report.md', 'reader-commands.txt'):
+    path = root / name
+    data = path.read_bytes()
+    print(name, 'bytes', len(data), 'lines', len(data.splitlines()), 'sha256', hashlib.sha256(data).hexdigest())
+report = (root / 'reader-report.md').read_text()
+for required in ('143 seconds', 'Case-1:', 'Case-2:', 'Case-3:', 'Assistance requests: **none**', 'Human consent', 'first_difference'):
+    assert required in report, required
+print('report required-field readback: PASS')
+PY
+

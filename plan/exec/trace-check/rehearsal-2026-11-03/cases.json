@@ -1,0 +1,23 @@
+[
+  {
+    "case": "case-1",
+    "base_run": "docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50",
+    "base_trial": "clean:00000:baseline",
+    "candidate_run": "docs/results/guardrail/2026-10-05/guardrail-live-c-ask-clean-50",
+    "candidate_trial": "clean:00000:candidate"
+  },
+  {
+    "case": "case-2",
+    "base_run": "plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03",
+    "base_trial": "clean:00000:baseline",
+    "candidate_run": "plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03",
+    "candidate_trial": "clean:00000:candidate"
+  },
+  {
+    "case": "case-3",
+    "base_run": "docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-50",
+    "base_trial": "provider_down:00000:baseline",
+    "candidate_run": "docs/results/guardrail/2026-10-05/guardrail-live-b-ask-provider_down-200",
+    "candidate_trial": "provider_down:00000:baseline"
+  }
+]

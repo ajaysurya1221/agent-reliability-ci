@@ -84,6 +84,20 @@ source may be `null`. `first_difference` is `null` for `MATCH`/`INVALID`; for
 `DRIFT` it gives the zero-based normalized step, a JSON Pointer within that step,
 event kinds, and full hashes of the differing values. A missing side has a null
 kind/hash, distinct from a recorded JSON null. Payloads are not dumped by default.
+`<missing>` in text, or a null kind/hash in JSON, means the **pointed value** is
+absent; its containing event may still exist.
+
+To name the changed behavior, inspect the selected trial's `events` in
+`trials.jsonl` at the reported normalized step. Count only `tool_start`,
+`tool_finish`, and `agent_result` events, from zero; the final step is the terminal
+record assembled from the trial's outcome and final-state fields. Read the tool
+name and the indicated field on each side. The first pointer can name an argument
+key even when the tool itself changed, because fields are compared in sorted key
+order. Default hashes locate the difference without exposing raw values; targeted
+record inspection is still needed to interpret those values. Reading a recorded
+command or endpoint declaration does not require executing or contacting it.
+For a terminal step, `/payload/outcome` refers to the selected trial's `outcome`,
+and the other terminal fields follow the same mapping.
 
 ## 3. Keep statistical and trace exits independent in CI
 
