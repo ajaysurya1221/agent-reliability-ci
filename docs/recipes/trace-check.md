@@ -113,10 +113,12 @@ matching an additional CI requirement.
 ## Comparison boundary
 
 - **Scenario:** task payload, selected seed, ordered fault specifications,
-  contract, budgets, Python/command execution kind, environment configuration,
+  contract, budgets, Python/command execution kind, declared toolset/MCP-server configuration,
   full decision configuration, and declared fixture identity must agree. Pinned
   decision models/providers cannot change. Experiment IDs, labels, agent identity,
-  and statistical designs may differ. No compatibility override is provided.
+  and statistical designs may differ. Agent command arguments/environment belong
+  to the variable agent identity; ambient process state is not authenticated.
+  No compatibility override is provided.
 - **View:** ordered `tool_start`, `tool_finish`, and optional `agent_result`
   payloads, followed by the terminal outcome, termination, claimed success,
   contract result, failure fingerprint/detail, and final state. Event-wrapper

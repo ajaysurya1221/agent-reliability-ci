@@ -62,6 +62,7 @@ def check_traces(
     candidate_trial_id: str,
 ) -> TraceCheckResult: ...
 
+
 def render_trace_check(
     result: TraceCheckResult, *, output_format: Literal["text", "json"] = "text"
 ) -> str: ...

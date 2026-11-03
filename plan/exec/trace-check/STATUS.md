@@ -9,8 +9,8 @@
 |---|---|
 | 1 Brief and baseline | COMPLETE |
 | 2 Core comparator | IN PROGRESS |
-| 3 CLI and installed-package checks | IN PROGRESS |
-| 4 Recipe and documentation | PENDING |
+| 3 CLI and installed-package checks | IMPLEMENTED; review/package gates pending |
+| 4 Recipe and documentation | IMPLEMENTED; independent review pending |
 | 5 Review, full verification, GitHub delivery | PENDING |
 
 ## Preflight conflict scan
@@ -36,3 +36,18 @@ Ruling: use this approved persistent record directory as the skill ledger/worksp
 do not delete it at closeout because historical execution evidence must be retained.
 
 Baseline verified: all 53 frozen files OK; 18 diff/gate tests pass; interpreter and arci imports resolve inside the worktree. Remote main equals the base; sprint/trace-check does not exist remotely.
+
+Integration: CLI and legacy CLI tests pass (38); all 12 documented gate/trace exit
+compositions pass. Actual offline recipe's three Bash blocks executed successfully:
+demo counts match the archived fixture, cross-run A/A MATCH retains candidate-run
+BLOCK, and A/B DRIFT identifies the missing retry. This is maintainer verification,
+not a non-author adoption receipt.
+
+Preservation check: all 228 baseline-protected files byte-identical; contracted
+README first screen unchanged. Core event framing was tightened during integration:
+start fields match selected trial, end payload is empty, optional result is singular.
+Missing located subtree uses null kind and hash per the locked JSON interface.
+
+The fixed reviewer role could not start because its configured model is unavailable
+on this account. A fresh independent default agent received the same read-only
+review brief; no review success is inferred from the failed dispatch.
