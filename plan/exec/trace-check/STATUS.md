@@ -8,10 +8,10 @@
 | Task | State |
 |---|---|
 | 1 Brief and baseline | COMPLETE |
-| 2 Core comparator | IN PROGRESS |
-| 3 CLI and installed-package checks | IMPLEMENTED; review/package gates pending |
-| 4 Recipe and documentation | IMPLEMENTED; independent review pending |
-| 5 Review, full verification, GitHub delivery | PENDING |
+| 2 Core comparator | IMPLEMENTED; independent review ACCEPT |
+| 3 CLI and installed-package checks | IMPLEMENTED; independent review ACCEPT; local installed probe passed |
+| 4 Recipe and documentation | COMPLETE; actual recipe passed; adoption unmeasured |
+| 5 Review, full verification, GitHub delivery | Branch review ACCEPT; final hosted/full-suite/merge receipt in PR 15 |
 
 ## Preflight conflict scan
 
@@ -51,3 +51,11 @@ Missing located subtree uses null kind and hash per the locked JSON interface.
 The fixed reviewer role could not start because its configured model is unavailable
 on this account. A fresh independent default agent received the same read-only
 review brief; no review success is inferred from the failed dispatch.
+
+Implementation frozen at `84878c1`. Independent task reviews and final whole-branch
+review all ACCEPT with no open findings. Full review receipts: `reports/reviews.md`.
+Local wheel probe returned MATCH/0, DRIFT/1, INVALID/3, checked package origin and
+source/summary preservation. Archived strict reproduction passed all six checks.
+PR: https://github.com/ajaysurya1221/agent-reliability-ci/pull/15
+Final exact-candidate and post-merge receipts live in that PR body, as described
+in `REPORT.md`; pending hosted results are not silently treated as successful.
