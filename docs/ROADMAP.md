@@ -51,6 +51,16 @@ measurement protocol, and the README's first screen. Also released: `arci plan`,
 `arci report --pass-k` and the platform-portability fixes that had been on `main` since v0.7.0.
 See [CHANGELOG.md](../CHANGELOG.md).
 
+## Available on main, unreleased
+
+`arci trace-check` compares one selected trace from each of two compatible native
+run stores. It returns `MATCH`/0, `DRIFT`/1 or `INVALID`/3, with source hashes and
+re-derived gate verdicts. It does not change statistical decisions or replay.
+See the [offline recipe and adoption worksheet](recipes/trace-check.md).
+Non-author adoption and seven-day retention remain unmeasured. PyPI and Action
+tag v0.8.0 do not include this command; importers and snapshot-update workflows
+remain proposals.
+
 ## Next, most valuable first
 
 1. **Per-request pacing through parent IPC**, replacing the documented divide-by-k trial-start

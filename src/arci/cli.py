@@ -69,6 +69,7 @@ from arci.schema import (
     Verdict,
 )
 from arci.storage import load_run
+from arci.trace_check import check_traces, render_trace_check
 
 
 class CliError(ValueError):
@@ -680,6 +681,20 @@ def _parser() -> _Parser:
     diff.add_argument("trial_b", metavar="TRIAL_B")
     diff.add_argument("--all-steps", action="store_true")
 
+    trace_check = commands.add_parser(
+        "trace-check",
+        help="compare selected observed traces from two native run stores",
+        description=(
+            "Read-only diagnostic comparison: MATCH (exit 0), DRIFT (exit 1), or INVALID "
+            "(exit 3). This is not a statistical verdict, authentication, or replay verification."
+        ),
+    )
+    trace_check.add_argument("baseline_run", metavar="BASE_RUN")
+    trace_check.add_argument("baseline_trial_id", metavar="BASE_TRIAL")
+    trace_check.add_argument("candidate_run", metavar="CAND_RUN")
+    trace_check.add_argument("candidate_trial_id", metavar="CAND_TRIAL")
+    trace_check.add_argument("--format", choices=("text", "json"), default="text")
+
     minimize = commands.add_parser("minimize", help="minimize a failing trial's faults")
     minimize.add_argument("run_dir", metavar="RUN_DIR")
     minimize.add_argument("trial_id", metavar="TRIAL_ID")
@@ -823,6 +838,19 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["trial_b"]),
             cast(bool, values["all_steps"]),
         )
+    if command == "trace-check":
+        result = check_traces(
+            cast(str, values["baseline_run"]),
+            cast(str, values["baseline_trial_id"]),
+            cast(str, values["candidate_run"]),
+            cast(str, values["candidate_trial_id"]),
+        )
+        _print(
+            render_trace_check(
+                result, output_format=cast(Literal["text", "json"], values["format"])
+            )
+        )
+        return result.exit_code
     if command == "minimize":
         return _cmd_minimize(
             cast(str, values["run_dir"]),
