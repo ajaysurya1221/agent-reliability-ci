@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v0.9.0 (2026-11-06)
+## v1.0.0 (2026-11-06)
 
 - **Added:** `arci triage RUN_DIR [--trial CANDIDATE_ID] [--format text|json]`
   selects up to three representative candidate failure groups and identifies the
@@ -17,7 +17,7 @@
   stores: `MATCH`/0, `DRIFT`/1, `INVALID`/3. Text and `arci-trace-check/1` JSON separate
   diagnostics from re-derived statistical verdicts. The offline recipe preserves
   both exits in CI; installed-wheel checks exercise all three statuses. No schema,
-  statistical, replay or historical-evidence changes. First released in v0.9.0.
+  statistical, replay or historical-evidence changes. First released in v1.0.0.
 - **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
   stores are unchanged.
 - **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason

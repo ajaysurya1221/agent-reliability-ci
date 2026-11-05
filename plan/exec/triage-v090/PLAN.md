@@ -143,3 +143,13 @@ unresolved gates leave PR unmerged or version untagged. Never weaken checks.
 Fallback releases already-merged trace-check with accurate installation/availability
 docs and the same gates. It does not claim triage completed. No human participant
 or outreach is required. No claim of adoption, retention or superiority follows.
+
+## Approved release-target amendment — 2026-11-05
+
+After implementation and initial agent QA, the operator requested a major release
+and instructed the orchestrator to pivot if the workflow reinvents an existing
+solution without useful value. Target is now **v1.0.0**, subject to an independent
+primary-source overlap review. The two-day budget, feature boundary and release
+gates remain. The original v0.9.0 candidate/QA records are retained unchanged; they
+are prepublication evidence, not a released version. Only current packaging,
+release metadata and the new unpublished release ADR are revised/re-frozen.

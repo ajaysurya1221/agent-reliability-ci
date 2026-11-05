@@ -1,0 +1,33 @@
+Statistical gate: BLOCK (exit 1).
+Configuration: alpha 0.05; delta 0.1; method clopper_pearson; planned pairs/arm 200.
+Looks: 200; reached 1; stopping look 1.
+Condition "reserve-timeout" (gating): BLOCK; baseline 192/200 PASS (0 ERROR); candidate 132/200 PASS (0 ERROR); candidate hard violations 0.
+Manifest SHA-256: f1bf62842b697506b6a5c8600aca078ade58205c35b7731fbe2ac57161fe8fa3
+Trials SHA-256: d082368ea7fa07676698dcd82e9b6b0b46110ffcf9bcb776d2674422eb5657a1
+Decision SHA-256: 422711cbaf234ac9992cec7ae61dbb8216b475ebe6684631bab859175bee0955
+OK: Selected observed pairs compared. Triage exit 1.
+Failure groups: 2 total; 2 shown; 0 omitted.
+Group 1: condition "reserve-timeout"; fingerprint "0d615ea1bb2e632e688ba1bd75deaaa73bdea58aeffbc010003b9a535a0cfbe5"; 65 FAIL; 0 hard-violating trials; gating BLOCK.
+Group 2: condition "reserve-timeout"; fingerprint "25667ce58569500f65dbe0208190529a5e130dca823ec257ed2eff7879fee08c"; 3 FAIL; 0 hard-violating trials; gating BLOCK.
+Pair 1: DRIFT. Selected normalized traces differ.
+  Baseline "reserve-timeout:00005:baseline": PASS; candidate "reserve-timeout:00005:candidate": FAIL.
+  Baseline trial SHA-256: dbde87a4d8b6ef44c4fca07b211bb7c11316c87761e769fd80415ba764619d11
+  Candidate trial SHA-256: ff13f98fd7e942240ff77875a954f874eaab047bb08fff4bb9132745d759950a
+  First difference: step 4, path "/payload/arguments/quantity".
+  Baseline context: event tool_start; seq 9; tool "reserve"; occurrence 1; differing value present.
+    Differing value SHA-256: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+  Candidate context: event tool_start; seq 10; tool "confirm"; occurrence 0; differing value absent.
+    Differing value SHA-256: <missing>
+Pair 2: MATCH. Selected normalized traces match.
+  Baseline "reserve-timeout:00063:baseline": FAIL; candidate "reserve-timeout:00063:candidate": FAIL.
+  Baseline trial SHA-256: 2982544a7e3acf9d12c5a167958b0d94a033dfe729725e8b12480b7d4d7e71cd
+  Candidate trial SHA-256: cdb7a0319c847d6b6018561eb1dc7f8fae499e6a5047553ff6dba9a0aacd852c
+Limitation: First difference is not root cause or proof of regression, benignness, or equality of later behavior.
+Limitation: DRIFT never changes the statistical gate exit; invalid diagnosis exits 3.
+Limitation: No candidate failures means no automatic comparison, not a claim of reliability.
+Limitation: Only selected observed pairs are compared; at most three failure groups are shown.
+Limitation: Names, pointers and hashes can disclose information; this output is not sanitized.
+Limitation: Compares only the selected observed tool/result trace and terminal state.
+Limitation: Integrity seals and declared scenario equality do not authenticate execution or verify replay.
+Limitation: Diagnostic status does not replace either source statistical gate verdict.
+Limitation: Fixture identities are empty; environment equality is declaration-only.

@@ -51,7 +51,7 @@ measurement protocol, and the README's first screen. Also released: `arci plan`,
 `arci report --pass-k` and the platform-portability fixes that had been on `main` since v0.7.0.
 See [CHANGELOG.md](../CHANGELOG.md).
 
-## Done in v0.9.0
+## Done in v1.0.0
 
 `arci trace-check` compares selected recorded views across compatible native
 stores. `arci triage` selects representative paired candidate failures from one
@@ -60,7 +60,7 @@ inspection. Triage retains the complete statistical gate and its exit code;
 trace drift does not redefine success or replay. See the [triage recipe](recipes/triage.md)
 and [cross-run comparison recipe](recipes/trace-check.md).
 
-Both commands are new in v0.9.0; v0.8.0 does not contain them. Independent agent
+Both commands are new in v1.0.0; v0.8.0 does not contain them. Independent agent
 QA is distinct from human adoption and retention, which remain unmeasured.
 Importers and snapshot-update workflows remain proposals.
 

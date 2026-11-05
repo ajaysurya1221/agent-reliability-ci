@@ -147,8 +147,14 @@ includes source hashes, the re-derived statistical verdicts, and the first diffe
 This is a diagnostic result: a match does not establish reliability or successful replay,
 and drift does not prove a regression. The [offline recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/trace-check.md)
 shows the missing-retry example and preserves both statistical and comparison exits in CI.
-**New in v0.9.0:** `triage` and `trace-check` are absent from v0.8.0.
+**New in v1.0.0:** `triage` and `trace-check` are absent from v0.8.0.
 Independent agent QA is not human adoption or retention; both remain unmeasured.
+
+Use this workflow to explain an ARCI experiment's decision from its recorded
+evidence. Snapshot testing and general trace viewers already exist; ARCI keeps
+diagnosis attached to its declared statistical design and scheduled trial pairs.
+The [v1 compatibility contract](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/COMPATIBILITY.md)
+covers documented commands, exit meanings and versioned evidence formats.
 
 ## How it works
 
@@ -387,15 +393,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v0.9.0`, the released feature set (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==0.9.0`). See
+This example pins `v1.0.0`, the released feature set (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==1.0.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v0.9.0
+- uses: ajaysurya1221/agent-reliability-ci@v1.0.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -498,9 +504,9 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v0.9.0 adds one-command native-run triage and cross-run trace comparison.
-Install `agent-reliability-ci==0.9.0` from PyPI or use Action tag `v0.9.0`.
-The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.9.0)
+**Availability:** v1.0.0 adds one-command native-run triage and cross-run trace comparison.
+Install `agent-reliability-ci==1.0.0` from PyPI or use Action tag `v1.0.0`.
+The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
 publishing with attestations. The packaged demo, descriptors, initialization,
@@ -508,7 +514,7 @@ planner and opt-in pass^k reporting remain available from the v0.8.0 release.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.9.0)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
 [![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)

@@ -1,0 +1,8 @@
+{
+  "command": "arci triage RETAINED_DEMO_RUN --format json",
+  "trials": 400,
+  "seconds": 0.547,
+  "exit_code": 1,
+  "python": "3.13",
+  "scope": "one local retained fixture measurement, not general performance"
+}

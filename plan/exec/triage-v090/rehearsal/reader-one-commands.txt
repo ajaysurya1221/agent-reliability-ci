@@ -1,0 +1,98 @@
+Reader one: independent agent first-use QA, not human adoption.
+Working directory for every CLI call: /tmp/arci-triage-v090.ygMrHy/empty
+Environment: PYTHONPATH removed; PYTHONSAFEPATH=1.
+Only permitted protocol, recipe, cases and installed CLI help were consulted.
+Preparation commands (before per-case timing; all exits 0):
+cat /Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/triage-v090/rehearsal/PROTOCOL.md
+cat /Users/ajay/Developer/.arci-worktrees/triage-v090/docs/recipes/triage.md
+cat /Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/triage-v090/rehearsal/cases.json
+env -u PYTHONPATH PYTHONSAFEPATH=1 /tmp/arci-triage-v090.ygMrHy/installed/bin/arci --help
+env -u PYTHONPATH PYTHONSAFEPATH=1 /tmp/arci-triage-v090.ygMrHy/installed/bin/arci triage --help
+
+CASE retry START_UTC 2026-11-05T18:44:49.007764+00:00
+COMMAND env -u PYTHONPATH PYTHONSAFEPATH=1 /tmp/arci-triage-v090.ygMrHy/installed/bin/arci triage /tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200
+COMMAND_END_UTC 2026-11-05T18:44:49.550439+00:00
+COMMAND_ELAPSED_SECONDS 0.542558
+EXIT 1
+STDOUT
+Statistical gate: BLOCK (exit 1).
+Configuration: alpha 0.05; delta 0.1; method clopper_pearson; planned pairs/arm 200.
+Looks: 200; reached 1; stopping look 1.
+Condition "reserve-timeout" (gating): BLOCK; baseline 192/200 PASS (0 ERROR); candidate 132/200 PASS (0 ERROR); candidate hard violations 0.
+Manifest SHA-256: f1bf62842b697506b6a5c8600aca078ade58205c35b7731fbe2ac57161fe8fa3
+Trials SHA-256: d082368ea7fa07676698dcd82e9b6b0b46110ffcf9bcb776d2674422eb5657a1
+Decision SHA-256: 422711cbaf234ac9992cec7ae61dbb8216b475ebe6684631bab859175bee0955
+OK: Selected observed pairs compared. Triage exit 1.
+Failure groups: 2 total; 2 shown; 0 omitted.
+Group 1: condition "reserve-timeout"; fingerprint "0d615ea1bb2e632e688ba1bd75deaaa73bdea58aeffbc010003b9a535a0cfbe5"; 65 FAIL; 0 hard-violating trials; gating BLOCK.
+Group 2: condition "reserve-timeout"; fingerprint "25667ce58569500f65dbe0208190529a5e130dca823ec257ed2eff7879fee08c"; 3 FAIL; 0 hard-violating trials; gating BLOCK.
+Pair 1: DRIFT. Selected normalized traces differ.
+  Baseline "reserve-timeout:00005:baseline": PASS; candidate "reserve-timeout:00005:candidate": FAIL.
+  Baseline trial SHA-256: dbde87a4d8b6ef44c4fca07b211bb7c11316c87761e769fd80415ba764619d11
+  Candidate trial SHA-256: ff13f98fd7e942240ff77875a954f874eaab047bb08fff4bb9132745d759950a
+  First difference: step 4, path "/payload/arguments/quantity".
+  Baseline context: event tool_start; seq 9; tool "reserve"; occurrence 1; differing value present.
+    Differing value SHA-256: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+  Candidate context: event tool_start; seq 10; tool "confirm"; occurrence 0; differing value absent.
+    Differing value SHA-256: <missing>
+Pair 2: MATCH. Selected normalized traces match.
+  Baseline "reserve-timeout:00063:baseline": FAIL; candidate "reserve-timeout:00063:candidate": FAIL.
+  Baseline trial SHA-256: 2982544a7e3acf9d12c5a167958b0d94a033dfe729725e8b12480b7d4d7e71cd
+  Candidate trial SHA-256: cdb7a0319c847d6b6018561eb1dc7f8fae499e6a5047553ff6dba9a0aacd852c
+Limitation: First difference is not root cause or proof of regression, benignness, or equality of later behavior.
+Limitation: DRIFT never changes the statistical gate exit; invalid diagnosis exits 3.
+Limitation: No candidate failures means no automatic comparison, not a claim of reliability.
+Limitation: Only selected observed pairs are compared; at most three failure groups are shown.
+Limitation: Names, pointers and hashes can disclose information; this output is not sanitized.
+Limitation: Compares only the selected observed tool/result trace and terminal state.
+Limitation: Integrity seals and declared scenario equality do not authenticate execution or verify replay.
+Limitation: Diagnostic status does not replace either source statistical gate verdict.
+Limitation: Fixture identities are empty; environment equality is declaration-only.
+
+STDERR
+
+CASE retry DIAGNOSIS_END_UTC 2026-11-05T18:45:08.172095+00:00
+CASE retry DIAGNOSIS_ELAPSED_SECONDS 19.164331
+CASE retry DIAGNOSIS: Whole-run BLOCK/exit 1; selected pair 1 DRIFT at normalized step 4, /payload/arguments/quantity, baseline tool_start seq 9 reserve occurrence 1 with value present versus candidate tool_start seq 10 confirm occurrence 0 with value absent. Both containing events exist. Pair 2 MATCH cannot override the gate. First difference does not establish root cause, benignness, or later equivalence.
+
+CASE repeat START_UTC 2026-11-05T18:45:08.172425+00:00
+COMMAND env -u PYTHONPATH PYTHONSAFEPATH=1 /tmp/arci-triage-v090.ygMrHy/installed/bin/arci triage /Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03 --trial clean:00000:candidate
+COMMAND_END_UTC 2026-11-05T18:45:08.264157+00:00
+COMMAND_ELAPSED_SECONDS 0.091727
+EXIT 2
+STDOUT
+Statistical gate: INCONCLUSIVE (exit 2).
+Configuration: alpha 0.05; delta 0.1; method clopper_pearson; planned pairs/arm 1.
+Looks: 1; reached 1; stopping look 1.
+Condition "clean" (gating): INCONCLUSIVE; baseline 1/1 PASS (0 ERROR); candidate 1/1 PASS (0 ERROR); candidate hard violations 0.
+Manifest SHA-256: 1dfcd7f8a34eefacc53af85f5a2379d58f37b8dd4cbcea7366f2b1b23f5536b0
+Trials SHA-256: 92d98d39da2e9a0a6e2b49a37e9538400a4c0b4ddefbccd8da9b58f193fbcdc5
+Decision SHA-256: 63c8378fcb0ee28e038edb31005bf0e239742340685c5e683fcc6f9c76acdb23
+OK: Selected observed pairs compared. Triage exit 2.
+Failure groups: 0 total; 0 shown; 0 omitted.
+Pair 1: DRIFT. Selected normalized traces differ.
+  Baseline "clean:00000:baseline": PASS; candidate "clean:00000:candidate": PASS.
+  Baseline trial SHA-256: 7807443e7a1da6275e49ca86c8e879f87c9ac4bba9981a96ad1cddeac6881c83
+  Candidate trial SHA-256: aa31798050446704816e99f7852ab8d2104db0892d0303961ddc20314089d25d
+  First difference: step 4, path "/payload/result/diagnostic_label".
+  Baseline context: event agent_result; seq 9; differing value absent.
+    Differing value SHA-256: <missing>
+  Candidate context: event agent_result; seq 9; differing value present.
+    Differing value SHA-256: b5a0272cdbec8dc10e680e2c08b7e10c3e722aa5713f7702844beff4b1072571
+Limitation: First difference is not root cause or proof of regression, benignness, or equality of later behavior.
+Limitation: DRIFT never changes the statistical gate exit; invalid diagnosis exits 3.
+Limitation: No candidate failures means no automatic comparison, not a claim of reliability.
+Limitation: Only selected observed pairs are compared; at most three failure groups are shown.
+Limitation: Names, pointers and hashes can disclose information; this output is not sanitized.
+Limitation: Compares only the selected observed tool/result trace and terminal state.
+Limitation: Integrity seals and declared scenario equality do not authenticate execution or verify replay.
+Limitation: Diagnostic status does not replace either source statistical gate verdict.
+Limitation: Fixture identities are empty; environment equality is declaration-only.
+
+STDERR
+
+CASE repeat DIAGNOSIS_END_UTC 2026-11-05T18:46:19.257688+00:00
+CASE repeat DIAGNOSIS_ELAPSED_SECONDS 71.085263
+CASE repeat DIAGNOSIS: Explicit passing candidate paired with scheduled baseline; both PASS. Whole-run INCONCLUSIVE/exit 2 remains unchanged. DRIFT at normalized step 4, /payload/result/diagnostic_label, within agent_result seq 9 on both sides; baseline value absent, candidate value present. No missing event is established. First difference cannot prove harmlessness, later equivalence, causation, or absolute reliability.
+ERRORS: none. Both nonzero CLI exits are valid statistical verdicts, not operational failures.
+ASSISTANCE: supplied protocol, recipe, cases and CLI help only; no author runtime help, answer key, or external search.

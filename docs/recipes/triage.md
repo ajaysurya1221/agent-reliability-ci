@@ -1,6 +1,6 @@
 # Diagnose an agent failure from its recorded run
 
-`arci triage` is included in v0.9.0. It reads an existing native ARCI run store,
+`arci triage` is included in v1.0.0. It reads an existing native ARCI run store,
 re-derives its complete statistical gate, selects up to three representative
 candidate failure groups and shows the first recorded difference from each
 trial's paired baseline. You do not need to write a trial-selection script or
@@ -13,7 +13,7 @@ Installation needs network. The packaged fixture makes no model calls and needs
 no API key. Keep `python` and `arci` in the same environment.
 
 ```bash
-python -m pip install agent-reliability-ci==0.9.0
+python -m pip install agent-reliability-ci==1.0.0
 arci demo --workers 4 --keep arci-triage-demo
 arci triage arci-triage-demo/runs/arci-demo-agent_b-reserve-timeout-200
 ```
@@ -24,6 +24,23 @@ experiment is **BLOCK**. The representative comparison identifies the baseline's
 next `reserve` call where the candidate proceeds to `confirm`. This fixture was
 constructed with a removed retry; the diagnostic position alone does not prove
 the cause of an arbitrary failure.
+
+Selected lines from the installed-command [rehearsal receipt](../../plan/exec/triage-v090/rehearsal/results/retry.txt):
+
+```text
+Statistical gate: BLOCK (exit 1).
+Failure groups: 2 total; 2 shown; 0 omitted.
+Pair 1: DRIFT. Selected normalized traces differ.
+  First difference: step 4, path "/payload/arguments/quantity".
+  Baseline context: event tool_start; seq 9; tool "reserve"; occurrence 1; differing value present.
+  Candidate context: event tool_start; seq 10; tool "confirm"; occurrence 0; differing value absent.
+```
+
+The reported path is an absent argument field on one side; both containing tool
+events exist. Occurrence counts are zero-based, so `reserve` occurrence 1 is the
+second recorded start with that name. Source hashes are retained in the complete
+receipt. Fresh demo runs retain the same constructed scenario but can have
+different source hashes because their recording metadata is new.
 
 ## Use the same command after your next change
 
@@ -100,6 +117,43 @@ decision with full counts and look history. `group_counts` tracks total, shown
 and omitted failure groups separately from `selected_pairs`, because an explicit
 passing selection may belong to no failure group. Each selected pair carries
 the existing `arci-trace-check/1` comparison and containing-event context.
+
+This abridged JSON projection comes from the same installed-command receipt;
+`gate` and the selected pair contain additional fields in the full output:
+
+```json
+{
+  "schema_version": "arci-triage/1",
+  "status": "OK",
+  "exit_code": 1,
+  "gate": {
+    "verdict": "BLOCK",
+    "exit_code": 1
+  },
+  "selected_pairs": [
+    {
+      "first_difference_context": {
+        "baseline": {
+          "event_kind": "tool_start",
+          "location": "event",
+          "occurrence": 1,
+          "seq": 9,
+          "tool": "reserve",
+          "value_present": true
+        },
+        "candidate": {
+          "event_kind": "tool_start",
+          "location": "event",
+          "occurrence": 0,
+          "seq": 10,
+          "tool": "confirm",
+          "value_present": false
+        }
+      }
+    }
+  ]
+}
+```
 
 Consumers should use these fields rather than infer success from a tool name or
 from the fact that a report was produced. Exact schema/CLI behavior is exercised

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "retry",
+    "run_dir": "/tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200",
+    "trial": null
+  },
+  {
+    "id": "repeat",
+    "run_dir": "/Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03",
+    "trial": "clean:00000:candidate"
+  }
+]

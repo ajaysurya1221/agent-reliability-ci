@@ -1,6 +1,6 @@
 # Compare recorded tool behavior across runs
 
-**Availability: v0.9.0.** Install `agent-reliability-ci==0.9.0`.
+**Availability: v1.0.0.** Install `agent-reliability-ci==1.0.0`.
 The PyPI package and Action tag **v0.8.0 do not contain `trace-check`**.
 The commands below use only packaged fixtures after installation; no model or API
 key is needed. Use Bash, POSIX, and the same environment for `python` and `arci`.
