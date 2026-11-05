@@ -2,12 +2,22 @@
 
 ## Unreleased
 
+## v0.9.0 (2026-11-06)
+
+- **Added:** `arci triage RUN_DIR [--trial CANDIDATE_ID] [--format text|json]`
+  selects up to three representative candidate failure groups and identifies the
+  containing event/tool at the first recorded difference from the paired baseline.
+  `arci-triage/1` JSON keeps the complete re-derived gate separate from diagnostic
+  samples. The command preserves gate exits; invalid diagnosis exits 3. It neither
+  executes recorded code nor writes stores, and DRIFT never changes the gate.
+  The offline recipe and installed-wheel checks cover the first-use path.
+
 - **Added:** read-only `arci trace-check BASE_RUN BASE_TRIAL CAND_RUN CAND_TRIAL`
   compares normalized tool/result events and terminal state across compatible native
   stores: `MATCH`/0, `DRIFT`/1, `INVALID`/3. Text and `arci-trace-check/1` JSON separate
   diagnostics from re-derived statistical verdicts. The offline recipe preserves
   both exits in CI; installed-wheel checks exercise all three statuses. No schema,
-  statistical, replay or historical-evidence changes. Not included in v0.8.0.
+  statistical, replay or historical-evidence changes. First released in v0.9.0.
 - **Added:** `arci run` prints `run store: <path>` on stderr after the verdict; stdout, reports and
   stores are unchanged.
 - **Changed:** `arci init` reports the actual errno when a hard-link publication fails for a reason

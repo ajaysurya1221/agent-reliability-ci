@@ -20,6 +20,7 @@ fi
 python="$("${PYTHON:-python3}" -c 'import sys; print(sys.executable)')"
 wheel="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 trace_smoke="$(cd "$(dirname "$0")" && pwd)/trace_check_smoke.py"
+triage_smoke="$(cd "$(dirname "$0")" && pwd)/triage_smoke.py"
 
 # No inherited checkout import paths may satisfy this installed-wheel test.
 unset PYTHONPATH
@@ -89,6 +90,9 @@ grep -qx 'All six steps held.' "$root/demo.log" || fail "arci demo did not print
 
 timed "installed trace-check statuses and read-only stores" \
   "$venv/bin/python" -P "$trace_smoke" "$root/demo"
+
+timed "installed triage gate exits, JSON contract and read-only stores" \
+  "$venv/bin/python" -P "$triage_smoke" "$root/demo"
 
 leftover="$(ls -A "$work")"
 [ -z "$leftover" ] || fail "the working directory is not empty after the demo: $leftover"
