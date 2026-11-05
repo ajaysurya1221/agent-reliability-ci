@@ -40,8 +40,8 @@ imports this worktree; 120 existing comparison/CLI tests pass.
 1. Baseline and briefs: complete. 272 protected-file hashes captured.
 2. Core and CLI lanes: complete at cb2ab9e.
 3. Task review ACCEPT for both lanes; two independent agent QA readers passed.
-   Whole-branch release review pending.
-4. Final local/hosted verification and merge: pending.
+   Whole-branch release review ACCEPT at d114769.
+4. Final local verification complete; exact-head hosted verification and merge pending (PR #17).
 5. Release and downloaded-artifact verification: pending.
 
 ## Integration observations
@@ -63,3 +63,14 @@ imports this worktree; 120 existing comparison/CLI tests pass.
 Ruling: honor the user's already explicit PR/merge/publication approval instead of
 repeating the finishing skill's choice menu — scope is already authorized — cost
 if wrong: publication is immutable, so exact-head and downloaded-byte gates remain.
+
+Final-version suite: 1404 passed in 423.88 seconds, exit 0. Rebuilt reviewed-tree
+wheel passed the full shared smoke in a fresh environment, including the six-step
+demo. The appended report and logs are evidence only; no production changes.
+
+Reviewer scope adjudication: human adoption/retention, general diagnostic accuracy
+and production safety remain unmeasured, as explicitly excluded by the approved
+agent-QA protocol. Exhaustive market coverage and future popularity are not
+asserted; the bounded primary-source overlap review is the evidence available.
+No deferred code findings remain. Preserve Beta maturity metadata; 1.x defines
+public compatibility without manufacturing production-readiness evidence.

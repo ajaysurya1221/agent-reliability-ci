@@ -1,0 +1,127 @@
+wheel_smoke: wheel /tmp/arci-triage-v090.ygMrHy/dist-v1-reviewed/agent_reliability_ci-1.0.0-py3-none-any.whl
+wheel_smoke: python /Users/ajay/Developer/.arci-worktrees/triage-v090/.venv/bin/python 3.13.12
+wheel_smoke: create a fresh venv
+wheel_smoke: pip install the wheel
+wheel_smoke: arci 1.0.0 imported from /private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-wheel-smoke.i8Gxvn/venv/lib/python3.13/site-packages/arci/__init__.py
+wheel_smoke: arci --help
+usage: arci [-h]
+            {run,preflight,gate,report,plan,bundle,replay,diff,trace-check,triage,minimize,demo,schema,init} ...
+
+positional arguments:
+  {run,preflight,gate,report,plan,bundle,replay,diff,trace-check,triage,minimize,demo,schema,init}
+    run                 run an arci.yaml descriptor or a frozen manifest
+    preflight           check an HTTP decision upstream
+    gate                recompute the gate for a stored run
+    report              render a stored run
+    plan                plan N per arm: exact verdict probabilities under
+                        stated assumptions
+    bundle              create a portable failure bundle
+    replay              replay a failure bundle
+    diff                find the first divergence between two trials
+    trace-check         compare selected observed traces from two native run
+                        stores
+    triage              inspect a native run's gate and selected paired traces
+                        without writes
+    minimize            minimize a failing trial's faults
+    demo                run the packaged six-step retry story (no clone, no
+                        model call)
+    schema              print the arci.yaml JSON Schema
+    init                write a runnable arci.yaml for a first experiment
+
+options:
+  -h, --help            show this help message and exit
+wheel_smoke: python -m arci --help
+usage: arci [-h]
+            {run,preflight,gate,report,plan,bundle,replay,diff,trace-check,triage,minimize,demo,schema,init} ...
+
+positional arguments:
+  {run,preflight,gate,report,plan,bundle,replay,diff,trace-check,triage,minimize,demo,schema,init}
+    run                 run an arci.yaml descriptor or a frozen manifest
+    preflight           check an HTTP decision upstream
+    gate                recompute the gate for a stored run
+    report              render a stored run
+    plan                plan N per arm: exact verdict probabilities under
+                        stated assumptions
+    bundle              create a portable failure bundle
+    replay              replay a failure bundle
+    diff                find the first divergence between two trials
+    trace-check         compare selected observed traces from two native run
+                        stores
+    triage              inspect a native run's gate and selected paired traces
+                        without writes
+    minimize            minimize a failing trial's faults
+    demo                run the packaged six-step retry story (no clone, no
+                        model call)
+    schema              print the arci.yaml JSON Schema
+    init                write a runnable arci.yaml for a first experiment
+
+options:
+  -h, --help            show this help message and exit
+wheel_smoke: arci demo --workers 4 --keep DEMO_DIR
+arci demo: the retry story, 4 workers, run stores in /private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-wheel-smoke.i8Gxvn/demo
+
+=== 1. One illustrative run: A and B look the same
+  ok   pass@1, no fault: A=PASS B=PASS
+
+=== 2. The frozen experiment, N=200 per arm, fault: tool_timeout on reserve
+  VERDICT: BLOCK (exit 1)   [A vs agent_b]
+  passed under the fault: A 192/200, agent_b 132/200
+  matches the recorded run (A 192/200, agent_b 132/200)
+  VERDICT: PASS (exit 0)   [A vs agent_a]
+  passed under the fault: A 192/200, agent_a 192/200
+  matches the recorded run (A 192/200, agent_a 192/200)
+  ok   A vs B is BLOCKED (exit 1)
+  ok   A vs A PASSES (exit 0)
+
+=== 3. Where do a passing and a failing run part ways?
+  mode: boundary
+  common_prefix: 9
+  left: tool_start tool="reserve" arguments={"order_id":"order-7","quantity":2,"sku":"widget"}
+  right: tool_start tool="confirm" arguments={"order_id":"order-7","sku":"widget"}
+  after_injection: tool_timeout
+  ok   the divergence sits right after the injected tool_timeout
+
+=== 4. Shrink the failing condition (3 injected faults)
+  kept: tool_timeout
+  removed: empty_result, tool_error_once
+  minimality: 1-minimal
+  trials_run: 3
+  ok   1-minimal reproducer keeps only ['tool_timeout']
+
+=== 5. Replay the reduced bundle offline
+  REPRODUCED: failure reproduced
+  ok   REPRODUCED from the recording, no live tools
+
+=== 6. The repair: agent C
+  ok   C passes the exact reproducer that B fails
+  VERDICT: PASS (exit 0)   [A vs agent_c]
+  ok   A vs C PASSES its own separately frozen experiment (exit 0)
+
+All six steps held.
+Run stores: /private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/arci-wheel-smoke.i8Gxvn/demo. Every count above was computed fresh on this machine, not replayed from evidence; they matched the recorded run (A 192/200, B 132/200).
+wheel_smoke: installed trace-check statuses and read-only stores
+trace_check_smoke: MATCH/0
+trace_check_smoke: DRIFT/1
+trace_check_smoke: INVALID/3
+trace_check_smoke: installed JSON contract and unchanged source hashes verified
+wheel_smoke: installed triage gate exits, JSON contract and read-only stores
+triage_smoke: PASS/0 diagnostic OK/0
+triage_smoke: BLOCK/1 diagnostic OK/1
+triage_smoke: INCONCLUSIVE/2 diagnostic OK/2
+triage_smoke: BLOCK/1 diagnostic INVALID/3
+triage_smoke: BLOCK/1 diagnostic INVALID/3
+triage_smoke: BLOCK/1 diagnostic OK/1
+triage_smoke: ERROR/3 diagnostic INVALID/3
+triage_smoke: PASS/0 diagnostic OK/0
+triage_smoke: installed JSON contract and unchanged source hashes verified
+wheel_smoke: arci schema
+wheel_smoke: timings
+    0.86s  create a fresh venv
+    0.90s  pip install the wheel
+    0.10s  arci --help
+    0.10s  python -m arci --help
+   66.33s  arci demo --workers 4
+    1.01s  installed trace-check statuses and read-only stores
+    4.22s  installed triage gate exits, JSON contract and read-only stores
+    0.12s  arci schema
+wheel_smoke: OK
