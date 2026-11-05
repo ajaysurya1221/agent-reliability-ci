@@ -1,7 +1,7 @@
 # Compare recorded tool behavior across runs
 
-**Availability: main / unreleased.** Use an installation built from this revision of
-ARCI. The PyPI package and Action tag **v0.8.0 do not contain `trace-check`**.
+**Availability: v1.0.0.** Install `agent-reliability-ci==1.0.0`.
+The PyPI package and Action tag **v0.8.0 do not contain `trace-check`**.
 The commands below use only packaged fixtures after installation; no model or API
 key is needed. Use Bash, POSIX, and the same environment for `python` and `arci`.
 
@@ -21,6 +21,9 @@ These are separate from the statistical `PASS`, `BLOCK`, `INCONCLUSIVE`, and
 or successful replay. `DRIFT` can be an intentional behavior change; it does not
 prove a regression or its cause. Declare any exact-path CI requirement before
 observing candidate results, especially when model behavior is nondeterministic.
+
+For automatic paired-failure selection within one store, start with
+[`arci triage`](triage.md). The command below retains explicit cross-store selection.
 
 ## 1. Create two offline stores
 
@@ -147,9 +150,10 @@ matching an additional CI requirement.
   declarations do not authenticate code bytes. Empty fixture identities are
   accepted with an explicit declaration-only limitation. No oracle is rerun.
 
-## Adoption pilot: unmeasured until a non-author participates
+## Optional human adoption pilot: unmeasured
 
-The operator arranges one consenting non-author developer and a sanitized,
+This optional future measurement is not a release requirement.
+The operator may arrange one consenting non-author developer and a sanitized,
 supported fixture. No outreach is part of this change. Allow **30 minutes** for
 the participant to find a planted missing retry/tool call, explain why benign
 drift alone is not a proven regression, and interpret the independent statistical

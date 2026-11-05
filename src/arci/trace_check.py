@@ -6,6 +6,7 @@ success. The existing gate validates each complete store independently.
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from enum import Enum
 from hashlib import sha256
@@ -245,6 +246,62 @@ def _projection(trial: TrialEnvelope) -> list[dict[str, JsonValue]]:
     }
     steps.append({"kind": "terminal", "payload": terminal})
     return steps
+
+
+@dataclass(frozen=True)
+class TraceStepContext:
+    """Containing record only; presence comes from the comparator's subtree hash."""
+
+    location: Literal["event", "terminal", "absent"]
+    event_kind: str | None = None
+    seq: int | None = None
+    tool: str | None = None
+    occurrence: int | None = None
+    value_present: bool = False
+
+
+def trace_step_context(trial: TrialEnvelope, step: int, *, value_present: bool) -> TraceStepContext:
+    """Map a normalized position after check_traces validates the selected events.
+
+    This does not evaluate pointers or compare values. In particular a missing
+    subtree can still have a containing event. Finishes resolve occurrence via
+    the validated call link, never a payload guess or event position.
+    """
+    if step < 0:
+        return TraceStepContext("absent", value_present=value_present)
+    starts: dict[str, ToolCall] = {}
+    position = 0
+    for event in trial.events:
+        if event.kind not in {"tool_start", "tool_finish", "agent_result"}:
+            continue
+        call = None
+        if event.kind == "tool_start":
+            call = _start_call(event)
+            if call is not None:
+                starts[call.call_id] = call
+        elif event.kind == "tool_finish":
+            call_id = event.payload.get("call_id")
+            if isinstance(call_id, str):
+                call = starts.get(call_id)
+        if position == step:
+            tool = None
+            if call is not None:
+                # Bound before escaping too; escaped controls never reach terminals.
+                tool = json.dumps(call.tool[:120], ensure_ascii=True)[1:-1]
+                if len(call.tool) > 120 or len(tool) > 120:
+                    tool = tool[:117] + "..."
+            return TraceStepContext(
+                "event",
+                event.kind,
+                event.seq,
+                tool,
+                call.occurrence if call is not None else None,
+                value_present,
+            )
+        position += 1
+    return TraceStepContext(
+        "terminal" if position == step else "absent", value_present=value_present
+    )
 
 
 class _Missing(Enum):

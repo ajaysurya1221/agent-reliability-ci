@@ -120,7 +120,24 @@ An agent crash, timeout, blown budget or uncaught tool fault is a `FAIL`. A brok
 injector, grader or event sink is an `ERROR`, and it invalidates the experiment instead of quietly
 leaving the denominator. `arci replay` uses its own codes: 0 reproduced, 1 not reproduced, 3 invalid.
 
-## Compare traces across runs (main / unreleased)
+## Diagnose failures and compare recorded runs
+
+`arci triage RUN_DIR` finds up to three representative candidate failure groups,
+selects their scheduled baseline partners and names the containing tool events at
+the first recorded difference. It reads existing stores without executing agents
+or writing evidence. Start with the packaged offline fixture:
+
+```bash
+arci demo --workers 4 --keep arci-triage-demo
+arci triage arci-triage-demo/runs/arci-demo-agent_b-reserve-timeout-200
+```
+
+The second command returns the whole-run **BLOCK (exit 1)**. Use `--format json`
+for coding agents or CI, or `--trial ID` to inspect a particular candidate trial.
+Triage preserves the statistical exit; a diagnostic validation failure exits 3.
+A selected trace can MATCH while its whole run is BLOCK or INCONCLUSIVE. The
+[triage recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/triage.md)
+explains selection, context and how to save a report without masking that exit.
 
 `arci trace-check BASE_RUN BASE_TRIAL CAND_RUN CAND_TRIAL` compares selected recorded
 tool behavior across compatible native stores and reports `MATCH` (0), `DRIFT` (1),
@@ -130,8 +147,14 @@ includes source hashes, the re-derived statistical verdicts, and the first diffe
 This is a diagnostic result: a match does not establish reliability or successful replay,
 and drift does not prove a regression. The [offline recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/trace-check.md)
 shows the missing-retry example and preserves both statistical and comparison exits in CI.
-**Available on main, unreleased:** PyPI and Action tag v0.8.0 do not contain this command.
-Non-author adoption remains unmeasured.
+**New in v1.0.0:** `triage` and `trace-check` are absent from v0.8.0.
+Independent agent QA is not human adoption or retention; both remain unmeasured.
+
+Use this workflow to explain an ARCI experiment's decision from its recorded
+evidence. Snapshot testing and general trace viewers already exist; ARCI keeps
+diagnosis attached to its declared statistical design and scheduled trial pairs.
+The [v1 compatibility contract](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/COMPATIBILITY.md)
+covers documented commands, exit meanings and versioned evidence formats.
 
 ## How it works
 
@@ -355,6 +378,7 @@ arci preflight manifest.json                       # live decision upstreams: ke
 arci run arci.yaml --workers 8                     # run + gate; exit code is the verdict (--out defaults to runs)
 arci gate runs/<experiment> --junit junit.xml --markdown report.md
 arci report runs/<experiment>                      # gate, failure clusters, tokens, estimated cost
+arci triage runs/<experiment>                      # representative failures + paired tool context; gate exit
 arci diff runs/<experiment> <passing_trial> <failing_trial>    # --all-steps to include annotations
 arci minimize runs/<experiment> <failing_trial> --out min.json
 arci bundle runs/<experiment> <failing_trial> --out bundle.json --root . --include my_agent.py
@@ -369,15 +393,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v0.8.0`, the released feature set (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==0.8.0`). See
+This example pins `v1.0.0`, the released feature set (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==1.0.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v0.8.0
+- uses: ajaysurya1221/agent-reliability-ci@v1.0.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -480,16 +504,17 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v0.8.0 is the current release: on PyPI as `agent-reliability-ci` (published by
-the release workflow from the tag `v0.8.0`, with attestations) and as the Action tag `v0.8.0`; the
-[release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0) carries
-the same wheel and sdist with their checksums. It adds the packaged demo (`arci demo`), the
-descriptor (`arci.yaml`, `arci schema`), `arci init`, the planner (`arci plan`), opt-in pass^k
-reporting (`arci report --pass-k`) and portability fixes over v0.7.0.
+**Availability:** v1.0.0 adds one-command native-run triage and cross-run trace comparison.
+Install `agent-reliability-ci==1.0.0` from PyPI or use Action tag `v1.0.0`.
+The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
+links the wheel, sdist, checksums and verification receipt. The release workflow
+builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
+publishing with attestations. The packaged demo, descriptors, initialization,
+planner and opt-in pass^k reporting remain available from the v0.8.0 release.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v0.8.0)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
 [![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)

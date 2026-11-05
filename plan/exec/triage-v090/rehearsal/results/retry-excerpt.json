@@ -1,0 +1,31 @@
+{
+  "schema_version": "arci-triage/1",
+  "status": "OK",
+  "exit_code": 1,
+  "gate": {
+    "verdict": "BLOCK",
+    "exit_code": 1
+  },
+  "selected_pairs": [
+    {
+      "first_difference_context": {
+        "baseline": {
+          "event_kind": "tool_start",
+          "location": "event",
+          "occurrence": 1,
+          "seq": 9,
+          "tool": "reserve",
+          "value_present": true
+        },
+        "candidate": {
+          "event_kind": "tool_start",
+          "location": "event",
+          "occurrence": 0,
+          "seq": 10,
+          "tool": "confirm",
+          "value_present": false
+        }
+      }
+    }
+  ]
+}

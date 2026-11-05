@@ -1,0 +1,10 @@
+{
+  "/tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200/decision.json": "f378680baa2ba7f3a74e2941c8a2a0968147db51d34b3e2366769dc29121d44e",
+  "/tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200/events.jsonl": "8df73567bd2106fcf96092ae06a626d50587b0895381786b49dd642df1a81218",
+  "/tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200/manifest.json": "96a0b5c92bb713c092baf00c4de003c28b80dbc908acbdc0cd5edf029d3af3bc",
+  "/tmp/arci-triage-v090.ygMrHy/demo/runs/arci-demo-agent_b-reserve-timeout-200/trials.jsonl": "a4c1549fa7f0e24583aa005c078250a5716843fd2833cc2fe8cba4007cafc72b",
+  "/Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03/decision.json": "c62e99e9210481bc2df5d151c6f68b03355baa3989fe5cfb523ebddbb3a815a3",
+  "/Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03/events.jsonl": "b64b5e8a9960e6069c914ae205e3883be401b0581b7273d812d522fa41085767",
+  "/Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03/manifest.json": "0b1051695276c97cd8e2ae4fb8b5b672a94387d87b56b7e2a101832aabddd07d",
+  "/Users/ajay/Developer/.arci-worktrees/triage-v090/plan/exec/trace-check/rehearsal-2026-11-03/fixture-evidence/stores/arci-trace-rehearsal-2026-11-03/trials.jsonl": "7b2ce26067b521fc01c1bfaded8c61dde8c82dd18d6e74730e27f979282290ae"
+}

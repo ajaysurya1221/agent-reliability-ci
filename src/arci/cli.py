@@ -695,6 +695,20 @@ def _parser() -> _Parser:
     trace_check.add_argument("candidate_trial_id", metavar="CAND_TRIAL")
     trace_check.add_argument("--format", choices=("text", "json"), default="text")
 
+    triage = commands.add_parser(
+        "triage",
+        help="inspect a native run's gate and selected paired traces without writes",
+        description=(
+            "Read-only failure triage. Preserves the gate exit: PASS 0, BLOCK 1, "
+            "INCONCLUSIVE 2, ERROR 3; INVALID diagnosis exits 3. Trace DRIFT does not "
+            "change the statistical verdict. The first difference is not root cause. "
+            "Tool names, pointers and hashes may disclose information."
+        ),
+    )
+    triage.add_argument("run_dir", metavar="RUN_DIR")
+    triage.add_argument("--trial", metavar="CANDIDATE_ID", help="select one candidate trial")
+    triage.add_argument("--format", choices=("text", "json"), default="text")
+
     minimize = commands.add_parser("minimize", help="minimize a failing trial's faults")
     minimize.add_argument("run_dir", metavar="RUN_DIR")
     minimize.add_argument("trial_id", metavar="TRIAL_ID")
@@ -850,6 +864,14 @@ def _dispatch(values: dict[str, object]) -> int:
                 result, output_format=cast(Literal["text", "json"], values["format"])
             )
         )
+        return result.exit_code
+    if command == "triage":
+        from arci.triage import render_triage, triage_run
+
+        result = triage_run(
+            cast(str, values["run_dir"]), trial_id=cast(str | None, values["trial"])
+        )
+        _print(render_triage(result, output_format=cast(Literal["text", "json"], values["format"])))
         return result.exit_code
     if command == "minimize":
         return _cmd_minimize(
