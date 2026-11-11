@@ -5,7 +5,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from collections.abc import Sequence
-from typing import cast
+from typing import TypedDict, cast
 
 from pydantic import JsonValue
 
@@ -13,12 +13,90 @@ from arci.reliability import IID_ASSUMPTION, UNAVAILABLE_SMALL_N, pass_k_report
 from arci.schema import (
     DECISION_TOOL,
     ArmStats,
+    Condition,
     GateDecision,
     Manifest,
     Outcome,
     TrialEnvelope,
     Verdict,
 )
+
+
+class FaultAccounting(TypedDict):
+    condition_id: str
+    fault: str
+    arm: str
+    trials: int
+    injections: int
+    trials_fired: int
+    status: str
+
+
+def fault_accounting(
+    conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]
+) -> list[FaultAccounting]:
+    """Count observed injections by declared name, the identity recorded by injected_by.
+
+    Multiple declarations of the same name cannot be distinguished by this field.
+    Events outside tool_finish never count; a trial counts at most once per name.
+    """
+    totals: Counter[tuple[str, str]] = Counter()
+    injections: Counter[tuple[str, str, str]] = Counter()
+    fired: Counter[tuple[str, str, str]] = Counter()
+    for trial in trials:
+        totals[trial.condition_id, trial.arm] += 1
+        observed: Counter[str] = Counter()
+        for event in trial.events:
+            name = event.payload.get("injected_by")
+            if event.kind == "tool_finish" and isinstance(name, str) and name:
+                observed[name] += 1
+        for name, count in observed.items():
+            key = trial.condition_id, trial.arm, name
+            injections[key] += count
+            fired[key] += 1
+    return [
+        FaultAccounting(
+            condition_id=condition.condition_id,
+            fault=name,
+            arm=arm,
+            trials=totals[condition.condition_id, arm],
+            injections=injections[condition.condition_id, arm, name],
+            trials_fired=fired[condition.condition_id, arm, name],
+            status="observed"
+            if fired[condition.condition_id, arm, name]
+            else "declared, never fired",
+        )
+        for condition in sorted(conditions, key=lambda c: c.condition_id)
+        for name in sorted({fault.name for fault in condition.faults})
+        for arm in ("baseline", "candidate")
+    ]
+
+
+def fault_markdown(conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]) -> list[str]:
+    lines = [
+        "",
+        "## Fault accounting",
+        "",
+        "Recorded tool_finish injections, grouped by declared fault name; repeated "
+        "declarations of the same name are indistinguishable. Counts are descriptive.",
+        "",
+    ]
+    rows = fault_accounting(conditions, trials)
+    if not rows:
+        return [*lines, "No faults declared."]
+    lines.extend(
+        [
+            "| Condition | Fault | Arm | Trials | Injections | Trials fired | Status |",
+            "|---|---|---|---:|---:|---:|---|",
+        ]
+    )
+    lines.extend(
+        f"| `{_cell(row['condition_id'])}` | `{_cell(row['fault'])}` | {row['arm']} | "
+        f"{row['trials']} | {row['injections']} | {row['trials_fired']} | {row['status']} |"
+        for row in rows
+    )
+    return lines
+
 
 USD_PER_MTOK_INPUT = 0.042
 _LIST_PRICE_DATE = "2026-09-22"
@@ -284,6 +362,7 @@ def render_markdown(
         for reason in condition.reasons:
             lines.append(f"- `{_cell(condition.condition_id)}`: {_cell(reason)}")
 
+    lines.extend(fault_markdown(manifest.conditions, trials))
     lines.extend(["", f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})"])
     return "\n".join(lines) + "\n"
 

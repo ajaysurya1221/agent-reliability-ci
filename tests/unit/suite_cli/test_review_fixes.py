@@ -179,12 +179,9 @@ def test_prior_history_transitive_label_independent_and_v1_skipped(
 @pytest.mark.parametrize(
     "command,args",
     [
-        ("report", ["--for", "md"]),
-        ("triage", ["--for", "json"]),
         ("bundle", ["--o", "unused", "--inc", "fixture"]),
         ("minimize", ["--o", "unused"]),
         ("trace-check", ["--for", "json"]),
-        ("plan", ["--base", ".9"]),
     ],
 )
 def test_deferred_abbreviated_options(

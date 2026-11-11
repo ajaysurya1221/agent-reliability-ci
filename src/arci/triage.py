@@ -12,8 +12,13 @@ from arci.hashing import canonical_json
 from arci.schedule import build_schedule
 from arci.schema import GateDecision, Outcome, TrialEnvelope, Verdict
 from arci.storage import load_run
+from arci.suite_gate import decide_suite
+from arci.suite_schedule import build_suite_schedule
+from arci.suite_schema import SUITE_SCHEMA_VERSION, SuiteDecision
+from arci.suite_storage import load_suite_run, manifest_schema_version
 from arci.trace_check import (
     TraceCheckResult,
+    TraceSource,
     TraceStepContext,
     check_traces,
     trace_step_context,
@@ -69,7 +74,7 @@ class TriageResult:
 
     status: Literal["OK", "INVALID"]
     reason: str
-    gate: GateDecision | None = None
+    gate: GateDecision | SuiteDecision | None = None
     group_counts: GroupCounts = GroupCounts()
     groups: tuple[FailureGroup, ...] = ()
     selected_pairs: tuple[SelectedPair, ...] = ()
@@ -87,28 +92,48 @@ def _hard(trial: TrialEnvelope) -> bool:
     )
 
 
-def _invalid(reason: str, gate: GateDecision | None = None) -> TriageResult:
+def _invalid(reason: str, gate: GateDecision | SuiteDecision | None = None) -> TriageResult:
     return TriageResult("INVALID", reason, gate)
 
 
 def triage_run(run_dir: Path | str, *, trial_id: str | None = None) -> TriageResult:
     """Derive the complete gate and compare only schedule-selected observed pairs."""
     try:
-        manifest, trials = load_run(run_dir)
-        gate = decide(manifest, trials)
+        try:
+            suite = manifest_schema_version(run_dir) == SUITE_SCHEMA_VERSION
+        except ValueError:
+            # Preserve v1's model-default loading for an omitted schema_version.
+            # Only an explicit suite version selects the suite loader.
+            suite = False
+        if suite:
+            manifest, trials = load_suite_run(run_dir)
+            gate = decide_suite(manifest, trials)
+            schedule = build_suite_schedule(manifest)
+        else:
+            manifest, trials = load_run(run_dir)
+            gate = decide(manifest, trials)
+            schedule = build_schedule(manifest)
     except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
         return _invalid("Run store is invalid or unavailable.")
     if gate.verdict is Verdict.ERROR:
         return _invalid("Run statistical gate is ERROR; diagnosis is unavailable.", gate)
 
-    schedule = build_schedule(manifest)
     by_id = {trial.trial_id: trial for trial in trials}
     # Pair using schedule identities, without interpreting the trial ID string.
     baseline_ids = {spec.pair_id: spec.trial_id for spec in schedule if spec.arm == "baseline"}
     observed = [by_id[spec.trial_id] for spec in schedule if spec.trial_id in by_id]
     candidates = [trial for trial in observed if trial.arm == "candidate"]
     order = {trial.trial_id: index for index, trial in enumerate(observed)}
-    conditions = {condition.condition_id: condition for condition in gate.conditions}
+    # Suite cells have no individual statistical verdict. Group ranking remains
+    # descriptive and cannot present the suite verdict as a condition verdict.
+    conditions = (
+        {condition.condition_id: (True, "suite mean only") for condition in manifest.conditions}
+        if isinstance(gate, SuiteDecision)
+        else {
+            condition.condition_id: (condition.is_gating, condition.verdict.value)
+            for condition in gate.conditions
+        }
+    )
     grouped: dict[tuple[str, str | None], list[TrialEnvelope]] = {}
     for trial in candidates:
         if trial.outcome is Outcome.FAIL:
@@ -128,14 +153,14 @@ def triage_run(run_dir: Path | str, *, trial_id: str | None = None) -> TriageRes
         item: tuple[tuple[str, str | None], list[TrialEnvelope]],
     ) -> tuple[int, int, str, bool, str]:
         (condition_id, fingerprint), members = item
-        condition = conditions[condition_id]
+        is_gating, verdict = conditions[condition_id]
         tier = (
             0
             if any(_hard(t) for t in members)
             else 1
-            if condition.is_gating and condition.verdict is Verdict.BLOCK
+            if is_gating and verdict == Verdict.BLOCK.value
             else 2
-            if condition.is_gating
+            if is_gating
             else 3
         )
         return tier, -len(members), condition_id, fingerprint is not None, fingerprint or ""
@@ -147,8 +172,8 @@ def triage_run(run_dir: Path | str, *, trial_id: str | None = None) -> TriageRes
             fingerprint,
             len(members),
             sum(_hard(t) for t in members),
-            conditions[condition_id].is_gating,
-            conditions[condition_id].verdict.value,
+            conditions[condition_id][0],
+            conditions[condition_id][1],
             representative(members).trial_id,
         )
         for (condition_id, fingerprint), members in shown
@@ -163,7 +188,11 @@ def triage_run(run_dir: Path | str, *, trial_id: str | None = None) -> TriageRes
     pairs: list[SelectedPair] = []
     for candidate in selected:
         baseline = by_id[baseline_ids[candidate.pair_id]]
-        comparison = check_traces(run_dir, baseline.trial_id, run_dir, candidate.trial_id)
+        comparison = (
+            _suite_comparison(run_dir, baseline.trial_id, candidate.trial_id)
+            if suite
+            else check_traces(run_dir, baseline.trial_id, run_dir, candidate.trial_id)
+        )
         # No context is constructed until BOTH loaded snapshots match the initial gate.
         for source, trial in ((comparison.baseline, baseline), (comparison.candidate, candidate)):
             if source is None or (
@@ -247,25 +276,37 @@ def render_triage(result: TriageResult, *, output_format: Literal["text", "json"
     if result.gate is not None:
         decision = result.gate
         lines.append(f"Statistical gate: {decision.verdict.value} (exit {decision.exit_code}).")
-        lines.append(
-            f"Configuration: alpha {decision.alpha:g}; delta {decision.delta:g}; "
-            f"method {decision.interval_method}; planned pairs/arm {decision.n_per_arm}."
-        )
-        looks = ", ".join(str(look) for look in decision.looks)
-        lines.append(
-            f"Looks: {looks}; reached {len(decision.history)}; "
-            f"stopping look {decision.stopped_at_look}."
-        )
-        for condition in decision.conditions:
-            role = "gating" if condition.is_gating else "descriptive ceiling"
-            baseline, candidate = condition.baseline, condition.candidate
-            lines.append(
-                f"Condition {_quoted(condition.condition_id)} ({role}): "
-                f"{condition.verdict.value}; baseline {baseline.successes}/{baseline.n} PASS "
-                f"({baseline.errors} ERROR); candidate {candidate.successes}/{candidate.n} PASS "
-                f"({candidate.errors} ERROR); candidate hard violations "
-                f"{condition.candidate_hard_violations}."
+        if isinstance(decision, SuiteDecision):
+            lines.extend(
+                [
+                    f"Configuration: alpha {decision.alpha}; delta {decision.delta}; "
+                    f"stakes {', '.join(decision.stakes)}; threshold {decision.threshold}.",
+                    f"Rounds: {decision.max_rounds}; reached {len(decision.history)}; "
+                    f"stopping round {decision.stopped_at_round}.",
+                    "Groups are descriptive; a suite-mean PASS can hide a regression in one cell.",
+                ]
             )
+        else:
+            lines.append(
+                f"Configuration: alpha {decision.alpha:g}; delta {decision.delta:g}; "
+                f"method {decision.interval_method}; planned pairs/arm {decision.n_per_arm}."
+            )
+            looks = ", ".join(str(look) for look in decision.looks)
+            lines.append(
+                f"Looks: {looks}; reached {len(decision.history)}; "
+                f"stopping look {decision.stopped_at_look}."
+            )
+            for condition in decision.conditions:
+                role = "gating" if condition.is_gating else "descriptive ceiling"
+                baseline, candidate = condition.baseline, condition.candidate
+                lines.append(
+                    f"Condition {_quoted(condition.condition_id)} ({role}): "
+                    f"{condition.verdict.value}; baseline {baseline.successes}/{baseline.n} PASS "
+                    f"({baseline.errors} ERROR); candidate "
+                    f"{candidate.successes}/{candidate.n} PASS "
+                    f"({candidate.errors} ERROR); candidate hard violations "
+                    f"{condition.candidate_hard_violations}."
+                )
         lines.append(f"Manifest SHA-256: {decision.manifest_sha256}")
         lines.append(f"Trials SHA-256: {decision.trials_sha256}")
         lines.append(f"Decision SHA-256: {decision.record_sha256}")
@@ -328,3 +369,61 @@ def _context_text(context: TraceStepContext) -> str:
         parts.extend((f'tool "{context.tool}"', f"occurrence {context.occurrence}"))
     parts.append(f"differing value {presence}")
     return "; ".join(parts) + "."
+
+
+def _suite_comparison(run_dir: Path | str, baseline_id: str, candidate_id: str) -> TraceCheckResult:
+    """Adapt suite evidence to v1's validated, payload-free trace comparator.
+
+    These internal pure helpers are shared deliberately: trace_check.py is outside
+    this work package's ownership and its public suite refusal stays unchanged.
+    """
+    from arci.trace_check import (
+        _first_difference,  # pyright: ignore[reportPrivateUsage]
+        _projection,  # pyright: ignore[reportPrivateUsage]
+        _valid_events,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    try:
+        manifest, trials = load_suite_run(run_dir)
+        gate = decide_suite(manifest, trials)
+        if gate.verdict is Verdict.ERROR:
+            return TraceCheckResult("INVALID", "Suite statistical gate is ERROR.")
+        by_id = {t.trial_id: t for t in trials}
+        baseline, candidate = by_id[baseline_id], by_id[candidate_id]
+        sources = tuple(
+            TraceSource(
+                manifest.experiment_id,
+                trial.trial_id,
+                manifest.record_sha256,
+                trial.record_sha256,
+                gate.record_sha256,
+                trial.outcome.value,
+                gate.verdict.value,
+                gate.exit_code,
+            )
+            for trial in (baseline, candidate)
+        )
+        if (
+            baseline.pair_id != candidate.pair_id
+            or baseline.arm != "baseline"
+            or candidate.arm != "candidate"
+        ):
+            return TraceCheckResult(
+                "INVALID", "Selected trials are not a scheduled pair.", sources[0], sources[1]
+            )
+        if not _valid_events(baseline) or not _valid_events(candidate):
+            return TraceCheckResult(
+                "INVALID", "Selected paired trace is invalid.", sources[0], sources[1]
+            )
+        difference = _first_difference(_projection(baseline), _projection(candidate))
+        return TraceCheckResult(
+            "MATCH" if difference is None else "DRIFT",
+            "Selected normalized traces match."
+            if difference is None
+            else "Selected normalized traces differ.",
+            sources[0],
+            sources[1],
+            difference,
+        )
+    except (OSError, ValueError, TypeError, UnicodeError, RecursionError, KeyError):
+        return TraceCheckResult("INVALID", "Suite store is invalid or unavailable.")
