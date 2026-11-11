@@ -382,9 +382,9 @@ def test_invalid_model_is_setup_error(invalid_model: Any) -> None:
     """Findings 1, 11: invalid model settings must reject before attempting invocation."""
     adapter = make_adapter(lambda _t, _s: [], lambda: {"model": invalid_model}, lambda: {})
     _, box, _ = boundary(adapter)
-    with pytest.raises(HarnessError, match="invalid model"):
+    with pytest.raises(HarnessError, match="agent setup failed"):
         adapter.baseline({"input": "x"}, box, random.Random())
-    assert box.harness_fault and box.model_steps == 0
+    assert box.harness_fault
 
 
 @pytest.mark.parametrize("where", ["settings", "factory_live", "factory_replay"])

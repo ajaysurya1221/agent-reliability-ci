@@ -1,0 +1,316 @@
+{
+  "task": "P3a3-adapter-second-fixes",
+  "status": "Implementation complete; unrestricted full-suite acceptance not established.",
+  "checks": [
+    {
+      "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters tests/unit/toolbox -q",
+      "exit": 0,
+      "outcomes": {
+        ".": 332
+      },
+      "tail": [
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/tests/unit/adapters/test_review_tools.py:70: LangChainBetaWarning: This API is in beta and may change in the future.",
+        "    target = RunnableLambda(extract_key).as_tool(name=\"lookup\", arg_types={\"key\": str})",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html"
+      ]
+    },
+    {
+      "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q",
+      "exit": 1,
+      "outcomes": {
+        ".": 1657,
+        "F": 65,
+        "s": 2
+      },
+      "tail": [
+        "FAILED tests/acceptance/test_runner_replay.py::test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+        "FAILED tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay"
+      ]
+    },
+    {
+      "command": ".venv/bin/ruff format --check . && .venv/bin/ruff check . && .venv/bin/basedpyright",
+      "exit": 0,
+      "tail": [
+        "475 files already formatted",
+        "All checks passed!",
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": ".venv/bin/basedpyright --project pyrightconfig.adapters.json",
+      "exit": 0,
+      "tail": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": "shasum -a 256 -c FROZEN.sha256",
+      "exit": 0,
+      "entries": 54,
+      "tail": [
+        "tests/acceptance/test_stats_gate.py: OK",
+        "uv.lock: OK"
+      ]
+    }
+  ],
+  "regressions": {
+    "pre_fix_failing_cases": 19,
+    "pre_fix_controls_passed": 4,
+    "idle_reset_removal": "Killed deterministically: expected one 30-second idle wait, observed no wait.",
+    "per_attempt_model_marker_reset_removal": "Killed: later binding ValueError escaped instead of latching harness ERROR."
+  },
+  "full_suite_failures": [
+    "tests/acceptance/test_decisions.py::test_a_gated_agent_decides_then_acts_and_everything_is_recorded",
+    "tests/acceptance/test_decisions.py::test_the_real_key_never_enters_the_agent_process",
+    "tests/acceptance/test_decisions.py::test_local_rejections_are_the_agents_problem_not_the_harness",
+    "tests/acceptance/test_decisions.py::test_models_discovery_is_recorded_but_is_not_a_tool_event",
+    "tests/acceptance/test_decisions.py::test_decisions_after_the_mcp_session_closed_are_still_served_and_recorded",
+    "tests/acceptance/test_decisions.py::test_budgets_cover_decision_attempts",
+    "tests/acceptance/test_decisions.py::test_low_confidence_flattens_choices_but_keeps_the_winner",
+    "tests/acceptance/test_decisions.py::test_low_confidence_leaves_an_already_uncertain_answer_alone",
+    "tests/acceptance/test_decisions.py::test_provider_unavailable_is_529_for_the_rest_of_the_trial",
+    "tests/acceptance/test_decisions.py::test_replay_serves_recorded_decisions_and_never_runs_the_fixture",
+    "tests/acceptance/test_decisions.py::test_the_gate_blocks_the_abandoning_agent",
+    "tests/acceptance/test_decisions.py::test_diff_hides_the_state_and_still_locates_the_divergence",
+    "tests/acceptance/test_decisions.py::test_minimisation_keeps_only_the_decision_fault",
+    "tests/acceptance/test_decisions.py::test_http_upstream_gets_the_real_key_and_the_pinned_model",
+    "tests/acceptance/test_decisions.py::test_a_real_provider_failure_is_a_harness_fault_and_a_422_is_passed_through",
+    "tests/acceptance/test_decisions_hardening.py::test_request_validation_is_total",
+    "tests/acceptance/test_decisions_hardening.py::test_the_shapes_the_official_sdk_may_send_are_accepted",
+    "tests/acceptance/test_decisions_hardening.py::test_one_request_per_connection_so_replay_sees_what_the_agent_saw",
+    "tests/acceptance/test_decisions_hardening.py::test_expect_continue_is_answered_at_once_and_never_admitted",
+    "tests/acceptance/test_decisions_hardening.py::test_the_mcp_server_never_inherits_the_real_key",
+    "tests/acceptance/test_decisions_sdk.py::test_the_official_sdk_needs_no_change",
+    "tests/acceptance/test_decisions_sdk.py::test_the_sdk_retries_twice_then_the_agent_degrades",
+    "tests/acceptance/test_decisions_v06.py::test_a_gateway_shaped_upstream_is_accepted_recorded_and_served",
+    "tests/acceptance/test_decisions_v06.py::test_models_discovery_through_the_prefix",
+    "tests/acceptance/test_decisions_v06.py::test_one_bounded_wait_on_429_or_529_then_one_recorded_attempt",
+    "tests/acceptance/test_decisions_v06.py::test_encoding_and_non_json_and_tls_are_one_clear_harness_message",
+    "tests/acceptance/test_decisions_v06.py::test_the_parent_paces_trial_starts_for_http_upstreams",
+    "tests/acceptance/test_decisions_v06.py::test_a_failed_resend_is_a_harness_fault_not_an_agent_failure",
+    "tests/acceptance/test_decisions_v06.py::test_every_probability_must_lie_in_the_unit_interval",
+    "tests/acceptance/test_decisions_v06.py::test_a_dripping_upstream_is_bounded_by_request_seconds",
+    "tests/acceptance/test_decisions_v06.py::test_preflight_is_bounded_by_the_same_deadline",
+    "tests/acceptance/test_decisions_v06.py::test_the_report_lists_decision_tokens_and_cost",
+    "tests/acceptance/test_decisions_v06.py::test_the_raw_upstream_answer_is_recorded_but_never_served",
+    "tests/acceptance/test_decisions_v06.py::test_no_upstream_means_a_null_snapshot",
+    "tests/acceptance/test_decisions_v06.py::test_an_error_on_removal_never_establishes_minimality",
+    "tests/acceptance/test_decisions_v06.py::test_minimality_is_never_claimed_for_a_live_upstream",
+    "tests/acceptance/test_decisions_v06.py::test_preflight_reports_ready_missing_pin_and_unreachable",
+    "tests/acceptance/test_decisions_v06.py::test_preflight_never_prints_provider_controlled_secrets",
+    "tests/acceptance/test_decisions_v06.py::test_the_gate_and_the_hero_story_hold_through_the_gateway",
+    "tests/acceptance/test_hardening.py::test_descendants_are_cleaned_up_after_a_successful_trial",
+    "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[b-BLOCK]",
+    "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[a-PASS]",
+    "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[c-PASS]",
+    "tests/acceptance/test_hero_decisions.py::test_one_clean_run_hides_the_regression",
+    "tests/acceptance/test_hero_decisions.py::test_the_failure_replays_offline_minimises_and_the_repair_passes",
+    "tests/acceptance/test_mcp.py::test_both_clients_pass_without_injection",
+    "tests/acceptance/test_mcp.py::test_injected_timeout_separates_the_retrying_client_from_the_broken_one",
+    "tests/acceptance/test_mcp.py::test_a_client_that_never_touches_its_tools_is_failed_by_the_snapshot_oracle",
+    "tests/acceptance/test_mcp.py::test_timeout_budget_and_cleanup",
+    "tests/acceptance/test_mcp.py::test_replay_mismatch_is_invalid",
+    "tests/acceptance/test_mcp.py::test_the_repaired_client_passes_the_same_fault_live",
+    "tests/acceptance/test_mcp.py::test_experiment_gate_and_cli_for_command_agents",
+    "tests/acceptance/test_mcp.py::test_diff_and_minimise_work_on_command_trials",
+    "tests/acceptance/test_mcp_hardening.py::test_leftover_recording_is_invalid_even_when_the_agent_hangs_to_the_deadline",
+    "tests/acceptance/test_mcp_hardening.py::test_a_client_protocol_mistake_is_the_agents_problem_not_a_harness_error",
+    "tests/acceptance/test_mcp_hardening.py::test_tool_error_text_from_the_bridge_does_not_leak_run_specific_paths",
+    "tests/acceptance/test_mcp_hardening.py::test_large_recordings_are_streamed_not_squeezed_into_one_frame",
+    "tests/acceptance/test_mcp_hardening.py::test_pipelined_large_messages_do_not_deadlock_the_boundary",
+    "tests/acceptance/test_mcp_hardening.py::test_an_infrastructure_exit_code_invalidates_the_trial_instead_of_blaming_the_agent",
+    "tests/acceptance/test_mcp_toolset.py::test_a_python_toolset_becomes_an_mcp_environment",
+    "tests/acceptance/test_mcp_toolset.py::test_fault_injection_and_the_oracle_work_through_the_bridge",
+    "tests/acceptance/test_runner_replay.py::test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+    "tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down",
+    "tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store",
+    "tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay"
+  ],
+  "same_failure_names_as_stored_p3a2_run": true,
+  "permission_diagnostics": [
+    {
+      "test_name": "test_models_discovery_is_recorded_but_is_not_a_tool_event",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_http_upstream_gets_the_real_key_and_the_pinned_model",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        ">       self.socket.bind(self.server_address)"
+      ]
+    },
+    {
+      "test_name": "test_request_validation_is_total",
+      "lines": [
+        "E           AssertionError: ('weird', 'PermissionError: [Errno <n>] Operation not permitted')"
+      ]
+    },
+    {
+      "test_name": "test_the_shapes_the_official_sdk_may_send_are_accepted",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_one_request_per_connection_so_replay_sees_what_the_agent_saw",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_the_official_sdk_needs_no_change",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_a_gateway_shaped_upstream_is_accepted_recorded_and_served",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_models_discovery_through_the_prefix",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_one_bounded_wait_on_429_or_529_then_one_recorded_attempt",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_encoding_and_non_json_and_tls_are_one_clear_harness_message",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_the_parent_paces_trial_starts_for_http_upstreams",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_a_failed_resend_is_a_harness_fault_not_an_agent_failure",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_every_probability_must_lie_in_the_unit_interval",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_a_dripping_upstream_is_bounded_by_request_seconds",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_preflight_is_bounded_by_the_same_deadline",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_the_report_lists_decision_tokens_and_cost",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_minimality_is_never_claimed_for_a_live_upstream",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_preflight_reports_ready_missing_pin_and_unreachable",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_preflight_never_prints_provider_controlled_secrets",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_the_gate_and_the_hero_story_hold_through_the_gateway",
+      "lines": [
+        ">       self.socket.bind(self.server_address)",
+        "E       PermissionError: [Errno 1] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_descendants_are_cleaned_up_after_a_successful_trial",
+      "lines": [
+        "E                   PermissionError: [Errno 1] Operation not permitted: 'ps'"
+      ]
+    },
+    {
+      "test_name": "test_one_clean_run_hides_the_regression",
+      "lines": [
+        "E           AssertionError: ('a', 'PermissionError: [Errno <n>] Operation not permitted')"
+      ]
+    },
+    {
+      "test_name": "test_a_client_protocol_mistake_is_the_agents_problem_not_a_harness_error",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_large_recordings_are_streamed_not_squeezed_into_one_frame",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted"
+      ]
+    },
+    {
+      "test_name": "test_pipelined_large_messages_do_not_deadlock_the_boundary",
+      "lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       AssertionError: assert ('PermissionError: [Errno <n>] Operation not permitted' is not None and 'infrastructure' in 'PermissionError: [Errno <n>] Operation not permitted')",
+        "E        +  where 'PermissionError: [Errno <n>] Operation not permitted' = TrialEnvelope(record_sha256='47d2a0a68c705c7a1086f331e0efc1e618af657e9873262446762935fd4bc392', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16454587499902118)).failure_detail"
+      ]
+    },
+    {
+      "test_name": "test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+      "lines": [
+        "E                   PermissionError: [Errno 1] Operation not permitted: 'ps'",
+        "E       AssertionError: ['PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', 'Perm...', 'PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', ...]"
+      ]
+    }
+  ],
+  "limit": "Current socket bind and ps PermissionErrors plus matching prior failure names support sandbox attribution. Dependent outcome/recording assertions do not all print the permission cause. The orchestrator must rerun outside the sandbox.",
+  "remaining_semantic_limits": [
+    "Custom perturbations must preserve real failure kind/detail; synthetic error-kind failures use injected error text. Recordings cannot distinguish rewritten or fabricated exception diagnostics.",
+    "ARCI accepts partial tool functions rejected by native create_agent in the installed version.",
+    "BaseTool.run supplies the run manager; parent-callback linkage may differ."
+  ]
+}

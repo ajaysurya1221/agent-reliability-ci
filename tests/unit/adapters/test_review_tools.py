@@ -16,7 +16,7 @@ if importlib.util.find_spec("langchain") is None:
     pytest.skip("optional LangChain extra is absent", allow_module_level=True)
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
-from langchain_core.callbacks import CallbackManagerForRetrieverRun, CallbackManagerForToolRun
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.retrievers import BaseRetriever
@@ -59,7 +59,7 @@ def extract_key(value: dict[str, Any]) -> str:
 
 @pytest.mark.parametrize("kind", ["Tool", "retriever", "runnable", "partial"])
 def test_stock_sync_tools_have_native_observations(kind: str) -> None:
-    """Findings 13, 34: stock sync wrappers and partials are valid without user injection."""
+    """Findings 13, 34 / P3a3 item 9: partials are accepted despite native rejection."""
     if kind == "Tool":
         target: BaseTool = Tool(name="lookup", description="Lookup.", func=plain)
         args = {"tool_input": "x"}
@@ -81,6 +81,8 @@ def test_stock_sync_tools_have_native_observations(kind: str) -> None:
     expected_partial: Any = None
     if kind == "partial":
         # Installed ToolNode cannot inspect a bare partial; the public body path can.
+        with pytest.raises(TypeError, match="not a module, class, method, or function"):
+            create_agent(native, tools=[target])
         expected_partial = target.run(args)
     else:
         create_agent(native, tools=[target]).invoke({"messages": [HumanMessage(content="x")]})
@@ -108,19 +110,10 @@ class ConfigTool(BaseTool):
         return str(config) + key
 
 
-class ManagerTool(BaseTool):
-    name: str = "lookup"
-    description: str = "Lookup."
-    args_schema: Any = Input
-
-    def _run(self, key: str, run_manager: CallbackManagerForToolRun | None = None) -> str:
-        return str(run_manager) + key
-
-
-@pytest.mark.parametrize("target", [ConfigTool(), ManagerTool()])
+@pytest.mark.parametrize("target", [ConfigTool()])
 @pytest.mark.parametrize("replaying", [False, True])
 def test_subclass_injection_rejected(target: BaseTool, replaying: bool) -> None:
-    """Findings 13, 34: a user implementation's hidden config/run-manager injection rejects."""
+    """Findings 13, 34 / P3a3 item 5: hidden config injection still rejects."""
     adapter = make_adapter(lambda _t, _s: [target], lambda: {}, lambda: {})
     with pytest.raises(HarnessError, match="injected tool arguments"):
         if replaying:

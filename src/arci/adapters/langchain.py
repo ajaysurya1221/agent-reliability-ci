@@ -7,12 +7,15 @@ classes and round-trippable scrubbed diagnostics, never attributes or exact mess
 A policy can take a different path and still reproduce when sequence, outcome and fingerprint agree.
 Provider retries belong in the model client's settings. The inner handler includes
 LangChain binding/output processing; infrastructure-shaped errors there are also
-classified as infrastructure. Serial execution includes retry backoff. Custom
-injectors should set injected_by: an unmarked error-kind result is indistinguishable
-from a real error in replay and follows the same class-name reconstruction rule.
-For built-in faults, before-hook failures are injected errors; value-only after
-faults (empty_result and decision_low_confidence) preserve any real error. Its
-original exception is raised live and reconstructed in replay despite the fault tag.
+classified as infrastructure. Serial execution includes retry backoff. Live tool
+failures re-raise the original exception. Replay reconstructs error-kind failures
+unless their detail is the injector text "injected error", regardless of fault tag.
+Custom perturbations must preserve real-error kind/detail and use that text for
+synthetic error-kind failures: altered diagnostics or synthetic class-like text
+cannot be distinguished from real errors in the recording and may diverge in replay.
+BaseTool run managers are supplied by BaseTool.run; parent-callback linkage can differ.
+functools.partial tool functions are accepted by ARCI, although native create_agent
+in the supported LangChain version rejects them.
 User error_types override builtin names. Reconstructed exceptions must format to
 the exact recorded diagnostic;
 unrecoverable text (including scrubbed non-literal KeyError keys) is a harness error.
@@ -61,7 +64,6 @@ try:
     )
     from langchain.agents.structured_output import AutoStrategy, ProviderStrategy, ToolStrategy
     from langchain_core.callbacks import BaseCallbackHandler
-    from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, LLMResult
     from langchain_core.runnables import RunnableConfig
@@ -134,6 +136,7 @@ class _Session:
         self.owner: int | None = None
         self.idle_since = time.monotonic()
         self.attempt = 0
+        self.run_started = False
         self.model_started = False
         self.model_region = threading.local()
 
@@ -205,17 +208,19 @@ class _World:
         if {"tool", "self"}.intersection(tool.args):
             self.reject("reserved boundary argument name")
         # Tool's public single-input args differ from its inferred implementation schema.
-        sources: list[Any] = (
-            [] if isinstance(tool, Tool) and tool.args_schema is None else [tool.get_input_schema()]
+        sources: list[tuple[Any, bool]] = (
+            []
+            if isinstance(tool, Tool) and tool.args_schema is None
+            else [(tool.get_input_schema(), False)]
         )
-        sources.extend(getattr(tool, key, None) for key in ("func", "coroutine"))
+        sources.extend((getattr(tool, key, None), False) for key in ("func", "coroutine"))
         # Inspect the user implementation of the ABC's extension points through
         # standard Python reflection, without importing any framework helper.
         for method in BaseTool.__abstractmethods__:
             implementation = getattr(tool, method)
             if not implementation.__module__.startswith("langchain_core."):
-                sources.append(implementation)
-        for source in sources:
+                sources.append((implementation, True))
+        for source, supplies_run_manager in sources:
             if source is None:
                 continue
             signature_source = source
@@ -229,9 +234,11 @@ class _World:
                 self.reject("injected tool arguments")
             if callable(signature_source) and not isinstance(signature_source, type):
                 parameters = inspect.signature(signature_source).parameters
-                if {"tool", "self"}.intersection(parameters):
+                if not isinstance(tool, Tool) and {"tool", "self"}.intersection(parameters):
                     self.reject("reserved boundary argument name")
-                injected_names = {"runtime", "run_manager"}
+                injected_names = {"runtime"}
+                if not supplies_run_manager:
+                    injected_names.add("run_manager")
                 # Stock Runnable/retriever wrappers accept callbacks internally;
                 # user-declared callback injection remains unsupported.
                 if not getattr(source, "__module__", "").startswith("langchain_core."):
@@ -282,9 +289,6 @@ def _proxy(tool: BaseTool, function: Callable[..., Any]) -> BaseTool:
     shared: dict[str, Any] = {
         "name": tool.name,
         "description": tool.description,
-        "extras": copy.deepcopy(tool.extras),
-        "metadata": copy.deepcopy(tool.metadata),
-        "tags": copy.deepcopy(tool.tags),
     }
     if isinstance(tool, Tool):
 
@@ -292,10 +296,16 @@ def _proxy(tool: BaseTool, function: Callable[..., Any]) -> BaseTool:
             del arguments  # A Tool supplies its single input positionally; raw args are captured.
             return function(**kwargs)
 
-        return Tool(func=invoke, args_schema=tool.args_schema, **shared)
-    return StructuredTool(
-        args_schema=tool.args_schema or tool.get_input_schema(), func=function, **shared
-    )
+        proxy: BaseTool = Tool(func=invoke, args_schema=tool.args_schema, **shared)
+    else:
+        proxy = StructuredTool(
+            args_schema=tool.args_schema or tool.get_input_schema(), func=function, **shared
+        )
+    # Constructor validation copies these containers; native tools share them.
+    proxy.extras = tool.extras
+    proxy.metadata = tool.metadata
+    proxy.tags = tool.tags
+    return proxy
 
 
 def _infra(exc: Exception) -> bool:
@@ -322,6 +332,7 @@ class _Outer(Middleware):
 
     def before_agent(self, state: AgentState[Any], runtime: Runtime[None]) -> None:
         self.session.check()
+        self.session.run_started = True
 
     async def abefore_agent(self, state: AgentState[Any], runtime: Runtime[None]) -> None:
         self.session.fail("async invocation")
@@ -425,6 +436,7 @@ class _Inner(Middleware):
     ) -> ModelResponse[Any]:
         session = self.session
         session.budgeted(lambda: session.boundary.note_model_step("model"))
+        session.model_started = False
         try:
             session.model_region.active = True
             try:
@@ -459,7 +471,7 @@ class _Inner(Middleware):
             self.session.replay
             and fault.kind == "error"
             and recorded is not None
-            and recorded.result.injected_by in (None, "empty_result", "decision_low_confidence")
+            and fault.detail != "injected error"
         ):
             name = fault.detail.split(":", 1)[0]
             classes = {value for value in self.errors if format_diagnostic(value.__name__) == name}
@@ -475,7 +487,7 @@ class _Inner(Middleware):
                 self.session.fail("unreconstructable tool error")
             message = fault.detail[len(name) :].removeprefix(": ")
             arguments: list[Any] = [message]
-            with suppress(ValueError, SyntaxError):
+            with suppress(BaseException):
                 arguments.append(ast.literal_eval(message))
             selected = next(iter(classes))
             for argument in arguments:
@@ -614,7 +626,7 @@ def make_adapter(
                 raise
             except BaseException as exc:
                 session.check()
-                if not session.model_started:
+                if not session.run_started:
                     session.fail(f"agent setup failed: {format_diagnostic(exc)}")
                 raise
 
@@ -639,8 +651,6 @@ def make_adapter(
                     session.fail(f"create_agent key {key}")
             if "model" not in kwargs:
                 session.fail("missing model")
-            if not isinstance(kwargs["model"], (str, BaseChatModel)):
-                session.fail("invalid model")
             middleware: list[Middleware] = list(kwargs.pop("middleware", ()))
             if any(getattr(item, "tools", ()) for item in middleware):
                 session.fail("middleware-owned tools")
