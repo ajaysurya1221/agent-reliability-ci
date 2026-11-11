@@ -98,3 +98,12 @@ Orchestrator decisions under D-07. Source: `reviews/P3a-review-workflow.json` (3
 5. Kept as stated limits for the recipe: non-finite numbers in arguments are agent
    failures; tuples and integer-keyed dictionaries as tool results are rejected; empty or
    duplicate call ids are rejected.
+
+## D-09: lanes integrated early; frozen dependency change applied (2026-11-11)
+
+Both lanes passed review and fix verification, and the remaining tasks (suite reports,
+LangChain quickstart and scaffold, HTML report) touch the same files. So the lanes were
+merged into `v2/integration` and ADR 0012's frozen changes were made there, earlier than
+D-04 planned, which also lets hosted CI check the adapter. `uv.lock` added LangChain's
+packages and changed no existing version; it resolves `langchain 1.4.10`. The version stays
+1.0.0 until the release record. Remaining work runs on `v2/integration`, one task at a time.
