@@ -805,7 +805,7 @@ def _brute_force(
             break
         mass[verdict] += probability
         expected_pairs += probability * rounds_run * n
-    return mass, expected_pairs
+    return {str(k): v for k, v in mass.items()}, expected_pairs
 
 
 BRUTE_LAWS: dict[str, tuple[Law, Law]] = {

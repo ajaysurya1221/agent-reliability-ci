@@ -183,7 +183,7 @@ def test_payload_already_lacks_seal_and_created_at() -> None:
     ],
     ids=["default", "reversed-tasks", "reversed-conditions", "other-rule"],
 )
-def test_rule_digest_matches_the_contract_formula(overrides: dict[str, object]) -> None:
+def test_rule_digest_matches_the_contract_formula(overrides: dict[str, Any]) -> None:
     """Contract 3, rule digest: hash_record({"domain": "arci-suite/1 rule", "content": ...})."""
     m = suite_manifest(**overrides)
     digest = suite_rule_sha256(m)
@@ -393,7 +393,7 @@ CHANGES: list[tuple[str, dict[str, object]]] = [
 
 
 @pytest.mark.parametrize("overrides", [c[1] for c in CHANGES], ids=[c[0] for c in CHANGES])
-def test_rule_digest_changes_with_any_other_field(overrides: dict[str, object]) -> None:
+def test_rule_digest_changes_with_any_other_field(overrides: dict[str, Any]) -> None:
     """Contract 3, rule digest: any difference but order, created_at, ids or seal changes it."""
     changed = suite_manifest(**overrides)
     assert suite_rule_sha256(changed) == _ref_rule_sha256(changed)

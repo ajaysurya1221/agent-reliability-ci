@@ -14,6 +14,7 @@ import warnings
 from collections.abc import Collection, Sequence
 from fractions import Fraction
 from functools import cache
+from typing import Any
 
 import pytest
 
@@ -907,7 +908,7 @@ def test_rule_changed_after_the_run_and_resealed_is_error(
     ],
     ids=["below the floor", "errored tolerance leaves PASS unreachable"],
 )
-def test_suite_plan_invalid(overrides: dict[str, object], rounds: int) -> None:
+def test_suite_plan_invalid(overrides: dict[str, Any], rounds: int) -> None:
     """Contract 5, check 4 alone."""
     m = suite_manifest(**overrides)
     trials = _store(m, [_row(ZEROS)] * rounds)

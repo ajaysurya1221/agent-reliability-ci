@@ -50,3 +50,14 @@ unsupported on Windows).
 
 The suite store must refuse to create a run directory unless
 `experiment_id == suite_experiment_id(manifest)`.
+
+## Closing (2026-11-11, after task P1c)
+
+ACCEPT. All section 8 items are implemented. The updated blind acceptance tests pass
+(769 cases). Outside the sandbox: 2,409 tests passed, 2 skipped; calibration bench exit 0
+in 246 s; ruff and strict basedpyright clean; 63 of 63 frozen hashes OK, the 54 earlier
+ones unchanged. The orchestrator fixed seven type annotations in the acceptance tests
+(no assertion changed). Frozen in this step: `suite_schema.py`, `suite_schedule.py`,
+`docs/STATISTICS_SUITE.md`, `docs/design/0011-suite-gate.md` and the five acceptance files.
+The branch is also pushed as `sprint/v2-suite` so hosted CI runs it on Ubuntu and macOS.
+Not done in this re-freeze: the suite section of `docs/AGENT_SEMANTICS.md` (phase 2).
