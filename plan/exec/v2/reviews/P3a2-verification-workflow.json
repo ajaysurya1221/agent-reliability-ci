@@ -1,0 +1,140 @@
+[
+ {
+  "items": [
+   {
+    "item": "Brief item 1: set-up failures are harness ERROR, the user's exception text is kept, and v1's gate cannot PASS a misconfigured adapter (findings 1, 7, 11, 14, 28)",
+    "status": "fixed",
+    "evidence": "I ran real arci.runner trials on HEAD and on HEAD~1, which I extracted to scratch/p3a2verify/old with git archive. Output is in /private/tmp/claude-501/-Users-ajay--claude-spares-spare-8K9guD/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/p3a2verify/all_cases.out, neigh_new.out and neigh_old.out.\n\nEvery set-up case the reviewers listed is now ERROR/harness_error with steps=0, and the cause is kept in the detail:\n- spec_raises: 'agent setup failed: RuntimeError: OPENAI_API_KEY is not set'\n- spec returns None or a list: 'TypeError: agent settings must be a mapping'\n- model=123, object() or None: 'invalid model'\n- nosuchprovider string: 'ValueError: Unable to infer model provider...'\n- openai string: 'ImportError: ... langchain-openai'\n- middleware=None: TypeError; middleware=[object()]: AttributeError\n- system_prompt=5: ValidationError; response_format=17: ValueError\n- duplicate middleware: AssertionError; async-only before_model: 'async invocation'\n- task_to_input raising KeyError('question'), returning 42, a string, None, {'messages':5} or [object()]: ERROR with the cause in the detail\n- make_tools raising or returning garbage: 'tool factory failed: RuntimeError: cannot connect to fixture database' and the like\n\nThe userproj/run_variants.py cases match: spec_raises, model_string_missing_provider and hook_keyerror are ERROR with the cause; factory_keyerror gives \"tool factory failed: KeyError: 'order_id'\"; plain_function_tools gives \"AttributeError: 'function' object has no attribute 'name'\".\n\nNeighbours behave correctly:\n- task_to_input returning a valid input: PASS, steps=2 calls=1.\n- A model raising a non-infrastructure error on its first call is still FAIL/crash, steps=1, live and replay: 'ValueError: bad request from model', RuntimeError, HTTP 400 and 404, and 'ValueError: wrapper' with a TimeoutError cause.\n- after_agent raising after the model ran, before_model raising on step 2, a wrap_model_call bug after the handler, a wrap_tool_call bug and tool-body errors all stay FAIL/crash, as they were before the fix.\n\nv1 gate, real trials, n_per_arm=60 (run_gate.py): spec_raises, input_raises, HTTP 401, HTTP 401 with ModelRetryMiddleware and gaierror all give VERDICT ERROR. Before the fix, spec_raises gave PASS.\n\nThe fixer's tests pass: 68 selected with -k setup|interrupt|infrastructure|mismatch|misconfigured, including test_misconfigured_experiment_cannot_pass_v1_gate."
+   },
+   {
+    "item": "Brief item 2: interrupted runs are rejected (findings 2, 25)",
+    "status": "fixed",
+    "evidence": "Runner trials. Before the fix, HITL was PASS and a tool-body interrupt was FAIL/crash GraphInterrupt.\n- HumanInTheLoopMiddleware(interrupt_on={'lookup': True}) now gives ERROR/harness_error 'LangChain adapter unsupported: interrupted run', steps=1 calls=0.\n- interrupt() inside a tool body gives the same ERROR with no middleware, ToolRetryMiddleware, catch-Exception and catch-BaseException middleware.\n- New neighbours (neigh2.py): a user middleware calling interrupt() in before_model gives ERROR 'interrupted run' steps=0, and in after_model gives ERROR 'interrupted run' steps=1. On HEAD~1 both were FAIL/completed 'oracle rejected final state'."
+   },
+   {
+    "item": "Brief item 4: widened infrastructure rule (401, 403, 407, 408, socket.gaierror, ssl.SSLError; the exception object only, no cause chain) (finding 4)",
+    "status": "fixed",
+    "evidence": "Runner trials with a model that raises on its first call:\n- 401, 403, 408, httpx.HTTPStatusError 401, ssl.SSLError and socket.gaierror are ERROR 'LangChain adapter infrastructure error', steps=1. This holds under no middleware, ModelRetryMiddleware, catch-Exception and catch-BaseException.\n- 407 is ERROR (neigh http407). On HEAD~1 it was FAIL.\n- A 401 inside a hand-written user retry middleware that catches Exception three times and then raises RuntimeError from the last error is ERROR; on HEAD~1 it was PASS.\n- A 401 with ModelFallbackMiddleware to a working model is ERROR; on HEAD~1 it was PASS.\n- Controls are unchanged: 429, 503, builtin ConnectionError, TimeoutError, TransportError and APIConnectionError are ERROR.\n- 400, 404, ValueError, and ValueError with a TimeoutError __cause__ are still FAIL. That confirms the cause chain is not consulted.\n\nOutside D-08, so not counted as defects:\n- requests ConnectionError and ReadTimeout, urllib URLError, and OSError(51) are still FAIL, or PASS under retry or catch middleware. A dead network through a requests- or urllib-based client can still tie both arms.\n- The latch detail is still the bare text and does not name the exception class."
+   },
+   {
+    "item": "Brief item 9: mismatched adapters (finding 19)",
+    "status": "fixed",
+    "evidence": "In userproj/run_variants.py, the 'mixed' manifest (toolset from one make_adapter call, arms from another) was FAIL/completed 'oracle rejected final state' and is now ERROR/harness_error 'LangChain adapter unsupported: mismatched adapter toolset'. The 'ok' variant is still PASS.\n\nThe check is skipped in replay. I replayed the recording of the ok live trial under both manifests (mixed_replay.py): ok replay is PASS and mixed replay is PASS. Replay is consistent and is not falsely rejected. A bundle cannot carry a mismatched manifest anyway, because the live trial is ERROR."
+   }
+  ],
+  "new_defects": [
+   {
+    "title": "User middleware that raises on the first model step is now ERROR 'agent setup failed', even when it is the agent's own policy",
+    "severity": "major",
+    "evidence": "The cutoff is session.model_started, which is set only by the provider's on_chat_model_start callback. So any exception from user before_agent, before_model or a pre-handler wrap_model_call on step 1 is treated as set-up. Runner trials, HEAD \u2192 HEAD~1:\n- a guardrail before_model raising PermissionError('request refused by policy'): ERROR 'agent setup failed: PermissionError...' \u2192 FAIL/crash\n- stock PIIMiddleware('email', strategy='block') with an email in the task input: ERROR 'agent setup failed: PIIDetectionError...' \u2192 FAIL/crash\n- RaiseInModel middleware: ERROR \u2192 FAIL\n- moderation middleware raising ConnectionError: ERROR \u2192 FAIL\n- before_agent raising: ERROR \u2192 FAIL\nThe same hook raising on step 2 is still FAIL (before_model_second). D-08 item 1 names the settings callable, create_agent, task_to_input, graph input rejection and async-only middleware; it does not name user hooks raising at run time.\nThe gate cannot reach a false PASS: any ERROR makes the verdict ERROR. But a candidate whose new guardrail over-blocks valid tasks is a genuine agent regression. It is reported as a harness fault ('agent setup failed') instead of FAIL, and the outcome depends on which step the hook fires. before_agent is the most defensible of these, since it runs once like set-up. The per-step hooks (before_model, wrap_model_call, PII and guardrail middleware) are not.",
+    "fix": "Draw the set-up boundary at graph entry, not at the provider callback. Set-up covers exceptions before _Outer.before_agent runs: builder, create_agent, task_to_input, graph input validation. It also covers exceptions inside _Inner's handler before on_chat_model_start: tool binding, as in no_tools_model, which is correctly ERROR now. An exception from a user middleware hook outside _Inner stays agent behaviour (FAIL). If the orchestrator wants before_agent treated as set-up, state it in D-08 and the recipe. Add runner tests for PIIMiddleware block and a guard that raises in before_model, expecting FAIL."
+   },
+   {
+    "title": "Agents whose middleware answers without invoking the model get 'agent setup failed' for a later run-time error",
+    "severity": "minor",
+    "evidence": "A wrap_model_call middleware returns cached ModelResponses and never calls the handler. The agent executes a real tool call (calls=1), then a user after_agent hook raises. The run is ERROR/harness_error 'agent setup failed: RuntimeError: user after_agent bug', steps=0 calls=1. On HEAD~1 it was FAIL/crash. Source: the neigh.py case shortcircuit_always_after_agent. The cause is that arm()'s catch-all uses `not session.model_started` as its whole test, and that flag is never set when the model is short-circuited. Tool-body errors in the same agent stay FAIL, because they go through _Stop.",
+    "fix": "Treat the run as started once any tool call has entered the boundary or _Outer.after_model has run, as well as on on_chat_model_start. The graph-entry boundary proposed in the major finding above fixes this too."
+   },
+   {
+    "title": "The new model type check rejects model shapes that create_agent accepts",
+    "severity": "minor",
+    "evidence": "`if not isinstance(kwargs['model'], (str, BaseChatModel)): session.fail('invalid model')` rejects RunnableBinding models. Runner trial: a spec with {'model': scripted.with_config(tags=['x'])} is now ERROR 'LangChain adapter unsupported: invalid model', steps=0. On HEAD~1 the same spec was PASS, steps=2 calls=1, so create_agent and the adapter handled it natively. `.bind(...)` and `.with_config(...)` wrappers, and other non-BaseChatModel chat-model wrappers, now fail closed although they worked.",
+    "fix": "Drop the isinstance pre-check, or widen it to what create_agent accepts. Invalid values such as model=123, None or object() would still be ERROR through the new set-up latch, because they fail in create_agent or in binding before on_chat_model_start. Add a test that a with_config-bound model still PASSes."
+   }
+  ]
+ },
+ {
+  "items": [
+   {
+    "item": "3. Order gate deadline (findings 3, 12, 21, 24; D-08 item 4)",
+    "status": "fixed",
+    "evidence": "Real runner, WAIT_SECONDS left at 30, max_seconds 90/120 (scratchpad p3a2verify/gr/rv_slow2.py). 2 calls with the first sleeping 35 s: PASS/completed, 2 recorded, 37.1 s. 4 calls x 11 s: PASS, 4 recorded, 46.1 s; the reviewers got ERROR 'tool order wait timeout' here before the fix. 5 calls, each retried after an 8 s backoff (ToolRetryMiddleware): PASS, 10 recorded, 39.5 s. Hanging first call with max_seconds 20: FAIL/timeout at 20.15 s, not ERROR. True deadlock, run against the real gate's _Session/_Outer (gr/deadlock.py). With c0 never arriving and W=0.5: all 7 waiters got HarnessError 'tool order wait timeout' at 0.50 s, one shared error object, harness_fault set, no thread left alive. With c0 running S s, then c1 never arriving: waiters failed at S+W, never during c0's run (W=0.5/S=1.5 gave 2.02 s; the real W=30/S=35 gave 65.01 s). Healthy messages with WAIT_SECONDS patched below the per-call time: 8 calls x 50 ms at W=0.03, 32 calls x 20 ms at W=0.1, and 32 calls with retry backoff at W=0.05. All three ran 60 reps, every rep completed, 1 distinct event sequence each. Race stress (gr/batch.py, gr/stress2.py): each batch ran in its own subprocess with a 900 s timeout. 300 reps each of n=8 and n=32 with fatal ValueError at first/middle/last, fatal plus flaky OSError retries with jittered backoff and random sleeps, healthy retry backoff, and KeyboardInterrupt swallowed by middleware at first/middle/last. Result: 20/20 batches rc=0, no timeouts or hangs, distinct sealed event sequences + fingerprint + result = 1 in every batch, distinct body orders = 1. Tool-call counts were as expected: n=32 fatal middle 17, last 32, retry last 39, ok_retry 40. 'tests/unit/adapters' gave 289 passed."
+   },
+   {
+    "item": "5. Replay reproduces what it recorded (findings 8, 22, 26, 9, 27, 15, 30)",
+    "status": "fixed",
+    "evidence": "Real runner + make_bundle + replay (gr/rv_replay.py): fatal_keyerror REPRODUCED 20/20 with the same fingerprint fa6e3a49 (it was NOT_REPRODUCED 20/20 before the fix). ValueError, OSError, injected-timeout, oracle-reject and budget cases each REPRODUCED 20/20. gr/up/run_replays.py: typed_valueerror+empty_result REPRODUCED (was INVALID). crash_keyerror plain and +empty_result, crash_valueerror+empty_result, typed_custom_registered+empty_result, tool_error_once and tool_timeout all REPRODUCED. A third-party class named ConnectionError registered in error_types: REPRODUCED. crash_unicode ends as observed=ERROR (fails closed, as the brief says). Builtin sweep (gr/replay_parity.py sweep): every builtin Exception class x 7 argument forms, raised uncaught from a tool, then recorded and replayed. 418 REPRODUCED (same type and diagnostic, recording consumed), 2 unreconstructable harness ERROR (KeyError() and KeyError(7)), 0 mismatches. Branch parity (replay_parity.py parity): 210 combinations of 5 built-in faults x 7 tool behaviours (ok, ValueError, KeyError, OSError, registered and unregistered user class, TimeoutError) x 3 policies (catch, typed retry, uncaught) x with/without fault_exceptions. In 190 of them record, LIVE and replay had identical outcome, observation sequence and call count, the recording was consumed, and no tool body ran in replay. The other 20 are all the unregistered user class: there replay fails closed with 'unreconstructable tool error', the stated rule. error_types precedence: probes7 with a user ConnectionError in error_types replays consumed with 2 calls; without it, replay rebuilds the builtin and diverges, which is the stated name-only limit. See new defect 1 for a gap in literal-value reconstruction."
+   },
+   {
+    "item": "8. Abort flag on any BaseException from a tool body (finding 6)",
+    "status": "fixed",
+    "evidence": "gr/base_probe.py: tool body raises KeyboardInterrupt, SystemExit, GeneratorExit, asyncio.CancelledError or a custom BaseException subclass, under a middleware that swallows BaseException, at (n=4,k=0), (4,2) and (16,15). In all 15 cases bodies = 0..k, tool_calls = k+1, model_steps = 1, harness_fault True, and the original exception is re-raised. Before the fix the reviewers saw all 4 bodies run and a second model step. Under concurrency, the 300-rep ki_catch batches for n=8 and n=32 at first/middle/last were each deterministic (1 distinct event sequence) with tool_calls 1, n/2+1 and n."
+   }
+  ],
+  "new_defects": [
+   {
+    "title": "Replay rebuild lets a non-ValueError/SyntaxError from ast.literal_eval escape as the tool's exception, so the replay silently differs",
+    "severity": "minor",
+    "evidence": "langchain.py _Inner.rebuild runs `with suppress(ValueError, SyntaxError): arguments.append(ast.literal_eval(message))` before the constructor loop. literal_eval raises TypeError on messages like \"{['a']: 'b'}\" or \"{['x', 'y']}\". Pathological input can also raise MemoryError: python 3.13 does so for '-'*100000+'1'. gr/literal_probe.py, tool raises ValueError(\"{['a']: 'b'}\"): live, uncaught, raises 'ValueError: {['a']: 'b'}'; replay raises 'TypeError: unhashable type: 'list'' with harness False. That gives a different crash fingerprint (NOT_REPRODUCED), not the unreconstructable ERROR. Under a catching middleware, live observes ValueError and replay observes TypeError, still with no harness flag. A plain message such as 'plain' replays correctly.",
+    "fix": "Wrap the literal_eval in `except Exception` (or move it inside the per-argument try), so any failure to parse just drops the literal candidate. Add the probe message as a test case."
+   },
+   {
+    "title": "The real-error rule for after-hook faults matches built-in fault names only, so a custom after-hook that tags a real error still diverges",
+    "severity": "minor",
+    "evidence": "rebuild reconstructs only when injected_by is in (None, 'empty_result', 'decision_low_confidence'). gr/custom_after.py: a custom perturbation whose after() sets injected_by='my_tagger' on a real ValueError result. Record: the middleware saw 'ValueError: real'. Replay: it saw 'ToolFault: error: ValueError: real'. The brief scopes the rule to built-in faults and the docstring states it only for them, so this is outside item 5. It is still the same live/replay branch split that findings 9 and 27 reported, for custom injectors.",
+    "fix": "Either state the limit in the recipe (custom after-hooks must not set injected_by on an error result), or decide a real error by its content, not by fault name. One option: live re-raises world.original whenever the body raised; replay reconstructs whenever error_kind is 'error' and the detail is not the injector's own text."
+   }
+  ]
+ },
+ {
+  "items": [
+   {
+    "item": "6. Proxies keep extras, metadata and tags (findings 10, 34)",
+    "status": "fixed",
+    "evidence": "I re-ran the reviewers' parity scripts (copied to p3a2verify/parity) against HEAD 351fba2. kinds.py 'kind:extras/metadata/tags' was DIFF and is now SAME. middleware_cases.py 'mw:user policy reads request.tool.metadata' and all 16 middleware cases are SAME. I also wrote p3a2verify/probe_tools.py, which compares the bound tool definitions (convert_to_openai_tool plus extras, metadata and tags) from native create_agent and from the adapter, and what a user wrap_tool_call sees on request.tool. Both match for StructuredTool and for single-input Tool with extras {'cache_control', 'defer_loading'}, metadata and tags. A policy that blocks on metadata={'approval': True} gives the same 'blocked by policy' error observation, no body runs, nothing is recorded, and replay is equal. Mutants that drop extras, metadata or tags, or remove the Tool branch in _proxy, are each killed by test_proxy_definitions_and_tool_policy_metadata_match_native. One new defect from this fix is listed below (deepcopy)."
+   },
+   {
+    "item": "7. Tool acceptance: Tool, create_retriever_tool, Runnable.as_tool, functools.partial; BaseTool _run with RunnableConfig or run manager; reserved tool/self names (findings 13, 34, 5)",
+    "status": "partly",
+    "evidence": "Checked with probe_tools.py and parity/stock_tools.py. These cases are accepted, run through the boundary, record the call, give native-equal observations, and replay with no bodies run: Tool(func) and Tool.from_function (recorded ('lookup','s:v')), create_retriever_tool (recorded 'doc:cats\\n\\ntwo'), Runnable.as_tool with dict arg_types, as_tool with TypedDict input, StructuredTool with func=partial (positional and keyword), and Tool(func=partial). BaseTool subclasses whose _run takes config: RunnableConfig or run_manager, and an @tool with a config: RunnableConfig parameter, are rejected with 'injected tool arguments', in both live and replay. That is the right reason. @tool def f(tool: str) and the dict and inferred schemas with tool or self are rejected at toolset() with 'reserved boundary argument name'. Still not fixed: RunnableLambda(f).as_tool(name=..., description=...) for a string-input runnable, the simplest as_tool form, works natively ('s:v') but the adapter rejects it with 'LangChain adapter unsupported: injected tool arguments'. as_tool returns a Tool whose func is the bound RunnableLambda.invoke, and its 'config: RunnableConfig | None' annotation trips _injected. The user injected nothing, so this is the same wrong-reason rejection as finding 13 and the brief's 'Runnable.as_tool accepted' is only met for dict/arg_types inputs. The test covers only the arg_types case."
+   },
+   {
+    "item": "10. Missing tests: model-step budget carrier, finding-31 mutation survivors, copied proxy (findings 29, 31, 32)",
+    "status": "fixed",
+    "evidence": "I mutated scratch copies of src/arci (p3a2verify/mutate2.py, results in p3a2verify/mutants2.jsonl) and ran tests/unit/adapters plus tests/unit/toolbox with ARCI_REQUIRE_ADAPTERS=1. A sanity mutant was killed (28 failures). Killed: f29 carrier replaced by a bare note_model_step (3 tests, test_model_budget_carrier_bypasses_recovery_and_backoff); 31a schema source dropped (test_schema_only_injection_is_rejected); 31b attempt index frozen (test_mixed_real_and_injected_replay_advances_attempt_index[0,1]); 31c __context__ followed; 31d any OSError counted as infra; 31e 501 and 600 bounds and the int guard removed (test_infrastructure_rule_exact_boundaries); 31f private name reached through 'import langchain_core.tools.base as _b' (test_only_public_framework_imports_are_used); 31g idle deadline removed, or wait(timeout=None): now a bounded failure in test_serial_gate_timeout_and_reentry_abort_all_waiters instead of a hang; 32 placeholder made silent (test_copied_proxy_rejected[copy] and [model_copy]); a deadline applied while the predecessor runs (test_slow_healthy_predecessor_has_no_gate_deadline). Unmodified suite: 308 passed. Two mutants of the new code survived, listed under new defects and gaps."
+   },
+   {
+    "item": "11. Per-trial overhead and LangChain in the grader (findings 23, 35)",
+    "status": "fixed",
+    "evidence": "I measured with p3a2verify/overhead2.py: 12 graded PASS trials after one warm-up, through arci.runner.run_trial. I waited until no other pytest was running (another session's suite run had pushed load to about 37). At load average about 4.4 to 5.2 on 15 CPUs: new layout (oracle tests.unit.adapters.checks:oracle) median 0.939 s (min 0.925, max 1.022), and again 0.954 s (0.942 to 1.070). Old layout (oracle in a module that imports the adapter fixture) median 1.799 s (1.768 to 1.915). Under the earlier load of about 30 the new layout gave 2.26 to 4.06 s, so earlier figures depend on load. The grader process no longer imports LangChain: an oracle (p3a2verify/ovl/oracle_probe.py) recorded sys.modules inside three grader processes and found no langchain, langchain_core, langgraph or langsmith ('8161 []', '8259 []', '8367 []'). test_grader_check_import_is_framework_free also passes. Caveat: the gain comes from the oracle's location (a fixture change), not from adapter code. A user who puts the oracle in the adapter module still pays about 0.85 s per trial, so the recipe must say so."
+   },
+   {
+    "item": "New ToolBox members is_replay and uses_tools: needed, minimal, tested, abusable?",
+    "status": "fixed",
+    "evidence": "Needed and covered indirectly. Mutants: is_replay always False gives 69 failures; always True gives 3; uses_tools always True gives 2 (test_mismatched_adapter_rejected_before_model); always False gives 183. Restoring the old replay rule (active is None or bool(recording)) fails test_mismatched_adapter_rejected_before_model[False]. Minimal: one read-only bool and one identity comparison ('self.__tools is tools') that returns only a bool and never exposes or calls the mapping. No direct unit test exists in tests/unit/toolbox; coverage comes only through the adapter tests. Leak: is_replay tells the agent whether it is being replayed. That was already derivable from the public, pre-existing ToolBox.recording, which returns the source recording in REPLAY, and _ToolBox__mode is reachable anyway. TRUST_MODEL.md treats the agent as buggy, not hostile, and makes no in-process security claim. So it is no new practical abuse surface; an agent could only choose to misbehave in replay, which it could already do. uses_tools gives nothing beyond identity. Nit, from reading the code (not run): the adapter reads getattr(boundary, 'is_replay', False) but calls boundary.uses_tools directly. A custom boundary that has fail_harness but no uses_tools ends as 'agent setup failed: AttributeError: ...' instead of a fixed message."
+   }
+  ],
+  "new_defects": [
+   {
+    "title": "Canonical documented BaseTool subclass (_run(..., run_manager: Optional[CallbackManagerForToolRun] = None)) is now rejected; it previously had native parity",
+    "severity": "major",
+    "evidence": "parity/kinds.py 'kind:BaseTool subclass + run_manager' was SAME before the fix (old out_kinds.txt) and is now DIFF, with adapter error 'LangChain adapter unsupported: injected tool arguments' while native runs and returns 'rm:k' (probe_tools.py 'BaseTool _run(run_manager) [docs pattern]'). The cause is validate_tool, which now inspects _run and adds 'run_manager' to injected_names. The brief allows 'rejected with the right reason', but this is the form the LangChain docs show for class tools, so many existing user toolsets now fail at registration.",
+    "fix": "Accept a run_manager parameter on _run: BaseTool.run always supplies one, and only parent-callback linkage differs. Or document the rejection prominently in the recipe with a migration hint (drop run_manager). Keep rejecting config: RunnableConfig."
+   },
+   {
+    "title": "Proxy deep-copies extras/metadata/tags, so a tool whose metadata holds a non-copyable object fails setup as harness ERROR",
+    "severity": "minor",
+    "evidence": "p3a2verify/probe_deepcopy.py: StructuredTool with metadata={'client': Client()} where Client holds a threading.Lock. Native create_agent runs it ('got:k'). The adapter raises 'LangChain adapter unsupported: agent setup failed: TypeError: cannot pickle '_thread.lock' object'. Native middleware also receives the same metadata object (identity), while the adapter hands it a copy, made again on every call.",
+    "fix": "Pass tool.extras, tool.metadata and tool.tags by reference (that is what native does), or use a shallow copy that cannot fail."
+   },
+   {
+    "title": "Single-input Tool whose func has a parameter named 'tool' is falsely rejected",
+    "severity": "minor",
+    "evidence": "probe_tools.py 'Tool(func with param tool)': native runs ('t:v'); the adapter gives 'reserved boundary argument name'. A Tool's input travels as __arg1, so no raw 'tool' key ever reaches ToolBox.call. The rejection comes from the signature check on func. The mutant that removes that signature check (i7_no_reserved_sig_check) survives every test, because tool.args already covers every real collision.",
+    "fix": "Drop the func-signature reserved-name check, or skip it for Tool, and rely on the tool.args check that guards the raw-argument keys."
+   },
+   {
+    "title": "Idle-clock reset after each call (item 3) is only flakily tested",
+    "severity": "minor",
+    "evidence": "Mutant gate_no_idle_reset removes 'session.idle_since = time.monotonic()' from the finally block of _Outer.wrap_tool_call. It survived the mutation run. Rerunning test_slow_healthy_predecessor_has_no_gate_deadline against it 3 times gave 1 failed and 2 passed. My 4-call probe (p3a2verify/gate_probe.py, WAIT_SECONDS=0.03, 0.06 s per call) fails on the mutant with 'tool order wait timeout' and passed 15/15 on the real code. So a regression that brings back finding 3 for messages with 3 or more calls would usually pass CI.",
+    "fix": "Make the test deterministic: 4 or more calls, or have the call-k+1 waiter checked while no owner is set, for example by asserting with a barrier that a waiter observing owner None right after a release does not time out."
+   },
+   {
+    "title": "functools.partial tools are accepted although native create_agent rejects them",
+    "severity": "minor",
+    "evidence": "probe_extra.py: create_agent(model, tools=[StructuredTool(..., func=partial(pre, 'p-'))]) raises TypeError ('functools.partial(...) is not a module, class, method, or function') at construction on the installed LangChain 1.4.9. Through the adapter, the proxy is a plain function, so the run succeeds and is graded. ARCI therefore scores an agent configuration that cannot be deployed. test_stock_sync_tools_have_native_observations[partial] hides this by comparing against target.run instead of create_agent. The fixer's report notes it.",
+    "fix": "Either state in the recipe that ARCI accepts partial tools that the installed create_agent rejects, or reject them with a fixed reason ('partial tool function') to keep native parity. The brief asked for acceptance, so the orchestrator should decide."
+   }
+  ]
+ }
+]
