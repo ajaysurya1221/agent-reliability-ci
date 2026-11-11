@@ -37,6 +37,7 @@ from arci.init import (
     InitError,
     parse_request,
     run_init,
+    run_langchain_init,
 )
 
 # --- end init ---
@@ -177,7 +178,33 @@ def _cmd_schema(out_path: str | None) -> int:
 # --- init ---
 def _cmd_init(values: dict[str, object]) -> int:
     """`arci init`: one stdout line (the next command), empty stderr, exit 0; or exit 3."""
+    references = (
+        ("experiment_id", "EXPERIMENT_ID"),
+        ("baseline", "--baseline"),
+        ("candidate", "--candidate"),
+        ("toolset", "--toolset"),
+        ("oracle", "--oracle"),
+    )
     try:
+        if values["langchain"]:
+            options = (
+                *(key for key, _ in references),
+                "task",
+                "task_file",
+                "n",
+                "init_out",
+            )
+            if (
+                any(values.get(key) is not None for key in options)
+                or values["fault"]
+                or values["force"]
+            ):
+                raise InitError("--langchain cannot be combined with other init arguments")
+            print(run_langchain_init())
+            return 0
+        missing = [flag for key, flag in references if values[key] is None]
+        if missing:
+            raise CliError(f"the following arguments are required: {', '.join(missing)}")
         request = parse_request(
             experiment_id=cast(str, values["experiment_id"]),
             baseline=cast(str, values["baseline"]),
@@ -187,8 +214,8 @@ def _cmd_init(values: dict[str, object]) -> int:
             task=cast(str | None, values["task"]),
             task_file=cast(str | None, values["task_file"]),
             faults=tuple(cast(list[str], values["fault"])),
-            n=cast(str, values["n"]),
-            out=cast(str, values["init_out"]),
+            n=cast(str, values.get("n", str(DEFAULT_N_PER_ARM))),
+            out=cast(str, values.get("init_out", DEFAULT_OUT)),
             force=cast(bool, values["force"]),
         )
         print(run_init(request))
@@ -915,18 +942,18 @@ def _parser(*, suite_probe: bool = False) -> _Parser:
         description=(
             "Write an arci.yaml smoke design from four module:function references, checked at "
             "once in a child process (imported and resolved; the toolset is built once with "
-            "the task and seed 0; nothing else is called). Prints the next command."
+            "the task and seed 0; nothing else is called). Or use --langchain alone to write "
+            "an offline LangChain suite in the current directory. Prints the next command."
         ),
     )
-    init.add_argument("experiment_id", metavar="EXPERIMENT_ID", help="also the task id")
-    init.add_argument("--baseline", required=True, metavar="REF", help="module:function agent")
-    init.add_argument("--candidate", required=True, metavar="REF", help="module:function agent")
     init.add_argument(
-        "--toolset", required=True, metavar="REF", help="module:function (task, seed) factory"
+        "--langchain", action="store_true", help="scaffold an offline LangChain suite; use alone"
     )
-    init.add_argument(
-        "--oracle", required=True, metavar="REF", help="module:function (task, state) -> bool"
-    )
+    init.add_argument("experiment_id", nargs="?", metavar="EXPERIMENT_ID", help="also the task id")
+    init.add_argument("--baseline", metavar="REF", help="module:function agent")
+    init.add_argument("--candidate", metavar="REF", help="module:function agent")
+    init.add_argument("--toolset", metavar="REF", help="module:function (task, seed) factory")
+    init.add_argument("--oracle", metavar="REF", help="module:function (task, state) -> bool")
     init.add_argument("--task", metavar="JSON", help="the task, a JSON object (default {})")
     init.add_argument("--task-file", metavar="PATH", help="read the task JSON from a UTF-8 file")
     init.add_argument(
@@ -941,12 +968,16 @@ def _parser(*, suite_probe: bool = False) -> _Parser:
     )
     init.add_argument(
         "--n",
-        default=str(DEFAULT_N_PER_ARM),
+        default=argparse.SUPPRESS,
         metavar="N",
         help=f"trials per arm (default {DEFAULT_N_PER_ARM}: a smoke design)",
     )
     init.add_argument(
-        "--out", dest="init_out", default=DEFAULT_OUT, metavar="PATH", help="default arci.yaml"
+        "--out",
+        dest="init_out",
+        default=argparse.SUPPRESS,
+        metavar="PATH",
+        help="default arci.yaml",
     )
     init.add_argument(
         "--force", action="store_true", help="replace an existing regular file at --out"

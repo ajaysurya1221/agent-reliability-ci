@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import importlib.util
 import json
 import math
 import os
@@ -422,7 +423,10 @@ def _read(handle: IO[bytes]) -> bytes:
 
 
 def check_references(
-    request: InitRequest, *, deadline: float = REFERENCE_CHECK_SECONDS
+    request: InitRequest,
+    *,
+    deadline: float = REFERENCE_CHECK_SECONDS,
+    import_paths: Sequence[str] = (),
 ) -> tuple[str, ...]:
     """Resolve the four references in one child; return the tool names the toolset advertises.
 
@@ -440,7 +444,7 @@ def check_references(
         }
     ).encode("utf-8")
     env = os.environ.copy()
-    env["PYTHONPATH"] = child_pythonpath(())
+    env["PYTHONPATH"] = child_pythonpath(import_paths)
     with (
         tempfile.TemporaryFile() as stdin,
         tempfile.TemporaryFile() as stdout,
@@ -696,3 +700,399 @@ def run_init(request: InitRequest, *, deadline: float = REFERENCE_CHECK_SECONDS)
     check_references(request, deadline=deadline)
     publish(request, render_descriptor(request))
     return next_command(request)
+
+
+# Self-contained wheel templates; kept byte-for-byte in sync with the runnable example.
+# These are source text, never framework imports in the core process.
+LANGCHAIN_FILES: Final[dict[str, str]] = {
+    "tools.py": r'''
+"""A fresh, seeded order desk for each trial; no external service or shared state."""
+
+from __future__ import annotations
+
+import copy
+import random
+from typing import cast
+
+from langchain_core.tools import StructuredTool
+from pydantic import JsonValue
+
+from arci.adapters.langchain import ToolEnv
+
+
+def make_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
+    rng = random.Random(seed)
+    order_id = str(task["order_id"])
+    sku = f"SKU-{rng.randrange(1000, 9999)}"
+    order: dict[str, JsonValue] = {
+        "sku": sku,
+        "total_cents": rng.randrange(1000, 20000),
+        "refunded_cents": 0,
+        "notes": [],
+    }
+    stock = rng.randrange(1, 50)
+
+    def lookup_order(order_id: str) -> dict[str, JsonValue]:
+        """Read an order's SKU, paid amount, refund and notes before changing it."""
+        if order_id != str(task["order_id"]):
+            raise ValueError("unknown order")
+        return copy.deepcopy(order)
+
+    def check_stock(sku: str) -> int:
+        """Return the current available quantity for a SKU."""
+        if sku != order["sku"]:
+            raise ValueError("unknown SKU")
+        return stock
+
+    def issue_refund(order_id: str, amount_cents: int) -> str:
+        """Refund the full paid amount; repeating the same refund is idempotent."""
+        lookup_order(order_id)
+        if amount_cents != order["total_cents"]:
+            raise ValueError("refund must equal the paid amount")
+        order["refunded_cents"] = amount_cents
+        return "refunded"
+
+    def add_note(order_id: str, note: str) -> str:
+        """Append an exact service note once; repeating the same note is idempotent."""
+        lookup_order(order_id)
+        notes = cast(list[JsonValue], order["notes"])
+        if note not in notes:
+            notes.append(note)
+        return "saved"
+
+    def snapshot() -> dict[str, JsonValue]:
+        return {"order_id": order_id, "order": copy.deepcopy(order), "stock": stock}
+
+    return ToolEnv(
+        [
+            StructuredTool.from_function(fn)
+            for fn in (lookup_order, check_stock, issue_refund, add_note)
+        ],
+        snapshot=snapshot,
+    )
+'''.lstrip("\n"),
+    "agent.py": r'''
+"""Swap the two model ids to compare real agents with identical inference settings."""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from langchain.agents.middleware import ToolRetryMiddleware
+from langchain.chat_models import init_chat_model
+from offline_model import OfflineModel
+from tools import make_tools
+
+from arci.adapters.langchain import make_adapter
+
+
+def settings(candidate: bool) -> dict[str, Any]:
+    variable = "ARCI_QUICKSTART_CANDIDATE" if candidate else "ARCI_QUICKSTART_BASELINE"
+    model_id = os.environ.get(variable)
+    # Keep inference settings identical. Ollama's optional reasoning mode is disabled
+    # for both arms; other providers keep their default reasoning mode in both arms.
+    inference: dict[str, Any] = {"temperature": 0}
+    if model_id and model_id.startswith("ollama:"):
+        inference["reasoning"] = False
+    model = (
+        init_chat_model(model_id, **inference)
+        if model_id
+        else OfflineModel(responses=[], candidate=candidate)
+    )
+    # Baseline retries a transient read failure inside the recorded tool boundary.
+    # Candidate removes that retry: clean tests pass, injected exceptions expose it.
+    retry = ToolRetryMiddleware(
+        max_retries=0 if candidate else 1,
+        initial_delay=0,
+        jitter=False,
+        retry_on=(TimeoutError, RuntimeError),
+        on_failure="continue",
+    )
+    return {
+        "model": model,
+        "middleware": [retry],
+        "system_prompt": (
+            "Use the order desk tools. Read the order first. Refund exactly its total_cents. "
+            "For stock notes, read its SKU stock and write exactly 'stock: N'. "
+            "For refund notes write exactly 'refunded'. Retry an empty lookup once."
+        ),
+    }
+
+
+def baseline_settings() -> dict[str, Any]:
+    return settings(False)
+
+
+def candidate_settings() -> dict[str, Any]:
+    return settings(True)
+
+
+toolset, baseline, candidate = make_adapter(
+    make_tools,
+    baseline_settings,
+    candidate_settings,
+    # Keys are fault kinds, not perturbation names such as 'tool_timeout'.
+    fault_exceptions={"timeout": TimeoutError, "error": RuntimeError},
+)
+'''.lstrip("\n"),
+    "offline_model.py": r'''
+"""A small scripted stand-in, not an LLM: read tool results instead of memorising seeds."""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Callable, Sequence
+from typing import Any, cast
+
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models import LanguageModelInput
+from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.runnables import Runnable
+from langchain_core.tools import BaseTool
+
+
+class OfflineModel(FakeMessagesListChatModel):
+    """Both arms solve clean tasks; candidate abandons a task on a tool error."""
+
+    candidate: bool = False
+
+    def bind_tools(
+        self,
+        tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
+        *,
+        tool_choice: str | None = None,
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, AIMessage]:
+        return cast(Runnable[LanguageModelInput, AIMessage], self)
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        prompt = next(m.text for m in messages if isinstance(m, HumanMessage))
+        match = re.search(r"ORD-\d+", prompt)
+        if match is None:
+            raise ValueError("expected an order id")
+        order_id = match.group()
+        replies = [m for m in messages if isinstance(m, ToolMessage)]
+        results: dict[str, Any] = {}
+        for reply in replies:
+            if reply.status == "error":
+                if self.candidate:
+                    return ChatResult(
+                        generations=[ChatGeneration(message=AIMessage(content="Done"))]
+                    )
+                continue
+            try:
+                results[str(reply.name)] = json.loads(reply.text)
+            except ValueError:
+                results[str(reply.name)] = reply.text
+        name, args = "", {}
+        order = results.get("lookup_order")
+        if not order:
+            # An empty read is not proof of success: both arms retry it.
+            name, args = "lookup_order", {"order_id": order_id}
+        elif prompt.startswith("Refund") and "issue_refund" not in results:
+            name, args = (
+                "issue_refund",
+                {"order_id": order_id, "amount_cents": order["total_cents"]},
+            )
+        elif prompt.startswith("Check") and "check_stock" not in results:
+            name, args = "check_stock", {"sku": order["sku"]}
+        elif "note" in prompt and "add_note" not in results:
+            note = "refunded" if prompt.startswith("Refund") else f"stock: {results['check_stock']}"
+            name, args = "add_note", {"order_id": order_id, "note": note}
+        response = (
+            AIMessage(content="Done")
+            if not name
+            else AIMessage(
+                content="", tool_calls=[{"name": name, "args": args, "id": f"call-{len(replies)}"}]
+            )
+        )
+        return ChatResult(generations=[ChatGeneration(message=response)])
+'''.lstrip("\n"),
+    "check.py": r'''
+"""Grade business state only; an agent's claimed success never decides the grade."""
+
+from __future__ import annotations
+
+from pydantic import JsonValue
+
+
+def check(task: dict[str, JsonValue], final_state: dict[str, JsonValue]) -> bool:
+    state = final_state.get("state")
+    if not isinstance(state, dict) or state.get("order_id") != task["order_id"]:
+        return False
+    order = state.get("order")
+    if not isinstance(order, dict):
+        return False
+    action = task["action"]
+    refund = order.get("total_cents") if action in {"refund", "refund_note"} else 0
+    notes = (
+        []
+        if action == "refund"
+        else ["refunded" if action == "refund_note" else f"stock: {state.get('stock')}"]
+    )
+    return order.get("refunded_cents") == refund and order.get("notes") == notes
+'''.lstrip("\n"),
+    "tasks.jsonl": (
+        '{"id": "desk-01", "input": "Refund order ORD-101.", "order_id": "ORD-101", '
+        '"action": "refund"}\n'
+        '{"id": "desk-02", "input": "Refund order ORD-102 and add a refunded note.",'
+        ' "order_id": "ORD-102", "action": "refund_note"}\n'
+        '{"id": "desk-03", "input": "Check stock for order ORD-103 and add a stock n'
+        'ote.", "order_id": "ORD-103", "action": "stock_note"}\n'
+        '{"id": "desk-04", "input": "Refund order ORD-104.", "order_id": "ORD-104", '
+        '"action": "refund"}\n'
+        '{"id": "desk-05", "input": "Refund order ORD-105 and add a refunded note.",'
+        ' "order_id": "ORD-105", "action": "refund_note"}\n'
+        '{"id": "desk-06", "input": "Check stock for order ORD-106 and add a stock n'
+        'ote.", "order_id": "ORD-106", "action": "stock_note"}\n'
+        '{"id": "desk-07", "input": "Refund order ORD-107.", "order_id": "ORD-107", '
+        '"action": "refund"}\n'
+        '{"id": "desk-08", "input": "Refund order ORD-108 and add a refunded note.",'
+        ' "order_id": "ORD-108", "action": "refund_note"}\n'
+        '{"id": "desk-09", "input": "Check stock for order ORD-109 and add a stock n'
+        'ote.", "order_id": "ORD-109", "action": "stock_note"}\n'
+        '{"id": "desk-10", "input": "Refund order ORD-110.", "order_id": "ORD-110", '
+        '"action": "refund"}\n'
+        '{"id": "desk-11", "input": "Refund order ORD-111 and add a refunded note.",'
+        ' "order_id": "ORD-111", "action": "refund_note"}\n'
+        '{"id": "desk-12", "input": "Check stock for order ORD-112 and add a stock n'
+        'ote.", "order_id": "ORD-112", "action": "stock_note"}\n'
+        '{"id": "desk-13", "input": "Refund order ORD-113.", "order_id": "ORD-113", '
+        '"action": "refund"}\n'
+        '{"id": "desk-14", "input": "Refund order ORD-114 and add a refunded note.",'
+        ' "order_id": "ORD-114", "action": "refund_note"}\n'
+        '{"id": "desk-15", "input": "Check stock for order ORD-115 and add a stock n'
+        'ote.", "order_id": "ORD-115", "action": "stock_note"}\n'
+        '{"id": "desk-16", "input": "Refund order ORD-116.", "order_id": "ORD-116", '
+        '"action": "refund"}\n'
+        '{"id": "desk-17", "input": "Refund order ORD-117 and add a refunded note.",'
+        ' "order_id": "ORD-117", "action": "refund_note"}\n'
+        '{"id": "desk-18", "input": "Check stock for order ORD-118 and add a stock n'
+        'ote.", "order_id": "ORD-118", "action": "stock_note"}\n'
+        '{"id": "desk-19", "input": "Refund order ORD-119.", "order_id": "ORD-119", '
+        '"action": "refund"}\n'
+        '{"id": "desk-20", "input": "Refund order ORD-120 and add a refunded note.",'
+        ' "order_id": "ORD-120", "action": "refund_note"}\n'
+        '{"id": "desk-21", "input": "Check stock for order ORD-121 and add a stock n'
+        'ote.", "order_id": "ORD-121", "action": "stock_note"}\n'
+        '{"id": "desk-22", "input": "Refund order ORD-122.", "order_id": "ORD-122", '
+        '"action": "refund"}\n'
+        '{"id": "desk-23", "input": "Refund order ORD-123 and add a refunded note.",'
+        ' "order_id": "ORD-123", "action": "refund_note"}\n'
+        '{"id": "desk-24", "input": "Check stock for order ORD-124 and add a stock n'
+        'ote.", "order_id": "ORD-124", "action": "stock_note"}\n'
+    ),
+    "arci.yaml": r"""
+# A planted, seed-deterministic offline regression: expect BLOCK at round 1.
+# Replace the task file and agent settings before registering your own experiment.
+suite_id: langchain-order-desk
+tasks: tasks.jsonl
+toolset: agent:toolset
+oracle: check:check
+baseline: {label: retry, agent: 'agent:baseline'}
+candidate: {label: no-retry, agent: 'agent:candidate'}
+conditions:
+  - id: clean
+  - id: tool_timeout
+    faults: [{name: tool_timeout, tool: lookup_order, occurrence: 0}]
+  - id: tool_error_once
+    faults: [{name: tool_error_once, tool: lookup_order, occurrence: 0}]
+  - id: empty_result
+    faults: [{name: empty_result, tool: lookup_order, occurrence: 0}]
+# Default alpha=1/20, delta=1/10, stakes=[1/4,1/2], fixed seeds, five-round cap.
+rule: {}
+budgets: {max_tool_calls: 6, max_model_steps: 6, max_seconds: 15, grader_seconds: 10}
+""".lstrip("\n"),
+}
+
+
+def run_langchain_init() -> str:
+    """Publish an offline suite in cwd, never replacing any existing destination.
+
+    All files are staged and checked first. Each publication is an atomic no-clobber
+    hard link; handled failures roll back our links. A process kill can leave a
+    partial scaffold: publication of several directory entries is not a transaction.
+    """
+    if importlib.util.find_spec("langchain") is None:
+        raise InitError("pip install 'agent-reliability-ci[langchain]'")
+    root = Path.cwd()
+    for name in LANGCHAIN_FILES:
+        _check_output(root / name, name, False)
+    linked: list[tuple[Path, Path]] = []
+    try:
+        with tempfile.TemporaryDirectory(prefix=".arci-langchain-", dir=root) as temporary:
+            stage = Path(temporary)
+            try:
+                for name, content in LANGCHAIN_FILES.items():
+                    with (stage / name).open("w", encoding="utf-8", newline="\n") as handle:
+                        handle.write(content)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                from arci.descriptor import loads_suite_descriptor
+
+                manifest = loads_suite_descriptor(
+                    (stage / "arci.yaml").read_text(encoding="utf-8"), str(stage / "arci.yaml")
+                )
+                if not manifest.validate_seal():
+                    raise InitError("the written descriptor did not round-trip; nothing written")
+                request = parse_request(
+                    experiment_id="langchain-order-desk",
+                    baseline="agent:baseline",
+                    candidate="agent:candidate",
+                    toolset="agent:toolset",
+                    oracle="check:check",
+                    task=json.dumps(manifest.tasks[0].task),
+                    task_file=None,
+                    faults=(
+                        "tool_timeout:lookup_order:0",
+                        "tool_error_once:lookup_order:0",
+                        "empty_result:lookup_order:0",
+                    ),
+                    n="8",
+                    out=DEFAULT_OUT,
+                    force=False,
+                )
+                check_references(request, import_paths=(str(stage),))
+                for name in LANGCHAIN_FILES:
+                    source, destination = stage / name, root / name
+                    _check_output(destination, name, False)
+                    try:
+                        os.link(source, destination)
+                    except FileExistsError:
+                        raise InitError(
+                            f"output {_show(name)} exists; use --force to replace it"
+                        ) from None
+                    except OSError as exc:
+                        if exc.errno in _LINKS_UNSUPPORTED:
+                            raise InitError(
+                                f"output {_show(name)}: cannot publish atomically here "
+                                "(hard links unsupported); choose another directory"
+                            ) from None
+                        raise
+                    linked.append((source, destination))
+                _fsync_directory(root)
+            except BaseException as exc:
+                for source, destination in reversed(linked):
+                    with contextlib.suppress(OSError):
+                        if os.path.samestat(source.stat(), destination.lstat()):
+                            destination.unlink()
+                if isinstance(exc, OSError):
+                    raise InitError(
+                        f"cannot write scaffold: {exc.strerror or type(exc).__name__}"
+                    ) from None
+                if isinstance(exc, DescriptorError):
+                    raise InitError(f"the written descriptor does not load: {exc}") from None
+                raise
+    except OSError as exc:
+        raise InitError(f"cannot write scaffold: {exc.strerror or type(exc).__name__}") from None
+    return "arci run arci.yaml"

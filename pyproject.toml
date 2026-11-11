@@ -81,7 +81,7 @@ known-first-party = ["arci", "tests", "examples", "bench"]
 [tool.basedpyright]
 include = ["src", "tests", "bench", "examples"]
 # Adapter paths need their framework's types; pyrightconfig.adapters.json checks them.
-exclude = ["src/arci/adapters", "tests/unit/adapters"]
+exclude = ["src/arci/adapters", "tests/unit/adapters", "examples/langchain_quickstart"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false

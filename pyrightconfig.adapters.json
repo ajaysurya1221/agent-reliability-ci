@@ -1,5 +1,9 @@
 {
-  "include": ["src/arci/adapters", "tests/unit/adapters"],
+  "include": [
+    "src/arci/adapters",
+    "tests/unit/adapters",
+    "examples/langchain_quickstart"
+  ],
   "pythonVersion": "3.11",
   "typeCheckingMode": "strict",
   "reportMissingTypeStubs": false,
