@@ -776,29 +776,31 @@ def make_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
+from configuration import resolve_settings, validate_registration
 from langchain.agents.middleware import ToolRetryMiddleware
 from langchain.chat_models import init_chat_model
 from offline_model import OfflineModel
+from pydantic import JsonValue
 from tools import make_tools
 
-from arci.adapters.langchain import make_adapter
+from arci.adapters.langchain import ToolEnv, make_adapter
 
 
 def settings(candidate: bool) -> dict[str, Any]:
-    variable = "ARCI_QUICKSTART_CANDIDATE" if candidate else "ARCI_QUICKSTART_BASELINE"
-    model_id = os.environ.get(variable)
+    registered = resolve_settings()
+    arm = "candidate" if candidate else "baseline"
+    model_id = str(registered[arm])
     # Keep inference settings identical. Ollama's optional reasoning mode is disabled
     # for both arms; other providers keep their default reasoning mode in both arms.
-    inference: dict[str, Any] = {"temperature": 0}
-    if model_id and model_id.startswith("ollama:"):
+    inference: dict[str, Any] = {"temperature": registered["temperature"]}
+    if registered[f"{arm}_reasoning"] is False:
         inference["reasoning"] = False
     model = (
         init_chat_model(model_id, **inference)
-        if model_id
-        else OfflineModel(responses=[], candidate=candidate)
+        if model_id != "offline:scripted"
+        else OfflineModel(responses=[])
     )
     # Baseline retries a transient read failure inside the recorded tool boundary.
     # Candidate removes that retry: clean tests pass, injected exceptions expose it.
@@ -815,7 +817,8 @@ def settings(candidate: bool) -> dict[str, Any]:
         "system_prompt": (
             "Use the order desk tools. Read the order first. Refund exactly its total_cents. "
             "For stock notes, read its SKU stock and write exactly 'stock: N'. "
-            "For refund notes write exactly 'refunded'. Retry an empty lookup once."
+            "Only add a note when the task asks for one. For refund notes write exactly "
+            "'refunded'. A plain refund needs no note. Retry an empty lookup once."
         ),
     }
 
@@ -828,8 +831,15 @@ def candidate_settings() -> dict[str, Any]:
     return settings(True)
 
 
+def registered_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
+    registered = validate_registration(task)
+    if registered["baseline"] == "offline:scripted":
+        OfflineModel.validate_prompt(task.get("input"))
+    return make_tools(task, seed)
+
+
 toolset, baseline, candidate = make_adapter(
-    make_tools,
+    registered_tools,
     baseline_settings,
     candidate_settings,
     # Keys are fault kinds, not perturbation names such as 'tool_timeout'.
@@ -856,9 +866,24 @@ from langchain_core.tools import BaseTool
 
 
 class OfflineModel(FakeMessagesListChatModel):
-    """Both arms solve clean tasks; candidate abandons a task on a tool error."""
+    """One policy for both arms: abandon on a tool error that middleware did not recover."""
 
-    candidate: bool = False
+    @staticmethod
+    def validate_prompt(prompt: object) -> str:
+        if (
+            not isinstance(prompt, str)
+            or re.fullmatch(
+                r"(?:Refund order ORD-\d+(?: and add a refunded note)?|"
+                r"Check stock for order ORD-\d+ and add a stock note)\.",
+                prompt,
+            )
+            is None
+        ):
+            raise ValueError(
+                "offline model only solves the shipped task wording; "
+                "replace the offline model when replacing tasks"
+            )
+        return prompt
 
     def bind_tools(
         self,
@@ -876,7 +901,7 @@ class OfflineModel(FakeMessagesListChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        prompt = next(m.text for m in messages if isinstance(m, HumanMessage))
+        prompt = self.validate_prompt(next(m.text for m in messages if isinstance(m, HumanMessage)))
         match = re.search(r"ORD-\d+", prompt)
         if match is None:
             raise ValueError("expected an order id")
@@ -885,11 +910,7 @@ class OfflineModel(FakeMessagesListChatModel):
         results: dict[str, Any] = {}
         for reply in replies:
             if reply.status == "error":
-                if self.candidate:
-                    return ChatResult(
-                        generations=[ChatGeneration(message=AIMessage(content="Done"))]
-                    )
-                continue
+                return ChatResult(generations=[ChatGeneration(message=AIMessage(content="Done"))])
             try:
                 results[str(reply.name)] = json.loads(reply.text)
             except ValueError:
@@ -918,6 +939,97 @@ class OfflineModel(FakeMessagesListChatModel):
         )
         return ChatResult(generations=[ChatGeneration(message=response)])
 '''.lstrip("\n"),
+    "configuration.py": r'''
+"""Resolve public inference settings, also stored in each sealed suite task."""
+
+from __future__ import annotations
+
+import math
+import os
+
+from pydantic import JsonValue
+
+
+def resolve_settings() -> dict[str, JsonValue]:
+    baseline = os.environ.get("ARCI_QUICKSTART_BASELINE")
+    candidate = os.environ.get("ARCI_QUICKSTART_CANDIDATE")
+    if (baseline is None) != (candidate is None):
+        raise ValueError(
+            "set both ARCI_QUICKSTART_BASELINE and ARCI_QUICKSTART_CANDIDATE, or neither"
+        )
+    real = baseline is not None
+    if real and any(
+        not value or ":" not in value or value == "offline:scripted" or value.strip() != value
+        for value in (baseline, candidate)
+    ):
+        raise ValueError("both model ids must be nonempty provider:model identifiers")
+    temperature = float(os.environ.get("ARCI_QUICKSTART_TEMPERATURE", "0.7" if real else "0"))
+    if (
+        not math.isfinite(temperature)
+        or (real and temperature <= 0)
+        or (not real and temperature != 0)
+    ):
+        raise ValueError(
+            "temperature must be finite and above 0 for real models, exactly 0 offline"
+        )
+    return {
+        "baseline": baseline or "offline:scripted",
+        "candidate": candidate or "offline:scripted",
+        "temperature": temperature,
+        "baseline_reasoning": False
+        if baseline and baseline.startswith("ollama:")
+        else "provider_default"
+        if real
+        else "not_applicable",
+        "candidate_reasoning": False
+        if candidate and candidate.startswith("ollama:")
+        else "provider_default"
+        if real
+        else "not_applicable",
+    }
+
+
+def validate_registration(task: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    settings = resolve_settings()
+    if task.get("quickstart_settings") != settings:
+        raise ValueError(
+            "quickstart environment disagrees with registered settings; "
+            "run python register.py before starting a new experiment"
+        )
+    return settings
+'''.lstrip("\n"),
+    "register.py": r'''
+"""Register the current public model settings before a new experiment; no model calls."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import yaml
+from configuration import resolve_settings
+
+
+def register(root: Path) -> None:
+    settings = resolve_settings()
+    descriptor = root / "arci.yaml"
+    data: dict[str, Any] = yaml.safe_load(descriptor.read_text())
+    tasks_path = root / data["tasks"]
+    tasks = [json.loads(line) for line in tasks_path.read_text().splitlines() if line.strip()]
+    for task in tasks:
+        task["quickstart_settings"] = settings
+    data.setdefault("rule", {})["scenario_seeds"] = (
+        "fixed" if settings["baseline"] == "offline:scripted" else "per_round"
+    )
+    tasks_path.write_text("".join(json.dumps(task) + "\n" for task in tasks))
+    descriptor.write_text(yaml.safe_dump(data, sort_keys=False))
+
+
+if __name__ == "__main__":
+    register(Path(__file__).resolve().parent)
+    print("Registered model settings; start a new run with arci run arci.yaml")
+'''.lstrip("\n"),
     "check.py": r'''
 """Grade business state only; an agent's claimed success never decides the grade."""
 
@@ -927,70 +1039,146 @@ from pydantic import JsonValue
 
 
 def check(task: dict[str, JsonValue], final_state: dict[str, JsonValue]) -> bool:
+    action = task["action"]
+    if action not in ("refund", "refund_note", "stock_note"):
+        raise ValueError(f"unknown grading action: {action!r}")
     state = final_state.get("state")
     if not isinstance(state, dict) or state.get("order_id") != task["order_id"]:
         return False
     order = state.get("order")
     if not isinstance(order, dict):
         return False
-    action = task["action"]
     refund = order.get("total_cents") if action in {"refund", "refund_note"} else 0
     notes = (
         []
         if action == "refund"
         else ["refunded" if action == "refund_note" else f"stock: {state.get('stock')}"]
     )
-    return order.get("refunded_cents") == refund and order.get("notes") == notes
+    return order.get("refunded_cents") == refund and (
+        action == "refund" or order.get("notes") == notes
+    )
 '''.lstrip("\n"),
     "tasks.jsonl": (
-        '{"id": "desk-01", "input": "Refund order ORD-101.", "order_id": "ORD-101", '
-        '"action": "refund"}\n'
-        '{"id": "desk-02", "input": "Refund order ORD-102 and add a refunded note.",'
-        ' "order_id": "ORD-102", "action": "refund_note"}\n'
-        '{"id": "desk-03", "input": "Check stock for order ORD-103 and add a stock n'
-        'ote.", "order_id": "ORD-103", "action": "stock_note"}\n'
-        '{"id": "desk-04", "input": "Refund order ORD-104.", "order_id": "ORD-104", '
-        '"action": "refund"}\n'
-        '{"id": "desk-05", "input": "Refund order ORD-105 and add a refunded note.",'
-        ' "order_id": "ORD-105", "action": "refund_note"}\n'
-        '{"id": "desk-06", "input": "Check stock for order ORD-106 and add a stock n'
-        'ote.", "order_id": "ORD-106", "action": "stock_note"}\n'
-        '{"id": "desk-07", "input": "Refund order ORD-107.", "order_id": "ORD-107", '
-        '"action": "refund"}\n'
-        '{"id": "desk-08", "input": "Refund order ORD-108 and add a refunded note.",'
-        ' "order_id": "ORD-108", "action": "refund_note"}\n'
-        '{"id": "desk-09", "input": "Check stock for order ORD-109 and add a stock n'
-        'ote.", "order_id": "ORD-109", "action": "stock_note"}\n'
-        '{"id": "desk-10", "input": "Refund order ORD-110.", "order_id": "ORD-110", '
-        '"action": "refund"}\n'
-        '{"id": "desk-11", "input": "Refund order ORD-111 and add a refunded note.",'
-        ' "order_id": "ORD-111", "action": "refund_note"}\n'
-        '{"id": "desk-12", "input": "Check stock for order ORD-112 and add a stock n'
-        'ote.", "order_id": "ORD-112", "action": "stock_note"}\n'
-        '{"id": "desk-13", "input": "Refund order ORD-113.", "order_id": "ORD-113", '
-        '"action": "refund"}\n'
-        '{"id": "desk-14", "input": "Refund order ORD-114 and add a refunded note.",'
-        ' "order_id": "ORD-114", "action": "refund_note"}\n'
-        '{"id": "desk-15", "input": "Check stock for order ORD-115 and add a stock n'
-        'ote.", "order_id": "ORD-115", "action": "stock_note"}\n'
-        '{"id": "desk-16", "input": "Refund order ORD-116.", "order_id": "ORD-116", '
-        '"action": "refund"}\n'
-        '{"id": "desk-17", "input": "Refund order ORD-117 and add a refunded note.",'
-        ' "order_id": "ORD-117", "action": "refund_note"}\n'
-        '{"id": "desk-18", "input": "Check stock for order ORD-118 and add a stock n'
-        'ote.", "order_id": "ORD-118", "action": "stock_note"}\n'
-        '{"id": "desk-19", "input": "Refund order ORD-119.", "order_id": "ORD-119", '
-        '"action": "refund"}\n'
-        '{"id": "desk-20", "input": "Refund order ORD-120 and add a refunded note.",'
-        ' "order_id": "ORD-120", "action": "refund_note"}\n'
-        '{"id": "desk-21", "input": "Check stock for order ORD-121 and add a stock n'
-        'ote.", "order_id": "ORD-121", "action": "stock_note"}\n'
-        '{"id": "desk-22", "input": "Refund order ORD-122.", "order_id": "ORD-122", '
-        '"action": "refund"}\n'
-        '{"id": "desk-23", "input": "Refund order ORD-123 and add a refunded note.",'
-        ' "order_id": "ORD-123", "action": "refund_note"}\n'
-        '{"id": "desk-24", "input": "Check stock for order ORD-124 and add a stock n'
-        'ote.", "order_id": "ORD-124", "action": "stock_note"}\n'
+        '{"id": "desk-01", "input": "Refund order ORD-101.", "order_id": "ORD-1'
+        '01", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-02", "input": "Refund order ORD-102 and add a refunded no'
+        'te.", "order_id": "ORD-102", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-03", "input": "Check stock for order ORD-103 and add a st'
+        'ock note.", "order_id": "ORD-103", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-04", "input": "Refund order ORD-104.", "order_id": "ORD-1'
+        '04", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-05", "input": "Refund order ORD-105 and add a refunded no'
+        'te.", "order_id": "ORD-105", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-06", "input": "Check stock for order ORD-106 and add a st'
+        'ock note.", "order_id": "ORD-106", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-07", "input": "Refund order ORD-107.", "order_id": "ORD-1'
+        '07", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-08", "input": "Refund order ORD-108 and add a refunded no'
+        'te.", "order_id": "ORD-108", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-09", "input": "Check stock for order ORD-109 and add a st'
+        'ock note.", "order_id": "ORD-109", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-10", "input": "Refund order ORD-110.", "order_id": "ORD-1'
+        '10", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-11", "input": "Refund order ORD-111 and add a refunded no'
+        'te.", "order_id": "ORD-111", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-12", "input": "Check stock for order ORD-112 and add a st'
+        'ock note.", "order_id": "ORD-112", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-13", "input": "Refund order ORD-113.", "order_id": "ORD-1'
+        '13", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-14", "input": "Refund order ORD-114 and add a refunded no'
+        'te.", "order_id": "ORD-114", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-15", "input": "Check stock for order ORD-115 and add a st'
+        'ock note.", "order_id": "ORD-115", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-16", "input": "Refund order ORD-116.", "order_id": "ORD-1'
+        '16", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-17", "input": "Refund order ORD-117 and add a refunded no'
+        'te.", "order_id": "ORD-117", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-18", "input": "Check stock for order ORD-118 and add a st'
+        'ock note.", "order_id": "ORD-118", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-19", "input": "Refund order ORD-119.", "order_id": "ORD-1'
+        '19", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-20", "input": "Refund order ORD-120 and add a refunded no'
+        'te.", "order_id": "ORD-120", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-21", "input": "Check stock for order ORD-121 and add a st'
+        'ock note.", "order_id": "ORD-121", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-22", "input": "Refund order ORD-122.", "order_id": "ORD-1'
+        '22", "action": "refund", "quickstart_settings": {"baseline": "offline:'
+        'scripted", "candidate": "offline:scripted", "temperature": 0.0, "basel'
+        'ine_reasoning": "not_applicable", "candidate_reasoning": "not_applicab'
+        'le"}}\n'
+        '{"id": "desk-23", "input": "Refund order ORD-123 and add a refunded no'
+        'te.", "order_id": "ORD-123", "action": "refund_note", "quickstart_sett'
+        'ings": {"baseline": "offline:scripted", "candidate": "offline:scripted'
+        '", "temperature": 0.0, "baseline_reasoning": "not_applicable", "candid'
+        'ate_reasoning": "not_applicable"}}\n'
+        '{"id": "desk-24", "input": "Check stock for order ORD-124 and add a st'
+        'ock note.", "order_id": "ORD-124", "action": "stock_note", "quickstart'
+        '_settings": {"baseline": "offline:scripted", "candidate": "offline:scr'
+        'ipted", "temperature": 0.0, "baseline_reasoning": "not_applicable", "c'
+        'andidate_reasoning": "not_applicable"}}\n'
     ),
     "arci.yaml": r"""
 # A planted, seed-deterministic offline regression: expect BLOCK at round 1.
@@ -1024,10 +1212,14 @@ def run_langchain_init() -> str:
     partial scaffold: publication of several directory entries is not a transaction.
     """
     if importlib.util.find_spec("langchain") is None:
-        raise InitError("pip install 'agent-reliability-ci[langchain]'")
+        raise InitError("pip install 'agent-reliability-ci[langchain]>=2.0.0'")
     root = Path.cwd()
-    for name in LANGCHAIN_FILES:
-        _check_output(root / name, name, False)
+    existing = sorted(root.iterdir())
+    if existing:
+        raise InitError(
+            f"output {_show(existing[0].name)} exists; "
+            "run arci init --langchain in an empty directory"
+        )
     linked: list[tuple[Path, Path]] = []
     try:
         with tempfile.TemporaryDirectory(prefix=".arci-langchain-", dir=root) as temporary:
@@ -1065,12 +1257,12 @@ def run_langchain_init() -> str:
                 check_references(request, import_paths=(str(stage),))
                 for name in LANGCHAIN_FILES:
                     source, destination = stage / name, root / name
-                    _check_output(destination, name, False)
                     try:
                         os.link(source, destination)
                     except FileExistsError:
                         raise InitError(
-                            f"output {_show(name)} exists; use --force to replace it"
+                            f"output {_show(name)} exists; "
+                            "run arci init --langchain in an empty directory"
                         ) from None
                     except OSError as exc:
                         if exc.errno in _LINKS_UNSUPPORTED:
@@ -1095,4 +1287,4 @@ def run_langchain_init() -> str:
                 raise
     except OSError as exc:
         raise InitError(f"cannot write scaffold: {exc.strerror or type(exc).__name__}") from None
-    return "arci run arci.yaml"
+    return "LANGSMITH_TRACING=false LANGSMITH_TRACING_V2=false arci run arci.yaml"

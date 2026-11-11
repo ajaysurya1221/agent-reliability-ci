@@ -11,22 +11,23 @@ round one**. No model server or API key is needed. Its five-step README is the e
 
 Open [agent.py](../../examples/langchain_quickstart/agent.py). Its statements, in order:
 
-1. `os` reads configuration; `Any` describes the framework's heterogeneous settings mapping.
+1. `configuration.py` resolves and validates registered inference settings; `Any` describes the framework's heterogeneous settings mapping.
    `ToolRetryMiddleware` and `init_chat_model` are public LangChain APIs. `OfflineModel` and
    `make_tools` are the user's local files; `make_adapter` is the ARCI boundary.
-2. `settings(candidate)` chooses `ARCI_QUICKSTART_BASELINE` or `ARCI_QUICKSTART_CANDIDATE`.
-   Each is a `provider:model` identifier. The shared `inference` mapping fixes temperature
-   at 0; for Ollama it disables reasoning. Other providers retain their own default reasoning
-   mode. Use matching provider settings for the two arms. An absent variable constructs the
-   scripted offline model. No provider is contacted at module import.
+2. `settings(candidate)` resolves both model ids, shared temperature and reasoning policy.
+   Both model variables must be set or both unset. Real temperature defaults to 0.7 and must
+   be positive; `ARCI_QUICKSTART_TEMPERATURE` overrides it for both arms. Ollama reasoning
+   is disabled; other providers retain the registered `provider_default` policy. The offline
+   model is deterministic at temperature 0. No provider is contacted at module import.
 3. `ToolRetryMiddleware` grants the baseline one retry and the candidate none, with zero
    delay and no jitter. It handles `TimeoutError` and `RuntimeError`, returning a tool-error
-   message when attempts run out. The fake candidate abandons that error; the baseline never
-   sees it after a successful retry. This is the intentionally planted behavioural difference.
+   message when attempts run out. Both arms use the same scripted model, which abandons an
+   unrecovered error. Removing the middleware retry is the only planted difference.
 4. The returned dictionary contains `model`, `middleware` and `system_prompt`: ordinary
    `create_agent` settings, with the same instructions for both arms. The two small settings
    functions select the arm. They are called afresh inside the trial worker.
-5. `make_adapter(make_tools, baseline_settings, candidate_settings, fault_exceptions=...)`
+5. `registered_tools` rejects environment/registration disagreement and unsupported offline
+   task wording before calling `make_tools`. `make_adapter(registered_tools, ...)`
    returns `toolset`, `baseline`, `candidate`, referenced by the descriptor. Fault mappings
    use kinds `timeout` and `error`, not names `tool_timeout` or `tool_error_once`. The factory
    receives task and seed; the default input conversion requires a string `task['input']`.
@@ -55,15 +56,19 @@ The adapter passes the checker this shape:
 `state` is exactly the dictionary returned by `ToolEnv.snapshot`. Without a snapshot callback
 it is `None`. [check.py](../../examples/langchain_quickstart/check.py) imports no agent framework:
 it requires the requested order, the correct refund amount and exactly the requested notes.
+A plain refund imposes no notes condition. An unknown action raises a grader error.
 It ignores claimed success. Snapshot values must be JSON-compatible; the checker must return
 an actual boolean. An oracle exception is ERROR, never agent FAIL. A real system should grade
 its own independently observable effects instead of trusting a self-reported answer.
 
 Clean tasks use two or three tool calls. All four conditions target the first `lookup_order`:
 clean leaves it alone; timeout/error prevent its execution once; empty_result replaces its
-returned value with null. Both scripts retry an empty read; only the baseline retries errors.
+returned value with null. The shared script retries an empty read; only the baseline retries errors.
 Retries of writes require idempotency in your real tool; this example's refund and note are
-idempotent too. A tool fault that never reaches its selected tool never fires.
+idempotent too. A tool fault that never reaches its selected tool never fires. Added faults on tools that some
+tasks never call are diluted into ties; fault accounting in the report shows how often they fired.
+A wrong argument that raises `ValueError` crashes the trial unless the agent handles it; the
+example middleware does not retry that exception.
 
 ## Failure classification
 
@@ -80,9 +85,9 @@ any ERROR as invalid. Candidate hard invariants can force BLOCK independently of
 | Invalid tool arguments, unknown tool, non-finite arguments | Agent-side error; FAIL if not recovered or if the final state is wrong. |
 | Model exception after model invocation, without an infrastructure signature | FAIL/crash unless handled by supported policy. |
 | Model/tool budget exhausted, trial timeout | FAIL/budget or FAIL/timeout; middleware cannot swallow terminal boundary failures. |
-| Tool factory, settings callable, `create_agent`, input conversion or graph input rejection before the first model call | ERROR/harness_error: configuration failure is not a tied pair of agent failures. |
+| Tool factory, settings callable, `create_agent`, input conversion, graph input rejection, or binding/input processing before the provider starts on any model turn | ERROR/harness_error: configuration failure is not a tied pair of agent failures. |
 | Provider HTTP 401, 403, 407, 408, 429 or 5xx; connection/transport timeout, DNS or TLS failure | ERROR/harness_error. Detection includes binding/output processing inside the model handler. |
-| Missing/incompatible framework APIs or mismatched adapter toolset | ERROR/harness_error. Without the extra, `init --langchain` gives the install hint and exits 3. |
+| Missing/incompatible framework APIs or mismatched adapter toolset | ERROR/harness_error. Without the extra, `init --langchain` gives the versioned install hint and exits 3; incompatible APIs can instead produce a reference-check import error. |
 | Unsupported tool/graph/middleware feature, non-JSON tool result, invalid tool-call ids, non-AI model response, interrupt or tool-order deadlock | ERROR/harness_error; the adapter cannot faithfully record it. |
 | Oracle/loader/snapshot failure | ERROR (grader_error or harness_error according to the failing boundary), never agent failure. |
 | Replay call mismatch, missing or unconsumed recording, invalid bundle seal | Invalid replay / ERROR, never a silent live call. |
@@ -152,3 +157,27 @@ variables can enable outgoing traces. Set both `LANGSMITH_TRACING=false` and
 `LANGSMITH_TRACING_V2=false` for offline execution; V2 overrides inherited legacy settings.
 Run stores can contain sensitive task data even with tracing disabled
 ([ADR 0012](../design/0012-optional-framework-extras.md)).
+
+## Registration and suite inspection
+
+Install `agent-reliability-ci[langchain]>=2.0.0`. The scaffold requires an empty directory,
+refuses conflicting packages as well as files, and prints a next command with both LangSmith
+tracing variables disabled. After setting both model variables, run `python register.py`.
+It stores both model ids, temperature and reasoning policies in sealed task metadata and
+selects `scenario_seeds: per_round` for real models. Positive temperature allows model behavior
+to vary between rounds. Per-round seeds vary scenario data; neither establishes independence.
+Settings must match the environment at execution, including execution of an older sealed manifest.
+Unsupported offline prompts are setup ERROR: replace the offline model with the tasks.
+With fixed seeds and the deterministic model every round is identical: BLOCK is by construction,
+not a measurement. Model settings and other manifest content change the experiment id;
+Python source edits, credentials, tracing and provider artifacts behind an unchanged model id do
+not. Source and provider defaults are not automatically hashed; use version control and pinned ids.
+
+Suite `report`, `triage`, `diff` and `plan` are available. `minimize`, `bundle`, `replay` and
+`trace-check` are not built for suites. `run` and `gate` display arm successes and a warning if
+baseline passes fewer than half its trials; ERROR includes the first harness detail and count.
+List failing/errored trials by replacing `RUN_DIR`:
+
+```sh
+python -c 'import json,sys; [print(t["trial_id"],t["arm"],t["outcome"],t.get("failure_detail")) for line in open(sys.argv[1]+"/trials.jsonl") if (t:=json.loads(line))["outcome"] != "PASS"]' RUN_DIR
+```

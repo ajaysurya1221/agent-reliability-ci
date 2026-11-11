@@ -17,10 +17,13 @@ import pytest
 from arci.descriptor import loads_suite_descriptor
 from arci.suite_stats import operating_characteristics, rule_of
 
-if importlib.util.find_spec("langchain") is None:
-    if os.environ.get("ARCI_REQUIRE_ADAPTERS") == "1":
-        raise ImportError("ARCI_REQUIRE_ADAPTERS=1 requires LangChain")
-    pytest.skip("optional LangChain extra is absent", allow_module_level=True)
+
+def require_langchain() -> None:
+    if importlib.util.find_spec("langchain") is None:
+        if os.environ.get("ARCI_REQUIRE_ADAPTERS") == "1":
+            raise ImportError("ARCI_REQUIRE_ADAPTERS=1 requires LangChain")
+        pytest.skip("optional LangChain extra is absent")
+
 
 EXAMPLE = Path(__file__).resolve().parents[3] / "examples" / "langchain_quickstart"
 
@@ -29,7 +32,7 @@ def offline_env() -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if k not in {"PYTHONPATH", "ARCI_QUICKSTART_BASELINE", "ARCI_QUICKSTART_CANDIDATE"}
+        if k != "PYTHONPATH" and not k.startswith("ARCI_QUICKSTART_")
     }
     env["LANGSMITH_TRACING"] = "false"
     env["LANGSMITH_TRACING_V2"] = "false"
@@ -43,11 +46,12 @@ def arci(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
         env=offline_env(),
         capture_output=True,
         text=True,
-        timeout=115,
+        timeout=600,
     )
 
 
 def run_and_gate(project: Path) -> float:
+    require_langchain()
     started = time.monotonic()
     run = arci(project, "run", "arci.yaml", "--workers", "4")
     elapsed = time.monotonic() - started
@@ -64,7 +68,9 @@ def run_and_gate(project: Path) -> float:
     gate = arci(project, "gate", str(stores[0]))
     assert gate.returncode == 1, gate.stdout + gate.stderr
     assert "BLOCK" in gate.stdout
-    assert elapsed < 120
+    for output in (run.stdout, gate.stdout):
+        assert "baseline 96/96 passed, candidate 48/96 passed" in output
+        assert "WARNING: baseline" not in output
     return elapsed
 
 

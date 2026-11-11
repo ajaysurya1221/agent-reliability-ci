@@ -47,6 +47,7 @@ def test_all_tasks_have_the_same_fault_law(monkeypatch: pytest.MonkeyPatch, seed
     monkeypatch.syspath_prepend(str(EXAMPLE))
     monkeypatch.delenv("ARCI_QUICKSTART_BASELINE", raising=False)
     monkeypatch.delenv("ARCI_QUICKSTART_CANDIDATE", raising=False)
+    monkeypatch.delenv("ARCI_QUICKSTART_TEMPERATURE", raising=False)
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     monkeypatch.setenv("LANGSMITH_TRACING_V2", "false")
     agent = importlib.import_module("agent")
@@ -102,8 +103,8 @@ def test_real_model_settings_match(monkeypatch: pytest.MonkeyPatch) -> None:
     agent.baseline_settings()
     agent.candidate_settings()
     assert calls == [
-        ("ollama:baseline", {"temperature": 0, "reasoning": False}),
-        ("ollama:candidate", {"temperature": 0, "reasoning": False}),
+        ("ollama:baseline", {"temperature": 0.7, "reasoning": False}),
+        ("ollama:candidate", {"temperature": 0.7, "reasoning": False}),
     ]
 
 
@@ -128,3 +129,64 @@ def test_offline_environment_disables_inherited_v2_tracing(monkeypatch: pytest.M
         timeout=10,
     )
     assert result.stdout == "False\n"
+
+
+def test_offline_policy_is_identical_for_both_arms(monkeypatch: pytest.MonkeyPatch) -> None:
+    from langchain_core.messages import HumanMessage, ToolMessage
+
+    monkeypatch.syspath_prepend(str(EXAMPLE))
+    for key in ("BASELINE", "CANDIDATE", "TEMPERATURE"):
+        monkeypatch.delenv(f"ARCI_QUICKSTART_{key}", raising=False)
+    agent = importlib.import_module("agent")
+    a, b = agent.baseline_settings(), agent.candidate_settings()
+    assert a["model"].model_dump() == b["model"].model_dump()
+    assert a["system_prompt"] == b["system_prompt"]
+    messages = [
+        HumanMessage(content="Refund order ORD-101."),
+        ToolMessage(content="error", tool_call_id="x", status="error"),
+    ]
+    assert a["model"].invoke(messages).tool_calls == b["model"].invoke(messages).tool_calls == []
+
+
+@pytest.mark.parametrize(
+    "change,detail",
+    [
+        ("prompt", "offline model only solves"),
+        ("one_arm", "set both"),
+        ("settings", "disagrees with registered"),
+    ],
+)
+def test_setup_errors_are_harness_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str, detail: str
+) -> None:
+    import shutil
+
+    from arci.descriptor import loads_suite_descriptor
+    from arci.runner import run_trial
+    from arci.schema import Outcome, Termination
+    from arci.suite_schedule import build_suite_round
+
+    shutil.copytree(EXAMPLE, tmp_path, dirs_exist_ok=True)
+    for key in ("BASELINE", "CANDIDATE", "TEMPERATURE"):
+        monkeypatch.delenv(f"ARCI_QUICKSTART_{key}", raising=False)
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGSMITH_TRACING_V2", "false")
+    if change == "prompt":
+        path = tmp_path / "tasks.jsonl"
+        path.write_text(path.read_text().replace("Refund order ORD-101.", "Please refund ORD-101."))
+    else:
+        monkeypatch.setenv("ARCI_QUICKSTART_BASELINE", "ollama:baseline")
+        if change == "settings":
+            monkeypatch.setenv("ARCI_QUICKSTART_CANDIDATE", "ollama:candidate")
+    path = tmp_path / "arci.yaml"
+    manifest = loads_suite_descriptor(path.read_text(), str(path))
+    trial = run_trial(
+        build_suite_round(manifest, 1)[0],
+        lambda _e: None,
+        manifest.contract,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    assert trial.outcome is Outcome.ERROR
+    assert trial.termination is Termination.HARNESS_ERROR
+    assert detail in (trial.failure_detail or "")
+    assert trial.usage.model_steps == 0

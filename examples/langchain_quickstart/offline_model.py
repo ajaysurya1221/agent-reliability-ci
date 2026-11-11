@@ -17,9 +17,24 @@ from langchain_core.tools import BaseTool
 
 
 class OfflineModel(FakeMessagesListChatModel):
-    """Both arms solve clean tasks; candidate abandons a task on a tool error."""
+    """One policy for both arms: abandon on a tool error that middleware did not recover."""
 
-    candidate: bool = False
+    @staticmethod
+    def validate_prompt(prompt: object) -> str:
+        if (
+            not isinstance(prompt, str)
+            or re.fullmatch(
+                r"(?:Refund order ORD-\d+(?: and add a refunded note)?|"
+                r"Check stock for order ORD-\d+ and add a stock note)\.",
+                prompt,
+            )
+            is None
+        ):
+            raise ValueError(
+                "offline model only solves the shipped task wording; "
+                "replace the offline model when replacing tasks"
+            )
+        return prompt
 
     def bind_tools(
         self,
@@ -37,7 +52,7 @@ class OfflineModel(FakeMessagesListChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        prompt = next(m.text for m in messages if isinstance(m, HumanMessage))
+        prompt = self.validate_prompt(next(m.text for m in messages if isinstance(m, HumanMessage)))
         match = re.search(r"ORD-\d+", prompt)
         if match is None:
             raise ValueError("expected an order id")
@@ -46,11 +61,7 @@ class OfflineModel(FakeMessagesListChatModel):
         results: dict[str, Any] = {}
         for reply in replies:
             if reply.status == "error":
-                if self.candidate:
-                    return ChatResult(
-                        generations=[ChatGeneration(message=AIMessage(content="Done"))]
-                    )
-                continue
+                return ChatResult(generations=[ChatGeneration(message=AIMessage(content="Done"))])
             try:
                 results[str(reply.name)] = json.loads(reply.text)
             except ValueError:

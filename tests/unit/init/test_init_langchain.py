@@ -3,21 +3,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from tests.unit.examples.test_langchain_quickstart import arci, run_and_gate
+from tests.unit.examples.test_langchain_quickstart import arci, require_langchain, run_and_gate
+
+
+def available(_name: str) -> object:
+    return object()
+
+
+def skip_references(*args: Any, **kwargs: Any) -> None:
+    pass
 
 
 def test_scaffold_and_run(tmp_path: Path) -> None:
+    require_langchain()
     result = arci(tmp_path, "init", "--langchain")
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "arci run arci.yaml\n"
+    assert (
+        result.stdout == "LANGSMITH_TRACING=false LANGSMITH_TRACING_V2=false arci run arci.yaml\n"
+    )
     assert result.stderr == ""
     assert {p.name for p in tmp_path.iterdir()} == {
         "tools.py",
         "agent.py",
         "offline_model.py",
+        "configuration.py",
+        "register.py",
         "check.py",
         "tasks.jsonl",
         "arci.yaml",
@@ -27,34 +41,47 @@ def test_scaffold_and_run(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "name", ["tools.py", "agent.py", "offline_model.py", "check.py", "tasks.jsonl", "arci.yaml"]
+    "name",
+    [
+        "tools.py",
+        "agent.py",
+        "offline_model.py",
+        "configuration.py",
+        "register.py",
+        "check.py",
+        "tasks.jsonl",
+        "arci.yaml",
+    ],
 )
 def test_scaffold_never_overwrites(
     tmp_path: Path, name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from arci.init import InitError, run_langchain_init
 
+    monkeypatch.setattr("importlib.util.find_spec", available)
     monkeypatch.chdir(tmp_path)
     (tmp_path / name).write_text("keep me")
     with pytest.raises(InitError) as error:
         run_langchain_init()
-    assert str(error.value) == f"output {name} exists; use --force to replace it"
+    assert (
+        str(error.value) == f"output {name} exists; run arci init --langchain in an empty directory"
+    )
     assert {p.name for p in tmp_path.iterdir()} == {name}
     assert (tmp_path / name).read_text() == "keep me"
 
 
-def test_packaged_templates_match_example_and_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_packaged_templates_match_example(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from arci.init import run_langchain_init
     from tests.unit.examples.test_langchain_quickstart import EXAMPLE
 
     monkeypatch.chdir(tmp_path)
-    assert run_langchain_init() == "arci run arci.yaml"
+    require_langchain()
+    assert (
+        run_langchain_init()
+        == "LANGSMITH_TRACING=false LANGSMITH_TRACING_V2=false arci run arci.yaml"
+    )
     for path in tmp_path.iterdir():
         assert path.read_bytes() == (EXAMPLE / path.name).read_bytes()
-    elapsed = run_and_gate(tmp_path)
-    print(f"scaffold function: BLOCK, round 1, 192 trials, {elapsed:.2f} seconds")
 
 
 def test_missing_extra_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -68,7 +95,9 @@ def test_missing_extra_writes_nothing(tmp_path: Path, monkeypatch: pytest.Monkey
         return None
 
     monkeypatch.setattr(importlib.util, "find_spec", missing)
-    with pytest.raises(InitError, match=r"^pip install 'agent-reliability-ci\[langchain\]'$"):
+    with pytest.raises(
+        InitError, match=r"^pip install 'agent-reliability-ci\[langchain\]>=2.0.0'$"
+    ):
         run_langchain_init()
     assert list(tmp_path.iterdir()) == []
 
@@ -89,7 +118,7 @@ def test_cli_missing_extra_writes_nothing(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
-        "error: CliError: init: pip install 'agent-reliability-ci[langchain]'\n"
+        "error: CliError: init: pip install 'agent-reliability-ci[langchain]>=2.0.0'\n"
     )
     assert list(tmp_path.iterdir()) == []
 
@@ -127,6 +156,8 @@ def test_publish_failure_rolls_back_only_our_files(
     from arci.init import InitError, run_langchain_init
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("importlib.util.find_spec", available)
+    monkeypatch.setattr("arci.init.check_references", skip_references)
     real_link = os.link
 
     def fail_second(source: Path, destination: Path) -> None:
@@ -147,7 +178,6 @@ def test_unwritable_staging_uses_init_error(
 ) -> None:
     import errno
     import tempfile
-    from typing import Any
 
     from arci.init import InitError, run_langchain_init
 
@@ -155,7 +185,23 @@ def test_unwritable_staging_uses_init_error(
         raise PermissionError(errno.EACCES, "Permission denied")
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("importlib.util.find_spec", available)
     monkeypatch.setattr(tempfile, "TemporaryDirectory", denied)
     with pytest.raises(InitError, match="cannot write scaffold: Permission denied"):
         run_langchain_init()
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("name", ["tools", "agent", "configuration", "README.md"])
+def test_nonempty_directory_is_refused(
+    tmp_path: Path, name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from arci.init import InitError, run_langchain_init
+
+    monkeypatch.setattr("importlib.util.find_spec", available)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / name).mkdir()
+    with pytest.raises(InitError, match="run arci init --langchain in an empty directory") as error:
+        run_langchain_init()
+    assert "--force" not in str(error.value)
+    assert list(tmp_path.iterdir()) == [tmp_path / name]

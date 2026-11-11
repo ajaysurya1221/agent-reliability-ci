@@ -65,8 +65,10 @@ from arci.schema import (
     Divergence,
     Manifest,
     MinimizeResult,
+    Outcome,
     ReplayBundle,
     ReplayStatus,
+    Termination,
     TrialEnvelope,
     TrialSpec,
     Verdict,
@@ -333,7 +335,7 @@ def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
     if isinstance(loaded, SuiteManifest):
         trials = run_suite(loaded, out_dir, workers=workers)
         suite_decision = decide_suite(loaded, trials)
-        _print(_suite_summary(suite_decision, len(trials)))
+        _print(_suite_summary(suite_decision, trials))
         print(f"run store: {(Path(out_dir) / loaded.experiment_id).resolve()}", file=sys.stderr)
         return suite_decision.exit_code
     manifest = loaded
@@ -483,14 +485,33 @@ def _cmd_preflight(
     return 0
 
 
-def _suite_summary(decision: SuiteDecision, trials: int) -> str:
+def _suite_summary(decision: SuiteDecision, trials: Sequence[TrialEnvelope]) -> str:
     last = decision.history[-1] if decision.history else None
     lines = [
         f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})",
         f"reason: {'; '.join(decision.reasons)}",
         f"stopping round: {decision.stopped_at_round}",
-        f"pairs: {trials // 2} ({trials} trials)",
+        f"pairs: {len(trials) // 2} ({len(trials)} trials)",
     ]
+    baseline = [trial for trial in trials if trial.arm == "baseline"]
+    candidate = [trial for trial in trials if trial.arm == "candidate"]
+    baseline_passed = sum(trial.outcome is Outcome.PASS for trial in baseline)
+    candidate_passed = sum(trial.outcome is Outcome.PASS for trial in candidate)
+    lines.append(
+        f"baseline {baseline_passed}/{len(baseline)} passed, "
+        f"candidate {candidate_passed}/{len(candidate)} passed"
+    )
+    if 2 * baseline_passed < len(baseline):
+        lines.append(
+            "WARNING: baseline passed fewer than half its trials; "
+            "a non-inferiority PASS says little about absolute reliability."
+        )
+    if decision.verdict is Verdict.ERROR:
+        errors = [trial for trial in trials if trial.termination is Termination.HARNESS_ERROR]
+        if errors:
+            detail = errors[0].failure_detail
+            count = sum(trial.failure_detail == detail for trial in errors)
+            lines.append(f"first harness error ({count} trials): {detail or 'detail unavailable'}")
     if last is not None:
         c = last.counts
         lines += [
@@ -553,7 +574,7 @@ def _cmd_suite_gate(run_dir: str, junit_path: str | None, markdown_path: str | N
         comparison = (
             "stored decision: MATCH" if matches else "stored decision: MISMATCH (ERROR, exit 3)"
         )
-    summary = _suite_summary(decision, len(trials)) + comparison + "\n"
+    summary = _suite_summary(decision, trials) + comparison + "\n"
     if not matches:
         summary = "VERDICT: ERROR (exit 3)\n" + summary.replace(
             "VERDICT:", "recomputed verdict:", 1
