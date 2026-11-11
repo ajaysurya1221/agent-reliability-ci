@@ -24,6 +24,10 @@ dependencies = [
   "pyyaml>=6,<7",
 ]
 
+[project.optional-dependencies]
+# One extra per framework adapter (docs/design/0012-optional-framework-extras.md).
+langchain = ["langchain>=1.4.9,<2"]
+
 [dependency-groups]
 dev = [
   "basedpyright>=1.37,<2",
@@ -33,6 +37,8 @@ dev = [
   # Only for tests/acceptance/test_decisions_sdk.py: the official SDK against the boundary.
   "typesafe-sdk>=0.7,<1",
 ]
+# Adapter tests and type checks only; core jobs never install this group.
+adapters = ["langchain>=1.4.9,<2"]
 
 [project.urls]
 Homepage = "https://github.com/ajaysurya1221/agent-reliability-ci"
@@ -74,6 +80,8 @@ known-first-party = ["arci", "tests", "examples", "bench"]
 
 [tool.basedpyright]
 include = ["src", "tests", "bench", "examples"]
+# Adapter paths need their framework's types; pyrightconfig.adapters.json checks them.
+exclude = ["src/arci/adapters", "tests/unit/adapters"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false

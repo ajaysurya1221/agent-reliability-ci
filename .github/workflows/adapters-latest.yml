@@ -1,0 +1,41 @@
+name: Adapters (latest)
+
+# Weekly: the newest LangChain releases inside the allowed range. Reports, never blocks.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.5"
+  LANGSMITH_TRACING: "false"
+  ARCI_REQUIRE_ADAPTERS: "1"
+
+jobs:
+  latest:
+    name: adapters / latest in range
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Sync, then upgrade the adapter packages inside the allowed range
+        run: |
+          uv sync --frozen --group adapters
+          uv pip install --python .venv/bin/python --upgrade "langchain>=1.4.9,<2" langchain-core langgraph langgraph-prebuilt
+          uv pip freeze --python .venv/bin/python | grep -E "^(langchain|langgraph)"
+      - name: Adapter tests
+        run: .venv/bin/pytest -p no:cacheprovider tests/unit/adapters tests/unit/toolbox
+      - name: Adapter type check
+        run: .venv/bin/basedpyright --project pyrightconfig.adapters.json
