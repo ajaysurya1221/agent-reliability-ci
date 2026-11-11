@@ -48,17 +48,29 @@ JSON output of `plan_to_json` (schema "arci.plan.v1"; these keys are stable):
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import lru_cache
 from itertools import pairwise
+from pathlib import Path
 from typing import Final
 
 from arci.gate import classify
 from arci.schema import Verdict
 from arci.stats import clopper_pearson_tail, difference_bounds
+from arci.suite_schedule import suite_cells
+from arci.suite_schema import SuiteManifest
+from arci.suite_stats import (
+    check_suite_plan,
+    earliest_block_round,
+    earliest_pass_round,
+    never_differs_pass_round,
+    operating_characteristics,
+    rule_of,
+)
 
 SCHEMA: Final = "arci.plan.v1"
 INTERVAL_METHOD: Final = "clopper_pearson"
@@ -67,6 +79,235 @@ DEFAULT_N_GRID: Final = (20, 50, 100, 200, 400)
 OUTCOMES: Final = (Verdict.PASS, Verdict.BLOCK, Verdict.INCONCLUSIVE)
 CONDITIONS: Final = 1
 LOOKS: Final = 1
+
+
+def _probability(value: object) -> Fraction:
+    if not isinstance(value, (str, int)) or isinstance(value, bool):
+        raise ValueError("probabilities must be decimal or rational numbers")
+    try:
+        result = Fraction(value)
+    except (ValueError, ZeroDivisionError):
+        raise ValueError("probabilities must be finite decimal or rational numbers") from None
+    if not 0 <= result <= 1:
+        raise ValueError("probabilities must be in [0, 1]")
+    return result
+
+
+def homogeneous_suite_law(
+    baseline_rate: str, candidate_rate: str, agreement: str
+) -> tuple[Fraction, Fraction, Fraction]:
+    """Recover all four joint masses from two marginals and P(A == B)."""
+    a, b, same = map(_probability, (baseline_rate, candidate_rate, agreement))
+    both = (a + b + same - 1) / 2
+    neither, minus, plus = 1 - a - b + both, a - both, b - both
+    if min(both, neither, minus, plus) < 0:
+        raise ValueError(
+            "baseline-rate, candidate-rate and agreement do not define a valid joint law"
+        )
+    return minus, both + neither, plus
+
+
+def _suite_file_laws(
+    path: Path, manifest: SuiteManifest
+) -> tuple[tuple[Fraction, Fraction, Fraction], ...]:
+    """JSON rows keyed by task_id/condition_id with p00, p01, p10 and p11.
+
+    The first bit is baseline; every registered cell must appear exactly once.
+    Decimal spellings are preserved for exact arithmetic.
+    """
+    raw: object = json.loads(path.read_text(encoding="utf-8"), parse_float=str)
+    if not isinstance(raw, list):
+        raise ValueError(
+            "cell laws must be a JSON list of task_id, condition_id, p00, p01, p10, p11 objects"
+        )
+    rows: dict[tuple[str, str], tuple[Fraction, Fraction, Fraction]] = {}
+    for item in raw:
+        if not isinstance(item, dict) or set(item) != {
+            "task_id",
+            "condition_id",
+            "p00",
+            "p01",
+            "p10",
+            "p11",
+        }:
+            raise ValueError("each cell law requires task_id, condition_id, p00, p01, p10, p11")
+        task, condition = item["task_id"], item["condition_id"]
+        if not isinstance(task, str) or not isinstance(condition, str):
+            raise ValueError("cell ids must be strings")
+        key = task, condition
+        if key in rows:
+            raise ValueError("duplicate cell law")
+        p00, p01, p10, p11 = (_probability(item[name]) for name in ("p00", "p01", "p10", "p11"))
+        if p00 + p01 + p10 + p11 != 1:
+            raise ValueError("joint cell probabilities must sum to one")
+        rows[key] = p10, p00 + p11, p01
+    keys = tuple(
+        (task.task_id, condition.condition_id) for task, condition in suite_cells(manifest)
+    )
+    if set(rows) != set(keys):
+        raise ValueError("one joint law is required for every registered cell, with no extra cells")
+    return tuple(rows[key] for key in keys)
+
+
+def suite_plan(
+    manifest: SuiteManifest,
+    *,
+    baseline_rate: str | None = None,
+    candidate_rate: str | None = None,
+    agreement: str | None = None,
+    cell_laws: Path | None = None,
+) -> dict[str, object]:
+    """Exact floors and bounded exact projections, never an unstated outcome model."""
+    warnings = check_suite_plan(manifest)
+    rule = rule_of(manifest)
+    model = "No model supplied; floors only."
+    laws: tuple[tuple[Fraction, Fraction, Fraction], ...] | None = None
+    inputs = (baseline_rate, candidate_rate, agreement)
+    if cell_laws is not None:
+        if any(value is not None for value in inputs):
+            raise ValueError("choose cell laws or the homogeneous model, not both")
+        laws = _suite_file_laws(cell_laws, manifest)
+        model = "Projection under the supplied per-cell joint laws."
+    elif any(value is not None for value in inputs):
+        if baseline_rate is None or candidate_rate is None or agreement is None:
+            raise ValueError(
+                "the homogeneous model requires all three: "
+                "--baseline-rate, --candidate-rate, --agreement"
+            )
+        law = homogeneous_suite_law(baseline_rate, candidate_rate, agreement)
+        laws = (law,) * manifest.n_cells
+        model = (
+            f"Projection under a homogeneous joint law: baseline-rate={baseline_rate}, "
+            f"candidate-rate={candidate_rate}, agreement={agreement}."
+        )
+    projection: dict[str, str] | None = None
+    status = "floors only: no model supplied"
+    if laws is not None:
+        # Bound packed-integer work, rather than rejecting ordinary default budgets
+        # just above 400 pairs. Zero-probability outcomes remove a state dimension
+        # (common homogeneous agreement models have only two outcomes).
+        pairs = manifest.registered_pairs
+        bits = (
+            sum(math.lcm(*(p.denominator for p in law)).bit_length() for law in laws)
+            * rule.max_rounds
+        )
+        minus = any(law[0] for law in laws)
+        plus = any(law[2] for law in laws)
+        dimensions = int(minus) + int(plus)
+        states_work = (
+            (pairs + 1) * (pairs + 2) * (2 * pairs + 3) // 6 - 1
+            if dimensions == 2
+            else (pairs + 1) * (pairs + 2) // 2 - 1
+            if dimensions == 1
+            else pairs
+        )
+        bit_work = states_work * (bits + 1)
+        # Calibrated against the exact kernel; this is a conservative admission
+        # estimate, not a wall-clock guarantee. Boundary construction also costs
+        # O(sum(round_pairs**2)) regardless of outcome support.
+        boundary_work = (
+            rule.n_cells**2
+            * rule.max_rounds
+            * (rule.max_rounds + 1)
+            * (2 * rule.max_rounds + 1)
+            // 6
+        )
+        if bits > 8192:
+            status = (
+                f"rational precision too large to enumerate: {bits} denominator bits "
+                "exceeds limit 8192; floors only"
+            )
+        elif bit_work > 100_000_000_000 or boundary_work > 100_000_000:
+            status = (
+                f"estimated work too large to enumerate: {bit_work} packed bit-operations "
+                f"(limit 100000000000), {boundary_work} boundary states "
+                "(limit 100000000); floors only"
+            )
+        else:
+            oc = operating_characteristics(laws, rule)
+            projection = {
+                "PASS": str(oc.p_pass),
+                "BLOCK": str(oc.p_block),
+                "INCONCLUSIVE": str(oc.p_inconclusive),
+                "expected_pairs": str(oc.expected_pairs),
+                "expected_sessions": str(2 * oc.expected_pairs),
+            }
+            status = "exact projection"
+    return {
+        "schema": "arci.plan.suite.v1",
+        "rule": {
+            "alpha": manifest.alpha,
+            "delta": manifest.delta,
+            "stakes": manifest.stakes,
+            "threshold": f"{rule.threshold.numerator}/{rule.threshold.denominator}",
+            "n_cells": rule.n_cells,
+            "max_rounds": rule.max_rounds,
+            "scenario_seeds": manifest.scenario_seeds,
+            "max_errored_pairs": rule.max_errored_pairs,
+        },
+        "floors": {
+            "earliest_pass_round": earliest_pass_round(rule),
+            "earliest_block_round": earliest_block_round(rule),
+            "never_differs_pass_round": never_differs_pass_round(rule),
+        },
+        "warnings": warnings,
+        "model": model,
+        "laws": None
+        if laws is None
+        else [
+            {
+                "task_id": task.task_id,
+                "condition_id": condition.condition_id,
+                "minus": str(law[0]),
+                "zero": str(law[1]),
+                "plus": str(law[2]),
+            }
+            for (task, condition), law in zip(suite_cells(manifest), laws, strict=True)
+        ],
+        "assumptions": (
+            "Cells and rounds are independent, each cell has the same joint law "
+            "in every round; no errors or hard violations. These are model projections, "
+            "not measured live-agent behavior or a guarantee averaged over seeds."
+        )
+        if laws is not None
+        else None,
+        "status": status,
+        "projection": projection,
+    }
+
+
+def _six_places(value: str) -> str:
+    exact = Fraction(value)
+    truncated = exact.numerator * 1_000_000 // exact.denominator
+    decimal = f"{truncated // 1_000_000}.{truncated % 1_000_000:06d}"
+    if exact and not truncated:
+        return "<0.000001 (positive)"
+    return decimal
+
+
+def render_suite_plan(document: dict[str, object]) -> str:
+    """Readable truncated decimals; machine output retains the exact fractions."""
+    lines = ["# Suite plan", "", str(document["model"]), ""]
+    if document["assumptions"] is not None:
+        lines.extend([str(document["assumptions"]), ""])
+    for section in ("rule", "floors", "projection"):
+        values = document[section]
+        if isinstance(values, dict):
+            if section == "projection":
+                lines.append("Decimals are truncated to six places; exact fractions are in JSON.")
+            for key, value in values.items():
+                display = _six_places(str(value)) if section == "projection" else value
+                if key == "stakes" and isinstance(value, (tuple, list)):
+                    display = ", ".join(str(stake) for stake in value)
+                lines.append(f"{key}: {display}")
+            lines.append("")
+    lines.extend([str(document["status"]), ""])
+    warnings = document["warnings"]
+    if isinstance(warnings, tuple):
+        lines.extend(f"Warning: {warning}" for warning in warnings)
+    return "\n".join(lines) + "\n"
+
+
 # The manifest's supported alpha range; with K=1 and one look the per-arm tail alpha/4 then stays
 # at or above the 2.5e-7 floor that `clopper_pearson_tail` accepts.
 _ALPHA_MIN: Final = 1e-6

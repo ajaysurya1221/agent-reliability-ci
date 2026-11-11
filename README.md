@@ -28,6 +28,35 @@ choosing a larger confirmatory run.
 ARCI observes calls that cross its tool boundary. It is not a sandbox, it does not replay model
 inference, and trace divergence shows where runs differ, not why.
 
+## New in 2.0: many tasks, and LangChain agents
+
+**Suites.** v1 gates one task under a few fault conditions. A suite registers many tasks by
+fault conditions and gates the suite average, in rounds, stopping as soon as the evidence
+decides. A PASS covers the average and can hide a regression in one task, so the per-task
+table sits beside every verdict. Nothing can PASS before about 80 paired runs at the
+default margin. The statistics and their assumptions are in
+[docs/STATISTICS_SUITE.md](docs/STATISTICS_SUITE.md).
+
+**LangChain.** If your agent is built with `create_agent`, ARCI can run it behind its tool
+boundary: you supply your tools, two settings functions and a check.
+
+```bash
+pip install 'agent-reliability-ci[langchain]>=2.0.0'
+mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
+```
+
+That runs a 24-task example offline with a scripted model and ends in `BLOCK`, by
+construction. To compare real models, see
+[examples/langchain_quickstart](examples/langchain_quickstart/README.md) and the
+[recipe](docs/recipes/langchain.md).
+
+**One recorded comparison.** A pre-registered run of that example on two local models
+(12B baseline, 4B candidate, temperature 0.7) ended in `BLOCK` after one round: 96 of 96
+against 70 of 96, with the prediction written beforehand being `PASS`. The report also
+showed the injected fault firing in 24 of 24 baseline trials but 18 to 20 of 24 candidate
+trials per faulted condition. It is one comparison on one suite and says nothing about
+these models elsewhere. Report: [docs/results/order-desk-study.html](docs/results/order-desk-study.html).
+
 ## Try the offline demo
 
 Python 3.11+, POSIX and [uv](https://docs.astral.sh/uv/). Installation needs network; the fixture makes
@@ -417,6 +446,27 @@ there for steps that run after the gate. This repository's own CI runs the test 
 re-derives the archived decisions, smoke-tests the built wheel on Linux and macOS, and runs the Action
 on a committed fixture that must BLOCK.
 
+The v2.0.0 release candidate adds opt-in `pr-comment: "true"`: it uploads the offline HTML
+report and creates or updates a PR summary. These inputs are not available on the v1.0.0 tag
+above; use a verified v2 revision. Grant `pull-requests: write` and serialize runs for each PR:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+```
+
+Add `pr-comment: "true"` under the Action's `with`. The default comment identity includes the
+workflow, job id and manifest path. Set `comment-id` to a stable experiment name to survive
+workflow or manifest renames; it remains scoped to the job id. For matrix jobs, set `comment-id`
+to include the matrix values (for example, `comment-id: reliability-${{ matrix.python }}`).
+Renaming a job or changing an identity creates a new comment; old comments retain their recorded
+head SHA and run id. Forks without write access skip comments softly. Upload or comment failures
+never change the gate result. Racing duplicate comments are refreshed on the next run, not deleted.
+
 ## What it does not do
 
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
@@ -450,7 +500,7 @@ on a committed fixture that must BLOCK.
   calls to confirm injection.
 - Command agents get one stdio MCP server (revision 2026-07-28), serial tool calls, no HTTP
   transport, no concurrent decisions.
-- No importers (OTLP, Claude Code, Codex), no HTML report yet. POSIX only: on Windows the package
+- No importers (OTLP, Claude Code, Codex). POSIX only: on Windows the package
   installs and `arci --help` runs, but experiments are unsupported.
 
 **Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)

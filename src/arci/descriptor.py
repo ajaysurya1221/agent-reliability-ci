@@ -52,6 +52,7 @@ from arci.schema import (
     Manifest,
     McpServerSpec,
 )
+from arci.suite_schema import SUITE_MAX_PAIRS, SUITE_SCHEMA_VERSION, SuiteId, SuiteManifest
 
 SCHEMA_TITLE = "ARCI experiment descriptor"
 SCHEMA_ID = (
@@ -1029,3 +1030,439 @@ def descriptor_schema() -> dict[str, Any]:
 def render_schema() -> str:
     """The bytes of `arci schema` and docs/schema/arci.schema.json."""
     return json.dumps(descriptor_schema(), indent=2, sort_keys=True) + "\n"
+
+
+# --- suites: separate models preserve the v1 API and generated schema bytes -------------------
+
+
+class SuiteRuleDescriptor(_Model):
+    alpha: str = "1/20"
+    delta: str = "1/10"
+    stakes: tuple[str, ...] = ("1/4", "1/2")
+    max_rounds: int | None = Field(default=None, ge=1)
+    scenario_seeds: Literal["fixed", "per_round"] = "fixed"
+    max_errored_pairs: int | None = Field(default=None, ge=0)
+    acknowledge_single_round: bool = False
+
+    @field_validator("max_rounds", "max_errored_pairs", mode="before")
+    @classmethod
+    def _explicit_budget(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("use an integer or omit the key to use its default")
+        return value
+
+    @field_validator("alpha", "delta", mode="before")
+    @classmethod
+    def _rational(cls, value: object) -> str:
+        return _suite_rational(value)
+
+    @field_validator("stakes", mode="before")
+    @classmethod
+    def _stakes(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+        return tuple(_suite_rational(item) for item in cast(list[object], value))
+
+
+def _suite_rational(value: object) -> str:
+    from fractions import Fraction
+
+    from arci.suite_schema import format_rational, parse_rational
+
+    hint = "use a positive rational in lowest terms, with at most 7 digits per part (e.g. 1/20)"
+    if isinstance(value, bool) or not isinstance(value, str | int):
+        raise ValueError(hint)
+    text = str(value)
+    try:
+        if "/" in text:
+            parse_rational(text)
+            return text
+        if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", text):
+            raise ValueError(hint)
+        # Bound decimal parsing before Fraction constructs a power of ten.
+        from decimal import Decimal
+
+        decimal = Decimal(text)
+        if not decimal.is_finite() or not 0 < decimal < 1:
+            raise ValueError("choose a rule value in (0, 1); " + hint)
+        exponent = decimal.as_tuple().exponent
+        if (
+            not isinstance(exponent, int)
+            or abs(exponent) > 1000
+            or len(decimal.as_tuple().digits) > 1000
+        ):
+            raise ValueError(hint)
+        rational = format_rational(Fraction(decimal))
+        parse_rational(rational)
+        return rational
+    except (ValueError, ArithmeticError) as exc:
+        raise ValueError(f"{exc}; {hint}") from None
+
+
+class SuiteDescriptor(_Model):
+    suite_id: str
+    tasks: tuple[dict[str, JsonValue], ...] = Field(min_length=1)
+    baseline: Arm
+    candidate: Arm
+    toolset: AgentRef | None = None
+    mcp_server: McpServerSpec | None = None
+    oracle: AgentRef | None = None
+    contract: ContractSpec | None = None
+    conditions: tuple[DescriptorCondition, ...] = Field(min_length=1)
+    rule: SuiteRuleDescriptor = Field(default_factory=SuiteRuleDescriptor)
+    budgets: Budgets = Field(default_factory=Budgets)
+    fixtures_sha256: str = ""
+    prior_runs: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _contract(self) -> Self:
+        _raise(_contract_rule(_given(self)))
+        if self.contract is not None:
+            try:
+                validate_contract(self.contract)
+            except ValueError as exc:
+                raise _PathError(
+                    ("contract", "unobservable"),
+                    f"{exc}; remove invariants outside the observable tool boundary",
+                ) from None
+        return self
+
+    def to_manifest(self) -> SuiteManifest:
+        from arci.suite_schedule import create_suite_manifest
+        from arci.suite_schema import SuiteTask
+        from arci.suite_stats import check_suite_plan, default_max_errored_pairs, default_max_rounds
+
+        baseline, candidate = _arm(self.baseline), _arm(self.candidate)
+        if (baseline.agent is None) != (candidate.agent is None):
+            raise DescriptorError(
+                "baseline and candidate must both be Python agents or both commands; "
+                "change candidate to the same kind as baseline",
+                ("candidate",),
+            )
+        python_arms = baseline.agent is not None
+        if python_arms and self.mcp_server is not None:
+            raise DescriptorError(
+                "remove mcp_server for Python agents; supply toolset", ("mcp_server",)
+            )
+        if not python_arms and self.toolset is not None:
+            raise DescriptorError(
+                "remove toolset for command agents; supply mcp_server", ("toolset",)
+            )
+        if python_arms and self.toolset is None:
+            raise DescriptorError("add toolset for Python agents", ("toolset",))
+        if not python_arms and self.mcp_server is None:
+            raise DescriptorError("add mcp_server for command agents", ("mcp_server",))
+        id_pattern = TypeAdapter(SuiteId).json_schema()["pattern"]
+        id_hint = "use 1 to 64 letters, digits, '.', '_' or '-', starting with a letter or digit"
+        seen_conditions: set[str] = set()
+        for index, condition in enumerate(self.conditions):
+            condition_id = condition.to_condition().condition_id
+            if re.fullmatch(id_pattern, condition_id) is None:
+                raise DescriptorError(id_hint, ("conditions", index, "id"))
+            if condition_id in seen_conditions:
+                raise DescriptorError(
+                    f"duplicate condition id {condition_id!r}; choose a unique id",
+                    ("conditions", index, "id"),
+                )
+            seen_conditions.add(condition_id)
+        tasks: list[SuiteTask] = []
+        seen_tasks: set[str] = set()
+        for index, item in enumerate(self.tasks):
+            if "id" not in item:
+                raise DescriptorError("add a unique task id", ("tasks", index, "id"))
+            task_id = item["id"]
+            if not isinstance(task_id, str):
+                raise DescriptorError("task id must be a string; quote it", ("tasks", index, "id"))
+            if task_id in seen_tasks:
+                raise DescriptorError(
+                    f"duplicate task id {task_id!r}; choose a unique id", ("tasks", index, "id")
+                )
+            seen_tasks.add(task_id)
+            try:
+                tasks.append(
+                    SuiteTask.model_validate(
+                        {
+                            "task_id": item["id"],
+                            "task": {k: v for k, v in item.items() if k != "id"},
+                        }
+                    )
+                )
+            except ValidationError:
+                raise DescriptorError(
+                    "use an id of 1 to 64 letters, digits, '.', '_' or '-', "
+                    "starting with a letter or digit",
+                    ("tasks", index, "id"),
+                ) from None
+        n = len(tasks) * len(self.conditions)
+        if n > SUITE_MAX_PAIRS:
+            raise DescriptorError(
+                f"grid has {n} cells, above {SUITE_MAX_PAIRS}; reduce tasks or conditions",
+                ("tasks",),
+            )
+        rounds = self.rule.max_rounds if self.rule.max_rounds is not None else default_max_rounds(n)
+        if rounds == 1 and not self.rule.acknowledge_single_round:
+            origin = (
+                "the default budget gives one round"
+                if self.rule.max_rounds is None
+                else "one round requested"
+            )
+            raise DescriptorError(
+                f"{origin}; set rule.acknowledge_single_round: true or increase rule.max_rounds",
+                ("rule", "acknowledge_single_round"),
+            )
+        tolerance = self.rule.max_errored_pairs
+        if tolerance is None:
+            tolerance = default_max_errored_pairs(n, rounds)
+        fields = self.rule.model_dump(exclude={"max_rounds", "max_errored_pairs"})
+        try:
+            manifest = create_suite_manifest(
+                suite_id=self.suite_id,
+                tasks=tuple(tasks),
+                conditions=tuple(c.to_condition() for c in self.conditions),
+                baseline=_arm(self.baseline),
+                candidate=_arm(self.candidate),
+                toolset=self.toolset,
+                mcp_server=self.mcp_server,
+                contract=self.contract or ContractSpec(oracle=str(self.oracle)),
+                budgets=self.budgets,
+                fixtures_sha256=self.fixtures_sha256,
+                prior_runs=self.prior_runs,
+                max_rounds=rounds,
+                max_errored_pairs=tolerance,
+                **fields,
+            )
+        except ValidationError as exc:
+            path, message = first_problem(validation_problems(exc, None))
+            if not path:
+                key = next(
+                    (
+                        key
+                        for word, key in (
+                            ("task ids", "tasks"),
+                            ("condition", "conditions"),
+                            ("acknowledge", "acknowledge_single_round"),
+                            ("max_errored_pairs", "max_errored_pairs"),
+                            ("registered pairs", "max_rounds"),
+                            ("alpha", "alpha"),
+                            ("delta", "delta"),
+                            ("stakes", "stakes"),
+                            ("python agents", "toolset"),
+                            ("command", "mcp_server"),
+                        )
+                        if word in message
+                    ),
+                    "baseline",
+                )
+                path = (key,)
+            if path[0] in SuiteRuleDescriptor.model_fields:
+                path = ("rule", *path)
+            raise DescriptorError(
+                f"{message}; correct {format_path(path)} before running", path
+            ) from None
+        try:
+            check_suite_plan(manifest)
+        except ValueError as exc:
+            from arci.suite_stats import never_differs_pass_round, rule_of
+
+            key = (
+                "max_rounds"
+                if never_differs_pass_round(rule_of(manifest)) is None
+                else "max_errored_pairs"
+            )
+            raise DescriptorError(
+                f"{exc}; increase rule.max_rounds or reduce rule.max_errored_pairs", ("rule", key)
+            ) from None
+        return manifest
+
+
+class _SuiteDecimalLoader(DescriptorLoader):
+    """Retain decimal spelling when reading rule values, including aliased/merged rules."""
+
+
+def _decimal_spelling(loader: _SuiteDecimalLoader, node: yaml.ScalarNode) -> str:
+    del loader
+    return node.value
+
+
+_SuiteDecimalLoader.add_constructor(_FLOAT_TAG, _decimal_spelling)
+
+
+def _suite_mapping(text: str, source: str) -> dict[str, object]:
+    try:
+        data = parse_yaml(text)
+    except _SourceError as exc:
+        raise DescriptorError(
+            f"{exc.message}; correct the indicated value", exc.path, source
+        ) from None
+    except (yaml.YAMLError, ValueError, TypeError, RecursionError) as exc:
+        raise DescriptorError(f"invalid YAML; correct the document: {exc}", (), source) from None
+    if not isinstance(data, dict):
+        raise DescriptorError("use one YAML mapping", (), source)
+    return cast(dict[str, object], data)
+
+
+def is_suite_descriptor(path: Path | str) -> bool:
+    """Classify the new descriptor shape; full validation is deferred to compilation."""
+    data = _suite_mapping(Path(path).read_text(encoding="utf-8"), str(path))
+    return "experiment_id" not in data and ("tasks" in data or "suite_id" in data)
+
+
+def loads_suite_descriptor(text: str, source: str = "<descriptor>") -> SuiteManifest:
+    """Compile a suite descriptor; task file paths are relative to the descriptor file."""
+    data = _suite_mapping(text, source)
+    # Validation above rejects duplicate keys, non-finite numbers, unsupported tags and cycles.
+    # Read the same safe nodes with decimal tokens preserved only for the rule block.
+    exact = cast(dict[str, object], yaml.load(text, Loader=_SuiteDecimalLoader))
+    if "rule" in exact:
+        data["rule"] = exact["rule"]
+    tasks = data.get("tasks")
+    if isinstance(tasks, str):
+        task_path = Path(source).parent / tasks
+        try:
+            content = task_path.read_text(encoding="utf-8-sig")
+            if task_path.suffix.lower() == ".jsonl":
+                tasks = []
+                for number, line in enumerate(content.split("\n"), 1):
+                    if line.strip():
+                        try:
+                            tasks.append(_suite_json_task(line))
+                        except ValueError as exc:
+                            raise ValueError(f"line {number}: {exc}") from None
+            elif task_path.suffix.lower() == ".json":
+                tasks = _suite_json_task(content)
+            elif task_path.suffix.lower() in {".yaml", ".yml"}:
+                tasks = parse_yaml(content)
+            else:
+                raise ValueError("use a JSON, YAML or JSONL task file")
+            data["tasks"] = tasks
+        except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
+            raise DescriptorError(
+                f"cannot load task file {str(task_path)!r}: {exc}; "
+                "supply a readable JSON/YAML/JSONL list",
+                ("tasks",),
+                source,
+            ) from None
+    try:
+        encoded = json.dumps(data, allow_nan=False)
+        spec = SuiteDescriptor.model_validate_json(encoded, strict=True)
+        return spec.to_manifest()
+    except ValidationError as exc:
+        path, message = first_problem(validation_problems(exc, data))
+        fix = (
+            "remove the unknown key"
+            if "unknown key" in message
+            else "supply the required type/value"
+        )
+        raise DescriptorError(f"{message}; {fix}", path, source) from None
+    except DescriptorError as exc:
+        raise exc.with_source(source) from None
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise DescriptorError(
+            f"invalid tasks or rule: {exc}; supply finite JSON values", ("tasks",), source
+        ) from None
+
+
+def _suite_prior_runs(manifest: SuiteManifest, out_dir: Path | str) -> SuiteManifest:
+    from arci.suite_schedule import create_suite_manifest
+    from arci.suite_storage import validate_suite_manifest
+
+    prior = list(manifest.prior_runs)
+    root = Path(out_dir)
+    if root.exists():
+        for directory in sorted(root.iterdir()):
+            if not directory.is_dir():
+                continue
+            path = directory / "manifest.json"
+            if not path.exists() and not (directory / "trials.jsonl").exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                # Inspect the kind before validating any suite fields.
+                if not isinstance(data, dict):
+                    raise ValueError("manifest must be an object with schema_version")
+                version = data.get("schema_version")
+                if version == "arci/0.5":
+                    continue
+                if version != SUITE_SCHEMA_VERSION:
+                    raise ValueError(f"unsupported schema_version {version!r}")
+                old = validate_suite_manifest(SuiteManifest.model_validate(data))
+            except (OSError, ValueError) as exc:
+                if isinstance(exc, ValidationError):
+                    key, message = first_problem(validation_problems(exc, None))
+                    detail = f"{format_path(key)}: {message}"
+                else:
+                    detail = str(exc)
+                print(
+                    _escape(
+                        f"warning: skipping earlier run manifest {path}: {detail}; "
+                        "repair it to include its history"
+                    ),
+                    file=sys.stderr,
+                )
+                continue
+            same_candidate = (
+                old.candidate.candidate_id == manifest.candidate.candidate_id
+                if manifest.candidate.candidate_id
+                else (old.candidate.agent, old.candidate.command)
+                == (manifest.candidate.agent, manifest.candidate.command)
+            )
+            if old.suite_id == manifest.suite_id and same_candidate:
+                for experiment_id in (*old.prior_runs, old.experiment_id):
+                    if experiment_id not in prior:
+                        prior.append(experiment_id)
+    if tuple(prior) == manifest.prior_runs:
+        return manifest
+    return create_suite_manifest(
+        **manifest.model_dump(exclude={"experiment_id", "record_sha256", "prior_runs"}),
+        prior_runs=tuple(prior),
+    )
+
+
+def compile_run_descriptor(
+    path: Path | str, *, out_dir: Path | str | None = None
+) -> Manifest | SuiteManifest:
+    """Dispatch by descriptor shape while preserving the existing v1 compiler API."""
+    try:
+        suite = is_suite_descriptor(path)
+    except (OSError, ValueError):
+        # Let the original v1 parser render unreadable or syntactically invalid input.
+        return compile_descriptor(path)
+    if not suite:
+        try:
+            return compile_descriptor(path)
+        except DescriptorError as exc:
+            if exc.path in {("tasks",), ("suite_id",)}:
+                raise DescriptorError(
+                    f"{exc.message}; remove {exc.path[0]} from this v1 descriptor "
+                    "or convert experiment_id/task to suite_id/tasks",
+                    exc.path,
+                    exc.source,
+                ) from None
+            raise
+    source = str(path)
+    try:
+        manifest = loads_suite_descriptor(Path(path).read_text(encoding="utf-8"), source)
+        return manifest if out_dir is None else _suite_prior_runs(manifest, out_dir)
+    except DescriptorError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise DescriptorError(
+            f"cannot compile suite: {exc}; repair the descriptor or earlier run manifest",
+            ("prior_runs",),
+            source,
+        ) from None
+
+
+def _suite_json_task(line: str) -> object:
+    def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate task key {key!r}; keep one value")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"non-finite JSON value {value}; use a finite number")
+
+    return json.loads(line, object_pairs_hook=unique, parse_constant=reject_constant)

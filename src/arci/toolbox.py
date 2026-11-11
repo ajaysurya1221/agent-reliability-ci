@@ -6,7 +6,7 @@ import copy
 import random
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from typing import TypeVar
+from typing import NoReturn, TypeVar
 
 from pydantic import JsonValue
 
@@ -18,6 +18,10 @@ from arci.schema import Budgets, RecordedCall, ToolCall, ToolMode, ToolResult
 Emit = Callable[[str, dict[str, JsonValue]], None]
 Latch = Callable[[str], None]
 JsonT = TypeVar("JsonT", bound=JsonValue)
+
+
+class HarnessError(BaseException):
+    """A latched harness failure that ordinary agent exception handlers cannot catch."""
 
 
 def format_diagnostic(value: BaseException | str) -> str:
@@ -118,6 +122,15 @@ class ToolBox:
         return tuple(self.__recorded)
 
     @property
+    def is_replay(self) -> bool:
+        """Whether this boundary serves recordings instead of registered tools."""
+        return self.__mode is ToolMode.REPLAY
+
+    def uses_tools(self, tools: Mapping[str, Callable[..., JsonValue]] | None) -> bool:
+        """Check registration identity without exposing or executing the tool mapping."""
+        return self.__tools is tools
+
+    @property
     def tool_calls(self) -> int:
         return self.__tool_calls
 
@@ -154,6 +167,11 @@ class ToolBox:
     def __mark_harness(self, detail: str) -> None:
         self.__harness_fault = True
         self.__latch_harness(detail)
+
+    def fail_harness(self, detail: str) -> NoReturn:
+        """Latch a harness fault immediately, including during replay, and stop execution."""
+        self.__mark_harness(detail)
+        raise HarnessError(detail)
 
     def assert_replay_consumed(self) -> None:
         if self.__replay_miss or self.has_unconsumed_recording:

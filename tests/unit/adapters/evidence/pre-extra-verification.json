@@ -1,0 +1,95 @@
+{
+  "candidate_sha256": {
+    "pyrightconfig.adapters.json": "7e2b6aeef60e0b176ad8659bb7fc6d558df9d18c25a9e06fa9940f7997922181",
+    "src/arci/adapters/__init__.py": "19ab84240b618746e698e58c5369211ffc60229ebb3bd5baab9424c3107d7ed8",
+    "src/arci/adapters/langchain.py": "e88d6b91989d2a49bf724bd4c007ec7c99c02124da3d3601a11569de0983bb14",
+    "src/arci/toolbox.py": "b1065867b2990eccb0c1c68729af06c13dde5bad61a06b90516fa5d88aaf5794",
+    "tests/unit/adapters/__init__.py": "974aee226c055fd30599a753d6e85237e002842d612f2b4a344e0ca4da04160a",
+    "tests/unit/adapters/fixtures.py": "095a1169c6c751e76f09df75aa71d522d902c5636afc39e9e31a848a20dea4d2",
+    "tests/unit/adapters/test_capabilities.py": "a19843887ea6ac0596ce5ce9e73fc06b02b36147d048d34fb06c4a6d7a779ea8",
+    "tests/unit/adapters/test_core.py": "c127ebc2672ba21f4d22f743dfe03211b600ec85ef1c479887e0cd0c926aed11",
+    "tests/unit/adapters/test_edges.py": "cce9d25c000833ce2fb047f47500bdbdcbfa515fc1433dd29e4b88fd77316b7d",
+    "tests/unit/adapters/test_lazy_import.py": "839ddf0795ef01c94d2fea6397c9ded046e06af4bb811a45e223e1497782cba4",
+    "tests/unit/adapters/test_rejections.py": "4b7890331d9d6cf59b8a82b1d52e8105ce22b4c15c7110d16bf8729cf9039fc9",
+    "tests/unit/adapters/test_replay_and_order.py": "a5497ecb132a9498c9bf215eedcf4257c8e3580b178886e7b3b1648db8a8e75f",
+    "tests/unit/adapters/test_runner.py": "cbab64b60501c2c99ac40af9046c0c8a7723b03ab71397255a764fe2ae7b81f7",
+    "tests/unit/toolbox/test_fail_harness.py": "651d761872fa0cd27d28e64d8c17031a0348dfc93c58906ec8dba6be9fef2155"
+  },
+  "commands": [
+    {
+      "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters tests/unit/toolbox -q",
+      "exit_code": 0,
+      "elapsed_seconds": 104.322,
+      "log": "tests/unit/adapters/evidence/adapter-tests.log",
+      "last_lines": [
+        "........................................................................ [ 37%]",
+        "........................................................................ [ 74%]",
+        "..................................................                       [100%]"
+      ]
+    },
+    {
+      "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q",
+      "exit_code": 1,
+      "elapsed_seconds": 467.3,
+      "log": "tests/unit/adapters/evidence/full-suite.log",
+      "last_lines": [
+        "FAILED tests/acceptance/test_mcp_toolset.py::test_a_python_toolset_becomes_an_mcp_environment",
+        "FAILED tests/acceptance/test_mcp_toolset.py::test_fault_injection_and_the_oracle_work_through_the_bridge",
+        "FAILED tests/acceptance/test_runner_replay.py::test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+        "FAILED tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay"
+      ]
+    },
+    {
+      "command": ".venv/bin/ruff format --check .",
+      "exit_code": 0,
+      "elapsed_seconds": 0.076,
+      "log": "tests/unit/adapters/evidence/format.log",
+      "last_lines": [
+        "468 files already formatted"
+      ]
+    },
+    {
+      "command": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "elapsed_seconds": 0.039,
+      "log": "tests/unit/adapters/evidence/lint.log",
+      "last_lines": [
+        "All checks passed!"
+      ]
+    },
+    {
+      "command": ".venv/bin/basedpyright",
+      "exit_code": 0,
+      "elapsed_seconds": 3.205,
+      "log": "tests/unit/adapters/evidence/types-core.log",
+      "last_lines": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": ".venv/bin/basedpyright --project pyrightconfig.adapters.json",
+      "exit_code": 0,
+      "elapsed_seconds": 1.109,
+      "log": "tests/unit/adapters/evidence/types-adapters.log",
+      "last_lines": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": "shasum -a 256 -c FROZEN.sha256",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021,
+      "log": "tests/unit/adapters/evidence/frozen.log",
+      "last_lines": [
+        "tests/acceptance/test_runner_replay.py: OK",
+        "tests/acceptance/test_schedule.py: OK",
+        "tests/acceptance/test_schema.py: OK",
+        "tests/acceptance/test_sequential.py: OK",
+        "tests/acceptance/test_stats_gate.py: OK",
+        "uv.lock: OK"
+      ]
+    }
+  ]
+}

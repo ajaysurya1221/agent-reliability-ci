@@ -84,6 +84,42 @@ jobs:
           retention-days: 7
           compression-level: 6
 
+  adapters:
+    name: adapters / ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ["locked", "low"]
+    env:
+      LANGSMITH_TRACING: "false"
+      ARCI_REQUIRE_ADAPTERS: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+      - name: Sync the locked adapter environment
+        run: uv sync --frozen --group adapters
+      - name: Move to the lowest supported adapter set
+        if: matrix.environment == 'low'
+        run: uv pip install --python .venv/bin/python -r constraints/adapters-low.txt
+      - name: Installed versions are the ones this environment names
+        run: .venv/bin/python .github/scripts/adapter_versions.py "constraints/adapters-${{ matrix.environment }}.txt"
+      - name: Adapter tests
+        run: .venv/bin/pytest -p no:cacheprovider tests/unit/adapters tests/unit/toolbox
+      - name: Adapter type check
+        run: |
+          .venv/bin/basedpyright --project pyrightconfig.adapters.json --outputjson > adapters-pyright.json || true
+          .venv/bin/python -c "import json; d=json.load(open('adapters-pyright.json'))['summary']; print(d); raise SystemExit(0 if d['filesAnalyzed'] > 0 and d['errorCount'] == 0 else 1)"
+
   stats-macos:
     name: stats re-derivation / macOS / Python ${{ matrix.python-version }}
     runs-on: macos-latest

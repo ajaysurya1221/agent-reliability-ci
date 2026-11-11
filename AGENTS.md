@@ -12,7 +12,9 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
 2. Edit only the files your brief says you own. Create new files only inside those paths.
 3. Do not run git commands that change state (no add, commit, checkout, stash, reset). The
    orchestrator owns git.
-4. No network. No new dependencies. Runtime code uses only the stdlib, `pydantic`, `pyyaml`.
+4. No network. No new dependencies. Runtime code uses only the stdlib, `pydantic`, `pyyaml`;
+   a module under `src/arci/adapters/` may also import the one optional extra it is named for,
+   and that extra's own packages, lazily.
 5. Use `.venv/bin/python`, `.venv/bin/pytest`, `.venv/bin/ruff`, `.venv/bin/basedpyright`
    directly. Do not call `uv`.
 6. The acceptance tests in `tests/acceptance/` are the source of truth for signatures and

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from collections.abc import Sequence
-from typing import cast
+from typing import TypedDict, cast
 
 from pydantic import JsonValue
 
@@ -13,12 +16,212 @@ from arci.reliability import IID_ASSUMPTION, UNAVAILABLE_SMALL_N, pass_k_report
 from arci.schema import (
     DECISION_TOOL,
     ArmStats,
+    Condition,
+    FaultSpec,
     GateDecision,
     Manifest,
     Outcome,
     TrialEnvelope,
     Verdict,
 )
+
+
+class FaultAccounting(TypedDict):
+    condition_id: str
+    fault: str
+    arm: str
+    trials: int
+    injections: int
+    trials_fired: int
+    status: str
+
+
+def _fault_name(fault: FaultSpec) -> str | None:
+    """Resolve the runner's recorded name without loading user code in this process."""
+    from arci.perturb import REGISTRY
+
+    if fault.name in REGISTRY:
+        return fault.name
+    if ":" not in fault.name:
+        return None
+    # A broken, noisy, exiting or hanging factory must not prevent a report.
+    script = """
+import contextlib, json, os, sys
+from arci.perturb import build
+from arci.schema import FaultSpec
+with open(os.devnull, 'w') as sink, contextlib.redirect_stdout(sink):
+    name = build(FaultSpec.model_validate_json(sys.stdin.read())).name
+print(json.dumps(name))
+"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            input=fault.model_dump_json(),
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=True,
+        )
+        name: object = json.loads(result.stdout)
+        return name if isinstance(name, str) and name else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _fault_scope(fault: FaultSpec, payload: dict[str, JsonValue]) -> bool:
+    tool, occurrence = payload.get("tool"), payload.get("occurrence")
+    if not isinstance(tool, str) or not isinstance(occurrence, int):
+        return True  # Missing scope evidence cannot exclude a declaration.
+    at = 0 if fault.at_occurrence is None else fault.at_occurrence
+    if fault.name in {"decision_unavailable", "decision_low_confidence"}:
+        return tool == DECISION_TOOL and (
+            occurrence >= at if fault.name == "decision_unavailable" else occurrence == at
+        )
+    return (
+        not tool.startswith("decision:")
+        and (fault.tool is None or tool == fault.tool)
+        and occurrence == at
+    )
+
+
+def fault_accounting(
+    conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]
+) -> list[FaultAccounting]:
+    """Attribute each injection once, retaining ambiguous and unknown observations."""
+    rows: list[FaultAccounting] = []
+    resolved: dict[str, str | None] = {}
+    declared = {condition.condition_id for condition in conditions}
+    observed_only = tuple(
+        Condition(condition_id=name)
+        for name in sorted({trial.condition_id for trial in trials} - declared)
+    )
+    for condition in sorted((*conditions, *observed_only), key=lambda c: c.condition_id):
+        declarations = list(enumerate(condition.faults))
+        for _, fault in declarations:
+            key = fault.model_dump_json()
+            if key not in resolved:
+                resolved[key] = _fault_name(fault)
+        for arm in ("baseline", "candidate"):
+            selected = [
+                t for t in trials if t.condition_id == condition.condition_id and t.arm == arm
+            ]
+            injections: Counter[int] = Counter()
+            fired: Counter[int] = Counter()
+            unknown: Counter[str] = Counter()
+            unknown_trials: Counter[str] = Counter()
+            ambiguous: set[int] = set()
+            for trial in selected:
+                starts = {
+                    e.payload["call_id"]: e.payload
+                    for e in trial.events
+                    if e.kind == "tool_start" and isinstance(e.payload.get("call_id"), str)
+                }
+                seen: set[int] = set()
+                unseen: set[str] = set()
+                for event in trial.events:
+                    name = event.payload.get("injected_by")
+                    if event.kind != "tool_finish" or not isinstance(name, str) or not name:
+                        continue
+                    call_id = event.payload.get("call_id")
+                    scope = (
+                        starts.get(call_id, event.payload)
+                        if isinstance(call_id, str)
+                        else event.payload
+                    )
+                    candidates = [
+                        i
+                        for i, fault in declarations
+                        if resolved[fault.model_dump_json()] in (name, None)
+                        and _fault_scope(fault, scope)
+                    ]
+                    if (
+                        len(candidates) == 1
+                        and resolved[condition.faults[candidates[0]].model_dump_json()] == name
+                    ):
+                        injections[candidates[0]] += 1
+                        seen.add(candidates[0])
+                    else:
+                        ambiguous.update(candidates)
+                        unknown[name] += 1
+                        unseen.add(name)
+                fired.update(seen)
+                unknown_trials.update(unseen)
+            for i, fault in sorted(declarations, key=lambda item: (item[1].name, item[0])):
+                label = fault.name
+                if sum(f.name == fault.name for f in condition.faults) > 1:
+                    label += (
+                        f" [declaration {i + 1}; tool={fault.tool or '*'}; "
+                        f"occurrence={fault.at_occurrence or 0}]"
+                    )
+                rows.append(
+                    FaultAccounting(
+                        condition_id=condition.condition_id,
+                        fault=label,
+                        arm=arm,
+                        trials=len(selected),
+                        injections=injections[i],
+                        trials_fired=fired[i],
+                        status="cannot attribute"
+                        if i in ambiguous or resolved[fault.model_dump_json()] is None
+                        else "observed"
+                        if fired[i]
+                        else "declared, never fired",
+                    )
+                )
+            for name in sorted(unknown):
+                rows.append(
+                    FaultAccounting(
+                        condition_id=condition.condition_id,
+                        fault=name,
+                        arm=arm,
+                        trials=len(selected),
+                        injections=unknown[name],
+                        trials_fired=unknown_trials[name],
+                        status="unattributed",
+                    )
+                )
+    # Preserve the established name/arm order for ordinary v1 report rows.
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["condition_id"],
+            row["status"] == "unattributed",
+            row["fault"],
+            row["arm"],
+        ),
+    )
+
+
+def fault_markdown(conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]) -> list[str]:
+    lines = [
+        "",
+        "## Fault accounting",
+        "",
+        "Recorded tool_finish injections, grouped by declared fault name; repeated "
+        "declarations of the same name are indistinguishable. Counts are descriptive.",
+        "",
+    ]
+    if any(len({f.name for f in c.faults}) != len(c.faults) for c in conditions):
+        lines[3] = (
+            "Recorded tool_finish injections, attributed by declaration, tool and occurrence; "
+            "ambiguous observations are unattributed. Counts are descriptive."
+        )
+    rows = fault_accounting(conditions, trials)
+    if not rows:
+        return [*lines, "No faults declared."]
+    lines.extend(
+        [
+            "| Condition | Fault | Arm | Trials | Injections | Trials fired | Status |",
+            "|---|---|---|---:|---:|---:|---|",
+        ]
+    )
+    lines.extend(
+        f"| `{_cell(row['condition_id'])}` | `{_cell(row['fault'])}` | {row['arm']} | "
+        f"{row['trials']} | {row['injections']} | {row['trials_fired']} | {row['status']} |"
+        for row in rows
+    )
+    return lines
+
 
 USD_PER_MTOK_INPUT = 0.042
 _LIST_PRICE_DATE = "2026-09-22"
@@ -284,6 +487,7 @@ def render_markdown(
         for reason in condition.reasons:
             lines.append(f"- `{_cell(condition.condition_id)}`: {_cell(reason)}")
 
+    lines.extend(fault_markdown(manifest.conditions, trials))
     lines.extend(["", f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})"])
     return "\n".join(lines) + "\n"
 

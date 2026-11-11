@@ -20,7 +20,9 @@ from arci.demo.run import check_keep, default_workers, run_demo
 from arci.descriptor import (
     DescriptorError,
     compile_descriptor,
+    compile_run_descriptor,
     is_descriptor_path,
+    is_suite_descriptor,
     render_schema,
 )
 
@@ -35,6 +37,7 @@ from arci.init import (
     InitError,
     parse_request,
     run_init,
+    run_langchain_init,
 )
 
 # --- end init ---
@@ -51,10 +54,12 @@ from arci.planning import (
     plan,
     plan_to_json,
     render_plan_markdown,
+    render_suite_plan,
+    suite_plan,
 )
 from arci.reliability import validate_ks
 from arci.replay import make_bundle, replay
-from arci.report import render_junit, render_markdown
+from arci.report import fault_accounting, render_junit, render_markdown
 from arci.runner import run_experiment
 from arci.schedule import build_schedule
 from arci.schema import (
@@ -62,13 +67,20 @@ from arci.schema import (
     Divergence,
     Manifest,
     MinimizeResult,
+    Outcome,
     ReplayBundle,
     ReplayStatus,
+    Termination,
     TrialEnvelope,
     TrialSpec,
     Verdict,
 )
 from arci.storage import load_run
+from arci.suite_gate import decide_suite, replay_suite_decision
+from arci.suite_report import render_suite_json, render_suite_markdown
+from arci.suite_runner import run_suite
+from arci.suite_schema import SUITE_SCHEMA_VERSION, SuiteDecision, SuiteManifest
+from arci.suite_storage import load_suite_run, manifest_schema_version
 from arci.trace_check import check_traces, render_trace_check
 
 
@@ -171,7 +183,33 @@ def _cmd_schema(out_path: str | None) -> int:
 # --- init ---
 def _cmd_init(values: dict[str, object]) -> int:
     """`arci init`: one stdout line (the next command), empty stderr, exit 0; or exit 3."""
+    references = (
+        ("experiment_id", "EXPERIMENT_ID"),
+        ("baseline", "--baseline"),
+        ("candidate", "--candidate"),
+        ("toolset", "--toolset"),
+        ("oracle", "--oracle"),
+    )
     try:
+        if values["langchain"]:
+            options = (
+                *(key for key, _ in references),
+                "task",
+                "task_file",
+                "n",
+                "init_out",
+            )
+            if (
+                any(values.get(key) is not None for key in options)
+                or values["fault"]
+                or values["force"]
+            ):
+                raise InitError("--langchain cannot be combined with other init arguments")
+            print(run_langchain_init())
+            return 0
+        missing = [flag for key, flag in references if values[key] is None]
+        if missing:
+            raise CliError(f"the following arguments are required: {', '.join(missing)}")
         request = parse_request(
             experiment_id=cast(str, values["experiment_id"]),
             baseline=cast(str, values["baseline"]),
@@ -181,8 +219,8 @@ def _cmd_init(values: dict[str, object]) -> int:
             task=cast(str | None, values["task"]),
             task_file=cast(str | None, values["task_file"]),
             faults=tuple(cast(list[str], values["fault"])),
-            n=cast(str, values["n"]),
-            out=cast(str, values["init_out"]),
+            n=cast(str, values.get("n", str(DEFAULT_N_PER_ARM))),
+            out=cast(str, values.get("init_out", DEFAULT_OUT)),
             force=cast(bool, values["force"]),
         )
         print(run_init(request))
@@ -288,7 +326,22 @@ def smoke_followup(manifest: Manifest) -> str:
 
 def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
     # --- descriptor ---
-    manifest = _run_manifest(manifest_path)
+    if is_descriptor_path(manifest_path):
+        try:
+            loaded = compile_run_descriptor(manifest_path, out_dir=out_dir)
+        except DescriptorError as exc:
+            raise CliError(str(exc)) from None
+    elif _suite_input(manifest_path):
+        loaded = SuiteManifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
+    else:
+        loaded = _run_manifest(manifest_path)
+    if isinstance(loaded, SuiteManifest):
+        trials = run_suite(loaded, out_dir, workers=workers)
+        suite_decision = decide_suite(loaded, trials)
+        _print(_suite_summary(suite_decision, trials))
+        print(f"run store: {(Path(out_dir) / loaded.experiment_id).resolve()}", file=sys.stderr)
+        return suite_decision.exit_code
+    manifest = loaded
     # --- end descriptor ---
     # --- smoke ---
     notice = smoke_notice(manifest)
@@ -435,6 +488,144 @@ def _cmd_preflight(
     return 0
 
 
+def _suite_summary(decision: SuiteDecision, trials: Sequence[TrialEnvelope]) -> str:
+    last = decision.history[-1] if decision.history else None
+    lines = [
+        f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})",
+        f"reason: {'; '.join(decision.reasons)}",
+        f"stopping round: {decision.stopped_at_round}",
+        f"pairs: {len(trials) // 2} ({len(trials)} trials)",
+    ]
+    baseline = [trial for trial in trials if trial.arm == "baseline"]
+    candidate = [trial for trial in trials if trial.arm == "candidate"]
+    baseline_passed = sum(trial.outcome is Outcome.PASS for trial in baseline)
+    candidate_passed = sum(trial.outcome is Outcome.PASS for trial in candidate)
+    lines.append(
+        f"baseline {baseline_passed}/{len(baseline)} passed, "
+        f"candidate {candidate_passed}/{len(candidate)} passed"
+    )
+    if 2 * baseline_passed < len(baseline):
+        lines.append(
+            "WARNING: baseline passed fewer than half its trials; "
+            "a non-inferiority PASS says little about absolute reliability."
+        )
+    if decision.verdict is Verdict.ERROR:
+        errors = [trial for trial in trials if trial.termination is Termination.HARNESS_ERROR]
+        if errors:
+            detail = errors[0].failure_detail
+            count = sum(trial.failure_detail == detail for trial in errors)
+            lines.append(f"first harness error ({count} trials): {detail or 'detail unavailable'}")
+    if last is not None:
+        c = last.counts
+        lines += [
+            f"counts: minus={c.minus}, zero={c.zero}, plus={c.plus}, errored={c.errored}",
+            f"PASS wealth: {last.pass_wealth}; threshold: {decision.threshold}; "
+            f"crossed: {last.pass_crossed}",
+            f"BLOCK wealth: {last.block_wealth}; threshold: {decision.threshold}; "
+            f"crossed: {last.block_crossed}",
+            f"errored pairs: {c.errored}; tolerance: {decision.max_errored_pairs}",
+            f"candidate hard violations: {last.candidate_hard_violations}",
+        ]
+    else:
+        lines += [
+            "counts: unavailable (invalid evidence)",
+            f"PASS wealth: unavailable; threshold: {decision.threshold}",
+            f"BLOCK wealth: unavailable; threshold: {decision.threshold}",
+            f"errored pairs: unavailable; tolerance: {decision.max_errored_pairs}",
+        ]
+    if decision.scenario_seeds == "per_round":
+        lines.append(
+            "scenario_seeds: per_round. Assuming joint independence across cells within rounds "
+            "and across rounds (or the conditional form), each directional statistical error "
+            f"is at most alpha/2 (alpha={decision.alpha}); "
+            "Its error guarantee requires that in every round the "
+            "suite mean over that round's scenario instances obey the relevant null, with the "
+            "independence conditions above (or their conditional form)."
+        )
+        lines.append(
+            "ARCI does not check or enforce this premise; "
+            "there is no guarantee averaged over seeds."
+        )
+    else:
+        lines.append(
+            "scenario_seeds: fixed. For the registered scenarios, each directional statistical "
+            f"error is at most alpha/2 (alpha={decision.alpha}), under joint independence across "
+            "cells and rounds and stationary per-cell laws, including no execution-order effect."
+        )
+    lines.append(
+        "The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule."
+    )
+    if decision.prior_runs:
+        lines.append("prior runs: " + ", ".join(decision.prior_runs))
+    return "\n".join(lines) + "\n"
+
+
+def _cmd_suite_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -> int:
+    if junit_path is not None:
+        raise CliError("suite support for gate --junit is not built yet")
+    manifest, trials = load_suite_run(run_dir)
+    decision = decide_suite(manifest, trials)
+    stored = Path(run_dir) / "decision.json"
+    matches = True
+    comparison = "stored decision: absent"
+    if stored.exists():
+        try:
+            previous = SuiteDecision.model_validate_json(stored.read_text(encoding="utf-8"))
+            matches = replay_suite_decision(previous, manifest, trials)
+        except (ValueError, OSError):
+            matches = False
+        comparison = (
+            "stored decision: MATCH" if matches else "stored decision: MISMATCH (ERROR, exit 3)"
+        )
+    summary = _suite_summary(decision, trials) + comparison + "\n"
+    if not matches:
+        summary = "VERDICT: ERROR (exit 3)\n" + summary.replace(
+            "VERDICT:", "recomputed verdict:", 1
+        )
+    _print(summary)
+    if markdown_path is not None:
+        _write(markdown_path, summary)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        _write(summary_path, summary)
+    return decision.exit_code if matches else 3
+
+
+def _suite_input(path: str) -> bool:
+    source = Path(path)
+    try:
+        # Never consume pipes, device files, or even regular files aliased to stdin.
+        resolved = source.resolve()
+        if resolved.is_relative_to("/dev/fd") or resolved.is_relative_to("/proc"):
+            return False
+        if source.is_file():
+            stdin = os.fstat(0)
+            current = source.stat()
+            if (current.st_dev, current.st_ino) == (stdin.st_dev, stdin.st_ino):
+                return False
+        if is_descriptor_path(source) and source.is_file():
+            return is_suite_descriptor(source)
+        if source.is_dir() or source.is_file():
+            return manifest_schema_version(source) == SUITE_SCHEMA_VERSION
+    except (OSError, ValueError):
+        return False
+    return False
+
+
+def _deferred_suite_command(values: dict[str, object]) -> bool:
+    command = str(values["command"])
+    fields = {
+        "minimize": ("run_dir",),
+        "bundle": ("run_dir",),
+        "replay": ("bundle_json",),
+        "trace-check": ("baseline_run", "candidate_run"),
+    }.get(command, ())
+    if any(isinstance(value := values.get(field), str) and _suite_input(value) for field in fields):
+        print(f"suite support for {command} is not built yet")
+        return True
+    return False
+
+
 def _invalid_store_report(exc: BaseException) -> str:
     return (
         f"# ARCI gate\n\nRun store validation failed: {_one_line(exc)}\n\nVERDICT: ERROR (exit 3)\n"
@@ -442,7 +633,12 @@ def _invalid_store_report(exc: BaseException) -> str:
 
 
 def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -> int:
+    suite = _suite_input(run_dir)
+    if suite and junit_path is not None:
+        raise CliError("JUnit export for suites is not built yet")
     try:
+        if suite:
+            return _cmd_suite_gate(run_dir, junit_path, markdown_path)
         manifest, trials = load_run(run_dir)
     except Exception as exc:
         _print(_invalid_store_report(exc))
@@ -461,12 +657,58 @@ def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -
     return decision.exit_code
 
 
-def _cmd_report(run_dir: str, report_format: str, pass_k: str | None = None) -> int:
+def _cmd_report(
+    run_dir: str, report_format: str, pass_k: str | None = None, out: str | None = None
+) -> int:
+    if out is not None and report_format != "html":
+        raise CliError("--out is supported for --format html only")
+
+    if report_format == "html":
+        from arci.html_report import render_store_html
+
+        if pass_k is not None:
+            raise CliError("--pass-k is reported in the md format only")
+        html, code = render_store_html(run_dir)
+        if out is None:
+            _print(html)
+        else:
+            _write(out, html)
+        return code
+
+    if _suite_input(run_dir):
+        if report_format == "junit" or pass_k is not None:
+            print("suite support for report is not built yet")
+            return 3
+        suite, suite_trials = load_suite_run(run_dir)
+        suite_decision = decide_suite(suite, suite_trials)
+        renderer = render_suite_json if report_format == "json" else render_suite_markdown
+        stored_status = "absent"
+        stored = Path(run_dir) / "decision.json"
+        if stored.exists() or stored.is_symlink():
+            try:
+                previous = SuiteDecision.model_validate_json(stored.read_text(encoding="utf-8"))
+                stored_status = (
+                    "match" if replay_suite_decision(previous, suite, suite_trials) else "mismatch"
+                )
+            except (ValueError, OSError):
+                stored_status = "mismatch"
+        _print(renderer(suite, suite_decision, suite_trials, stored_status=stored_status))
+        return 3 if stored_status == "mismatch" else suite_decision.exit_code
     ks = () if pass_k is None else validate_ks(_int_list(pass_k, "--pass-k"))
     if ks and report_format != "md":
         raise CliError("--pass-k is reported in the md format only")
     manifest, trials = load_run(run_dir)
     decision = decide(manifest, trials)
+    if report_format == "json":
+        _print(
+            json.dumps(
+                decision.model_dump(mode="json")
+                | {"fault_accounting": fault_accounting(manifest.conditions, trials)},
+                sort_keys=True,
+                indent=2,
+            )
+        )
+        return 0
     report = (
         render_markdown(manifest, decision, trials, pass_k=ks)
         if report_format == "md"
@@ -547,16 +789,26 @@ def _cmd_replay(bundle_path: str) -> int:
     }[result.status]
 
 
-def _cmd_diff(run_dir: str, trial_a: str, trial_b: str, all_steps: bool) -> int:
+def _cmd_diff(
+    run_dir: str, trial_a: str, trial_b: str, all_steps: bool, other_run: str | None = None
+) -> int:
     first_divergence = cast(
         _FirstDivergence,
         vars(importlib.import_module("arci.diff"))["first_divergence"],
     )
 
-    _manifest, trials = load_run(run_dir)
+    def read_trials(path: str) -> tuple[TrialEnvelope, ...]:
+        if _suite_input(path):
+            # As in v1, diff is a trace diagnostic, including for ERROR runs.
+            # The loader validates seals; this command makes no gate claim.
+            return load_suite_run(path)[1]
+        return tuple(load_run(path)[1])
+
+    trials = read_trials(run_dir)
+    other_trials = trials if other_run is None else read_trials(other_run)
     mode: Literal["boundary", "all"] = "all" if all_steps else "boundary"
     divergence = first_divergence(
-        _find_trial(trials, trial_a), _find_trial(trials, trial_b), mode=mode
+        _find_trial(trials, trial_a), _find_trial(other_trials, trial_b), mode=mode
     )
     print(f"mode: {mode}")
     print(f"common_prefix: {divergence.common_prefix}")
@@ -588,7 +840,7 @@ def _cmd_minimize(run_dir: str, trial_id: str, out_path: str) -> int:
     return 0
 
 
-def _parser() -> _Parser:
+def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -620,8 +872,9 @@ def _parser() -> _Parser:
     gate.add_argument("--markdown", metavar="PATH")
 
     report = commands.add_parser("report", help="render a stored run")
-    report.add_argument("run_dir", metavar="RUN_DIR")
-    report.add_argument("--format", choices=("md", "junit"), default="md")
+    report.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    report.add_argument("--format", choices=("md", "json", "junit", "html"), default="md")
+    report.add_argument("--out", metavar="FILE", help="write HTML to FILE instead of stdout")
     report.add_argument(
         "--pass-k",
         metavar="K,K,...",
@@ -638,48 +891,62 @@ def _parser() -> _Parser:
             "Domain: clopper_pearson, K=1, one look, N <= 400; other designs are refused."
         ),
     )
-    plan_command.add_argument("--baseline-rate", type=float, required=True, metavar="P")
-    plan_command.add_argument("--candidate-rate", type=float, required=True, metavar="P")
-    plan_command.add_argument("--alpha", type=float, default=0.05)
-    plan_command.add_argument("--delta", type=float, default=0.10)
+    if not v1_plan:
+        plan_command.add_argument(
+            "suite_input", nargs="?", help="suite descriptor or sealed manifest"
+        )
     plan_command.add_argument(
-        "--n-grid", default=",".join(map(str, DEFAULT_N_GRID)), metavar="N,N,..."
+        "--baseline-rate", type=float if v1_plan else str, required=v1_plan, metavar="P"
     )
     plan_command.add_argument(
-        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=True
+        "--candidate-rate", type=float if v1_plan else str, required=v1_plan, metavar="P"
     )
-    plan_command.add_argument("--target-probability", type=float, default=0.80, metavar="P")
+    plan_command.add_argument(
+        "--agreement", metavar="P", help="suite model P(baseline == candidate)"
+    )
+    plan_command.add_argument(
+        "--cell-laws",
+        metavar="JSON",
+        help="joint laws: JSON list of task_id, condition_id, p00, p01, p10, p11",
+    )
+    plan_command.add_argument("--alpha", type=float)
+    plan_command.add_argument("--delta", type=float)
+    plan_command.add_argument("--n-grid", metavar="N,N,...")
+    plan_command.add_argument(
+        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=v1_plan
+    )
+    plan_command.add_argument("--target-probability", type=float, metavar="P")
     plan_command.add_argument(
         "--format", dest="plan_format", choices=("json", "markdown"), default="markdown"
     )
     plan_command.add_argument(
         "--interval-method",
-        default=INTERVAL_METHOD,
         metavar="METHOD",
         help="only clopper_pearson is supported",
     )
-    plan_command.add_argument(
-        "--conditions", type=int, default=1, metavar="K", help="only K=1 is supported"
-    )
+    plan_command.add_argument("--conditions", type=int, metavar="K", help="only K=1 is supported")
     plan_command.add_argument(
         "--looks", metavar="N,N,...", help="refused: the planner covers one fixed-sample look"
     )
 
     bundle = commands.add_parser("bundle", help="create a portable failure bundle")
-    bundle.add_argument("run_dir", metavar="RUN_DIR")
-    bundle.add_argument("trial_id", metavar="TRIAL_ID")
-    bundle.add_argument("--out", required=True, metavar="PATH")
+    bundle.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    bundle.add_argument("trial_id", metavar="TRIAL_ID", nargs="?" if suite_probe else None)
+    bundle.add_argument("--out", required=not suite_probe, metavar="PATH")
     bundle.add_argument("--root", metavar="DIR")
     bundle.add_argument("--include", action="append", default=[], metavar="RELPATH")
 
     replay_command = commands.add_parser("replay", help="replay a failure bundle")
-    replay_command.add_argument("bundle_json", metavar="BUNDLE_JSON")
+    replay_command.add_argument(
+        "bundle_json", metavar="BUNDLE_JSON", nargs="?" if suite_probe else None
+    )
 
     diff = commands.add_parser("diff", help="find the first divergence between two trials")
-    diff.add_argument("run_dir", metavar="RUN_DIR")
-    diff.add_argument("trial_a", metavar="TRIAL_A")
-    diff.add_argument("trial_b", metavar="TRIAL_B")
+    diff.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    diff.add_argument("trial_a", metavar="TRIAL_A", nargs="?" if suite_probe else None)
+    diff.add_argument("trial_b", metavar="TRIAL_B", nargs="?" if suite_probe else None)
     diff.add_argument("--all-steps", action="store_true")
+    diff.add_argument("--other-run", metavar="RUN_DIR", help="store containing TRIAL_B")
 
     trace_check = commands.add_parser(
         "trace-check",
@@ -689,10 +956,16 @@ def _parser() -> _Parser:
             "(exit 3). This is not a statistical verdict, authentication, or replay verification."
         ),
     )
-    trace_check.add_argument("baseline_run", metavar="BASE_RUN")
-    trace_check.add_argument("baseline_trial_id", metavar="BASE_TRIAL")
-    trace_check.add_argument("candidate_run", metavar="CAND_RUN")
-    trace_check.add_argument("candidate_trial_id", metavar="CAND_TRIAL")
+    trace_check.add_argument("baseline_run", metavar="BASE_RUN", nargs="?" if suite_probe else None)
+    trace_check.add_argument(
+        "baseline_trial_id", metavar="BASE_TRIAL", nargs="?" if suite_probe else None
+    )
+    trace_check.add_argument(
+        "candidate_run", metavar="CAND_RUN", nargs="?" if suite_probe else None
+    )
+    trace_check.add_argument(
+        "candidate_trial_id", metavar="CAND_TRIAL", nargs="?" if suite_probe else None
+    )
     trace_check.add_argument("--format", choices=("text", "json"), default="text")
 
     triage = commands.add_parser(
@@ -705,14 +978,14 @@ def _parser() -> _Parser:
             "Tool names, pointers and hashes may disclose information."
         ),
     )
-    triage.add_argument("run_dir", metavar="RUN_DIR")
+    triage.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
     triage.add_argument("--trial", metavar="CANDIDATE_ID", help="select one candidate trial")
     triage.add_argument("--format", choices=("text", "json"), default="text")
 
     minimize = commands.add_parser("minimize", help="minimize a failing trial's faults")
-    minimize.add_argument("run_dir", metavar="RUN_DIR")
-    minimize.add_argument("trial_id", metavar="TRIAL_ID")
-    minimize.add_argument("--out", required=True, metavar="PATH")
+    minimize.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    minimize.add_argument("trial_id", metavar="TRIAL_ID", nargs="?" if suite_probe else None)
+    minimize.add_argument("--out", required=not suite_probe, metavar="PATH")
 
     # --- demo ---
     demo = commands.add_parser(
@@ -756,18 +1029,18 @@ def _parser() -> _Parser:
         description=(
             "Write an arci.yaml smoke design from four module:function references, checked at "
             "once in a child process (imported and resolved; the toolset is built once with "
-            "the task and seed 0; nothing else is called). Prints the next command."
+            "the task and seed 0; nothing else is called). Or use --langchain alone to write "
+            "an offline LangChain suite in the current directory. Prints the next command."
         ),
     )
-    init.add_argument("experiment_id", metavar="EXPERIMENT_ID", help="also the task id")
-    init.add_argument("--baseline", required=True, metavar="REF", help="module:function agent")
-    init.add_argument("--candidate", required=True, metavar="REF", help="module:function agent")
     init.add_argument(
-        "--toolset", required=True, metavar="REF", help="module:function (task, seed) factory"
+        "--langchain", action="store_true", help="scaffold an offline LangChain suite; use alone"
     )
-    init.add_argument(
-        "--oracle", required=True, metavar="REF", help="module:function (task, state) -> bool"
-    )
+    init.add_argument("experiment_id", nargs="?", metavar="EXPERIMENT_ID", help="also the task id")
+    init.add_argument("--baseline", metavar="REF", help="module:function agent")
+    init.add_argument("--candidate", metavar="REF", help="module:function agent")
+    init.add_argument("--toolset", metavar="REF", help="module:function (task, seed) factory")
+    init.add_argument("--oracle", metavar="REF", help="module:function (task, state) -> bool")
     init.add_argument("--task", metavar="JSON", help="the task, a JSON object (default {})")
     init.add_argument("--task-file", metavar="PATH", help="read the task JSON from a UTF-8 file")
     init.add_argument(
@@ -782,12 +1055,16 @@ def _parser() -> _Parser:
     )
     init.add_argument(
         "--n",
-        default=str(DEFAULT_N_PER_ARM),
+        default=argparse.SUPPRESS,
         metavar="N",
         help=f"trials per arm (default {DEFAULT_N_PER_ARM}: a smoke design)",
     )
     init.add_argument(
-        "--out", dest="init_out", default=DEFAULT_OUT, metavar="PATH", help="default arci.yaml"
+        "--out",
+        dest="init_out",
+        default=argparse.SUPPRESS,
+        metavar="PATH",
+        help="default arci.yaml",
     )
     init.add_argument(
         "--force", action="store_true", help="replace an existing regular file at --out"
@@ -820,19 +1097,80 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["run_dir"]),
             cast(str, values["format"]),
             cast(str | None, values["pass_k"]),
+            cast(str | None, values["out"]),
         )
     if command == "plan":
+        suite_input = cast(str | None, values.get("suite_input"))
+        if suite_input is not None:
+            if (
+                not is_descriptor_path(Path(suite_input))
+                and manifest_schema_version(suite_input) != SUITE_SCHEMA_VERSION
+            ):
+                raise CliError("plan positional input must be a suite descriptor or manifest")
+            loaded = (
+                compile_run_descriptor(suite_input)
+                if is_descriptor_path(Path(suite_input))
+                else SuiteManifest.model_validate_json(
+                    Path(suite_input).read_text(encoding="utf-8")
+                )
+            )
+            if not isinstance(loaded, SuiteManifest):
+                raise CliError("plan positional input must be a suite descriptor or manifest")
+            from arci.suite_storage import validate_suite_manifest
+
+            loaded = validate_suite_manifest(loaded)
+            if any(
+                values[field] is not None
+                for field in (
+                    "alpha",
+                    "delta",
+                    "looks",
+                    "conditions",
+                    "interval_method",
+                    "target_verdict",
+                    "target_probability",
+                    "n_grid",
+                )
+            ):
+                raise CliError(
+                    "suite plan uses its registered rule; v1 design/target options are unsupported"
+                )
+            laws_path = cast(str | None, values["cell_laws"])
+            document = suite_plan(
+                loaded,
+                baseline_rate=cast(str | None, values["baseline_rate"]),
+                candidate_rate=cast(str | None, values["candidate_rate"]),
+                agreement=cast(str | None, values["agreement"]),
+                cell_laws=None if laws_path is None else Path(laws_path),
+            )
+            _print(
+                json.dumps(document, sort_keys=True, indent=2)
+                if values["plan_format"] == "json"
+                else render_suite_plan(document)
+            )
+            return 0
+        if values["agreement"] is not None or values["cell_laws"] is not None:
+            raise CliError("--agreement and --cell-laws require a suite descriptor")
+        for field in ("baseline_rate", "candidate_rate", "target_verdict"):
+            if values[field] is None:
+                raise CliError(f"the following argument is required: --{field.replace('_', '-')}")
         return _cmd_plan(
-            baseline_rate=cast(float, values["baseline_rate"]),
-            candidate_rate=cast(float, values["candidate_rate"]),
-            alpha=cast(float, values["alpha"]),
-            delta=cast(float, values["delta"]),
-            n_grid=cast(str, values["n_grid"]),
+            baseline_rate=float(cast(str, values["baseline_rate"])),
+            candidate_rate=float(cast(str, values["candidate_rate"])),
+            alpha=cast(float, values["alpha"]) if values["alpha"] is not None else 0.05,
+            delta=cast(float, values["delta"]) if values["delta"] is not None else 0.10,
+            n_grid=cast(str, values["n_grid"])
+            if values["n_grid"] is not None
+            else ",".join(map(str, DEFAULT_N_GRID)),
             target_verdict=cast(str, values["target_verdict"]),
-            target_probability=cast(float, values["target_probability"]),
+            target_probability=cast(float, values["target_probability"])
+            if values["target_probability"] is not None
+            else 0.80,
             output_format=cast(str, values["plan_format"]),
-            interval_method=cast(str, values["interval_method"]),
-            conditions=cast(int, values["conditions"]),
+            interval_method=cast(str, values["interval_method"])
+            if values["interval_method"] is not None
+            else INTERVAL_METHOD,
+            conditions=cast(int, values["conditions"]) if values["conditions"] is not None else 1,
             looks=cast(str | None, values["looks"]),
         )
     if command == "bundle":
@@ -846,12 +1184,14 @@ def _dispatch(values: dict[str, object]) -> int:
     if command == "replay":
         return _cmd_replay(cast(str, values["bundle_json"]))
     if command == "diff":
-        return _cmd_diff(
+        args = (
             cast(str, values["run_dir"]),
             cast(str, values["trial_a"]),
             cast(str, values["trial_b"]),
             cast(bool, values["all_steps"]),
         )
+        other_run = cast(str | None, values["other_run"])
+        return _cmd_diff(*args) if other_run is None else _cmd_diff(*args, other_run)
     if command == "trace-check":
         result = check_traces(
             cast(str, values["baseline_run"]),
@@ -906,7 +1246,18 @@ def _dispatch(values: dict[str, object]) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI and translate user-facing errors to exit code 3."""
     try:
-        namespace = _parser().parse_args(argv)
+        arguments = sys.argv[1:] if argv is None else argv
+        v1_plan = False
+        if "--help" not in arguments and "-h" not in arguments:
+            probe, _ = _parser(suite_probe=True).parse_known_args(arguments)
+            values = cast(dict[str, object], vars(probe))
+            if _deferred_suite_command(values):
+                return 3
+            if values["command"] == "plan":
+                # Keep v1 argparse conversions, required-option order and stray errors.
+                positional = values.get("suite_input")
+                v1_plan = positional is None or not Path(str(positional)).is_file()
+        namespace = _parser(v1_plan=v1_plan).parse_args(arguments)
         return _dispatch(cast(dict[str, object], vars(namespace)))
     except CliError as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)

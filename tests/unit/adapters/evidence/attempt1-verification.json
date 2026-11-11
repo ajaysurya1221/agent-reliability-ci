@@ -1,0 +1,40 @@
+{
+  "candidate_sha256": {
+    "pyrightconfig.adapters.json": "7e2b6aeef60e0b176ad8659bb7fc6d558df9d18c25a9e06fa9940f7997922181",
+    "src/arci/adapters/__init__.py": "19ab84240b618746e698e58c5369211ffc60229ebb3bd5baab9424c3107d7ed8",
+    "src/arci/adapters/langchain.py": "83907aeec0dce404b923a86e523abf572ed69dfe7025b778cb59fb49332afaef",
+    "src/arci/toolbox.py": "b1065867b2990eccb0c1c68729af06c13dde5bad61a06b90516fa5d88aaf5794",
+    "tests/unit/adapters/__init__.py": "974aee226c055fd30599a753d6e85237e002842d612f2b4a344e0ca4da04160a",
+    "tests/unit/adapters/fixtures.py": "095a1169c6c751e76f09df75aa71d522d902c5636afc39e9e31a848a20dea4d2",
+    "tests/unit/adapters/test_capabilities.py": "d01a2653a01b27619701b97d0198f12a3e52a98ef2b3963f4e7d4a9aae1763f8",
+    "tests/unit/adapters/test_core.py": "c127ebc2672ba21f4d22f743dfe03211b600ec85ef1c479887e0cd0c926aed11",
+    "tests/unit/adapters/test_edges.py": "cce9d25c000833ce2fb047f47500bdbdcbfa515fc1433dd29e4b88fd77316b7d",
+    "tests/unit/adapters/test_lazy_import.py": "839ddf0795ef01c94d2fea6397c9ded046e06af4bb811a45e223e1497782cba4",
+    "tests/unit/adapters/test_rejections.py": "4b7890331d9d6cf59b8a82b1d52e8105ce22b4c15c7110d16bf8729cf9039fc9",
+    "tests/unit/adapters/test_replay_and_order.py": "a5497ecb132a9498c9bf215eedcf4257c8e3580b178886e7b3b1648db8a8e75f",
+    "tests/unit/adapters/test_runner.py": "cbab64b60501c2c99ac40af9046c0c8a7723b03ab71397255a764fe2ae7b81f7",
+    "tests/unit/toolbox/test_fail_harness.py": "651d761872fa0cd27d28e64d8c17031a0348dfc93c58906ec8dba6be9fef2155"
+  },
+  "commands": [
+    {
+      "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters tests/unit/toolbox -q",
+      "exit_code": 1,
+      "elapsed_seconds": 118.665,
+      "log": "tests/unit/adapters/evidence/attempt1-adapter-tests.log",
+      "last_lines": [
+        "E               During task with name 'tools' and id '70d68cbd-a843-0eae-e60b-6054e5fe64a7'",
+        "",
+        ".venv/lib/python3.13/site-packages/langchain_core/tools/base.py:1098: TypeError",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_rejections.py::test_reserved_boundary_argument_names_are_explicit_rejections[False-self]",
+        "FAILED tests/unit/adapters/test_rejections.py::test_reserved_boundary_argument_names_are_explicit_rejections[True-self]"
+      ]
+    },
+    {
+      "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q",
+      "exit_code": 130,
+      "status": "interrupted after adapter failures, before edits",
+      "log": "tests/unit/adapters/evidence/attempt1-full-suite.log"
+    }
+  ]
+}
