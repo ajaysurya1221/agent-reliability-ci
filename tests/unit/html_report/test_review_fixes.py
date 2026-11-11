@@ -110,12 +110,12 @@ def test_plain_presentation_empty_digest_and_named_tables() -> None:
         assert not any(token in " ".join(Document(page).text) for token in ("**", "`", "<br>"))
 
 
-def test_phone_width_long_heading_wraps() -> None:
+def test_phone_width_long_suite_id_wraps_outside_heading() -> None:
     m, ts = evidence("BLOCK")
     m = m.model_copy(update={"suite_id": "a" * 64})
     html = render_suite_html(m, decide_suite(m, ts), ts)
-    assert "<h2>Suite " + "a" * 64 + "</h2>" in html
-    assert "h1, h2, p, td, th, li, caption { overflow-wrap: anywhere; }" in html
+    assert '<h2>Suite</h2><p class="long-value">Suite id: ' + "a" * 64 + "</p>" in html
+    assert ".long-value { overflow-wrap: anywhere; }" in html
 
 
 @pytest.mark.parametrize("kind", ["missing", "manifest", "trials"])

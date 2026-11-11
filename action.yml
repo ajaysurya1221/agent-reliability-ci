@@ -21,12 +21,12 @@ inputs:
     required: false
     default: "false"
   pr-comment:
-    description: "Post/update one sticky PR summary. Requires pull-requests: write; forks without write access skip softly. Serialize runs for one PR with a concurrency group, e.g. ${{ github.workflow }}-${{ github.event.pull_request.number }}, cancel-in-progress: false. Racing duplicates are refreshed on the next run; none are deleted."
+    description: "Post/update one sticky PR summary. Requires pull-requests: write; forks without write access skip softly. Serialize runs for one PR with a concurrency group and cancel-in-progress: false (see README). Racing duplicates are refreshed on the next run; none are deleted."
     required: false
     default: "false"
 
   comment-id:
-    description: "Optional sticky-comment identity; defaults to workflow name + job + manifest path. Use distinct ids for independent experiments."
+    description: "Optional sticky-comment identity within a job; defaults to workflow name + job + manifest path. Set distinct ids for matrix legs and independent experiments."
     required: false
     default: ""
 

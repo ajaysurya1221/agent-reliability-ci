@@ -37,7 +37,7 @@ def gh_api(method: str, endpoint: str, payload: dict[str, str] | None = None) ->
 
 def marker(env: Mapping[str, str]) -> str:
     identity = (
-        ["explicit", env["ARCI_COMMENT_ID"]]
+        ["explicit", "job", env.get("GITHUB_JOB", ""), env["ARCI_COMMENT_ID"]]
         if env.get("ARCI_COMMENT_ID")
         else [
             env.get("GITHUB_WORKFLOW", ""),
@@ -56,6 +56,40 @@ def _provenance(env: Mapping[str, str]) -> str:
     run = env.get("GITHUB_RUN_ID", "")
     run = run if re.fullmatch(r"[0-9]{1,30}", run) else "unavailable"
     return f"Head SHA: `{head}`; run id: `{run}`."
+
+
+def _sections(summary: str) -> list[str]:
+    """Keep each generated heading with all its paragraphs and tables."""
+    sections: list[str] = []
+    headed = False
+    for block in summary.strip().split("\n\n"):
+        if block.startswith("## "):
+            sections.append(block)
+            headed = True
+        elif headed:
+            sections[-1] += "\n\n" + block
+        else:
+            sections.append(block)
+    return sections
+
+
+def _table_prefix(section: str, budget: int) -> str:
+    """Fit whole data rows, retaining the heading, prose and both table headers."""
+    lines = section.split("\n")
+    for index, line in enumerate(lines[:-2]):
+        if not line.startswith("|") or not re.fullmatch(r"\|[ :|\-]+\|", lines[index + 1]):
+            continue
+        kept = lines[: index + 2]
+        size = len("\n".join(kept).encode())
+        rows = 0
+        for row in lines[index + 2 :]:
+            if not row.startswith("|") or size + 1 + len(row.encode()) > budget:
+                break
+            kept.append(row)
+            size += 1 + len(row.encode())
+            rows += 1
+        return "\n".join(kept) if rows else ""
+    return ""
 
 
 def _body(env: Mapping[str, str], repository: str) -> str:
@@ -91,9 +125,12 @@ def _body(env: Mapping[str, str], repository: str) -> str:
     kept: list[str] = []
     size = 0
     # Only generated sections are admitted; never cut a table row or a code span.
-    for section in summary.strip().split("\n\n"):
+    for section in _sections(summary):
         added = len(section.encode()) + (2 if kept else 0)
         if size + added > budget:
+            partial = _table_prefix(section, budget - size - (2 if kept else 0))
+            if partial:
+                kept.append(partial)
             return (
                 prefix + ("\n\n".join(kept) or fallback + "Report unavailable.") + notice + suffix
             )
@@ -156,7 +193,8 @@ def post_comment(env: Mapping[str, str], api: Api = gh_api) -> str:
             return "ARCI comment updated."
         api("POST", root, {"body": body})
         return "ARCI comment created."
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except Exception:
+        # Publication is best-effort; never expose exception text or credentials.
         return "ARCI comment skipped: API or report unavailable; gate result unchanged."
 
 

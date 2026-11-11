@@ -26,13 +26,15 @@ class ExperimentStore:
 
 def load_run(run_dir: Path | str) -> tuple[Manifest, tuple[TrialEnvelope, ...]]:
     directory = Path(run_dir)
-    manifest = Manifest.model_validate_json((directory / "manifest.json").read_text())
+    manifest = Manifest.model_validate_json(
+        (directory / "manifest.json").read_text(encoding="utf-8")
+    )
     if not manifest.validate_seal():
         raise ValueError("manifest seal is invalid")
     path = directory / "trials.jsonl"
     trials = tuple(
         TrialEnvelope.model_validate_json(line)
-        for line in path.read_text().splitlines()
+        for line in path.read_text(encoding="utf-8").split("\n")
         if line.strip()
     )
     if any(not trial.validate_seal() for trial in trials):

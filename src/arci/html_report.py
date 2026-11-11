@@ -50,14 +50,14 @@ body { margin: 0; background: var(--paper); color: var(--ink);
 main { max-width: 1100px; margin: auto; padding: clamp(16px, 4vw, 48px); }
 h1 { font-size: clamp(24px, 5vw, 38px); line-height: 1.2; }
 h2 { margin-top: 2em; font-size: 1.25em; }
-h1, h2, p, td, th, li, caption { overflow-wrap: anywhere; }
+.long-value { overflow-wrap: anywhere; }
 .verdict { border: 2px solid currentColor; padding: 16px; font-weight: bold; }
 .table { overflow-x: auto; margin: 1em 0; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 8px; }
 th { vertical-align: bottom; } td { vertical-align: top; min-width: 6ch; }
 svg { display: block; width: 100%; height: auto; color: var(--ink); }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; }
 @media print { .table { overflow: visible; } body { font-size: 10pt; } }
 """
 
@@ -97,8 +97,15 @@ def _text(value: object) -> str:
     return escape(visible_text(value), quote=True)
 
 
+def _wrap_class(value: object) -> str:
+    # Preserve ordinary words' min-content widths, especially the arm names.
+    return (
+        ' class="long-value"' if any(len(word) > 24 for word in visible_text(value).split()) else ""
+    )
+
+
 def _p(value: object) -> str:
-    return f"<p>{_text(value)}</p>"
+    return f"<p{_wrap_class(value)}>{_text(value)}</p>"
 
 
 def _heading(value: str) -> str:
@@ -108,10 +115,13 @@ def _heading(value: str) -> str:
 def _table(name: str, headers: Sequence[str], rows: Sequence[Sequence[object]]) -> str:
     return (
         f'<div class="table" tabindex="0" role="region" aria-label="{_text(name)}"><table>'
-        f"<caption>{_text(name)}</caption><thead><tr>"
+        f"<caption{_wrap_class(name)}>{_text(name)}</caption><thead><tr>"
         + "".join(f'<th scope="col">{_text(h)}</th>' for h in headers)
         + "</tr></thead><tbody>"
-        + "".join("<tr>" + "".join(f"<td>{_text(v)}</td>" for v in row) + "</tr>" for row in rows)
+        + "".join(
+            "<tr>" + "".join(f"<td{_wrap_class(v)}>{_text(v)}</td>" for v in row) + "</tr>"
+            for row in rows
+        )
         + "</tbody></table></div>"
     )
 
@@ -173,7 +183,7 @@ def suite_meaning(decision: SuiteDecision, *, mismatch: bool = False) -> str:
             return "The candidate broke a hard invariant; this BLOCK is not a statistical finding."
         return (
             "On the suite mean, the candidate's success is lower than the baseline's "
-            "by more than the registered margin"
+            "by more than the registered margin."
         )
     return _MEANING[decision.verdict]
 
@@ -259,7 +269,7 @@ def render_suite_html(
     code = 3 if stored_status == "mismatch" else decision.exit_code
     arms, low = _arms(trials)
     body = _p(suite_meaning(decision, mismatch=stored_status == "mismatch")) + arms
-    body += _heading(f"Suite {manifest.suite_id}")
+    body += _heading("Suite") + _p(f"Suite id: {manifest.suite_id}")
     body += _table(
         "Arm labels",
         ("Arm", "Label"),
@@ -469,7 +479,7 @@ def _decision_usage(trials: Sequence[TrialEnvelope]) -> tuple[int, int, int]:
 def render_html(manifest: Manifest, decision: GateDecision, trials: Sequence[TrialEnvelope]) -> str:
     """Build the v1 view directly from evidence, never from Markdown syntax."""
     body = _p(_VERDICT_MEANINGS[decision.verdict])
-    body += _heading(f"Experiment {manifest.experiment_id}")
+    body += _heading("Experiment") + _p(f"Experiment id: {manifest.experiment_id}")
     body += _table(
         "Arm labels",
         ("Arm", "Label"),
@@ -534,7 +544,7 @@ def render_html(manifest: Manifest, decision: GateDecision, trials: Sequence[Tri
             if decision.interval_method == "newcombe"
             else f"Clopper-Pearson ({decision.per_arm_confidence:.4%})"
         )
-        body += _heading(f"Condition: {condition.condition_id}") + _table(
+        body += _heading("Condition") + _table(
             f"Condition {condition.condition_id} measurements",
             ("Measure", "Baseline", "Candidate / condition"),
             [
@@ -595,7 +605,7 @@ def render_store_html(run_dir: str) -> tuple[str, int]:
             )
         v1, observed = load_run(run_dir)
         return render_html(v1, decide(v1, observed), observed), 0
-    except (OSError, ValueError) as exc:
+    except Exception as exc:
         return render_error_html(exc), 3
 
 
