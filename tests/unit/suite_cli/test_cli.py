@@ -81,11 +81,18 @@ def test_run_gate_real_fixture(
         "over that round's scenario instances obey the relevant null" in gate.stdout
     )
     assert (run_dir / "decision.json").read_bytes() == stored
+    report = cli("report", str(run_dir), "--format", "json")
+    assert report.returncode == code, report.stdout + report.stderr
+    assert json.loads(report.stdout)["decision"] == decision.model_dump(mode="json")
+    diagnostic = cli("triage", str(run_dir), "--format", "json")
+    assert diagnostic.returncode == code, diagnostic.stdout + diagnostic.stderr
+    assert json.loads(diagnostic.stdout)["gate"]["verdict"] == verdict
+    difference = cli("diff", str(run_dir), trials[0].trial_id, trials[1].trial_id)
+    assert difference.returncode == 0, difference.stdout + difference.stderr
+    assert (run_dir / "decision.json").read_bytes() == stored
 
 
-@pytest.mark.parametrize(
-    "command", ["report", "triage", "diff", "minimize", "bundle", "replay", "trace-check", "plan"]
-)
+@pytest.mark.parametrize("command", ["minimize", "bundle", "replay", "trace-check"])
 @pytest.mark.parametrize("input_kind", ["descriptor", "store"])
 def test_deferred_commands(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str, input_kind: str

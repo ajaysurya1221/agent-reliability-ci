@@ -54,10 +54,12 @@ from arci.planning import (
     plan,
     plan_to_json,
     render_plan_markdown,
+    render_suite_plan,
+    suite_plan,
 )
 from arci.reliability import validate_ks
 from arci.replay import make_bundle, replay
-from arci.report import render_junit, render_markdown
+from arci.report import fault_accounting, render_junit, render_markdown
 from arci.runner import run_experiment
 from arci.schedule import build_schedule
 from arci.schema import (
@@ -75,6 +77,7 @@ from arci.schema import (
 )
 from arci.storage import load_run
 from arci.suite_gate import decide_suite, replay_suite_decision
+from arci.suite_report import render_suite_json, render_suite_markdown
 from arci.suite_runner import run_suite
 from arci.suite_schema import SUITE_SCHEMA_VERSION, SuiteDecision, SuiteManifest
 from arci.suite_storage import load_suite_run, manifest_schema_version
@@ -612,14 +615,10 @@ def _suite_input(path: str) -> bool:
 def _deferred_suite_command(values: dict[str, object]) -> bool:
     command = str(values["command"])
     fields = {
-        "report": ("run_dir",),
-        "triage": ("run_dir",),
-        "diff": ("run_dir",),
         "minimize": ("run_dir",),
         "bundle": ("run_dir",),
         "replay": ("bundle_json",),
         "trace-check": ("baseline_run", "candidate_run"),
-        "plan": ("suite_input",),
     }.get(command, ())
     if any(isinstance(value := values.get(field), str) and _suite_input(value) for field in fields):
         print(f"suite support for {command} is not built yet")
@@ -659,11 +658,40 @@ def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -
 
 
 def _cmd_report(run_dir: str, report_format: str, pass_k: str | None = None) -> int:
+    if _suite_input(run_dir):
+        if report_format == "junit" or pass_k is not None:
+            print("suite support for report is not built yet")
+            return 3
+        suite, suite_trials = load_suite_run(run_dir)
+        suite_decision = decide_suite(suite, suite_trials)
+        renderer = render_suite_json if report_format == "json" else render_suite_markdown
+        stored_status = "absent"
+        stored = Path(run_dir) / "decision.json"
+        if stored.exists() or stored.is_symlink():
+            try:
+                previous = SuiteDecision.model_validate_json(stored.read_text(encoding="utf-8"))
+                stored_status = (
+                    "match" if replay_suite_decision(previous, suite, suite_trials) else "mismatch"
+                )
+            except (ValueError, OSError):
+                stored_status = "mismatch"
+        _print(renderer(suite, suite_decision, suite_trials, stored_status=stored_status))
+        return 3 if stored_status == "mismatch" else suite_decision.exit_code
     ks = () if pass_k is None else validate_ks(_int_list(pass_k, "--pass-k"))
     if ks and report_format != "md":
         raise CliError("--pass-k is reported in the md format only")
     manifest, trials = load_run(run_dir)
     decision = decide(manifest, trials)
+    if report_format == "json":
+        _print(
+            json.dumps(
+                decision.model_dump(mode="json")
+                | {"fault_accounting": fault_accounting(manifest.conditions, trials)},
+                sort_keys=True,
+                indent=2,
+            )
+        )
+        return 0
     report = (
         render_markdown(manifest, decision, trials, pass_k=ks)
         if report_format == "md"
@@ -744,16 +772,26 @@ def _cmd_replay(bundle_path: str) -> int:
     }[result.status]
 
 
-def _cmd_diff(run_dir: str, trial_a: str, trial_b: str, all_steps: bool) -> int:
+def _cmd_diff(
+    run_dir: str, trial_a: str, trial_b: str, all_steps: bool, other_run: str | None = None
+) -> int:
     first_divergence = cast(
         _FirstDivergence,
         vars(importlib.import_module("arci.diff"))["first_divergence"],
     )
 
-    _manifest, trials = load_run(run_dir)
+    def read_trials(path: str) -> tuple[TrialEnvelope, ...]:
+        if _suite_input(path):
+            # As in v1, diff is a trace diagnostic, including for ERROR runs.
+            # The loader validates seals; this command makes no gate claim.
+            return load_suite_run(path)[1]
+        return tuple(load_run(path)[1])
+
+    trials = read_trials(run_dir)
+    other_trials = trials if other_run is None else read_trials(other_run)
     mode: Literal["boundary", "all"] = "all" if all_steps else "boundary"
     divergence = first_divergence(
-        _find_trial(trials, trial_a), _find_trial(trials, trial_b), mode=mode
+        _find_trial(trials, trial_a), _find_trial(other_trials, trial_b), mode=mode
     )
     print(f"mode: {mode}")
     print(f"common_prefix: {divergence.common_prefix}")
@@ -785,7 +823,7 @@ def _cmd_minimize(run_dir: str, trial_id: str, out_path: str) -> int:
     return 0
 
 
-def _parser(*, suite_probe: bool = False) -> _Parser:
+def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -818,7 +856,7 @@ def _parser(*, suite_probe: bool = False) -> _Parser:
 
     report = commands.add_parser("report", help="render a stored run")
     report.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
-    report.add_argument("--format", choices=("md", "junit"), default="md")
+    report.add_argument("--format", choices=("md", "json", "junit"), default="md")
     report.add_argument(
         "--pass-k",
         metavar="K,K,...",
@@ -835,31 +873,40 @@ def _parser(*, suite_probe: bool = False) -> _Parser:
             "Domain: clopper_pearson, K=1, one look, N <= 400; other designs are refused."
         ),
     )
-    if suite_probe:
-        plan_command.add_argument("suite_input", nargs="?")
-    plan_command.add_argument("--baseline-rate", type=float, required=not suite_probe, metavar="P")
-    plan_command.add_argument("--candidate-rate", type=float, required=not suite_probe, metavar="P")
-    plan_command.add_argument("--alpha", type=float, default=0.05)
-    plan_command.add_argument("--delta", type=float, default=0.10)
+    if not v1_plan:
+        plan_command.add_argument(
+            "suite_input", nargs="?", help="suite descriptor or sealed manifest"
+        )
     plan_command.add_argument(
-        "--n-grid", default=",".join(map(str, DEFAULT_N_GRID)), metavar="N,N,..."
+        "--baseline-rate", type=float if v1_plan else str, required=v1_plan, metavar="P"
     )
     plan_command.add_argument(
-        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=not suite_probe
+        "--candidate-rate", type=float if v1_plan else str, required=v1_plan, metavar="P"
     )
-    plan_command.add_argument("--target-probability", type=float, default=0.80, metavar="P")
+    plan_command.add_argument(
+        "--agreement", metavar="P", help="suite model P(baseline == candidate)"
+    )
+    plan_command.add_argument(
+        "--cell-laws",
+        metavar="JSON",
+        help="joint laws: JSON list of task_id, condition_id, p00, p01, p10, p11",
+    )
+    plan_command.add_argument("--alpha", type=float)
+    plan_command.add_argument("--delta", type=float)
+    plan_command.add_argument("--n-grid", metavar="N,N,...")
+    plan_command.add_argument(
+        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=v1_plan
+    )
+    plan_command.add_argument("--target-probability", type=float, metavar="P")
     plan_command.add_argument(
         "--format", dest="plan_format", choices=("json", "markdown"), default="markdown"
     )
     plan_command.add_argument(
         "--interval-method",
-        default=INTERVAL_METHOD,
         metavar="METHOD",
         help="only clopper_pearson is supported",
     )
-    plan_command.add_argument(
-        "--conditions", type=int, default=1, metavar="K", help="only K=1 is supported"
-    )
+    plan_command.add_argument("--conditions", type=int, metavar="K", help="only K=1 is supported")
     plan_command.add_argument(
         "--looks", metavar="N,N,...", help="refused: the planner covers one fixed-sample look"
     )
@@ -881,6 +928,7 @@ def _parser(*, suite_probe: bool = False) -> _Parser:
     diff.add_argument("trial_a", metavar="TRIAL_A", nargs="?" if suite_probe else None)
     diff.add_argument("trial_b", metavar="TRIAL_B", nargs="?" if suite_probe else None)
     diff.add_argument("--all-steps", action="store_true")
+    diff.add_argument("--other-run", metavar="RUN_DIR", help="store containing TRIAL_B")
 
     trace_check = commands.add_parser(
         "trace-check",
@@ -1033,17 +1081,77 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str | None, values["pass_k"]),
         )
     if command == "plan":
+        suite_input = cast(str | None, values.get("suite_input"))
+        if suite_input is not None:
+            if (
+                not is_descriptor_path(Path(suite_input))
+                and manifest_schema_version(suite_input) != SUITE_SCHEMA_VERSION
+            ):
+                raise CliError("plan positional input must be a suite descriptor or manifest")
+            loaded = (
+                compile_run_descriptor(suite_input)
+                if is_descriptor_path(Path(suite_input))
+                else SuiteManifest.model_validate_json(
+                    Path(suite_input).read_text(encoding="utf-8")
+                )
+            )
+            if not isinstance(loaded, SuiteManifest):
+                raise CliError("plan positional input must be a suite descriptor or manifest")
+            from arci.suite_storage import validate_suite_manifest
+
+            loaded = validate_suite_manifest(loaded)
+            if any(
+                values[field] is not None
+                for field in (
+                    "alpha",
+                    "delta",
+                    "looks",
+                    "conditions",
+                    "interval_method",
+                    "target_verdict",
+                    "target_probability",
+                    "n_grid",
+                )
+            ):
+                raise CliError(
+                    "suite plan uses its registered rule; v1 design/target options are unsupported"
+                )
+            laws_path = cast(str | None, values["cell_laws"])
+            document = suite_plan(
+                loaded,
+                baseline_rate=cast(str | None, values["baseline_rate"]),
+                candidate_rate=cast(str | None, values["candidate_rate"]),
+                agreement=cast(str | None, values["agreement"]),
+                cell_laws=None if laws_path is None else Path(laws_path),
+            )
+            _print(
+                json.dumps(document, sort_keys=True, indent=2)
+                if values["plan_format"] == "json"
+                else render_suite_plan(document)
+            )
+            return 0
+        if values["agreement"] is not None or values["cell_laws"] is not None:
+            raise CliError("--agreement and --cell-laws require a suite descriptor")
+        for field in ("baseline_rate", "candidate_rate", "target_verdict"):
+            if values[field] is None:
+                raise CliError(f"the following argument is required: --{field.replace('_', '-')}")
         return _cmd_plan(
-            baseline_rate=cast(float, values["baseline_rate"]),
-            candidate_rate=cast(float, values["candidate_rate"]),
-            alpha=cast(float, values["alpha"]),
-            delta=cast(float, values["delta"]),
-            n_grid=cast(str, values["n_grid"]),
+            baseline_rate=float(cast(str, values["baseline_rate"])),
+            candidate_rate=float(cast(str, values["candidate_rate"])),
+            alpha=cast(float, values["alpha"]) if values["alpha"] is not None else 0.05,
+            delta=cast(float, values["delta"]) if values["delta"] is not None else 0.10,
+            n_grid=cast(str, values["n_grid"])
+            if values["n_grid"] is not None
+            else ",".join(map(str, DEFAULT_N_GRID)),
             target_verdict=cast(str, values["target_verdict"]),
-            target_probability=cast(float, values["target_probability"]),
+            target_probability=cast(float, values["target_probability"])
+            if values["target_probability"] is not None
+            else 0.80,
             output_format=cast(str, values["plan_format"]),
-            interval_method=cast(str, values["interval_method"]),
-            conditions=cast(int, values["conditions"]),
+            interval_method=cast(str, values["interval_method"])
+            if values["interval_method"] is not None
+            else INTERVAL_METHOD,
+            conditions=cast(int, values["conditions"]) if values["conditions"] is not None else 1,
             looks=cast(str | None, values["looks"]),
         )
     if command == "bundle":
@@ -1057,12 +1165,14 @@ def _dispatch(values: dict[str, object]) -> int:
     if command == "replay":
         return _cmd_replay(cast(str, values["bundle_json"]))
     if command == "diff":
-        return _cmd_diff(
+        args = (
             cast(str, values["run_dir"]),
             cast(str, values["trial_a"]),
             cast(str, values["trial_b"]),
             cast(bool, values["all_steps"]),
         )
+        other_run = cast(str | None, values["other_run"])
+        return _cmd_diff(*args) if other_run is None else _cmd_diff(*args, other_run)
     if command == "trace-check":
         result = check_traces(
             cast(str, values["baseline_run"]),
@@ -1118,11 +1228,17 @@ def main(argv: list[str] | None = None) -> int:
     """Run the CLI and translate user-facing errors to exit code 3."""
     try:
         arguments = sys.argv[1:] if argv is None else argv
+        v1_plan = False
         if "--help" not in arguments and "-h" not in arguments:
             probe, _ = _parser(suite_probe=True).parse_known_args(arguments)
-            if _deferred_suite_command(cast(dict[str, object], vars(probe))):
+            values = cast(dict[str, object], vars(probe))
+            if _deferred_suite_command(values):
                 return 3
-        namespace = _parser().parse_args(arguments)
+            if values["command"] == "plan":
+                # Keep v1 argparse conversions, required-option order and stray errors.
+                positional = values.get("suite_input")
+                v1_plan = positional is None or not Path(str(positional)).is_file()
+        namespace = _parser(v1_plan=v1_plan).parse_args(arguments)
         return _dispatch(cast(dict[str, object], vars(namespace)))
     except CliError as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)

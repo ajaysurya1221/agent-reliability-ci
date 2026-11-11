@@ -37,4 +37,13 @@ BLOCK means the candidate is worse than the baseline by more than the configured
 - Experiment: no global errors.
 - `fetch_timeout`: regression bound crossed
 
+## Fault accounting
+
+Recorded tool_finish injections, grouped by declared fault name; repeated declarations of the same name are indistinguishable. Counts are descriptive.
+
+| Condition | Fault | Arm | Trials | Injections | Trials fired | Status |
+|---|---|---|---:|---:|---:|---|
+| `fetch_timeout` | `tool_timeout` | baseline | 12 | 0 | 0 | declared, never fired |
+| `fetch_timeout` | `tool_timeout` | candidate | 12 | 0 | 0 | declared, never fired |
+
 VERDICT: BLOCK (exit 1)
