@@ -1,0 +1,5 @@
+?? dist-v0.8.0/
+?? plan/exec/v2/
+?? "plan/research/A. EXECUTIVE DECISION.pdf"
+?? plan/research/arci-go-ahead-plan.md
+?? plan/research/arci-research-10112026.md

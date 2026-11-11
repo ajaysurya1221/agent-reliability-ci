@@ -1,0 +1,12 @@
+?? dist-v0.8.0/SHA256SUMS
+?? dist-v0.8.0/agent_reliability_ci-0.8.0-py3-none-any.whl
+?? dist-v0.8.0/agent_reliability_ci-0.8.0.tar.gz
+?? plan/exec/v2/PLAN.md
+?? plan/exec/v2/spikes/s2/scope_before.json
+?? plan/exec/v2/spikes/s3/NOTE.md
+?? plan/exec/v2/spikes/s3/mcp_client_check.py
+?? plan/exec/v2/tasks/S1-suite-statistics-spike.md
+?? plan/exec/v2/tasks/S2-langchain-adapter-spike.md
+?? "plan/research/A. EXECUTIVE DECISION.pdf"
+?? plan/research/arci-go-ahead-plan.md
+?? plan/research/arci-research-10112026.md

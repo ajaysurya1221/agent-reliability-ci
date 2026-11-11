@@ -1,0 +1,17 @@
+{
+  "runs": [
+    "run-0003",
+    "run-0004"
+  ],
+  "exit_codes": [
+    1,
+    1
+  ],
+  "same_check_verdicts": true,
+  "identical_trial_hashes": 53,
+  "source_digests_unchanged": true,
+  "scope_inventory_unchanged": 735,
+  "failed_checks": [
+    "native_parity"
+  ]
+}

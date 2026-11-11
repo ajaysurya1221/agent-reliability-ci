@@ -1,0 +1,420 @@
+[
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/suite_helpers.py",
+   "tests": 0,
+   "covered": [
+    "Contract 1, cells: cell_keys() computes cell order independently as sorted (task_id, condition_id); round_trials maps differences to cells by that order, not by the order build_suite_round returns",
+    "Contract 1, difference: d=+1 is candidate PASS and baseline FAIL, d=-1 the reverse, d=0 both PASS",
+    "Contract 1, errored pair: a cell in `errored` gets a candidate trial with Outcome.ERROR",
+    "Contract 2, SuiteManifest/SuiteTask: the default manifest has 5 tasks t0..t4 and 4 conditions (clean, fetch_timeout, empty_log, store_error_late, all valid SuiteIds, none CEILING), python arms with a toolset and no mcp_server, max_rounds 20 and max_errored_pairs 4 (1% of 400), everything else default",
+    "Contract 3, create_suite_manifest: the manifest is built only through it, never with experiment_id or record_sha256",
+    "Contract 3, trial identity: spec_sha256 = arci.schedule.spec_sha256(spec), and the identity fields are copied from the scheduled TrialSpec",
+    "Contract 4, wealth: reference_wealth works from the counts with integer powers. I cross-checked it against the spike s1 count_wealth (200 random count triples, exact equality) and against the contract's known facts: all-zero first crosses 40 at 79 pairs, all +1 crosses at 9, all -1 BLOCKs at 13, 80 zeros give 42.2732..., and 1 errored pair plus 79 zeros (scored as minus) give 21.170...",
+    "Contract 5, hard violations: a hard-severity Violation sits in candidate trial.contract.violations"
+   ],
+   "contract_gaps": [
+    "The contract does not say whether a candidate trial with a hard violation can have Outcome.PASS. AGENT_SEMANTICS line 8 says PASS requires no hard violation, and the v1 synthetic_trials forces FAIL. The brief, though, says outcomes follow `differences`. I followed the brief: `hard` only adds the violation and never changes the outcome, so the counts stay exactly as `differences` gives them. A test that wants a realistic record should pass differences[i] = -1 (candidate FAIL) for a hard cell. The section 5 gate reads violations whatever the outcome, so the verdict is unaffected.",
+    "Contract section 5 says a trial with no contract result has no hard violations, but it does not say what an ERROR trial carries. Following v1, envelope() gives ERROR termination harness_error and contract None, unless hard_violation is set, in which case it gets ContractResult(success=False, violations=(hard,)). The brief said 'a ContractResult' without qualification, so I note the choice here.",
+    "In an errored cell the baseline outcome is unconstrained by the contract. The baseline still follows differences[i] (FAIL only when d=+1). This affects SuiteCellStats.baseline_successes, which tests must compute the same way.",
+    "Section 4: alpha does not enter the wealth at all, only the threshold. reference_wealth keeps the alpha parameter from the brief's signature and discards it with `del alpha`.",
+    "Not a gap in the contract: build_suite_round raises when round > max_rounds, so round_trials cannot build trials past max_rounds (the 'stored after the stopping round' tests must stay within max_rounds)."
+   ],
+   "notes": "I wrote one file of 192 lines: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/suite_helpers.py. It provides CONDITIONS, HARD, tasks(n), suite_manifest(*, n_tasks=5, n_conditions=4, **overrides), cell_keys(manifest), envelope(spec, outcome=PASS, *, hard_violation=False, **overrides), round_trials(manifest, round, differences, *, errored=(), hard=()), rounds_trials(manifest, rows) and reference_wealth(minus, zero, plus, alpha, delta, stakes).\n\n- **suite_manifest:** n_conditions must be 1..4 (the first entries of CONDITIONS), otherwise ValueError. n_tasks is unbounded, with task ids f't{i}'. Above 10 tasks the string order puts 't10' before 't2'; cell_keys handles that.\n- **round_trials:** it raises ValueError on a wrong length, a value outside {-1, 0, 1} or an index out of range. It returns, in cell order, the baseline envelope then the candidate envelope, looking up each spec by (task_id, condition_id, arm) from build_suite_round. rounds_trials takes plain difference rows only (no errored or hard rows); tests needing those should concatenate round_trials calls.\n- **Reuse:** the faults, MOD and contract() come from tests.acceptance.helpers, which is frozen.\n- **Checks:** ruff format, ruff check (clean) and py_compile all pass. basedpyright reports only errors that follow from arci.suite_schedule and arci.suite_schema not existing yet (2 unresolved imports and the unknown types they cause). Nothing else under the repository was changed or read outside what was allowed."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_schedule.py",
+   "tests": 43,
+   "covered": [
+    "Contract 1, cell: full grid N = T*K, sorted by (task_id, condition_id) in Python string order (ids chosen so string order differs from numeric/case order), cell index = position; suite_cells returns the manifest's own task and condition objects",
+    "Contract 3, rule digest: digest_payload already lacks record_sha256 and created_at; digest recomputed in the test from digest_payload + hash_record({'domain': 'arci-suite/1 rule', 'content': payload}) with experiment_id removed and tasks/conditions sorted by id, for default, reversed-task, reversed-condition and changed-rule manifests",
+    "Contract 3, rule digest invariance: task order, condition order, created_at, stored experiment_id, record_sha256",
+    "Contract 3, rule digest change: 35 parametrised changes (suite_id, alpha, delta, stakes values and count, max_rounds, scenario_seeds, max_errored_pairs incl. 0, task content, empty task content, task id, task added/removed, condition removed, condition id, fault at_occurrence/params/tool/bucket, fault added, contract oracle, contract forbidden_tools, two budgets fields, prior_runs, toolset, fixtures_sha256, baseline label/agent/candidate_id, candidate label/agent/candidate_id, arms swapped), plus fault order inside a condition and the mcp_server of a command-agent suite; each also checks the reference digest and that experiment_id changes",
+    "Contract 3, experiment id: '<suite_id>@<64 hex>' format, equals suite_id@recomputed digest, suite_experiment_id recomputes rather than reading a stale stored id",
+    "Contract 3, create_suite_manifest: returns a SuiteManifest that validates its seal with the right experiment_id; experiment_id and record_sha256 each raise TypeError",
+    "Contract 3, seed: 13 golden vectors for key 'ab'*32 computed from the formula with hashlib and cross-checked with openssl; fixed mode gives the r=0 seed in every round; per_round matches r=round and differs between rounds; 53-bit bound over several keys; ValueError for upper-case/short/long/non-hex/empty key, index -1 and 2**32, round 0/-1/2**32 in both modes, unknown modes",
+    "Contract 3, arm order: 11 golden vectors; the real round is used (formula with the round, rounds 1 and 3 of cell 0 differ); same formula for fixed and per_round suite digests; domain ValueErrors",
+    "Contract 3, ids: suite_pair_id format; trial_id = pair_id:arm; pair_round accepts matching ids (incl. 100000, 999999, spaces in task id) and inverts suite_pair_id; 18 rejections (empty, round 0, 5 and 7 digits, missing parts, trial id, empty task/condition, wrong prefix, non-digit, signs, leading space, Arabic-Indic digits, v1 pair id)",
+    "Contract 3, build_suite_round: 2*N specs in cell order, baseline then candidate; literal first and last trial ids; every TrialSpec compared whole (and by spec_sha256) against a TrialSpec built in the test from the contract field list with defaults for interval_method, looks, tool_mode, recording, replay_final_state, in both seed modes over three rounds; alpha/delta mirrors 0.025/0.125; decisions None; command-agent suite gives command/mcp_server and toolset None",
+    "Contract 3, seeds in build: both arms share the seed, no two cells of a round share one, seeds equal the hashlib reference and cell_seed; fixed mode keeps a cell's seed across rounds, per_round does not",
+    "Contract 3, experiment_id taken as stored and seed derived from the recomputed digest, on a manifest resealed with changed alpha and the old experiment_id",
+    "Contract 3: specs identical for manifests that differ only in task/condition order and created_at",
+    "Contract 3, build_suite_round: ValueError for rounds 0, -1, max_rounds+1, 100, and round 2 of a single-round suite",
+    "Contract 3, build_suite_schedule: equals rounds 1..max_rounds concatenated in both modes; unique trial ids, pair ids and spec_sha256; deterministic",
+    "Contract 3, module rules: no import of random in suite_schedule.py; imports only stdlib (sys.stdlib_module_names), arci.hashing, arci.schema, arci.suite_schema (AST scan)"
+   ],
+   "contract_gaps": [
+    "pair_round: the contract writes the pattern as ^...$ but does not say full match versus re.match. Under Python re.match '$' also matches before a trailing newline, so it is undefined whether 'r000001:t0:clean\\n' is accepted. Not tested.",
+    "pair_round: 'raises ValueError for anything else' does not say whether a non-str argument (None, int) must raise ValueError or may raise TypeError. Not tested.",
+    "cell_seed / arm_order domains: nothing says what happens to non-int or bool cell_index/round (True is an int in Python), or a non-str key such as bytes. Not tested.",
+    "suite_pair_id: no domain is given (round < 1, round >= 10**6, which would make a 7-digit id pair_round rejects, or task/condition ids containing ':'). SuiteId forbids ':' and SUITE_MAX_PAIRS keeps rounds at or below 100000, so this cannot happen through a valid manifest, but the function contract is silent. Not tested.",
+    "build_suite_round's ValueError('seed collision') cannot be triggered without a real 53-bit collision, so it has no test. The contract does not say whether build_suite_round or create_suite_manifest checks this, or whether the message must be exact.",
+    "build_suite_round: the contract does not say whether it validates a manifest whose stored experiment_id is stale. Tests assume it does not (it uses experiment_id as stored, seed from content), which is how the contract reads.",
+    "Rule digest: 'Any other difference changes it' is not defined for differences that compare equal in Python but not in canonical JSON, or the reverse (task dict key order, which canonical_json sorts away). Not tested.",
+    "acknowledge_single_round cannot be changed alone (rule 7 ties it to max_rounds == 1), and schema_version / seed_derivation each have one allowed value, so these fields have no 'digest changes' case.",
+    "TrialSpec defaults: the contract says 'the defaults' for interval_method, looks, tool_mode, recording, replay_final_state. The tests read them from TrialSpec.model_fields, the frozen v1 schema."
+   ],
+   "notes": "I wrote one file, plan/exec/v2/acceptance-staging/test_suite_schedule.py: 43 test functions, 154 collected cases once parametrised. It imports nothing from plan/. Every expected digest, seed and arm order is recomputed inside the test from the contract formulas with hashlib, hash_record and digest_payload. The golden literals came from the formulas with key 'ab'*32, and openssl dgst cross-checked two of them. No test calls operating_characteristics; the slowest test builds an 800-spec schedule and takes about 0.02 s.\n\nChecks run: ruff format, ruff check and py_compile are clean. py_compile wrote a .pyc into acceptance-staging/__pycache__, beside the ones already there.\n\nThe real implementation was not available, so I did a dry run against a throwaway stub of the contract. I wrote the stub myself; it lived only in memory, injected into sys.modules inside one python process, with bytecode writing and the pytest cache off. All 152 runnable cases passed. The 2 AST import tests were deselected because the stub has no source file. This checks the tests' own wiring, not any real implementation. I did not run basedpyright; it cannot resolve the missing modules. The file has two pyright-ignore comments for Literal/arg typing from dict unpacking.\n\nPoints the orchestrator should know:\n(1) Two tests read the source of arci.suite_schedule with ast. One checks that random is never imported. The other checks that imports are only stdlib (sys.stdlib_module_names), arci.hashing, arci.schema and arci.suite_schema. Relative imports are resolved under arci. A typing_extensions import would fail that test, as the contract implies.\n(2) Several tests assert that values derived from SHA-256 differ: per-round seeds across rounds, seeds after a reseal. Failure needs a 53-bit collision, so the chance is negligible. Where the key is fixed ('ab'*32), I checked the values.\n(3) The tests build manifests through suite_helpers.suite_manifest and also through SuiteManifest.create(**manifest.model_dump(exclude={'record_sha256','experiment_id'}), experiment_id=...). The second route assumes SuiteManifest accepts its own python-mode dump, including schema_version, seed_derivation and created_at.\n(4) suite_helpers.py looks correct for my use. I did not edit it."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_schema.py",
+   "tests": 37,
+   "covered": [
+    "Contract 2, module constants SUITE_SCHEMA_VERSION, SUITE_SEED_DERIVATION, SUITE_MAX_PAIRS",
+    "Contract 2, SuiteId pattern (TypeAdapter accept/reject, plus SuiteTask.task_id and SuiteManifest.suite_id fields)",
+    "Contract 2, Rational pattern (format only; TypeAdapter accept/reject)",
+    "Contract 2, parse_rational: lowest-terms n/d gives that Fraction; ValueError for non-lowest terms, 1/0 and malformed text",
+    "Contract 2, format_rational: n/d lowest terms, 2/alpha example '40/1', round trip with parse_rational, ValueError for <= 0",
+    "Contract 2, SuiteManifest defaults (schema_version, created_at, mcp_server, alpha, delta, stakes, scenario_seeds, seed_derivation, acknowledge_single_round, budgets, fixtures_sha256, prior_runs) and SuiteTask.task default {}",
+    "Contract 2, SuiteManifest exact field set (no decisions, n_per_arm, base_seed, looks, task_id)",
+    "Contract 2, base classes Model / Sealed",
+    "Contract 2, max_rounds and max_errored_pairs have no default",
+    "Contract 2, tasks and conditions at least 1",
+    "Contract 2, rule 1: duplicate task_id, duplicate condition_id, condition_id not a SuiteId (space, colon, empty, leading dash, 65 chars)",
+    "Contract 2, rule 2: CEILING fault, each DECISION_PERTURBATIONS name (tool not a decision tool, so the name rule alone fires), tool with DECISION_TOOL_PREFIX",
+    "Contract 2, rule 3: python arms without toolset / with mcp_server, command arms without mcp_server / with toolset, both mixed-arm orders; passing command-arm manifest",
+    "Contract 2, rule 4: alpha/delta/stake not in lowest terms, alpha below 1/1000000 / above 1/2, delta >= 1, 0 and 9 stakes, stake >= 1, decreasing and repeated stakes; boundary passes (alpha 1/1000000 and 1/2, 1 and 8 stakes)",
+    "Contract 2, rule 5: max_rounds 0 and -1, pairs above 100000 at 20 cells and 1 cell; exactly 100000 passes",
+    "Contract 2, rule 6: max_errored_pairs -1 and registered+1 fail; 0 and registered pass",
+    "Contract 2, rule 7: ack iff max_rounds == 1 (three failing cases, one passing)",
+    "Contract 2, Literal fields schema_version, seed_derivation, scenario_seeds on SuiteManifest; schema_version and verdict on SuiteDecision",
+    "Contract 2, n_cells and registered_pairs over six grid shapes",
+    "Contract 2, extra fields forbidden on SuiteManifest, SuiteTask, SuiteCounts, SuiteRoundDecision, SuiteCellStats, SuiteDecision",
+    "Contract 2, all records frozen (assignment raises ValidationError, as v1 Model)",
+    "Contract 2, SuiteManifest seal round trip via model_dump_json / model_validate_json for python, command and rich manifests; tamper evidence",
+    "Contract 2, created_at VOLATILE like v1",
+    "Contract 2, SuiteDecision seal round trip (full and ERROR-template decisions) and tamper evidence",
+    "Contract 2, importing arci.suite_schema in a fresh interpreter loads no arci module beyond arci.schema/arci.hashing and never arci.suite_stats",
+    "Contract 2, exact field sets of SuiteCounts, SuiteRoundDecision, SuiteCellStats, SuiteDecision",
+    "Contract 2, SuiteCounts every field ge=0",
+    "Contract 2, minimal SuiteDecision.create defaults (history (), stopped_at_round 0, cells (), prior_runs (), schema_version) and exit_code int equal to EXIT_CODES[verdict] for every Verdict",
+    "Contract 2, SuiteDecision required fields have no default"
+   ],
+   "contract_gaps": [
+    "parse_rational: the contract says 'ValueError unless n/d in lowest terms' but does not define n/d. It does not say whether parse_rational is as strict as the Rational pattern. So these inputs were left out: '0/1' (lowest terms, but not positive), '-1/2' and '+1/2' (signs), '01/2' (leading zero), ' 1/2' and '1/2 ' (whitespace, which int() accepts), and '1_0/3' (underscore, which int() accepts). A naive split-and-int() implementation accepts several of them.",
+    "parse_rational('1/0') is asserted to raise ValueError. My reading: '1/0' is not a fraction, and ValueError is the only exception the contract names. An implementation that calls Fraction(int(n), int(d)) raises ZeroDivisionError instead, which the test would catch as a disagreement.",
+    "format_rational: the contract does not say what happens for a non-Fraction argument such as int or float. Not tested.",
+    "SuiteManifest.VOLATILE is given only as 'VOLATILE, like v1' on created_at. The test checks the behaviour (created_at does not affect the seal), not the class attribute.",
+    "The decision records have no stated value constraints except SuiteCounts ge=0. For example, nothing says SuiteRoundDecision.round >= 1 or that SuiteDecision.exit_code must equal EXIT_CODES[verdict] at construction. So no test expects a mismatched exit_code to be refused.",
+    "Whether rational fields accept non-string input (a Fraction or an int) is not stated. Not tested.",
+    "SuiteId's '$' anchor: under pydantic's Rust regex engine 'a\\n' is rejected, but a python-re engine would accept it. That case was dropped so the result does not depend on the regex engine."
+   ],
+   "notes": "I wrote one file: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_schema.py. It has 37 test functions, which pytest collects as 185 items because of parametrisation. py_compile, ruff format and ruff check all pass (ruff: 'All checks passed!'). I did not run basedpyright, because the modules under test do not exist. The pyright-ignore comments follow house style on the `**dict[str, object]` constructor calls. I removed the frozen-assignment ignores after a probe showed basedpyright does not flag those lines.\n\nI also checked the tests against a stand-in. I wrote it in my scratchpad from contract section 2 alone, not from the real implementation, and loaded it through sys.modules injection. Result: 184 passed and 1 failed. The failure is expected: the import-isolation test runs a fresh interpreter, where the stand-in is not installed. Its logic was checked separately on arci.schedule, where the only new module loaded is ['arci.schedule']. A per-case check confirmed that each failing construction case trips its intended rule and no other.\n\nConstruction failures are built directly with SuiteManifest.create using a fixed experiment_id, because the contract says construction checks structure only. That keeps the rule tests independent of suite_schedule. One test also builds through suite_helpers.suite_manifest, which uses create_suite_manifest. Because suite_helpers imports arci.suite_schedule at module top, this file cannot import until suite_schedule exists.\n\nsuite_helpers.py looks correct for this scope. I used CONDITIONS, tasks and suite_manifest from it, plus DEAD, TIMEOUT, MOD and contract from tests/acceptance/helpers.py. pytest's py_compile run left test_suite_schema.cpython-313.pyc in acceptance-staging/__pycache__/ (the directory already existed). My rm of that file was denied, so it is still there; delete it before copying the files to tests/acceptance/. I wrote nothing else outside my scratchpad."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "findings": [
+    {
+     "test": "test_suite_schedule_imports_only_allowed_modules (and its helper _imports)",
+     "kind": "asserts-beyond-contract",
+     "detail": "The contract says suite_schedule.py \"Imports only the standard library, `arci.hashing`, `arci.schema`, `arci.suite_schema`.\" An implementation that writes `from arci import hashing, schema` or `from arci import suite_schema` follows that rule. For an absolute ImportFrom, though, _imports records only node.module, so it records the bare name \"arci\". \"arci\" is not in `allowed`, so `assert name in allowed` fails for a correct implementation. I ran the scanner on `from __future__ import annotations\\nfrom arci import hashing, schema\\nfrom . import suite_schema\\nimport hashlib`. It returned {'__future__', 'arci', 'arci.suite_schema', 'hashlib'}. Relative `from . import x` is already resolved to arci.x; only the absolute `from arci import x` form breaks. A bare `import arci` would also fail, which is arguably correct, since the contract names only the three submodules.",
+     "fix": "In _imports, replace `elif node.module: names.add(node.module)` with: `elif node.module == \"arci\": names.update(f\"arci.{alias.name}\" for alias in node.names)` followed by `elif node.module: names.add(node.module)`. This resolves `from arci import hashing` to arci.hashing, the same way the relative branch already does. test_suite_schedule_does_not_use_random stays correct under this change."
+    },
+    {
+     "test": "test_rule_digest_changes_with_any_other_field",
+     "kind": "missing-coverage",
+     "detail": "Across the 35 variants, the test checks the digest against the reference and checks that experiment_id differs from the base. It never checks that create_suite_manifest stored the right experiment_id for the changed manifest, or that suite_experiment_id agrees. The contract says create_suite_manifest \"builds the manifest with the right `experiment_id`\" and suite_experiment_id(m) = f\"{m.suite_id}@{suite_rule_sha256(m)}\". Both are checked only on the default manifest. A different suite_id (the 'suite_id' variant) is the one case where the prefix itself changes, and it is never checked. test_rule_digest_changes_with_the_mcp_server likewise checks only `one` against the reference, not `two`. This is cheap to add and stays within the contract.",
+     "fix": "In test_rule_digest_changes_with_any_other_field, add `assert changed.experiment_id == f\"{changed.suite_id}@{_ref_rule_sha256(changed)}\"` and `assert suite_experiment_id(changed) == changed.experiment_id`. In test_rule_digest_changes_with_the_mcp_server, add `assert suite_rule_sha256(two) == _ref_rule_sha256(two)` and `assert two.experiment_id == f\"{two.suite_id}@{_ref_rule_sha256(two)}\"`."
+    }
+   ],
+   "summary": "I checked all 43 tests in test_suite_schedule.py against P1-CONTRACT sections 1 and 3 and ADR 0011, and found one test that would fail a correct implementation. It is the import-allowlist AST test: `from arci import hashing` is recorded as the bare name \"arci\", which is not in the allowed set, so a contract-following file using that form fails. The fix is a one-line change to _imports.\n\nI recomputed every literal with hashlib in the project venv (Python 3.13.12, pydantic 2.13.5, the version uv.lock pins). All 13 SEED_GOLDEN and all 11 ORDER_GOLDEN values match the contract formulas for key 'ab'*32. For cells 0, 3 and 19, the per_round seeds over rounds 1 to 29 are all distinct and none equals the fixed (r=0) seed. The Python string order ['10','9','B','a','a-1','a.1','a_1','b'] and the condition order clean, empty_log, fetch_timeout, store_error_late are correct. The literal first and last trial ids are correct. float(Fraction(1,40)) == 0.025 and float(Fraction(1,8)) == 0.125. __future__ is in sys.stdlib_module_names.\n\nUnder pydantic 2.13.5, TrialSpec equality ignores model_fields_set, so the whole-spec comparison in test_round_specs_equal_the_contract_field_list holds even if the implementation omits None defaults or uses model_construct.\n\nEvery CHANGES variant builds a structurally valid manifest under contract section 2 rules 1 to 7: stakes are increasing, error tolerances are in range, there are no CEILING faults, and arm kinds are consistent.\n\nThe tests' readings match the contract: experiment_id taken as stored with no stale-id error in build_suite_round, ValueError for round < 1 even in fixed mode, a lowercase-only key, and pair_round using [0-9], which rejects Arabic-Indic digits.\n\nThe SHA-256 distinctness assertions are deterministic or fail only on a 53-bit collision. The rest of the file covers the scope listed in the brief.\n\nOne small coverage addition is suggested: check the stored experiment_id for every digest-change variant, which includes the changed suite_id prefix. I agree with the author's listed contract gaps; none needs a test without a contract change. No files were changed."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_schedule.py",
+   "tests": 43,
+   "covered": [
+    "Contract 3, module discipline: suite_schedule.py imports only stdlib, arci.hashing, arci.schema, arci.suite_schema (scanner now resolves `from arci import x` to arci.x)",
+    "Contract 3, module discipline: no random module",
+    "Contract 3, rule digest: any field difference other than order, created_at, ids or seal changes suite_rule_sha256 (35 parametrized variants, checked against an independent reference digest)",
+    "Contract 3, experiment id: suite_experiment_id(m) == f\"{m.suite_id}@{suite_rule_sha256(m)}\", now checked on every changed-field variant including the suite_id variant",
+    "Contract 3, create_suite_manifest: stores the right experiment_id, now checked on every changed-field variant and on the second mcp_server manifest",
+    "Contract 3, rule digest: fault order inside a condition is content",
+    "Contract 3, rule digest: mcp_server of a command-agent suite is registered content (both manifests now checked against the reference digest)",
+    "Contract 3, seeds, schedule, rounds and the other clauses already covered before this revision (unchanged)"
+   ],
+   "contract_gaps": [],
+   "notes": "Finding 1 (test_suite_schedule_imports_only_allowed_modules / _imports, asserts-beyond-contract): APPLIED. Contract 3 allows arci.hashing, arci.schema and arci.suite_schema, and `from arci import hashing` imports exactly those, so the old scanner wrongly failed it by recording the bare \"arci\". _imports now has a `node.module == \"arci\"` branch that records arci.<alias>. I re-ran the reviewer's sample and it now gives ['__future__', 'arci.hashing', 'arci.schema', 'arci.suite_schema', 'hashlib']. A bare `import arci` is still rejected. The contract names only the three submodules, so that is the right outcome. test_suite_schedule_does_not_use_random is unaffected. Finding 2 (test_rule_digest_changes_with_any_other_field and test_rule_digest_changes_with_the_mcp_server, missing-coverage): APPLIED. Contract 3 says create_suite_manifest builds the manifest with the right experiment_id, and that suite_experiment_id(m) = f\"{m.suite_id}@{suite_rule_sha256(m)}\". Both rules apply to every manifest, not only the default one. Each changed variant now asserts experiment_id == suite_id@reference digest and suite_experiment_id(changed) == changed.experiment_id. The suite_id variant now exercises the case where the prefix itself changes. The mcp_server test now checks `two` against the reference digest and checks two.experiment_id. Expected values come from the in-test _ref_rule_sha256, not from the code under test. Only test_suite_schedule.py was edited. suite_helpers.py is unchanged. py_compile, ruff format (file left unchanged) and ruff check (all checks passed) are clean. The tests cannot be run until the implementation exists, as expected. The count of 43 is test functions before parametrize expansion."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "summary": "I read all of the contract and the ADR, then ran the staged file for real. I copied src/arci and the needed tests/acceptance files into my scratchpad (/private/tmp/claude-501/-Users-ajay--claude-spares-spare-8K9guD/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/proj) and added my own stand-in arci/suite_schema.py, written from contract section 2 only, plus a minimal suite_schedule.create_suite_manifest. I ran it with PYTHONPATH so that the import-isolation subprocess also loads the stand-in. Result: all 185 collected items pass, the subprocess test included. ruff check and ruff format --check pass on the staged file.\n\nI recomputed every literal and found no wrong expected value: gcd(123456789, 1000000007) = 1, 999999/1000000, 999/1000 and 501/1000 are in lowest terms, 2/(1/20) = 40, 2/(1/1000000) = 2000000, 5000*20 = 100000 and 5001*20 = 100020. The model_copy(update=...) tamper cases do break the seal, created_at is volatile, and assigning to a frozen field raises ValidationError.\n\nI then swapped parse_rational for the common `Fraction(text)` plus round-trip check. That version failed one case only, test_parse_rational_rejects[1/0], which raises ZeroDivisionError.\n\nbasedpyright strict is part of `just check`, and its include list covers tests/. It reports 2 errors at line 79 of this file, so it will fail that check once frozen.\n\nEvery other test asserts only what section 2 states. Fixtures, helpers and the v1 models behave as intended. Coverage of the stated scope is complete, apart from the small gaps listed in the findings.\n\nOne housekeeping item from the author's notes still stands: acceptance-staging/__pycache__/test_suite_schema.cpython-313.pyc must be removed before the files are copied into tests/acceptance/. I changed no file in the repo.",
+   "findings": [
+    {
+     "test": "_build helper (line 79), used by most tests",
+     "kind": "would-not-run",
+     "detail": "basedpyright strict (pyproject [tool.basedpyright] includes tests/; justfile line 7 runs it) reports 2 errors at test_suite_schema.py:79:45: 'Argument of type \"object\" cannot be assigned to parameter \"n_tasks\" of type \"int\"' (and the same for n_conditions). The cause is `_fields(**overrides)` with overrides: dict[str, object]. Checked against a stand-in module; the error is in _fields' signature, not in the implementation, so it will appear with the real module too. A frozen test file that fails the type gate cannot be fixed later.",
+     "fix": "Either change line 79 to `return SuiteManifest.create(**_fields(**overrides))  # pyright: ignore[reportArgumentType]` (house style, like the ignores on lines 123/137), or type the parameters as `n_tasks: Any = 5, n_conditions: Any = 4` and convert with int() inside _fields. Re-run `.venv/bin/basedpyright tests/acceptance/test_suite_schema.py` against a stand-in before freezing."
+    },
+    {
+     "test": "test_parse_rational_rejects[1/0]",
+     "kind": "asserts-beyond-contract",
+     "detail": "Contract line 44: `parse_rational(text: str) -> Fraction: ...   # ValueError unless \"n/d\" in lowest terms`. '1/0' arguably counts as in lowest terms (gcd(1, 0) == 1), and the contract never says how a zero denominator is handled. The obvious implementation `v = Fraction(text); if f\"{v.numerator}/{v.denominator}\" != text: raise ValueError` raises ZeroDivisionError for '1/0' (its MRO is ArithmeticError, not ValueError). I swapped that version into my stand-in: it fails exactly this one item and passes every other test in the file. In practice it cannot reach a manifest, because the Rational pattern rejects '1/0' first.",
+     "fix": "Preferred: have the orchestrator amend contract line 44 to say 'ValueError for any other text, including a zero denominator' before both sides start, and keep the case. Otherwise drop '1/0' from the parametrize list, or loosen that case to `pytest.raises((ValueError, ZeroDivisionError))`."
+    },
+    {
+     "test": "test_decision_required_fields",
+     "kind": "missing-coverage",
+     "detail": "The contract (lines 125-145) gives no default for 14 SuiteDecision fields: experiment_id, manifest_sha256, trials_sha256, alpha, delta, stakes, threshold, n_cells, max_rounds, scenario_seeds, max_errored_pairs, verdict, exit_code, reasons. The test checks only 5 of them (verdict, exit_code, reasons, threshold, n_cells). An implementation that defaults, say, trials_sha256 = \"\" or stakes = () would pass.",
+     "fix": "Parametrize `missing` over all 14 keys of the local `fields` dict, e.g. `@pytest.mark.parametrize(\"missing\", [\"experiment_id\", \"manifest_sha256\", \"trials_sha256\", \"alpha\", \"delta\", \"stakes\", \"threshold\", \"n_cells\", \"max_rounds\", \"scenario_seeds\", \"max_errored_pairs\", \"verdict\", \"exit_code\", \"reasons\"])`."
+    },
+    {
+     "test": "test_explicit_numbers_have_no_default",
+     "kind": "missing-coverage",
+     "detail": "Only max_rounds and max_errored_pairs are checked as required. The other SuiteManifest fields with no default in contract lines 51-73 are experiment_id, suite_id, tasks, conditions, contract, baseline and candidate. None of them is checked, so an implementation that defaults tasks/conditions to () would be caught only by the min-length test. One that defaulted suite_id or experiment_id would not be caught at all.",
+     "fix": "Extend the parametrize list to [\"max_rounds\", \"max_errored_pairs\", \"experiment_id\", \"suite_id\", \"tasks\", \"conditions\", \"contract\", \"baseline\", \"candidate\"]. Each deletion from `_fields()` raises ValidationError against a contract-following model."
+    },
+    {
+     "test": "test_construction_rule_violations_raise[r5-negative-rounds]",
+     "kind": "other",
+     "detail": "The case is not isolated, contrary to the author's note that each case trips only its intended rule. With max_rounds=-1 and max_errored_pairs=0, rule 6 also fails: contract line 91 needs `0 <= max_errored_pairs <= n_cells * max_rounds`, and 0 <= -20 is false. An implementation missing the `max_rounds >= 1` check would still pass this case through rule 6. This is harmless for correctness, because r5-zero-rounds is isolated (0 <= 0 <= 0 holds, and acknowledge_single_round=False matches max_rounds != 1), so the lower bound stays pinned.",
+     "fix": "No change needed. Optionally rename the id to 'r5-r6-negative-rounds' or add a comment that only r5-zero-rounds isolates the lower bound, so later readers do not rely on it."
+    },
+    {
+     "test": "test_decision_seal_survives_json_round_trip",
+     "kind": "other",
+     "detail": "The fixture is internally inconsistent: n_cells=1 and cells holds one cell with pairs=1, but history[0] has pairs=20 and counts totalling 20. Contract line 105 says pairs is cumulative: round * n_cells. The contract states no value constraints on these records, so a contract-following implementation passes, and this is not a wrong assertion. But if the implementation adds any consistency validator, the frozen test breaks for reasons unrelated to seals.",
+     "fix": "Optional: make the fixture consistent, e.g. `_round_decision(pairs=1, counts=_counts(zero=1), verdict=Verdict.PASS, reasons=(\"non-inferiority established\",), pass_crossed=True)` with n_cells=1, so the test pins only the seal round trip."
+    }
+   ]
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_gate.py",
+   "tests": 53,
+   "covered": [
+    "Contract 5, round verdict rule 1: errored > max_errored_pairs gives ERROR and outranks a hard violation and a PASS crossing; strict '>' boundary (errored == limit still PASS)",
+    "Contract 5, round verdict rule 2: a candidate hard violation outranks a PASS crossing; it counts on an errored candidate; baseline hard violations do not count; the count is of hard entries, soft entries ignored",
+    "Contract 5, round verdict rules 4, 5 and 6: PASS (all +1, round 1), BLOCK (all -1, round 1), INCONCLUSIVE (zeros)",
+    "Contract 5: pass_crossed and block_crossed stay the true crossings under ERROR and hard-violation BLOCK verdicts",
+    "Contract 5 / 4 scored_wealth: an errored pair is -1 for PASS wealth (1 errored + 79 zeros, 4 rounds, max_errored 1 -> INCONCLUSIVE, pass_wealth 2.11702e+01, where scoring 0 or dropping would PASS) and +1 for BLOCK wealth (14 minus, 5 zero, 1 errored does not BLOCK, where scoring -1, 0 or dropping would)",
+    "Contract 2 SuiteRoundDecision fields: round, cumulative pairs, cumulative counts, hard violations, trials_sha256 per round recomputed with hash_record, pass_wealth/block_wealth equal to an independent wealth_text of the scored Fraction wealth",
+    "Contract 5 evaluate_rounds: stops after the first non-INCONCLUSIVE round; ignores a trailing partial round (even a would-be-decisive one) without raising; empty / partial-only input gives ()",
+    "Contract 5 decide_suite: PASS at round 4 for an all-zero 20-cell candidate (stopped_at_round 4, exit 0, history == evaluate_rounds, 4.22732e+01); BLOCK at round 1 for all -1; INCONCLUSIVE at max_rounds 4 with alternating differences (exit 2)",
+    "Contract 2 SuiteCellStats: cell order, pairs include errored pairs, baseline successes counted even when the partner errored, each pair in exactly one count, per-cell hard violations; BLOCK at the last round from a late hard violation",
+    "Contract 5 fields of every decision: mirrors (experiment_id, manifest_sha256, alpha, delta, stakes, scenario_seeds, max_rounds, max_errored_pairs, prior_runs, n_cells), threshold '40/1' and '80/3' for alpha 3/40, trials_sha256 recomputed",
+    "Contract 5 check 1 with 12 model_copy invalid manifests (including lone surrogates in experiment_id and a task) and model_construct: reasons exactly ('manifest values invalid',) and the fixed template",
+    "Contract 5 check 2 alone (manifest_sha256 as supplied), check 3 alone (stored experiment_id with wrong digest / wrong suite id), checks 3+6 for a resealed manifest whose delta, max_errored_pairs or fixtures_sha256 changed after the run",
+    "Contract 5 check 4 alone: max_rounds 3 for 20 cells; max_errored_pairs 31 at 80 pairs refused while 30 is accepted and PASSes",
+    "Contract 5 check 5 alone for six wrong-typed/invalid trial values and a model_construct trial",
+    "Contract 5 normalise first: outcome 'PASS' / 'ERROR' strings via model_copy keep a valid seal and give the same decision as the real enums",
+    "Contract 5 check 6: duplicate, unknown id, trial from another experiment, each matched field (experiment_id, pair_id, arm, task_id, condition_id, seed, spec_sha256) resealed, replay-mode spec hash mismatch",
+    "Contract 5 check 7 alone; check 8 alone for empty store, partial first/last round, missing round 2, round 2 alone",
+    "Contract 5 skip rules: check 1 skips 2-8; check 5 skips 6-8; check 6 skips 8 but not 7; failing checks 2,3,4,7,8 collected in table order",
+    "Contract 5 situations: trials stored after a decisive round and after an ERROR round, stopped without a decision; history is the walked rounds, cells cover all supplied trials",
+    "Contract 5 trials_sha256 '' for a lone-surrogate seal (with mirrors and with the template) and for a non-string seal among string seals",
+    "Contract 5: every decision validate_seal() true, exit_code == EXIT_CODES[verdict], ERROR has stopped_at_round 0 and exit 3 (checked in a shared helper on every call)",
+    "Contract 5: determinism (two calls equal) and order independence under seeded shuffles, including an ERROR store",
+    "Contract 5 replay_suite_decision: true for PASS, BLOCK, check-ERROR and template decisions (also with reversed trials); false after eight tampers; never raises on model_construct inputs"
+   ],
+   "contract_gaps": [
+    "Round verdict rule 3 ('both tests crossed') cannot be reached, so it has no test. Crossing PASS needs the PASS-scored mean of d + delta to be > 0 (Jensen on log(1 + lambda x) for the stake that crosses). Crossing BLOCK needs the BLOCK-scored mean to be < 0. Errored scoring makes the PASS-scored mean <= the BLOCK-scored mean. A brute-force search over extreme deltas and stakes found no case either. The comment in spikes/s1/suite_stats.py ('For arbitrary user stakes both tests can cross together') does not hold for fixed-stake mixtures.",
+    "The 'gate computation failed' paths (an exception in the walk, the cell table or sealing, and the last-resort template) cannot be triggered by any input I could build, so they have no test.",
+    "Order independence of the supplied trials is not stated explicitly. I inferred it because every field is defined over the set of trials (sorted digests, set-based check 8, cells in cell order) and asserted it. Please confirm the contract means this.",
+    "The brief suggested model_copy(update={'outcome': 'ERROR'}) as a 'trial values invalid' input. Under 'Normalise first', TrialEnvelope.model_validate turns the string 'ERROR' into Outcome.ERROR, and the seal still verifies, so check 5 does not fail. I tested it as normalisation (the decision is unchanged) and used truly invalid values for check 5.",
+    "trials_sha256 for a non-string seal: the contract lists 'a seal that is not a string' as a reason the computation raises. But with only one non-string seal, sorted([5]) and hash_record work. I tested only a mixed int/str set, where sorting raises. Whether a lone non-string seal must give '' is unclear.",
+    "evaluate_rounds behaviour outside its stated assumptions (invalid manifest, duplicate or mismatched trials) is unspecified, so it has no test.",
+    "The fixed template does not mention schema_version, so it is not asserted.",
+    "Whether a failing check 2 masks anything is clear, but the wording 'Check 8 is skipped when check 6 fails' leaves check 7 running. I asserted (schedule mismatch, trial seal invalid) for a duplicate plus a broken seal, which is the literal reading."
+   ],
+   "notes": "I wrote one file, /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_gate.py. It has 53 test functions, about 95 cases once the parametrize sets are counted, and it calls operating_characteristics zero times. It passes py_compile, ruff format and ruff check (line length 100). I could not run it because the modules under test do not exist; I also did not run basedpyright, since every import of the missing modules would report errors.\n\nWhere expected values come from:\n- Wealth comes from suite_helpers.reference_wealth, and scored wealth applies the errored rule on top.\n- The display text comes from my own integer implementation of wealth_text. Its self-check reproduces the contract's 4.22732e+01.\n- Digests are recomputed with hash_record over the sorted record_sha256 values. Round membership comes from the r{round:06d} prefix of the trial id.\n- Round verdicts come from a rule 1 to 6 oracle in the test file.\n\nExact literals and boundaries, each checked with a separate Fraction script in my scratchpad:\n- 2.11702e+01: 1 errored pair plus 79 zeros.\n- At 20 cells and 80 pairs, max_errored_pairs 31 is the first value check_suite_plan (b) refuses; 30 is accepted.\n- 14 minus, 5 zero and 1 errored pair does not BLOCK, but would if the errored pair were scored -1, scored 0 or dropped.\n- 20 cells, 4 rounds of alternating differences is INCONCLUSIVE at every round.\n- The cell-table store is INCONCLUSIVE for rounds 1 to 3 and BLOCKs at round 4 on the hard violation.\n- The changed-delta manifest (1/20) and the mirror manifest (6 cells, 30 rounds, alpha 3/40, stakes 1/8 and 1/2) both have valid plans.\n\nPydantic warns when dumping wrong-typed values, so the module silences only 'Pydantic serializer warnings' through pytestmark. Most tests use a manifest with max_rounds 20, and every decide_suite call there rebuilds an 800-spec schedule. That is fast enough but is the main runtime cost.\n\nsuite_helpers.py looks correct for this use, and I did not edit it. The tests rely on two of its behaviours: round_trials puts cell i's baseline at index 2i and its candidate at 2i+1, and an errored candidate's baseline still follows the cell's difference."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_stats.py",
+   "tests": 54,
+   "covered": [
+    "4 SuiteRule: fields, max_errored_pairs default 0, frozen dataclass",
+    "4 SuiteRule.threshold == 2/alpha exactly (several alphas, 40 at defaults)",
+    "4 Domains: alpha in [1/1000000, 1/2] as a Fraction (edges accepted; 0, negative, 1/1000001, just above 1/2, float, str rejected)",
+    "4 Domains: delta Fraction with 0 < delta < 1 (edges accepted; 0, 1, negative, 3/2, float, str rejected)",
+    "4 Domains: stakes 1 to 8 Fractions, 0<q<1, strictly increasing (empty, 9 entries, decreasing, duplicate, 0, 1, negative, >1, float, str rejected; 1 and 8 entries accepted)",
+    "4 Domains: n_cells >= 1, max_rounds >= 1, 0 <= max_errored_pairs <= n_cells*max_rounds",
+    "4 SuitePlanError subclasses ValueError",
+    "4 rule_of on the default manifest and on a non-default one (alpha, delta, stakes, n_cells, max_rounds, max_errored_pairs, threshold)",
+    "4 wealth: hand-derived single-pair values at the defaults (35/24, 5/8, 115/88, 25/24, 85/88), empty stream is (1, 1), returns two Fractions",
+    "4 wealth vs reference_wealth on 150 seeded count triples x 4 rules, and on 19 edge triples (floors, 400-pair cap, 5000 zeros)",
+    "4 wealth(0, 100000, 0, rule) under 5 seconds and equal to the reference",
+    "4 Domains: wealth and scored_wealth reject negative and non-int counts (float, str, Fraction, None)",
+    "4 scored_wealth: errored pairs as -1 in PASS and +1 in BLOCK (sweep vs reference and vs wealth); errored = 0 equals wealth",
+    "4 known facts: one errored pair plus 79 zeros gives PASS wealth about 21.17, not crossed",
+    "ADR 0011 item 5 at the defaults: no both-crossed case over a sweep of counts with 0 to 3 errored pairs (sweep reaches each crossing separately)",
+    "4 crossed: inclusive at 40 (+/- 1e-40), and exact equality with constructed rules where 2/alpha equals the PASS wealth of four +1 and the BLOCK wealth of five -1",
+    "4 wealth_text: verified example 4.22732e+01, values below 1, exact powers of ten (including e+100 and e-100), truncation not rounding (2/3, 0.9999999, 10 - 1e-20), agreement with an in-test integer formatter on real wealths, ValueError for 0 and negatives",
+    "4 known facts: all-zero PASS first crosses at 79 pairs; all +1 at 9; all -1 BLOCK at 13 (implementation and reference)",
+    "4 never_differs_pass_round: 4 for 20 cells, 8 for 10 cells, None for 20x3, plus 1-cell, 78/79-cell and 40-cell edges",
+    "4 earliest_pass_round and earliest_block_round: 1 for 20 cells, plus edges and None cases derived from 9 and 13 pairs",
+    "4 Defaults: default_max_rounds for 1, 3, 7, 20, 133, 134, 399, 400, 401, 100000; default_max_errored_pairs on 11 cases",
+    "4 check_suite_plan: default plan returns (); (a) 20 cells x 3 rounds refused; 20x4 with E=1 passes; 1-cell floor at 78/79 rounds; 40 cells x 1 round refused",
+    "4 check_suite_plan (b): exact refusal boundary for E at 20x4, found in-test with the reference (E=30 passes, 31 and 80 refused)",
+    "4 check_suite_plan warning: exactly ('max_rounds below 3: few looks',) for 40x2 and for 80x1 with acknowledge_single_round",
+    "4 operating_characteristics vs in-test brute-force path enumeration with the contract 5 round verdict: 2 heterogeneous cells, 1 to 3 rounds, 3 rules with threshold 4 (18 cases; the grid reaches PASS, BLOCK and INCONCLUSIVE)",
+    "4 operating_characteristics: OperatingCharacteristics of Fractions, probabilities sum to exactly 1",
+    "4 operating_characteristics on deterministic 5-cell streams consistent with the 79/9/13 floors (verdict probability 1, exact expected pairs)",
+    "4 known facts: the two 20-cell Table C rows (0.95/0.95 and 0.95/0.75, independent) as exact fractions copied from results.json C[73] and C[79], all four fields; literals checked against the rounded contract figures",
+    "4 known facts at the defaults: on the margin p_pass <= alpha/2 and p_block <= alpha/2 for two homogeneous and two strongly heterogeneous grids, 120 registered pairs",
+    "4 Domains: operating_characteristics rejects wrong law count, empty, sums other than 1, negative, floats, ints, 2 or 4 entries, string entry"
+   ],
+   "contract_gaps": [
+    "Contract 4 does not say that PASS and BLOCK cannot both cross; only ADR 0011 item 5 says so, and contract 5 keeps a 'both tests crossed' ERROR branch. OperatingCharacteristics has no p_error field and still must sum to 1, so the contract assumes ERROR is impossible for every valid rule without saying so. The both-crossed sweep is limited to the defaults. The brute-force reference checks that its own ERROR mass is 0 for the non-default rules it uses.",
+    "The alpha/2 margin bound is stated only 'at the defaults'. ADR item 5 proves it for any rule, but I left out margin tests for non-default alpha or stakes. My own DP shows they hold, and they would be stricter tests.",
+    "Type rules for SuiteRule's integer fields are not given (bool, or a float like 2.0 for n_cells or max_rounds). Untested.",
+    "Whether a bool counts as an int for wealth and scored_wealth is not stated. Untested.",
+    "default_max_rounds and default_max_errored_pairs have no stated domain: no word on n_cells <= 0, max_rounds <= 0, or non-int input. Untested.",
+    "wealth_text and crossed input types are not stated beyond a Fraction value (no word on int or float). The ValueError cases tested are only Fractions <= 0.",
+    "The contract does not say whether stakes given as a list instead of a tuple are accepted by SuiteRule, or whether a law given as a list of three Fractions is accepted by operating_characteristics. Untested.",
+    "The SuitePlanError message text, and which of (a) or (b) is reported when both fail, are not stated. Only the exception type is tested.",
+    "never_differs_pass_round, earliest_pass_round and earliest_block_round are defined on streams with no errored pairs. I read this as meaning max_errored_pairs does not change them, and the never_differs tests include E=4 and E=400 cases on that reading. If the orchestrator reads it the other way, those two parametrized cases are the ones to revisit.",
+    "check_suite_plan behaviour on a manifest that fails rebuild or validation (model_construct) is not stated for suite_stats. Untested here."
+   ],
+   "notes": "I wrote one file, plan/exec/v2/acceptance-staging/test_suite_stats.py: 54 test functions, which pytest collects as 232 cases. py_compile passes, and ruff format and ruff check are clean at line length 100. basedpyright was not run, because the modules under test do not exist yet. Seven '# pyright: ignore[reportArgumentType]' comments mark calls that pass wrong types on purpose; a comment near the top of the file explains them.\n\nThe file imports only arci.suite_stats and tests.acceptance.suite_helpers (reference_wealth and suite_manifest). Nothing comes from plan/. Expected values are worked out inside the tests: wealth from reference_wealth, wealth_text from an in-test integer formatter, the floors and the (b) boundary for E from the reference, and verdict probabilities from brute-force enumeration over every outcome path. The Table C fractions are copied literals from results.json records C[73] and C[79], N=20, field 'balanced'. I checked the cell laws 19/400, 181/200, 19/400 and 19/80, 29/40, 3/80 against the spike's law(). Only two tests run 20 cells over 400 pairs, under the limit of three.\n\nI could not run the real implementation, so I dry-ran the logic in my scratchpad. I wrote a short throwaway version of contract 4 (Table C rows sent to the spike's enumerate_balanced) and a fake suite_manifest that enforces schema rule 7. All 232 cases passed in about 13 seconds. I then broke that throwaway code in deliberate ways: strict crossing, swapped errored scoring, rounded text, the wrong warning threshold, no check (b), floor-rounded default_max_rounds, and wrong expected pairs. The tests caught every one. A BLOCK-before-PASS change went unnoticed, which is expected because no case ever crosses both.\n\nsuite_helpers.py looks correct to me. reference_wealth matches the contract formula and the reviewed spike's count_wealth. I did not edit it.\n\nTwo side effects:\n1. py_compile wrote acceptance-staging/__pycache__/test_suite_stats.cpython-313.pyc. I deleted that one file; the other .pyc files in that folder were already there.\n2. Another agent writing to the shared scratchpad overwrote my first scratch helper (scratchpad/ref.py), so I moved my work to scratchpad/stats_agent/. Nothing in the repo was affected."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_schema.py",
+   "tests": 200,
+   "covered": [
+    "Contract 2, module constants SUITE_SCHEMA_VERSION / SUITE_SEED_DERIVATION / SUITE_MAX_PAIRS",
+    "Contract 2, SuiteId and Rational patterns (accept and reject)",
+    "Contract 2, parse_rational (lowest terms accepted, not-lowest and malformed rejected with ValueError)",
+    "Contract 2, format_rational (lowest terms, ValueError unless > 0, 2/alpha example 40/1)",
+    "Contract 2, SuiteManifest fields, defaults, exact field set, v1 Model/Sealed base classes",
+    "Contract 2, SuiteManifest required fields: max_rounds, max_errored_pairs, experiment_id, suite_id, tasks, conditions, contract, baseline, candidate",
+    "Contract 2, tasks and conditions at least 1",
+    "Contract 2, construction rules 1-7: boundary cases that construct and one failing case per rule and sub-rule",
+    "Contract 2, SuiteTask.task_id and SuiteManifest.suite_id are SuiteId; Literal fields",
+    "Contract 2, n_cells and registered_pairs",
+    "Contract 2, extra fields forbidden, records frozen",
+    "Contract 2, manifest and decision seals survive JSON round trip, tamper evident, created_at VOLATILE",
+    "Contract 2, suite_schema import boundary (no statistics import)",
+    "Contract 2, SuiteCounts/SuiteRoundDecision/SuiteCellStats/SuiteDecision field sets, SuiteCounts ge=0",
+    "Contract 2, SuiteDecision defaults, exit_code = EXIT_CODES[verdict], Literal schema_version, Verdict type",
+    "Contract 2, all 14 SuiteDecision fields without a stated default are required"
+   ],
+   "contract_gaps": [
+    "Contract line 44, parse_rational: says only 'ValueError unless \"n/d\" in lowest terms'. It does not say what happens with a zero denominator ('1/0'); the obvious Fraction-based implementation raises ZeroDivisionError, not ValueError. I removed '1/0' from test_parse_rational_rejects. Suggested amendment: 'ValueError for any other text, including a zero denominator'. If the contract is amended, add the case back.",
+    "Contract section 2 states no consistency constraints between SuiteDecision / SuiteRoundDecision fields (pairs vs round * n_cells, counts totals, wealth strings). The schema tests do not assert any such validator exists or does not exist. The round-trip fixture is now self-consistent, so it passes either way."
+   ],
+   "notes": "Findings:\n1. _build/_fields basedpyright error: APPLIED. _fields now takes only **overrides: object and pops n_tasks/n_conditions with isinstance asserts. No pyright ignore was needed. basedpyright strict, using the repo's settings, reports 0 errors on the file when run against a scratch stand-in of suite_schema/suite_schedule that I wrote from the contract.\n2. parse_rational '1/0': APPLIED (dropped the case). The contract does not say what happens with a zero denominator. I logged it under contract_gaps with a suggested amendment, so I did not loosen the assertion to allow ZeroDivisionError.\n3. test_decision_required_fields: APPLIED. It now covers all 14 SuiteDecision fields with no default (contract lines 127-143).\n4. test_explicit_numbers_have_no_default: APPLIED. Extended to experiment_id, suite_id, tasks, conditions, contract, baseline, candidate (contract lines 53-62 give these no default).\n5. r5-negative-rounds not isolated: APPLIED as the optional rename. The id is now r5-r6-negative-rounds, with a comment that only r5-zero-rounds isolates rule 5's lower bound. The case cannot be isolated, because rule 6 then needs 0 <= max_errored_pairs <= a negative number.\n6. Decision round-trip fixture: APPLIED, in a slightly different form from the suggestion. A PASS from one zero pair cannot be arithmetically consistent, so the fixture is now n_cells=1, max_rounds=1, one d=0 pair, INCONCLUSIVE ('no test crossed'), stopped_at_round=1, exit_code=EXIT_CODES[INCONCLUSIVE]. Its pairs and counts match, and the round and decision trials_sha256 are equal. The wealth strings 1.04166e+00 / 9.65909e-01 are wealth_text of PASS 25/24 and BLOCK 85/88, recomputed with Fraction. The tamper check (verdict -> BLOCK) is kept.\nChecks: ruff format (unchanged), ruff check (all passed) and py_compile all pass. Smoke run against my own stand-in written from the contract (scratch only, not in src): 200 passed. That stand-in is not the real implementation, so the run is not acceptance evidence. Nothing outside acceptance-staging was changed; suite_helpers.py is untouched."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "summary": "I reviewed all 54 test functions (232 cases) in test_suite_stats.py against P1-CONTRACT.md section 4 and ADR 0011. I found no wrong tests and one gap in coverage.\n\nHow I checked:\n- **Independent run.** I wrote my own throwaway implementation of contract 4 in /private/tmp/claude-501/-Users-ajay--claude-spares-spare-8K9guD/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/rev. Its operating_characteristics is a plain exact Fraction DP. It calls the spike's enumerate_balanced only for the default rule with 10 or more cells, which covers the two Table C rows. I also stubbed suite_manifest so it enforces schema rules 4 to 7, and loaded the real suite_helpers.py. All 232 cases passed in 13.6 s. wealth(0, 100000, 0) took 0.8 s.\n- **Table C values.** The four copied strings in each record match results.json C[73] and C[79] field 'balanced' character for character, and ERROR there is 0. The laws 19/400, 181/200, 19/400 and 19/80, 29/40, 3/80 match the spike's law(95, 95) and law(95, 75), both independent.\n- **Recomputed values.** The (b) boundary at 20x4 is 31, so E = 30 passes and 31 is refused. One errored pair plus 79 zeros gives PASS wealth 21.1703. The exact-equality alphas are 0.4148 (PASS, four +1) and 0.4944 (BLOCK, five -1), both inside [1/1000000, 1/2]. The three brute-force rules (threshold 4) have no both-crossed count triple up to 12 of each, so the in-test assertion that ERROR mass is 0 is a true fact and cannot fail a correct implementation. The floors (79/9/13), all floor and earliest-round table rows, default rows, wealth_text literals and hand-derived single-pair wealths are consistent with the contract formulas.\n- **Margin bound.** My own DP confirms p_pass and p_block are at most alpha/2 for all four margin grids.\n- **Would it run.** ruff check and ruff format are clean at line length 100. The acceptance marker is registered in pyproject.toml. The tests.acceptance.helpers names that suite_helpers imports (MOD, TIMEOUT, EMPTY_LOG, NEVER, contract) exist and build valid Condition and ArmSpec objects. The check_suite_plan manifests (20x3, 1-cell 78/79/400, 40x2, 80x1 with acknowledge_single_round, 40x1) satisfy the structural schema rules 1 to 7, so they can be built.\n- **Contract fit.** No assertion goes beyond the contract. The type rejections (float, str, int, None) all follow from the contract's wording: \"Fraction instances\", \"non-negative ints\" and \"three Fractions\". The never_differs cases with E = 4 and E = 400 are consistent with the definition, which is a stream with no errored pairs.\n\nThe gap: operating_characteristics is never run on 20 different laws over 400 pairs, which contract 4 says it must handle.",
+   "findings": [
+    {
+     "test": "(new) operating_characteristics on 20 heterogeneous cells, 400 registered pairs",
+     "kind": "missing-coverage",
+     "detail": "Contract 4 says of operating_characteristics: \"It must handle 20 cells and 400 registered pairs with different laws per cell.\" The only 20-cell, 400-pair tests (test_operating_characteristics_reproduce_table_c) use one law for all cells. Heterogeneous laws are only exercised on 2 or 3 cells (the brute-force grid and test_directional_errors_on_the_margin_are_at_most_half_alpha). An implementation that is exact only for homogeneous grids at full size, or one that falls back to a per-path or per-state enumeration that cannot finish on 20 different laws, would pass the whole file.",
+     "fix": "Add one test at the defaults, which makes three 400-pair tests, still within the stated limit:\nlaws = tuple((F(1,2), F(1,2), F(0)) if i % 2 == 0 else (F(1,10), F(1,2), F(2,5)) for i in range(20))\nassert sum(l[2] - l[0] for l in laws) / 20 == -DELTA\nresult = operating_characteristics(laws, _rule(20, 20, 4))\nassert result.p_pass + result.p_block + result.p_inconclusive == 1\nassert result.p_pass <= ALPHA / 2 and result.p_block <= ALPHA / 2\nassert 20 <= result.expected_pairs <= 400\nI checked this grid with the spike's enumerate_balanced: about 1.2 s, PASS 0.00139, BLOCK 0.00174, expected pairs 399.21. So a contract-following implementation passes it."
+    }
+   ]
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_stats.py",
+   "tests": 55,
+   "covered": [
+    "Contract 4, Domains (SuiteRule, wealth/scored_wealth counts, operating_characteristics laws)",
+    "Contract 4, wealth (formula, order-free, integer powers, 100000 zero pairs promptly)",
+    "Contract 4, scored_wealth (errored-pair rule)",
+    "Contract 4, crossed (inclusive integer comparison)",
+    "Contract 4, wealth_text (truncation rule, verified example 4.22732e+01, ValueError for value <= 0)",
+    "Contract 4, earliest_pass_round / earliest_block_round / never_differs_pass_round",
+    "Contract 4, Defaults (default_max_rounds, default_max_errored_pairs)",
+    "Contract 4, check_suite_plan (refusals a and b, few-looks warning)",
+    "Contract 4, operating_characteristics (exact probabilities vs brute force, sum to 1, expected pairs, 20 cells and 400 registered pairs with different laws per cell)",
+    "Contract 4, known facts (79/9/13 floors, 20x3 refused, 20x4 E=1 passes and 21.17 INCONCLUSIVE, Table C records, margin bound p_pass and p_block <= alpha/2 incl. a heterogeneous 20-cell 400-pair grid)"
+   ],
+   "contract_gaps": [],
+   "notes": "Finding 1 (missing coverage: operating_characteristics on 20 different laws, 400 pairs): APPLIED. Contract 4 does state \"It must handle 20 cells and 400 registered pairs with different laws per cell\", and until now the only 400-pair runs used one law for every cell. I added test_operating_characteristics_on_twenty_different_laws_and_400_pairs. It uses alternating laws (1/2,1/2,0) and (1/10,1/2,2/5), whose suite mean is exactly -1/10, and runs them at the defaults with _rule(20, 20, 4). It asserts that the three probabilities sum to 1, that p_pass and p_block are each <= alpha/2, and that 20 <= expected_pairs <= 400. The lower bound holds because looks happen only at round ends and each round has n_cells pairs. The file now has three 400-pair operating_characteristics runs: the two Table C cases plus this one, which is within the limit. I checked the grid independently with the spike's enumerate_balanced (PYTHONPATH s1c:s1:s1b): it took about 1.1 s and gave PASS about 0.00139, BLOCK about 0.00174 and expected pairs 399.209, so an implementation that follows the contract passes. The test file imports nothing from plan/. I did not edit suite_helpers.py. py_compile passed, ruff format left the file unchanged, and ruff check reported all checks passed. As expected, the tests could not be run, because the module under test does not exist yet."
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "summary": "I found no wrong assertion and no wrong literal. The file can be frozen once four coverage gaps are fixed, and the first gap matters most.\n\nHow I checked: I wrote my own implementation of contract sections 2 to 5 in scratch, with my own code for the stats, wealth_text, check_suite_plan, the gate and the sealed decision. I copied src/arci and tests/acceptance next to it and ran the staged test_suite_gate.py with suite_helpers.py. I changed no repo file. All 90 collected cases pass, in about 1.5 s.\n\nResults:\n- **Literals.** All match my independent arithmetic: 2.11702e+01, 4.22732e+01, \"40/1\" and \"80/3\". The max_errored_pairs boundary also holds: 31 is refused and 30 is accepted at 20 cells x 4 rounds. The 14 minus / 5 zero / 1 errored round does not BLOCK. Alternating differences stay INCONCLUSIVE for four rounds. The non-default mirror manifest has a valid plan.\n- **Pydantic behaviour.** Each check 1 manifest built with model_copy fails as intended. Most fail a structural rule; \"no tasks\" also fails rule 6 (4 > 0), so the case holds even without a minimum-tasks check. model_copy with outcome \"PASS\" or \"ERROR\" keeps a valid seal on both the supplied and the rebuilt copy. A non-string seal (5) fails the rebuild, and sorting it next to strings raises, so trials_sha256 is \"\". The lone-surrogate seal breaks canonical_json. The replay-mode TrialSpec builds, because TrialSpec has no validator. reseal and TrialEnvelope.create accept every field used.\n- **Assertions.** I compared each one with the contract and found none beyond it. Asserting (schedule mismatch, trial seal invalid) for a duplicate plus a broken seal matches the table. Reading order-independence from the set-based field definitions is sound. Rule 3 (\"both tests crossed\") is truly unreachable: a PASS crossing needs a positive PASS-scored mean of d + delta, a BLOCK crossing needs a negative BLOCK-scored mean, and errored scoring keeps the PASS-scored mean at or below the BLOCK-scored mean.\n\nTwo deliberately wrong versions of my implementation still pass all 90 cases:\n- one that counts a pair as errored only when the candidate errored;\n- one that treats check_suite_plan warnings as \"suite plan invalid\".\n\nThose two gaps, and two smaller ones, are the findings below. There is also one optional hardening of the tamper tests.",
+   "findings": [
+    {
+     "test": "(new) test_baseline_or_both_arms_errored_is_one_errored_pair",
+     "kind": "missing-coverage",
+     "detail": "Contract section 1 says \"Errored pair: either trial has outcome is Outcome.ERROR.\" Contract section 2 (SuiteCellStats) says \"candidate_successes: candidate trials with Outcome.PASS, even if the partner errored\" and \"each pair in exactly one of minus / zero / plus / errored\". round_trials only ever errors the candidate, so no test has an errored baseline, or both arms errored. An implementation that uses `if candidate.outcome is ERROR` in both the walk and the cell table passes all 90 cases (I ran this mutant). The rule that a candidate success still counts when the baseline errored is also untested.",
+     "fix": "Add, using _m4() (max_errored_pairs 4) and four rounds of ZEROS: in round 2, `specs = build_suite_round(m, 2)`. Replace the round-2 trials at index 6 with `envelope(specs[6], Outcome.ERROR)` (cell 3 baseline ERROR, candidate PASS). Replace indexes 8 and 9 with `envelope(specs[8], Outcome.ERROR)` and `envelope(specs[9], Outcome.ERROR)` (cell 4, both arms ERROR). Expected values, verified against my implementation: decision INCONCLUSIVE, reasons ('no test crossed',), stopped_at_round 4. history[-1].counts is (minus 0, zero 78, plus 0, errored 2), and history[-1].pass_wealth equals _wealth_text(_scored(0, 78, 0, 2)[0]), which is '1.08643e+01'. cells[3] has baseline_successes 3, candidate_successes 4 and counts (0, 3, 0, 1). cells[4] has pairs 4 and counts (0, 3, 0, 1): the both-arms pair is one errored pair, not two. Also run _check_round on every round with counts derived the same way."
+    },
+    {
+     "test": "(new) test_plan_warnings_are_not_a_plan_failure",
+     "kind": "missing-coverage",
+     "detail": "Contract section 5, check 4 is \"check_suite_plan(manifest) does not raise\". Contract section 4 says check_suite_plan \"Otherwise it returns warnings, exactly (\"max_rounds below 3: few looks\",) when max_rounds < 3\". No test has a valid plan with max_rounds < 3, so an implementation that treats a non-empty warning tuple as \"suite plan invalid\" passes all 90 cases (I ran this mutant).",
+     "fix": "Add two cases, both verified against my implementation. (a) `m = suite_manifest(n_tasks=10, max_rounds=2, max_errored_pairs=0)` gives 40 cells; with two rounds of zeros (40 differences each), `_decide` gives PASS, ('non-inferiority established',), stopped_at_round 2. (b) `m = suite_manifest(n_tasks=20, max_rounds=1, acknowledge_single_round=True, max_errored_pairs=0)` gives 80 cells; with one round of 80 zeros, the decision is PASS at round 1. In both cases also assert that 'suite plan invalid' is not in d.reasons."
+    },
+    {
+     "test": "test_rule_2_hard_violation_outranks_a_pass_crossing / test_rule_1_errored_above_the_limit_outranks_everything",
+     "kind": "missing-coverage",
+     "detail": "Contract section 5 says \"pass_crossed and block_crossed are always the true crossings, whatever the verdict.\" Under the rule 1 and rule 2 verdicts, only pass_crossed=True is tested. block_crossed is always False there, so an implementation that forces block_crossed to False on a non-statistical verdict would not be caught.",
+     "fix": "Add two cases, verified against my implementation. (a) With _m20() and `_row(MINUS, hard={3})`, evaluate_rounds round 1 gives verdict BLOCK, reasons ('candidate hard violation',), pass_crossed False, block_crossed True. (b) With _m_err1() and `_row(MINUS, errored={0, 1})`, round 1 gives verdict ERROR, reasons ('errored pairs exceed max_errored_pairs',), pass_crossed False, block_crossed True, block_wealth '6.79683e+01'. Run _check_history on both."
+    },
+    {
+     "test": "(new) test_seal_is_checked_on_the_rebuilt_instances",
+     "kind": "missing-coverage",
+     "detail": "Contract section 5, Normalise first, says \"every later check and all scoring use only the rebuilt instances\". test_wrong_typed_outcomes_are_normalised_before_scoring uses values whose seal verifies on both the supplied and the rebuilt record, so it cannot tell whether checks 2 and 7 ran on the rebuilt records. An implementation that calls validate_seal() on the supplied instances passes every current test.",
+     "fix": "Add two cases, verified against my implementation: `_m20().model_copy(update={\"max_rounds\": \"20\"})`, and a trial `good[5].model_copy(update={\"seed\": str(good[5].seed)})`. In both, the supplied copy's validate_seal() is False and the rebuilt copy's is True. Assert that `decide_suite` returns a decision equal to the one for the untouched inputs (PASS at round 4 on _zero_store()), so neither 'manifest seal invalid' nor 'trial seal invalid' appears. This pins contract-literal behaviour; drop it if the orchestrator does not want that pinned."
+    },
+    {
+     "test": "test_replay_is_false_after_any_tamper",
+     "kind": "other",
+     "detail": "The tamper cases build decisions with SuiteDecision.create(...), which runs pydantic validation. Contract section 2 gives SuiteDecision no validators, so this works today; it passes against my implementation. But an implementation that adds a harmless consistency validator (for example stopped_at_round == len(history), or exit_code == EXIT_CODES[verdict]) would make the 'stopped' and 'history' cases raise during the test's own setup. They would then error instead of testing replay.",
+     "fix": "Optional hardening: build each tampered decision without validation, so the replay tamper tests do not depend on SuiteDecision having no validators. For example: `t = d.model_copy(update={...}); t = t.model_copy(update={\"record_sha256\": hash_record(digest_payload(t))})`, importing digest_payload from arci.schema."
+    }
+   ]
+  }
+ },
+ {
+  "label": null,
+  "result": {
+   "file": "/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/acceptance-staging/test_suite_gate.py",
+   "tests": 96,
+   "covered": [
+    "Contract 1, errored pair: either trial ERROR (baseline-only and both-arms cases), one errored pair per pair",
+    "Contract 2, SuiteCellStats: candidate/baseline successes count even when the partner errored; each pair in exactly one of minus/zero/plus/errored",
+    "Contract 2, SuiteRoundDecision: cumulative counts, pairs, trials_sha256, wealth texts, crossings",
+    "Contract 4, wealth_text verified example and scored_wealth errored-pair rule",
+    "Contract 4, check_suite_plan: warnings for max_rounds < 3 are not a failure; refusals below the floor and for an unreachable PASS",
+    "Contract 5, round verdict rules 1 to 6 in order",
+    "Contract 5, pass_crossed and block_crossed are the true crossings under rule 1 and rule 2 verdicts (both directions)",
+    "Contract 5, evaluate_rounds: one decision per complete round, stops after the first decisive round, ignores a trailing partial round",
+    "Contract 5, normalise first: wrong-typed values scored after rebuild; seals (checks 2 and 7) checked on the rebuilt instances",
+    "Contract 5, checks 1 to 8 with their reasons, skip rules and collection order",
+    "Contract 5, the five post-walk situations",
+    "Contract 5, fields of every decision: mirrors, threshold, fixed template, trials_sha256 empty when uncomputable",
+    "Contract 5, decide_suite pure and order-independent; never raises on model_construct/model_copy inputs",
+    "Contract 5, replay_suite_decision true for real decisions, false after any tamper, never raises"
+   ],
+   "contract_gaps": [
+    "The rebuilt-seal test relies on pydantic lax coercion of '20' to int for SuiteManifest.max_rounds and of a str seed for TrialEnvelope.seed. The contract declares these fields as plain int on the non-strict base Model, so this follows the contract as written, but the contract never says the fields must stay non-strict. If the implementer marks them strict, check 1/5 would fail instead. The TrialEnvelope case is v1 frozen code and I checked it locally: supplied seal False, rebuilt seal True. The orchestrator may drop the manifest half if it does not want lax coercion pinned."
+   ],
+   "notes": "I could not run the tests (the arci.suite_* modules do not exist yet, as expected). py_compile, ruff check and ruff format are all clean, and ruff format left the file unchanged. The file uses operating_characteristics zero times. I recomputed every new literal with an independent Fraction script: scored(0,78,0,2) PASS wealth is 1.08643e+01 and not crossed; rounds 1 to 3 do not cross either; 18 minus plus 2 errored gives BLOCK wealth 6.79683e+01 (crossed) with PASS not crossed; 20 minus crosses BLOCK only; 40 zeros give about 5.84 and 80 zeros about 42.27. I added SuiteCellStats (arci.suite_schema) and digest_payload (arci.schema) to the imports.\nFindings:\n1. test_baseline_or_both_arms_errored_is_one_errored_pair: APPLIED. Contract 1 and 2 support it. Round 2 has cell 3 baseline ERROR and cell 4 with both arms ERROR. The test checks every round with _check_round, the INCONCLUSIVE result at round 4, cells 3 and 4 against the reviewer's expected values, and every other cell as (4,4,4,(0,4,0,0)).\n2. test_plan_warnings_are_not_a_plan_failure: APPLIED. Contract 4 and check 4 say only a raise is a failure. It runs as two parametrized cases (40 cells over 2 rounds, 80 cells over 1 round with acknowledge_single_round). Both PASS at the last round, 'suite plan invalid' is absent, and the rounds and mirrors are checked.\n3. block_crossed under the rule 1 and rule 2 verdicts: APPLIED, as two new tests (rule 2 with MINUS and hard={3}; rule 1 with MINUS and errored={0,1} on _m_err1). Both assert pass_crossed False and block_crossed True, and the rule 1 test also asserts block_wealth '6.79683e+01'. The existing tests are unchanged.\n4. test_seals_are_checked_on_the_rebuilt_instances: APPLIED. The contract states it ('every later check and all scoring use only the rebuilt instances'). The caveat about strict fields is under contract_gaps.\n5. replay tamper hardening: APPLIED. The tampered decisions are now built with model_copy and resealed with hash_record(digest_payload(t)), which is the same formula Sealed.create uses. They no longer go through SuiteDecision validation, and each one asserts its seal is valid before the replay check."
+  }
+ }
+]

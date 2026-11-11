@@ -1,0 +1,17 @@
+experiment_id: s2b-langchain-spike
+task_id: lookup-answer
+task: {expected: "forty-two"}
+toolset: user_app:toolset
+oracle: user_check:check
+baseline: user_app:baseline
+candidate: user_app:candidate
+n_per_arm: 2
+base_seed: 42000
+conditions:
+  - id: tool_timeout
+    fault: {name: tool_timeout, tool: lookup, occurrence: 0}
+  - id: tool_error_once
+    fault: {name: tool_error_once, tool: lookup, occurrence: 0}
+  - id: empty_result
+    fault: {name: empty_result, tool: lookup, occurrence: 0}
+budgets: {max_tool_calls: 4, max_model_steps: 8, max_seconds: 15.0, grader_seconds: 10.0}

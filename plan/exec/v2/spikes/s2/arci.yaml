@@ -1,0 +1,17 @@
+experiment_id: s2-langchain-spike
+task_id: lookup-answer
+task: {answer: "forty-two"}
+toolset: adapter_spike:make_world
+oracle: adapter_spike:oracle
+baseline: adapter_spike:baseline
+candidate: adapter_spike:candidate
+n_per_arm: 2
+base_seed: 42000
+conditions:
+  - id: tool_timeout
+    fault: {name: tool_timeout, tool: lookup, occurrence: 0}
+  - id: tool_error_once
+    fault: {name: tool_error_once, tool: lookup, occurrence: 0}
+  - id: empty_result
+    fault: {name: empty_result, tool: lookup, occurrence: 0}
+budgets: {max_tool_calls: 4, max_model_steps: 5, max_seconds: 30.0, grader_seconds: 20.0}

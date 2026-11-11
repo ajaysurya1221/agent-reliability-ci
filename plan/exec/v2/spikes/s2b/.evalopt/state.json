@@ -1,0 +1,122 @@
+{
+  "mode": "mixed",
+  "max_iterations": 6,
+  "iteration": 2,
+  "phase": "DONE_WITH_BLOCKERS",
+  "allowed": "plan/exec/v2/spikes/s2b/",
+  "plan": [
+    "Read brief and contracts",
+    "Implement adapter and verifier",
+    "Run twice and report limitations"
+  ],
+  "risk": "medium",
+  "research_backend": "installed local sources; no network",
+  "blocking_gates": [
+    "brief checks",
+    "ruff",
+    "basedpyright",
+    "frozen",
+    "scope"
+  ],
+  "skip_reasons": {
+    "network": "user prohibited",
+    "product_suite": "no product edits",
+    "external_skill_state": "owned-directory constraint"
+  },
+  "reflection_notes": [
+    "Move validation outside user middleware to preserve native ToolNode handling.",
+    "Compare actual exception detail, all validation observations, exact unsupported reasons, and completed budget snapshots.",
+    "Keep native injected-fault body-count mismatch as a failing acceptance check.",
+    "Use literal tool-return dict to isolate output formatting from canonical task-key transport."
+  ],
+  "stop_reason": "Native/injected body-count parity contradicts short-circuit semantics; replay limits demonstrated without kernel changes.",
+  "verification_results": {
+    "runs": [
+      "run-0003",
+      "run-0004"
+    ],
+    "exit_codes": [
+      1,
+      1
+    ],
+    "same_check_verdicts": true,
+    "identical_trial_hashes": 53,
+    "source_digests_unchanged": true,
+    "scope_inventory_unchanged": 735,
+    "failed_checks": [
+      "native_parity"
+    ]
+  },
+  "command_history": {
+    "ruff-format": {
+      "argv": [
+        ".venv/bin/ruff",
+        "format",
+        "--no-cache",
+        "--check",
+        "plan/exec/v2/spikes/s2b"
+      ],
+      "exit": 0,
+      "last_lines": [
+        "8 files already formatted"
+      ]
+    },
+    "ruff-check": {
+      "argv": [
+        ".venv/bin/ruff",
+        "check",
+        "--no-cache",
+        "plan/exec/v2/spikes/s2b"
+      ],
+      "exit": 0,
+      "last_lines": [
+        "All checks passed!"
+      ]
+    },
+    "basedpyright": {
+      "argv": [
+        ".venv/bin/basedpyright",
+        "--pythonpath",
+        "/Users/ajay/Developer/.arci-worktrees/v2-spike-venv/bin/python",
+        "plan/exec/v2/spikes/s2b"
+      ],
+      "exit": 0,
+      "last_lines": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    "frozen": {
+      "argv": [
+        "shasum",
+        "-a",
+        "256",
+        "-c",
+        "FROZEN.sha256"
+      ],
+      "exit": 0,
+      "last_lines": [
+        "tests/acceptance/test_sequential.py: OK",
+        "tests/acceptance/test_stats_gate.py: OK",
+        "uv.lock: OK"
+      ]
+    },
+    "gitleaks": {
+      "argv": [
+        "/opt/homebrew/bin/gitleaks",
+        "dir",
+        "--redact",
+        "--no-banner",
+        "--no-color",
+        "--exit-code",
+        "1",
+        "plan/exec/v2/spikes/s2b"
+      ],
+      "exit": 0,
+      "last_lines": [
+        "10:07PM INF scanned ~1066493 bytes (1.07 MB) in 87.5ms",
+        "10:07PM INF no leaks found"
+      ]
+    }
+  },
+  "final_summary": "Spike complete; acceptance FAIL; source and all final trial seals repeatable."
+}

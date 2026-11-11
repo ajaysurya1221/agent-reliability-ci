@@ -1,0 +1,6 @@
+# Large or regenerable spike output stays local; the scripts that produce it are tracked.
+spikes/*/out/
+spikes/s1/results.json
+spikes/s1b/results.json
+spikes/s1c/results.json
+__pycache__/
