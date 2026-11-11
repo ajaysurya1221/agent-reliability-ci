@@ -426,3 +426,32 @@ The test authors listed where this contract was silent. These answers bind both 
   expected; lists passed where tuples are declared; the text of `SuitePlanError`; which of
   (a) or (b) is reported when both fail; `evaluate_rounds` on inputs that break its stated
   assumptions; consistency between fields of a hand-built decision record.
+
+## 8. Amendments after the independent review (2026-11-11)
+
+These replace the earlier text where they differ. Source: `reviews/P1-review.md`.
+
+1. **Rationals are bounded.** `Rational` is `^[1-9][0-9]{0,6}/[1-9][0-9]{0,6}$`: numerator
+   and denominator have at most 7 digits. `parse_rational` rejects anything longer.
+   `format_rational` is unchanged (a threshold such as `2000000/1` still formats).
+2. **`experiment_id` has a fixed shape.** On `SuiteManifest` it must match
+   `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}@[0-9a-f]{64}$`; anything else is a validation error.
+   So it is always safe as a directory name. The gate's check 3 still compares it with the
+   recomputed id. `create_suite_manifest` builds its draft with a placeholder of that shape.
+3. **Round digests cover one round.** `SuiteRoundDecision.trials_sha256` is
+   `hash_record({"trials": sorted record_sha256 of the trials of that round only})`. The
+   decision-level `trials_sha256` still covers all supplied trials.
+4. **A seal must be a string as supplied.** Check 5 also fails (`trial values invalid`) when
+   any supplied `record_sha256` is not a `str`, even if rebuilding would coerce it.
+5. **`replay_suite_decision` normalises the decision too.** It rebuilds the supplied
+   decision with `SuiteDecision.model_validate(decision.model_dump(mode="python"))`, checks
+   that seal, and compares the rebuilt decision with `decide_suite(manifest, trials)`. A
+   decision that does not rebuild is `False`.
+6. **Cost.** `evaluate_rounds` and `decide_suite` are linear in the number of trials apart
+   from big-integer growth: wealth is carried forward round to round as integers (one
+   running product per stake and direction, compared with the threshold by integer
+   arithmetic), never recomputed from counts each round. `suite_stats.wealth` keeps its
+   signature and exactness. A valid store of 1 cell by 5,000 rounds that never crosses
+   decides in under 5 seconds; report the measured time for 1 cell by 100,000 rounds.
+7. **No warnings.** The gate emits no Python warning for any input (rebuild dumps are made
+   with warnings off).
