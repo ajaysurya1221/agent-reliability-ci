@@ -54,6 +54,9 @@ pytestmark = pytest.mark.acceptance
 KEY = "ab" * 32  # a fixed, valid rule digest for the golden vectors
 MASK53 = 2**53 - 1
 EXPERIMENT_ID = re.compile(r"^suite-acceptance@[0-9a-f]{64}$")
+# Well-formed digests (contract 8 item 2) that are not any manifest's rule digest.
+STALE_DIGEST = "0" * 64
+OTHER_DIGEST = "1" * 64
 
 
 # --- the tests' own oracle, written from the contract ------------------------------------
@@ -197,9 +200,11 @@ def test_experiment_id_is_suite_id_at_full_digest() -> None:
 
 
 def test_suite_experiment_id_recomputes_rather_than_reading_the_stored_id() -> None:
-    """Contract 3, experiment id: computed from suite_id and the recomputed digest."""
-    stale = SuiteManifest.create(**_refields(_base()), experiment_id="suite-acceptance@stale")
-    assert stale.experiment_id == "suite-acceptance@stale"
+    """Contract 3, experiment id: computed from suite_id and the recomputed digest. The stored
+    id is well formed but holds the wrong digest (contract 8 item 2 fixes its shape)."""
+    stale_id = f"suite-acceptance@{STALE_DIGEST}"
+    stale = SuiteManifest.create(**_refields(_base()), experiment_id=stale_id)
+    assert stale.experiment_id == stale_id
     assert suite_experiment_id(stale) == f"suite-acceptance@{_ref_rule_sha256(stale)}"
     assert suite_experiment_id(stale) == _base().experiment_id
 
@@ -220,6 +225,18 @@ def test_create_suite_manifest_refuses_generated_fields(field: str) -> None:
     value = _base().experiment_id if field == "experiment_id" else _base().record_sha256
     with pytest.raises(TypeError):
         create_suite_manifest(**fields, **{field: value})
+
+
+def test_create_suite_manifest_builds_a_well_formed_id_for_every_suite_id() -> None:
+    """Contract 8 item 2: the sealed experiment_id always matches
+    ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}@[0-9a-f]{64}$, so create_suite_manifest (whose draft uses
+    a placeholder of that shape) builds for every SuiteId, the 64-character one included."""
+    shape = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}@[0-9a-f]{64}$")
+    for suite_id in ("a", "0", "a" * 64, "suite_1.2-x"):
+        m = suite_manifest(suite_id=suite_id)
+        assert shape.fullmatch(m.experiment_id)
+        assert m.experiment_id == f"{suite_id}@{_ref_rule_sha256(m)}"
+        assert m.validate_seal()
 
 
 def test_rule_digest_ignores_task_order() -> None:
@@ -249,8 +266,12 @@ def test_rule_digest_ignores_created_at() -> None:
 
 
 def test_rule_digest_ignores_stored_experiment_id_and_seal() -> None:
-    """Contract 3, rule digest: experiment_id and record_sha256 do not enter the digest."""
-    other_id = SuiteManifest.create(**_refields(_base()), experiment_id="anything-else")
+    """Contract 3, rule digest: experiment_id and record_sha256 do not enter the digest. The
+    other id is well formed (contract 8 item 2) and holds a different suite part and digest."""
+    other_id = SuiteManifest.create(
+        **_refields(_base()), experiment_id=f"anything-else@{OTHER_DIGEST}"
+    )
+    assert other_id.experiment_id != _base().experiment_id
     other_seal = _base().model_copy(update={"record_sha256": "0" * 64})
     assert suite_rule_sha256(other_id) == suite_rule_sha256(_base())
     assert suite_rule_sha256(other_seal) == suite_rule_sha256(_base())

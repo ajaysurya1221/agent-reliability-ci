@@ -9,6 +9,8 @@ with an independent Fraction computation and are named where they appear.
 from __future__ import annotations
 
 import random
+import time
+import warnings
 from collections.abc import Collection, Sequence
 from fractions import Fraction
 from functools import cache
@@ -173,7 +175,8 @@ def _check_round(
     assert rd.pairs == r * n_cells
     assert (rd.counts.minus, rd.counts.zero, rd.counts.plus, rd.counts.errored) == counts
     assert rd.candidate_hard_violations == hard
-    assert rd.trials_sha256 == _digest([t for t in trials if _round_of(t) <= r])
+    # Contract 8 item 3: the round digest covers the trials of that round only.
+    assert rd.trials_sha256 == _digest([t for t in trials if _round_of(t) == r])
     assert rd.pass_wealth == _wealth_text(pass_wealth)
     assert rd.block_wealth == _wealth_text(block_wealth)
     assert rd.pass_crossed is pass_crossed
@@ -583,8 +586,28 @@ def test_evaluate_rounds_cumulative_counts_and_digests() -> None:
     assert [rd.pairs for rd in history] == [20, 40, 60, 80]
     assert [rd.verdict for rd in history] == [Verdict.INCONCLUSIVE] * 3 + [Verdict.PASS]
     _check_history(history, ZERO_ROWS, 4, trials)
-    assert history[-1].trials_sha256 == _digest(trials)
+    # Contract 8 item 3: each round digest covers one round, so the last one is not the
+    # digest over the whole store (that one is the decision's own trials_sha256).
+    assert history[-1].trials_sha256 == _digest([t for t in trials if _round_of(t) == 4])
+    assert history[-1].trials_sha256 != _digest(trials)
     assert len({rd.trials_sha256 for rd in history}) == 4
+
+
+def test_round_digests_cover_one_round_each() -> None:
+    """Contract 8 item 3: SuiteRoundDecision.trials_sha256 is hash_record over the sorted
+    seals of that round's trials only; the decision's trials_sha256 still covers all of them."""
+    m, trials = _m20(), _zero_store()
+    d = _decide(m, trials)
+    assert len(d.history) == 4
+    for r, rd in enumerate(d.history, start=1):
+        one_round = [t for t in trials if _round_of(t) == r]
+        assert len(one_round) == 2 * N
+        assert rd.trials_sha256 == _digest(one_round)
+        if r > 1:
+            # A cumulative digest would differ, so this pins the one-round reading.
+            assert rd.trials_sha256 != _digest([t for t in trials if _round_of(t) <= r])
+    assert d.trials_sha256 == _digest(trials)
+    assert d.trials_sha256 not in {rd.trials_sha256 for rd in d.history}
 
 
 def test_evaluate_rounds_stops_after_the_first_decisive_round() -> None:
@@ -758,6 +781,11 @@ def _bad_manifests() -> list[tuple[str, dict[str, object]]]:
         ("acknowledgement without one round", {"acknowledge_single_round": True}),
         ("errored limit above registered pairs", {"max_errored_pairs": 401}),
         ("max_rounds wrong type", {"max_rounds": "many"}),
+        # Contract 8 item 2: experiment_id has a fixed shape, so a malformed one no longer
+        # rebuilds and check 1 fails on it.
+        ("experiment_id without a digest", {"experiment_id": "suite-acceptance"}),
+        ("experiment_id with a path separator", {"experiment_id": f"../suite@{'0' * 64}"}),
+        ("experiment_id with uppercase hex", {"experiment_id": f"suite-acceptance@{'A' * 64}"}),
         ("lone surrogate in experiment_id", {"experiment_id": "\ud800"}),
         (
             "lone surrogate in a task",
@@ -1215,12 +1243,45 @@ def test_trials_sha256_is_empty_in_the_template_too() -> None:
 
 
 def test_trials_sha256_is_empty_for_a_non_string_seal() -> None:
-    """Contract 5: a seal that is not a string among string seals cannot be sorted."""
+    """Contract 5 and 8 item 4: a seal that is not a str fails check 5, and the digest over the
+    supplied seals, which cannot be sorted, is ""."""
     good = _zero_store()
     trials = (good[0].model_copy(update={"record_sha256": 5}), *good[1:])
     d = _decide(_m20(), trials)
     _assert_check_error(d, (TRIAL_INVALID,))
     assert d.trials_sha256 == ""
+    _assert_mirrors(d, _m20())
+
+
+@pytest.mark.parametrize("position", [0, 7, 159], ids=["first", "middle", "last"])
+def test_bytes_seal_fails_check_5(position: int) -> None:
+    """Contract 8 item 4: a supplied record_sha256 that is not a str fails check 5 even when
+    rebuilding would coerce it. The bytes here hold the trial's own correct digest, so the
+    rebuilt trial seals validly and nothing but item 4 refuses this store."""
+    good = _zero_store()
+    assert len(good) == 160  # 20 cells x 2 arms x 4 rounds
+    original = good[position]
+    as_bytes = original.model_copy(update={"record_sha256": original.record_sha256.encode()})
+    assert as_bytes.record_sha256 == original.record_sha256.encode()
+    rebuilt = TrialEnvelope.model_validate(as_bytes.model_dump(mode="python"))
+    assert rebuilt.record_sha256 == original.record_sha256
+    assert rebuilt == original and rebuilt.validate_seal()
+
+    trials = (*good[:position], as_bytes, *good[position + 1 :])
+    d = _decide(_m20(), trials)
+    _assert_check_error(d, (TRIAL_INVALID,))
+    assert d.trials_sha256 == ""
+    _assert_mirrors(d, _m20())
+
+
+def test_a_string_seal_of_the_wrong_value_is_check_7_not_check_5() -> None:
+    """Contract 8 item 4 is about the type only: a str seal still reaches check 7, which is
+    where a wrong digest is reported."""
+    good = _zero_store()
+    trials = (good[0].model_copy(update={"record_sha256": "0" * 64}), *good[1:])
+    d = _decide(_m20(), trials)
+    _assert_check_error(d, (TRIAL_SEAL,))
+    assert d.trials_sha256 == _digest(trials)
 
 
 # --- determinism and replay ---------------------------------------------------------------------
@@ -1313,3 +1374,171 @@ def test_replay_never_raises() -> None:
     d = _decide(m, trials)
     assert replay_suite_decision(d, SuiteManifest.model_construct(), trials) is False
     assert replay_suite_decision(d, m, (TrialEnvelope.model_construct(),)) is False
+
+
+def test_replay_normalises_the_supplied_decision() -> None:
+    """Contract 8 item 5: replay_suite_decision rebuilds the decision with
+    SuiteDecision.model_validate(decision.model_dump(mode="python")), checks that seal and
+    compares the rebuilt decision with decide_suite(manifest, trials). A copy holding the
+    plain string "PASS", and one holding the string "20" for n_cells, both rebuild to the
+    real decision, so both replay True."""
+    m, trials = _m20(), _zero_store()
+    d = _decide(m, trials)
+    assert d.verdict is Verdict.PASS and d.n_cells == 20
+
+    as_text = d.model_copy(update={"verdict": "PASS"})
+    assert as_text.verdict is not Verdict.PASS
+    assert SuiteDecision.model_validate(as_text.model_dump(mode="python")) == d
+    assert replay_suite_decision(as_text, m, trials) is True
+
+    # "20" for n_cells breaks the seal as supplied; the rebuilt record's seal verifies.
+    coerced = d.model_copy(update={"n_cells": "20"})
+    rebuilt = SuiteDecision.model_validate(coerced.model_dump(mode="python"))
+    assert not coerced.validate_seal()
+    assert rebuilt == d and rebuilt.validate_seal()
+    assert replay_suite_decision(coerced, m, trials) is True
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"verdict": "MAYBE"},
+        {"n_cells": "many"},
+        {"schema_version": "arci-suite/2"},
+        {"stakes": None},
+        {"exit_code": "zero"},
+    ],
+    ids=["verdict", "n_cells", "schema_version", "stakes", "exit_code"],
+)
+def test_replay_is_false_for_a_decision_that_cannot_rebuild(update: dict[str, object]) -> None:
+    """Contract 8 item 5: a decision that does not rebuild is False."""
+    m, trials = _m20(), _zero_store()
+    d = _decide(m, trials)
+    assert replay_suite_decision(d.model_copy(update=update), m, trials) is False
+
+
+def test_replay_normalises_but_still_compares() -> None:
+    """Contract 8 item 5: normalising is not forgiving. A sealed BLOCK decision whose verdict
+    is the plain string "BLOCK" rebuilds and its rebuilt seal verifies, yet it is not the
+    decision decide_suite gives for this store, so replay is False."""
+    m, trials = _m20(), _zero_store()
+    d = _decide(m, trials)
+    block = SuiteDecision.model_validate(
+        {**d.model_dump(mode="python"), "verdict": Verdict.BLOCK, "exit_code": 1}
+    )
+    sealed = block.model_copy(update={"record_sha256": hash_record(digest_payload(block))})
+    assert sealed.validate_seal()
+    as_text = sealed.model_copy(update={"verdict": "BLOCK"})
+    assert as_text.verdict is not Verdict.BLOCK
+    rebuilt = SuiteDecision.model_validate(as_text.model_dump(mode="python"))
+    assert rebuilt == sealed and rebuilt.validate_seal()
+    assert rebuilt != d
+    assert replay_suite_decision(as_text, m, trials) is False
+
+
+# --- cost (contract 8 item 6) -------------------------------------------------------------
+
+
+def test_one_cell_by_five_thousand_rounds_decides_in_under_five_seconds() -> None:
+    """Contract 8 item 6: a valid store of 1 cell by 5,000 rounds that never crosses decides
+    in under 5 seconds (only decide_suite is timed; building the store is not).
+
+    The differences alternate +1, -1, +1, ..., one pair per round. Per stake q, with
+    up = q / (1 - delta) and down = q / (1 + delta), a +1 multiplies the PASS running product
+    by f_plus = 1 + up * (1 + delta) and a -1 by f_minus = 1 + up * (delta - 1); the BLOCK
+    product by g_plus = 1 - down * (1 + delta) and g_minus = 1 - down * (delta - 1). The exact
+    checks below establish f_plus * f_minus < 1, g_plus * g_minus < 1 and 0 < g_plus < 1 for
+    both default stakes. Hence after an even round 2k the products are (f_plus * f_minus) ** k
+    and (g_plus * g_minus) ** k, both at most 1; after an odd round 2k + 1 they are
+    f_plus * (f_plus * f_minus) ** k <= f_plus and g_plus * (g_plus * g_minus) ** k <= g_plus.
+    Each wealth is the mean over the stakes of its products, so at every one of the 5,000
+    round ends the PASS wealth is at most mean(max(1, f_plus)) and the BLOCK wealth at most 1,
+    both below the threshold 40. Spot checks against reference_wealth confirm the algebra.
+    """
+    bound = Fraction(0)
+    for q in STAKES:
+        up = q / (1 - DELTA)
+        down = q / (1 + DELTA)
+        f_plus = 1 + up * (1 + DELTA)
+        f_minus = 1 + up * (DELTA - 1)
+        g_plus = 1 - down * (1 + DELTA)
+        g_minus = 1 - down * (DELTA - 1)
+        assert f_plus * f_minus < 1
+        assert g_plus * g_minus < 1
+        assert 0 < g_plus < 1
+        bound += max(Fraction(1), f_plus)
+    bound /= len(STAKES)
+    assert bound < THRESHOLD and Fraction(1) < THRESHOLD
+
+    rounds = 5000
+    for r in (1, 2, 3, 9, 13, 79, 2500, 4999, rounds):
+        plus = (r + 1) // 2  # the odd rounds carry the +1 differences
+        pass_wealth, block_wealth = reference_wealth(r - plus, 0, plus, ALPHA, DELTA, STAKES)
+        assert pass_wealth <= bound < THRESHOLD
+        assert block_wealth <= 1 < THRESHOLD
+
+    m = suite_manifest(n_tasks=1, n_conditions=1, max_rounds=rounds, max_errored_pairs=0)
+    assert m.n_cells == 1
+    trials = _store(m, [_row((1 if r % 2 else -1,)) for r in range(1, rounds + 1)])
+    assert len(trials) == 2 * rounds
+
+    start = time.perf_counter()
+    d = decide_suite(m, trials)
+    elapsed = time.perf_counter() - start
+
+    assert d.verdict is Verdict.INCONCLUSIVE, d.reasons
+    assert d.reasons == (REASON_NONE,)
+    assert d.stopped_at_round == rounds
+    assert len(d.history) == rounds
+    last = d.history[-1]
+    assert (last.counts.minus, last.counts.zero, last.counts.plus, last.counts.errored) == (
+        rounds // 2,
+        0,
+        (rounds + 1) // 2,
+        0,
+    )
+    assert last.pass_crossed is False and last.block_crossed is False
+    assert d.validate_seal()
+    assert elapsed < 5.0, f"decide_suite took {elapsed:.2f}s"
+
+
+# --- no warnings (contract 8 item 7) -------------------------------------------------------
+
+
+def _warning_cases() -> list[tuple[str, SuiteManifest, tuple[TrialEnvelope, ...]]]:
+    """Inputs the gate must handle without emitting a warning, wrong-typed records included."""
+    m, good = _m20(), _zero_store()
+
+    def swap(index: int, **update: object) -> tuple[TrialEnvelope, ...]:
+        return (*good[:index], good[index].model_copy(update=update), *good[index + 1 :])
+
+    return [
+        ("a valid store", m, good),
+        ("manifest with a str max_rounds", m.model_copy(update={"max_rounds": "20"}), good),
+        ("manifest that cannot rebuild", m.model_copy(update={"max_rounds": 0}), good),
+        ("model_construct manifest", SuiteManifest.model_construct(), good),
+        ("broken manifest seal", m.model_copy(update={"record_sha256": "0" * 64}), good),
+        ("trial outcome as text", m, swap(7, outcome="PASS")),
+        ("trial seed as text", m, swap(7, seed=str(good[7].seed))),
+        ("trial outcome unknown", m, swap(7, outcome="MAYBE")),
+        ("trial seal not a str", m, swap(7, record_sha256=5)),
+        ("trial seal as bytes", m, swap(7, record_sha256=good[7].record_sha256.encode())),
+        ("lone surrogate in a trial", m, swap(7, failure_detail="\ud800")),
+        ("model_construct trial", m, (*good, TrialEnvelope.model_construct())),
+        ("empty store", m, ()),
+    ]
+
+
+@pytest.mark.parametrize("label", [case[0] for case in _warning_cases()])
+def test_the_gate_emits_no_warnings(label: str) -> None:
+    """Contract 8 item 7: the gate emits no Python warning for any input, because its rebuild
+    dumps are made with warnings off. Every warning raised inside the block below fails this
+    test, whatever the module-level filters say."""
+    _, m, trials = next(case for case in _warning_cases() if case[0] == label)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("error")
+        d = decide_suite(m, trials)
+        replayed = replay_suite_decision(d, m, trials)
+    assert isinstance(d, SuiteDecision)
+    assert isinstance(replayed, bool)
+    assert [str(w.message) for w in caught] == []

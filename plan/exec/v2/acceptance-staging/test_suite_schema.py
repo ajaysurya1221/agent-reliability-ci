@@ -53,19 +53,23 @@ SERVER = McpServerSpec(argv=("env-server", "{workdir}"), snapshot=f"{MOD}:snapsh
 TOOLSET = f"{MOD}:make_world"
 
 
+WRONG_DIGEST = "0" * 64  # well formed (contract 8 item 2) but not the rule digest
+
+
 def _fields(**overrides: object) -> dict[str, object]:
     """Fields of a structurally valid manifest: python arms, 20 cells, 20 rounds, 4 errored.
 
-    `experiment_id` is a fixed string: construction checks structure only (contract section 2),
-    so the schema does not compare it with the rule digest. The test-only keys `n_tasks`
-    (default 5) and `n_conditions` (default 4) size the grid and are not manifest fields.
+    `experiment_id` is a fixed, well-formed id (contract 8 item 2 fixes its shape) that is not
+    the rule digest: construction checks structure only (contract section 2), so the schema
+    does not compare it with the rule digest. The test-only keys `n_tasks` (default 5) and
+    `n_conditions` (default 4) size the grid and are not manifest fields.
     """
     n_tasks = overrides.pop("n_tasks", 5)
     n_conditions = overrides.pop("n_conditions", 4)
     assert isinstance(n_tasks, int)
     assert isinstance(n_conditions, int)
     fields: dict[str, object] = {
-        "experiment_id": "suite-acceptance@structure-only",
+        "experiment_id": f"suite-acceptance@{WRONG_DIGEST}",
         "suite_id": "suite-acceptance",
         "tasks": tasks(n_tasks),
         "conditions": CONDITIONS[:n_conditions],
@@ -165,18 +169,55 @@ def test_suite_id_rejects(text: str) -> None:
         TypeAdapter(SuiteId).validate_python(text)
 
 
-@pytest.mark.parametrize("text", ["1/20", "40/1", "1/1", "2/40", "10/100", "123/4567"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1/20",
+        "40/1",
+        "1/1",
+        "2/40",
+        "10/100",
+        "123/4567",
+        # Contract 8 item 1: at most 7 digits each side, so 7 digits is the largest accepted.
+        "1234567/7654321",
+        "9999999/9999998",
+        "9999999/1",
+        "1/9999999",
+        "2000000/1",
+    ],
+)
 def test_rational_pattern_accepts(text: str) -> None:
-    """Contract 2, Rational pattern ^[1-9][0-9]*/[1-9][0-9]*$ (format only, not lowest terms)."""
+    """Contract 8 item 1, Rational pattern ^[1-9][0-9]{0,6}/[1-9][0-9]{0,6}$ (format only,
+    not lowest terms)."""
     assert TypeAdapter(Rational).validate_python(text) == text
 
 
 @pytest.mark.parametrize(
     "text",
-    ["", "1", "0/1", "1/0", "01/2", "1/02", "-1/2", "+1/2", "1.5/2", "1/2/3", " 1/2", "1/2 "],
+    [
+        "",
+        "1",
+        "0/1",
+        "1/0",
+        "01/2",
+        "1/02",
+        "-1/2",
+        "+1/2",
+        "1.5/2",
+        "1/2/3",
+        " 1/2",
+        "1/2 ",
+        # Contract 8 item 1: 8 digits on either side is too long.
+        "12345678/1",
+        "1/12345678",
+        "12345678/12345678",
+        "10000000/1",
+        "1/10000000",
+        "123456789/1000000007",
+    ],
 )
 def test_rational_pattern_rejects(text: str) -> None:
-    """Contract 2, Rational pattern ^[1-9][0-9]*/[1-9][0-9]*$."""
+    """Contract 8 item 1, Rational pattern ^[1-9][0-9]{0,6}/[1-9][0-9]{0,6}$."""
     with pytest.raises(ValidationError):
         TypeAdapter(Rational).validate_python(text)
 
@@ -193,7 +234,11 @@ def test_rational_pattern_rejects(text: str) -> None:
         ("1/1", Fraction(1)),
         ("3/7", Fraction(3, 7)),
         ("1/1000000", Fraction(1, 1_000_000)),
-        ("123456789/1000000007", Fraction(123_456_789, 1_000_000_007)),
+        # Contract 8 item 1: 7 digits each side is still accepted.
+        ("9999999/9999998", Fraction(9_999_999, 9_999_998)),
+        ("1/9999999", Fraction(1, 9_999_999)),
+        ("9999999/1", Fraction(9_999_999)),
+        ("2000000/1", Fraction(2_000_000)),
     ],
 )
 def test_parse_rational_reads_lowest_terms(text: str, value: Fraction) -> None:
@@ -204,10 +249,32 @@ def test_parse_rational_reads_lowest_terms(text: str, value: Fraction) -> None:
 
 
 @pytest.mark.parametrize(
-    "text", ["2/40", "4/2", "6/4", "10/100", "2/2", "", "abc", "1", "1/", "/2", "1/2/3"]
+    "text",
+    [
+        "2/40",
+        "4/2",
+        "6/4",
+        "10/100",
+        "2/2",
+        "",
+        "abc",
+        "1",
+        "1/",
+        "/2",
+        "1/2/3",
+        # Contract 8 item 1: parse_rational rejects anything longer than 7 digits a side,
+        # whether or not it is in lowest terms.
+        "10000000/1",
+        "1/10000000",
+        "9999999/10000000",
+        "10000000/9999999",
+        "123456789/1000000007",
+        "12345678/12345679",
+    ],
 )
 def test_parse_rational_rejects(text: str) -> None:
-    """Contract 2, parse_rational: ValueError unless "n/d" in lowest terms."""
+    """Contract 2 and 8 item 1, parse_rational: ValueError unless "n/d" in lowest terms with
+    at most 7 digits on each side."""
     with pytest.raises(ValueError):
         parse_rational(text)
 
@@ -228,6 +295,21 @@ def test_format_rational_writes_lowest_terms(value: Fraction, text: str) -> None
     """Contract 2, format_rational: "n/d", lowest terms (and 2 / alpha example "40/1")."""
     assert format_rational(value) == text
     assert parse_rational(format_rational(value)) == value
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (2 / Fraction(1, 1_000_000), "2000000/1"),  # the largest threshold: alpha >= 1/1000000
+        (Fraction(1, 10**8), "1/100000000"),
+        (Fraction(10**9 + 1), "1000000001/1"),
+    ],
+)
+def test_format_rational_is_unchanged_by_the_digit_bound(value: Fraction, text: str) -> None:
+    """Contract 8 item 1: format_rational is unchanged, so it still writes "n/d" in lowest
+    terms for values whose numerator or denominator has more than 7 digits (contract 2),
+    even though parse_rational and the Rational type now reject that text."""
+    assert format_rational(value) == text
 
 
 @pytest.mark.parametrize("value", [Fraction(0), Fraction(-1, 2), Fraction(-40)])
@@ -356,6 +438,10 @@ def test_tasks_and_conditions_are_non_empty(overrides: dict[str, object]) -> Non
         pytest.param({"alpha": "1/2"}, id="alpha-highest-bound"),
         pytest.param({"delta": "1/1000000"}, id="delta-small"),
         pytest.param({"delta": "999999/1000000"}, id="delta-large"),
+        # Contract 8 item 1: 7 digits a side is accepted on every Rational manifest field.
+        pytest.param({"alpha": "499999/1000000"}, id="alpha-seven-digit-denominator"),
+        pytest.param({"delta": "9999998/9999999"}, id="delta-seven-digits-both-sides"),
+        pytest.param({"stakes": ("1/9999999", "9999998/9999999")}, id="stakes-seven-digits"),
         pytest.param({"stakes": ("1/2",)}, id="one-stake"),
         pytest.param({"stakes": ("999/1000",)}, id="stake-near-one"),
         pytest.param(
@@ -477,6 +563,13 @@ RULE_FAILURES = [
     pytest.param({"stakes": ("1/4", "3/2")}, id="r4-stake-above-one"),
     pytest.param({"stakes": ("1/2", "1/4")}, id="r4-stakes-decreasing"),
     pytest.param({"stakes": ("1/4", "1/4")}, id="r4-stakes-repeated"),
+    # Contract 8 item 1: 8 digits a side is too long. Each value below satisfies rule 4
+    # (lowest terms, in range, increasing), so the length bound is the only reason to refuse.
+    pytest.param({"alpha": "4999999/10000000"}, id="item1-alpha-eight-digit-denominator"),
+    pytest.param({"delta": "9999999/10000000"}, id="item1-delta-eight-digit-denominator"),
+    pytest.param({"delta": "10000001/20000003"}, id="item1-delta-eight-digits-both-sides"),
+    pytest.param({"stakes": ("1/10000000",)}, id="item1-stake-eight-digit-denominator"),
+    pytest.param({"stakes": ("1/4", "10000001/20000000")}, id="item1-second-stake-too-long"),
     # Rule 5: max_rounds >= 1 and n_cells * max_rounds <= SUITE_MAX_PAIRS.
     pytest.param({"max_rounds": 0, "max_errored_pairs": 0}, id="r5-zero-rounds"),
     # Not isolated: a negative max_rounds also fails rule 6 (0 <= 0 <= -20 is false). Only
@@ -513,6 +606,57 @@ def test_suite_id_field_is_suite_id(bad: str) -> None:
     """Contract 2, SuiteManifest.suite_id is a SuiteId."""
     with pytest.raises(ValidationError):
         _build(suite_id=bad)
+
+
+# --- experiment_id has a fixed shape (contract 8 item 2) -----------------------------------
+
+HEX64 = "0123456789abcdef" * 4
+EXPERIMENT_ID_OK = [
+    f"a@{'0' * 64}",
+    f"0@{HEX64}",
+    f"suite-acceptance@{'f' * 64}",
+    f"Z9_.-@{'ab' * 32}",
+    f"{'a' * 64}@{HEX64}",  # local part at its 64-character limit
+]
+EXPERIMENT_ID_BAD = [
+    pytest.param("", id="empty"),
+    pytest.param("suite-acceptance", id="no-digest"),
+    pytest.param("suite-acceptance@", id="empty-digest"),
+    pytest.param(f"@{'0' * 64}", id="empty-suite-part"),
+    pytest.param(f"_suite@{'0' * 64}", id="leading-underscore"),
+    pytest.param(f"suite/acceptance@{'0' * 64}", id="forward-slash"),
+    pytest.param(f"suite\\acceptance@{'0' * 64}", id="backslash"),
+    pytest.param(f"..@{'0' * 64}", id="parent-directory"),
+    pytest.param(f"../suite@{'0' * 64}", id="parent-directory-path"),
+    pytest.param(f"suite acceptance@{'0' * 64}", id="space"),
+    pytest.param(f"suite:acceptance@{'0' * 64}", id="colon"),
+    pytest.param(f"{'a' * 65}@{'0' * 64}", id="suite-part-65-chars"),
+    pytest.param(f"suite-acceptance@{'0' * 63}", id="63-hex-digits"),
+    pytest.param(f"suite-acceptance@{'0' * 65}", id="65-hex-digits"),
+    pytest.param(f"suite-acceptance@{'A' * 64}", id="uppercase-hex"),
+    pytest.param(f"suite-acceptance@{'0' * 62}AB", id="uppercase-hex-tail"),
+    pytest.param(f"suite-acceptance@{'0' * 63}g", id="not-hex"),
+    pytest.param(f"suite@acceptance@{'0' * 64}", id="two-at-signs"),
+    pytest.param(f"suite-acceptance@{'0' * 64}/..", id="trailing-path"),
+    pytest.param(f"{'0' * 64}", id="digest-alone"),
+]
+
+
+@pytest.mark.parametrize("experiment_id", EXPERIMENT_ID_OK)
+def test_well_formed_experiment_ids_construct(experiment_id: str) -> None:
+    """Contract 8 item 2: experiment_id matches ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}@[0-9a-f]{64}$,
+    whatever digest it holds (the schema never compares it with the rule digest)."""
+    m = _build(experiment_id=experiment_id)
+    assert m.experiment_id == experiment_id
+    assert m.validate_seal()
+
+
+@pytest.mark.parametrize("experiment_id", EXPERIMENT_ID_BAD)
+def test_malformed_experiment_ids_are_a_validation_error(experiment_id: str) -> None:
+    """Contract 8 item 2: anything else is a pydantic.ValidationError, so the id is always
+    safe as a directory name."""
+    with pytest.raises(ValidationError):
+        _build(experiment_id=experiment_id)
 
 
 @pytest.mark.parametrize(

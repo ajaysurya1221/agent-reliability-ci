@@ -76,3 +76,25 @@ all i need to see is something finally in our Github." From here the orchestrato
 and pushes the v2 branches as work is verified. Still outside this: anything the
 maintainer's own deny list blocks (opening or merging pull requests with `gh`), merging to
 `main`, tagging and publishing a release.
+
+## D-08: adapter rules settled after the independent review (2026-11-11)
+
+Orchestrator decisions under D-07. Source: `reviews/P3a-review-workflow.json` (39 agents,
+35 findings, none refuted).
+
+1. **Set-up failures are ERROR, not FAIL.** Anything raised before the first model call
+   (the agent settings callable, `create_agent`, `task_to_input`, the graph rejecting its
+   input, async-only user middleware) is a harness error. Otherwise a broken configuration
+   fails both arms alike, every pair ties, and ties count toward PASS.
+2. **ADR 0011 item 10 is widened before it is frozen.** Infrastructure errors also include
+   HTTP 401, 403, 407 and 408, DNS failures (`socket.gaierror`) and TLS failures
+   (`ssl.SSLError`). Same reason as item 1: a missing key or dead network is not agent
+   behaviour.
+3. **An interrupted run is rejected.** A graph that returns with an interrupt pending is a
+   harness ERROR; it was being graded as a completed run.
+4. **The order gate has no fixed deadline.** A waiting tool call times out only when no
+   call has been running for 30 seconds (a real deadlock). The trial's own time budget
+   bounds everything else.
+5. Kept as stated limits for the recipe: non-finite numbers in arguments are agent
+   failures; tuples and integer-keyed dictionaries as tool results are rejected; empty or
+   duplicate call ids are rejected.
