@@ -9,7 +9,7 @@ from arci.suite_schema import SuiteManifest
 
 def manifest_fields(**updates: Any) -> dict[str, Any]:
     fields: dict[str, Any] = {
-        "experiment_id": "supplied-id",
+        "experiment_id": "supplied-id@" + "0" * 64,
         "suite_id": "suite",
         "tasks": ({"task_id": "b", "task": {"value": 0.5}}, {"task_id": "a"}),
         "conditions": ({"condition_id": "z"}, {"condition_id": "clean"}),

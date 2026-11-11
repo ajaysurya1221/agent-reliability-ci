@@ -19,7 +19,7 @@ from arci.suite_schema import (
     format_rational,
     parse_rational,
 )
-from arci.suite_stats import check_suite_plan, crossed, rule_of, scored_wealth, wealth_text
+from arci.suite_stats import RunningWealth, check_suite_plan, rule_of
 
 
 def _is_string(value: object) -> bool:
@@ -101,29 +101,36 @@ def evaluate_rounds(
         rounds.setdefault(pair_round(trial.pair_id), []).append(trial)
     rule = rule_of(manifest)
     counts = _Counts()
-    seen: list[TrialEnvelope] = []
+    passed, blocked = RunningWealth(rule, 1), RunningWealth(rule, -1)
     history: list[SuiteRoundDecision] = []
     for r in range(1, manifest.max_rounds + 1):
         current = rounds.get(r, [])
         if len(current) != 2 * manifest.n_cells:
             break
+        before = (counts.minus, counts.zero, counts.plus, counts.errored)
         by_id = {trial.trial_id: trial for trial in current}
         for trial in current:
             if trial.arm == "baseline":
                 counts.add(trial, by_id[f"{trial.pair_id}:candidate"])
-        seen.extend(current)
-        wp, wb = scored_wealth(counts.minus, counts.zero, counts.plus, counts.errored, rule)
-        pc, bc = crossed(wp, rule), crossed(wb, rule)
+        changes = tuple(
+            a - b
+            for a, b in zip(
+                (counts.minus, counts.zero, counts.plus, counts.errored), before, strict=True
+            )
+        )
+        passed.advance(*changes)
+        blocked.advance(*changes)
+        pc, bc = passed.crossed(), blocked.crossed()
         verdict, reasons = _round_verdict(counts, manifest.max_errored_pairs, pc, bc)
         history.append(
             SuiteRoundDecision(
                 round=r,
                 pairs=r * manifest.n_cells,
-                trials_sha256=_digest(seen),
+                trials_sha256=_digest(current),
                 counts=counts.model(),
                 candidate_hard_violations=counts.hard,
-                pass_wealth=wealth_text(wp),
-                block_wealth=wealth_text(wb),
+                pass_wealth=passed.text(),
+                block_wealth=blocked.text(),
                 pass_crossed=pc,
                 block_crossed=bc,
                 verdict=verdict,
@@ -247,8 +254,10 @@ def decide_suite(manifest: SuiteManifest, trials: Sequence[TrialEnvelope]) -> Su
             return valid
 
         try:
-            rebuilt = SuiteManifest.model_validate(manifest.model_dump(mode="python"))
-            canonical_json(rebuilt.model_dump(mode="json"))
+            rebuilt = SuiteManifest.model_validate(
+                manifest.model_dump(mode="python", warnings=False)
+            )
+            canonical_json(rebuilt.model_dump(mode="json", warnings=False))
             normalized = rebuilt
         except Exception:
             return _decision(None, digest, ("manifest values invalid",))
@@ -268,8 +277,10 @@ def decide_suite(manifest: SuiteManifest, trials: Sequence[TrialEnvelope]) -> Su
 
         def rebuild_trials() -> bool:
             for trial in trials:
-                item = TrialEnvelope.model_validate(trial.model_dump(mode="python"))
-                canonical_json(item.model_dump(mode="json"))
+                if not _is_string(trial.record_sha256):
+                    return False
+                item = TrialEnvelope.model_validate(trial.model_dump(mode="python", warnings=False))
+                canonical_json(item.model_dump(mode="json", warnings=False))
                 clean.append(item)
             return True
 
@@ -326,6 +337,7 @@ def replay_suite_decision(
     decision: SuiteDecision, manifest: SuiteManifest, trials: Sequence[TrialEnvelope]
 ) -> bool:
     try:
-        return decision.validate_seal() and decide_suite(manifest, trials) == decision
+        rebuilt = SuiteDecision.model_validate(decision.model_dump(mode="python", warnings=False))
+        return rebuilt.validate_seal() and decide_suite(manifest, trials) == rebuilt
     except Exception:
         return False

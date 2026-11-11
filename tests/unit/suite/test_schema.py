@@ -142,3 +142,46 @@ def test_schema_does_not_import_statistics() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("text", ["9999999/9999998", "1/9999999", "9999999/1"])
+def test_seven_digit_rationals(text: str) -> None:
+    assert parse_rational(text) == Fraction(text)
+
+
+@pytest.mark.parametrize("text", ["10000000/1", "1/10000000", "99999999/99999998"])
+def test_eight_digit_rationals_rejected(text: str) -> None:
+    with pytest.raises(ValueError):
+        parse_rational(text)
+    for field in ("alpha", "delta", "stakes"):
+        with pytest.raises(ValidationError):
+            SuiteManifest(**manifest_fields(**{field: (text,) if field == "stakes" else text}))
+
+
+def test_manifest_accepts_seven_digit_parts() -> None:
+    assert SuiteManifest(
+        **manifest_fields(alpha="1/1000000", delta="9999998/9999999", stakes=("1/9999999",))
+    )
+    assert format_rational(Fraction(10000000)) == "10000000/1"
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        "",
+        "../escape",
+        "/tmp/abs",
+        "a@" + "f" * 63,
+        "a@" + "F" * 64,
+        "a" * 65 + "@" + "f" * 64,
+        "a@" + "f" * 64 + "\n",
+    ],
+)
+def test_experiment_id_shape_rejected(identifier: str) -> None:
+    with pytest.raises(ValidationError):
+        SuiteManifest(**manifest_fields(experiment_id=identifier))
+
+
+def test_experiment_id_shape_does_not_assert_digest() -> None:
+    identifier = "a" * 64 + "@" + "f" * 64
+    assert SuiteManifest(**manifest_fields(experiment_id=identifier)).experiment_id == identifier

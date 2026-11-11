@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from fractions import Fraction
 from time import perf_counter_ns
 from typing import Any
 
@@ -94,10 +93,10 @@ def test_priority_and_crossing_flags(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.history[0].pass_crossed
     assert result.history[0].candidate_hard_violations == 1
 
-    def both(*args: object) -> tuple[Fraction, Fraction]:
-        return Fraction(40), Fraction(40)
+    def both(self: gate.RunningWealth) -> bool:
+        return True
 
-    monkeypatch.setattr(gate, "scored_wealth", both)
+    monkeypatch.setattr(gate.RunningWealth, "crossed", both)
     assert gate.decide_suite(m, trials).reasons == ("candidate hard violation",)
     trials[1] = reseal(trials[1], contract=None)
     assert_error(gate.decide_suite(m, trials), "both tests crossed", history=True)
@@ -191,7 +190,7 @@ def test_duplicate_and_replayed_specs_rejected() -> None:
 
 
 def test_all_checks_collected_in_order_and_skip_eight() -> None:
-    m = gate_manifest(max_rounds=3).model_copy(update={"experiment_id": "wrong"})
+    m = gate_manifest(max_rounds=3).model_copy(update={"experiment_id": "wrong@" + "0" * 64})
     trials = store(m, [0] * 20)
     trials[0] = trials[0].model_copy(update={"seed": -1})
     assert_error(
@@ -306,7 +305,7 @@ def test_mirrored_fields_hashes_determinism_order_and_replay() -> None:
     assert result.trials_sha256 == hash_record({"trials": sorted(t.record_sha256 for t in trials)})
     for r in result.history:
         assert r.trials_sha256 == hash_record(
-            {"trials": sorted(t.record_sha256 for t in trials[: r.round * 40])}
+            {"trials": sorted(t.record_sha256 for t in trials[(r.round - 1) * 40 : r.round * 40])}
         )
     assert [(c.task_id, c.condition_id) for c in result.cells] == sorted(
         (c.task_id, c.condition_id) for c in result.cells
@@ -371,22 +370,74 @@ def test_last_resort_on_unsealable_decision(monkeypatch: pytest.MonkeyPatch) -> 
     assert result.experiment_id == result.trials_sha256 == ""
 
 
-def test_twenty_cells_twenty_rounds_uses_cumulative_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_twenty_cells_twenty_rounds_exact_history() -> None:
     m = gate_manifest(max_rounds=20)
-    trials = store(m, ([-1, 0, 0, 0, 0, 0, 0, 0, 0, 0] * 40))
-    calls: list[tuple[int, int, int, int]] = []
-    original = gate.scored_wealth
+    trials = store(m, [-1, 0, 0, 0, 0, 0, 0, 0, 0, 0] * 40)
+    result = gate.decide_suite(m, trials)
+    assert result.verdict is Verdict.INCONCLUSIVE
+    for row in result.history:
+        wp, wb = scored_wealth(2 * row.round, 18 * row.round, 0, 0, rule_of(m))
+        assert (row.pass_wealth, row.block_wealth) == (wealth_text(wp), wealth_text(wb))
 
-    def measured(
-        minus: int, zero: int, plus: int, errored: int, rule: Any
-    ) -> tuple[Fraction, Fraction]:
-        calls.append((minus, zero, plus, errored))
-        return original(minus, zero, plus, errored, rule)
 
-    monkeypatch.setattr(gate, "scored_wealth", measured)
+def test_five_thousand_round_store_decides_under_five_seconds() -> None:
+    m = gate_manifest(tasks=({"task_id": "one"},), max_rounds=5000, max_errored_pairs=0)
+    trials = store(m, [-1, *([0] * 9)] * 500)
     started = perf_counter_ns()
     result = gate.decide_suite(m, trials)
     elapsed = perf_counter_ns() - started
     assert result.verdict is Verdict.INCONCLUSIVE
-    assert calls == [(2 * r, 18 * r, 0, 0) for r in range(1, 21)]
-    assert elapsed < 800_000_000
+    assert len(result.history) == 5000
+    assert elapsed < 5_000_000_000
+
+
+def test_bytes_seal_rejected_before_coercion() -> None:
+    m = gate_manifest()
+    trials = store(m, [1] * 20)
+    trials[0] = trials[0].model_copy(update={"record_sha256": trials[0].record_sha256.encode()})
+    result = gate.decide_suite(m, trials)
+    assert_error(result, "trial values invalid")
+    assert result.trials_sha256 == ""
+
+
+def test_replay_normalizes_plain_string_verdicts(monkeypatch: pytest.MonkeyPatch) -> None:
+    m = gate_manifest()
+    trials = store(m, [-1] * 20)
+    decision = gate.decide_suite(m, trials)
+    supplied = decision.model_copy(
+        update={
+            "verdict": "BLOCK",
+            "history": tuple(
+                row.model_copy(update={"verdict": "BLOCK"}) for row in decision.history
+            ),
+        }
+    )
+    validate_seal = SuiteDecision.validate_seal
+
+    def checked(self: SuiteDecision) -> bool:
+        assert self.verdict is Verdict.BLOCK
+        assert all(row.verdict is Verdict.BLOCK for row in self.history)
+        return validate_seal(self)
+
+    monkeypatch.setattr(SuiteDecision, "validate_seal", checked)
+    assert gate.replay_suite_decision(supplied, m, trials)
+    assert not gate.replay_suite_decision(
+        supplied.model_copy(update={"verdict": "unknown"}), m, trials
+    )
+
+
+def test_wrong_typed_records_emit_no_warnings() -> None:
+    import warnings
+
+    m = gate_manifest()
+    trials = store(m, [1] * 20)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert_error(
+            gate.decide_suite(m.model_copy(update={"max_rounds": []}), trials),
+            "manifest values invalid",
+        )
+        bad = trials[0].model_copy(update={"outcome": {"invalid": 1}})
+        assert_error(gate.decide_suite(m, [bad, *trials[1:]]), "trial values invalid")
+        coerced = trials[0].model_copy(update={"seed": str(trials[0].seed)})
+        assert gate.decide_suite(m, [coerced, *trials[1:]]).verdict is Verdict.PASS

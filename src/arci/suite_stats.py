@@ -84,15 +84,60 @@ def _factors(rule: SuiteRule, sign: int) -> tuple[tuple[Fraction, ...], ...]:
     )
 
 
+def _integer_factors(rule: SuiteRule, sign: int) -> tuple[tuple[tuple[int, ...], ...], int]:
+    factors = _factors(rule, sign)
+    denominator = lcm(*(f.denominator for row in factors for f in row))
+    return tuple(
+        tuple(f.numerator * (denominator // f.denominator) for f in row) for row in factors
+    ), denominator
+
+
+def _wealth_ratio(minus: int, zero: int, plus: int, rule: SuiteRule, sign: int) -> tuple[int, int]:
+    factors, denominator = _integer_factors(rule, sign)
+    return (
+        sum(m**minus * z**zero * p**plus for m, z, p in factors),
+        len(factors) * denominator ** (minus + zero + plus),
+    )
+
+
+class RunningWealth:
+    """One integer product per stake, with a shared denominator per direction.
+
+    No reduction by gcd or reconstruction from cumulative counts at round ends.
+    The error replacement is directional: -1 for PASS and +1 for BLOCK.
+    """
+
+    def __init__(self, rule: SuiteRule, sign: int) -> None:
+        self.rule = rule
+        self.sign = sign
+        self.factors, self.base = _integer_factors(rule, sign)
+        self.products = [1] * len(rule.stakes)
+        self.denominator = len(rule.stakes)
+
+    def advance(self, minus: int, zero: int, plus: int, errored: int) -> None:
+        minus += errored if self.sign == 1 else 0
+        plus += errored if self.sign == -1 else 0
+        self.denominator *= self.base ** (minus + zero + plus)
+        for i, (m, z, p) in enumerate(self.factors):
+            self.products[i] *= m**minus * z**zero * p**plus
+
+    def crossed(self) -> bool:
+        return _ratio_crossed(sum(self.products), self.denominator, self.rule)
+
+    def text(self) -> str:
+        return _ratio_text(sum(self.products), self.denominator)
+
+
+def _ratio_crossed(numerator: int, denominator: int, rule: SuiteRule) -> bool:
+    return numerator * rule.alpha.numerator >= 2 * denominator * rule.alpha.denominator
+
+
 def wealth(minus: int, zero: int, plus: int, rule: SuiteRule) -> tuple[Fraction, Fraction]:
     _counts(minus, zero, plus)
-
-    def direction(sign: int) -> Fraction:
-        return sum(
-            (m**minus * z**zero * p**plus for m, z, p in _factors(rule, sign)), Fraction(0)
-        ) / len(rule.stakes)
-
-    return direction(1), direction(-1)
+    return (
+        Fraction(*_wealth_ratio(minus, zero, plus, rule, 1)),
+        Fraction(*_wealth_ratio(minus, zero, plus, rule, -1)),
+    )
 
 
 def scored_wealth(
@@ -105,14 +150,17 @@ def scored_wealth(
 
 
 def crossed(value: Fraction, rule: SuiteRule) -> bool:
-    return value.numerator * rule.alpha.numerator >= 2 * value.denominator * rule.alpha.denominator
+    return _ratio_crossed(value.numerator, value.denominator, rule)
 
 
 def wealth_text(value: Fraction) -> str:
     """Six significant digits, truncated with integers even for enormous wealths."""
     if value <= 0:
         raise ValueError("wealth must be positive")
-    numerator, denominator = value.numerator, value.denominator
+    return _ratio_text(value.numerator, value.denominator)
+
+
+def _ratio_text(numerator: int, denominator: int) -> str:
     # An integer estimate only: the loops below certify the exponent exactly.
     # Avoid str(huge_int), which is limited by CPython's decimal digit guard.
     e = (numerator.bit_length() - denominator.bit_length()) * 30103 // 100000
@@ -138,12 +186,14 @@ def _first_round(rule: SuiteRule, difference: int, direction: int) -> int | None
             n if difference == 0 else 0,
             n if difference == 1 else 0,
         )
-        return crossed(wealth(*counts, rule)[direction], rule)
+        return _ratio_crossed(*_wealth_ratio(*counts, rule, 1 if direction == 0 else -1), rule)
 
     # The selected best-case factors are all > 1, so crossing is monotone.
-    if not reaches(rule.max_rounds):
-        return None
-    low, high = 1, rule.max_rounds
+    low, high = 1, 1
+    while not reaches(high):
+        if high == rule.max_rounds:
+            return None
+        low, high = high + 1, min(2 * high, rule.max_rounds)
     while low < high:
         middle = (low + high) // 2
         if reaches(middle):
@@ -177,10 +227,10 @@ def check_suite_plan(manifest: SuiteManifest) -> tuple[str, ...]:
     rule = rule_of(manifest)
     if never_differs_pass_round(rule) is None:
         raise SuitePlanError("budget cannot establish PASS for a candidate that never differs")
-    if not crossed(
-        scored_wealth(
-            0, 0, manifest.registered_pairs - rule.max_errored_pairs, rule.max_errored_pairs, rule
-        )[0],
+    if not _ratio_crossed(
+        *_wealth_ratio(
+            rule.max_errored_pairs, 0, manifest.registered_pairs - rule.max_errored_pairs, rule, 1
+        ),
         rule,
     ):
         raise SuitePlanError("PASS unreachable once max_errored_pairs is used")

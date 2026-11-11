@@ -194,7 +194,7 @@ def test_schedule_counts_order_identity_and_mirrors(mode: str) -> None:
             for s in (a, b):
                 arm = m.baseline if s.arm == "baseline" else m.candidate
                 assert s.trial_id == f"{s.pair_id}:{s.arm}"
-                assert s.experiment_id == "supplied-id"
+                assert s.experiment_id == "supplied-id@" + "0" * 64
                 assert (s.variant, s.agent, s.command) == (arm.label, arm.agent, arm.command)
                 assert (s.task, s.condition, s.budgets) == (task.task, condition, m.budgets)
                 assert (s.toolset, s.mcp_server, s.decisions) == (m.toolset, m.mcp_server, None)

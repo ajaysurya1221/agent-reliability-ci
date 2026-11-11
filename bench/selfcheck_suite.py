@@ -13,9 +13,18 @@ from itertools import product
 from time import perf_counter_ns
 
 from arci.schedule import spec_sha256
-from arci.schema import Outcome, Termination, TrialEnvelope, TrialSpec, Verdict
+from arci.schema import (
+    ContractResult,
+    Outcome,
+    Termination,
+    TrialEnvelope,
+    TrialSpec,
+    Verdict,
+    Violation,
+)
 from arci.suite_gate import decide_suite
 from arci.suite_schedule import build_suite_schedule, create_suite_manifest
+from arci.suite_schema import SuiteManifest
 from arci.suite_stats import (
     OperatingCharacteristics,
     SuiteRule,
@@ -27,19 +36,31 @@ from arci.suite_stats import (
     operating_characteristics,
     rule_of,
     wealth,
+    wealth_text,
 )
 
 Law = tuple[F, F, F]
 
 
-def default_rule(n: int, rounds: int | None = None) -> SuiteRule:
-    return SuiteRule(
-        F(1, 20),
-        F(1, 10),
-        (F(1, 4), F(1, 2)),
-        n,
-        default_max_rounds(n) if rounds is None else rounds,
+def _manifest(n: int, rounds: int, **rule: object) -> SuiteManifest:
+    return create_suite_manifest(
+        suite_id="bench",
+        tasks=tuple({"task_id": f"t{i}"} for i in range(n)),
+        conditions=({"condition_id": "clean"},),
+        toolset="fixtures:tools",
+        contract={"oracle": "fixtures:oracle"},
+        baseline={"label": "a", "agent": "fixtures:a"},
+        candidate={"label": "b", "agent": "fixtures:b"},
+        max_rounds=rounds,
+        acknowledge_single_round=rounds == 1,
+        max_errored_pairs=rule.pop("max_errored_pairs", 0),
+        **rule,
     )
+
+
+def default_rule(n: int, rounds: int | None = None) -> SuiteRule:
+    # Literal defaults could drift from the manifest while every old check passed.
+    return rule_of(_manifest(n, default_max_rounds(n) if rounds is None else rounds))
 
 
 def joint_law(a: F, b: F, coupling: str) -> Law:
@@ -74,7 +95,26 @@ def calibration_cases(n: int, quick: bool = False) -> list[tuple[str, tuple[Law,
                     for d in (low,) * low_count + (high,) * (n - low_count)
                 )
                 cases.append((f"heterogeneous/{coupling}/{offset}", laws))
+    # Coupling endpoints at a fixed arm rate do not span the three-point margin
+    # family: the old grid could never reproduce the ADR's tightest search rows.
+    zeros = (F(1, 10),) if quick else (*(F(i, 10) for i in range(10)), F(1, 9), F(9, 20))
+    delta = default_rule(n).delta
+    for p_zero in zeros:
+        law = ((1 - p_zero + delta) / 2, p_zero, (1 - p_zero - delta) / 2)
+        cases.append((f"three-point/p0/{p_zero}", (law,) * n))
     return cases
+
+
+# Rounded percentages transcribed from ADR 0011's boundary-maxima row
+# (2026-11-11), sourced there to the S1c review search, not Table C.
+# Kept here so the comparison and its provenance ship on this branch.
+ADR_MARGIN_PERCENT = {
+    1: F(216, 100),
+    2: F(197, 100),
+    5: F(167, 100),
+    10: F(142, 100),
+    20: F(115, 100),
+}
 
 
 def check_calibration(quick: bool = False) -> dict[int, tuple[F, F]]:
@@ -104,6 +144,18 @@ def check_calibration(quick: bool = False) -> dict[int, tuple[F, F]]:
     print("|---:|---:|---:|")
     for n, (fp, fb) in maxima.items():
         print(f"| {n} | {_decimal(fp)} | {_decimal(fb)} |")
+    if not quick:
+        print("ADR margin comparison: exact difference in percentage points from rounded source")
+        for n, (fp, fb) in maxima.items():
+            observed = 100 * max(fp, fb)
+            reference = ADR_MARGIN_PERCENT[n]
+            difference = observed - reference
+            # Exact fraction, even when the rounded percentage reproduces the ADR.
+            print(
+                f"cells={n}: observed={float(observed):.6f}%; ADR={float(reference):.2f}%; "
+                f"exact difference={difference}",
+                flush=True,
+            )
     return maxima
 
 
@@ -434,25 +486,48 @@ def _envelope(spec: TrialSpec, outcome: Outcome) -> TrialEnvelope:
     )
 
 
+def _expected_rounds(
+    differences: Sequence[int | None], rule: SuiteRule, hard_pairs: frozenset[int] = frozenset()
+) -> list[tuple[int, Verdict, tuple[str, ...], F, F]]:
+    """Independent, literal per-pair factors and priority; no kernel wealth or gate helpers."""
+    passed = [F(1)] * len(rule.stakes)
+    blocked = [F(1)] * len(rule.stakes)
+    errors = hard_count = 0
+    rows: list[tuple[int, Verdict, tuple[str, ...], F, F]] = []
+    for i, d in enumerate(differences):
+        errors += d is None
+        hard_count += i in hard_pairs
+        for j, q in enumerate(rule.stakes):
+            passed[j] *= 1 + q * ((-1 if d is None else d) + rule.delta) / (1 - rule.delta)
+            blocked[j] *= 1 - q * ((1 if d is None else d) + rule.delta) / (1 + rule.delta)
+        if (i + 1) % rule.n_cells:
+            continue
+        wp, wb = sum(passed, F(0)) / len(passed), sum(blocked, F(0)) / len(blocked)
+        pc, bc = wp >= 2 / rule.alpha, wb >= 2 / rule.alpha
+        if errors > rule.max_errored_pairs:
+            verdict, reason = Verdict.ERROR, "errored pairs exceed max_errored_pairs"
+        elif hard_count:
+            verdict, reason = Verdict.BLOCK, "candidate hard violation"
+        elif pc and bc:
+            verdict, reason = Verdict.ERROR, "both tests crossed"
+        elif pc:
+            verdict, reason = Verdict.PASS, "non-inferiority established"
+        elif bc:
+            verdict, reason = Verdict.BLOCK, "regression established"
+        else:
+            verdict, reason = Verdict.INCONCLUSIVE, "no test crossed"
+        rows.append(((i + 1) // rule.n_cells, verdict, (reason,), wp, wb))
+        if verdict is not Verdict.INCONCLUSIVE:
+            break
+    return rows
+
+
 def gate_path_characteristics(laws: Sequence[Law]) -> OperatingCharacteristics:
-    """Every ordered path through real decide_suite; no wealth/frontier shortcut."""
-    manifest = create_suite_manifest(
-        suite_id="brute",
-        tasks=tuple({"task_id": f"t{i}"} for i in range(len(laws))),
-        conditions=({"condition_id": "clean"},),
-        toolset="fixtures:tools",
-        contract={"oracle": "fixtures:oracle"},
-        baseline={"label": "a", "agent": "fixtures:a"},
-        candidate={"label": "b", "agent": "fixtures:b"},
-        alpha="1/2",
-        delta="1/2",
-        stakes=("9/10",),
-        max_rounds=3,
-        max_errored_pairs=0,
-    )
+    """Every ordered path through real decide_suite; compare each stopping round too."""
+    n = len(laws)
+    manifest = _manifest(n, 5 if n == 1 else 3, alpha="1/2", delta="1/3", stakes=("9/10",))
+    rule = rule_of(manifest)
     schedule = build_suite_schedule(manifest)
-    # Preseal the three possible pairs at each position. Enumeration still sends
-    # each path's own complete prefixes through the public validating gate.
     pairs = tuple(
         tuple(
             (
@@ -464,44 +539,152 @@ def gate_path_characteristics(laws: Sequence[Law]) -> OperatingCharacteristics:
         for a, b in zip(schedule[::2], schedule[1::2], strict=True)
     )
     totals = {v: F(0) for v in (Verdict.PASS, Verdict.BLOCK, Verdict.INCONCLUSIVE)}
+    early = {Verdict.PASS: 0, Verdict.BLOCK: 0}
     cost = F(0)
     for path in product(range(3), repeat=manifest.registered_pairs):
         mass = F(1)
         for i, outcome in enumerate(path):
-            mass *= laws[i % len(laws)][outcome]
-        trials: list[TrialEnvelope] = []
-        for r in range(1, 4):
-            for i in range((r - 1) * len(laws), r * len(laws)):
-                trials.extend(pairs[i][path[i]])
-            decision = decide_suite(manifest, trials)
-            if decision.reasons == ("stopped without a decision",):
-                continue
-            assert decision.verdict is not Verdict.ERROR, decision.reasons
-            totals[decision.verdict] += mass
-            cost += mass * r * len(laws)
-            break
+            mass *= laws[i % n][outcome]
+        expected = _expected_rounds([d - 1 for d in path], rule)
+        stop, verdict, reasons, _, _ = expected[-1]
+        trials = [t for i in range(stop * n) for t in pairs[i][path[i]]]
+        decision = decide_suite(manifest, trials)
+        assert (decision.verdict, decision.stopped_at_round, decision.reasons) == (
+            verdict,
+            stop,
+            reasons,
+        )
+        totals[verdict] += mass
+        cost += mass * stop * n
+        if stop < manifest.max_rounds and mass and verdict in early:
+            early[verdict] += 1
+    # The old rule had no early BLOCK paths; ignoring early BLOCK could not fail.
+    assert early[Verdict.PASS] > 1 and early[Verdict.BLOCK] > 1, early
+    print(f"early paths at {n} cells: PASS={early[Verdict.PASS]}, BLOCK={early[Verdict.BLOCK]}")
     result = OperatingCharacteristics(
         totals[Verdict.PASS], totals[Verdict.BLOCK], totals[Verdict.INCONCLUSIVE], cost
     )
-    assert result == operating_characteristics(laws, rule_of(manifest))
+    assert result == operating_characteristics(laws, rule)
     return result
 
 
 def check_gate_paths() -> None:
-    print("\nBrute-force gate paths versus exact enumeration (3 rounds)")
+    print("\nBrute-force gate paths versus exact enumeration (5 or 3 rounds)")
     print("| cells | paths | PASS | BLOCK | INCONCLUSIVE | expected pairs |")
     print("|---:|---:|---:|---:|---:|---:|")
+    # Old symmetric/mirrored laws were invariant to reversing baseline/candidate:
+    # even a reversed-sign gate produced the same aggregate probabilities.
     for laws in (
-        ((F(1, 3), F(1, 3), F(1, 3)),),
-        ((F(1, 2), F(1, 3), F(1, 6)), (F(1, 6), F(1, 3), F(1, 2))),
+        ((F(1, 6), F(1, 3), F(1, 2)),),
+        ((F(1, 2), F(1, 3), F(1, 6)), (F(1, 5), F(1, 5), F(3, 5))),
     ):
         result = gate_path_characteristics(laws)
+        rounds = 5 if len(laws) == 1 else 3
         print(
-            f"| {len(laws)} | {3 ** (3 * len(laws))} | {_decimal(result.p_pass)} | "
+            f"| {len(laws)} | {3 ** (rounds * len(laws))} | {_decimal(result.p_pass)} | "
             f"{_decimal(result.p_block)} | {_decimal(result.p_inconclusive)} | "
             f"{_decimal(result.expected_pairs)} |",
             flush=True,
         )
+
+
+def check_gate_overrides() -> None:
+    print("\nErrored-pair and hard-violation gate paths versus independent expectation")
+    # The old bench only supplied PASS/FAIL with no violations; broken error
+    # scoring, tolerance, or hard-override priority could never affect its output.
+    manifest = _manifest(20, 4, max_errored_pairs=1)
+    rule = rule_of(manifest)
+    cases: tuple[tuple[str, list[int | None], frozenset[int]], ...] = (
+        ("error at tolerance suppresses PASS", [None] + [0] * 79, frozenset()),
+        ("error at tolerance suppresses BLOCK", [None] + [-1] * 13 + [0] * 6, frozenset()),
+        ("errors above tolerance", [None, None] + [1] * 18, frozenset()),
+        ("hard overrides PASS", [1] * 20, frozenset({0})),
+        ("hard on errored pair", [None] + [0] * 19, frozenset({0})),
+        ("excess errors override hard", [None, None] + [1] * 18, frozenset({0})),
+    )
+    schedule = build_suite_schedule(manifest)
+    for name, path, hard_pairs in cases:
+        expected = _expected_rounds(path, rule, hard_pairs)
+        stop, verdict, reasons, _, _ = expected[-1]
+        trials: list[TrialEnvelope] = []
+        for i, d in enumerate(path[: stop * rule.n_cells]):
+            a = _envelope(schedule[2 * i], Outcome.PASS if d == -1 else Outcome.FAIL)
+            b = _envelope(
+                schedule[2 * i + 1],
+                Outcome.ERROR if d is None else Outcome.PASS if d == 1 else Outcome.FAIL,
+            )
+            if i in hard_pairs:
+                b = TrialEnvelope.create(
+                    **(
+                        b.model_dump(exclude={"record_sha256"})
+                        | {
+                            "contract": ContractResult(
+                                success=False,
+                                violations=(
+                                    Violation(invariant="bench", severity="hard", detail=""),
+                                ),
+                            )
+                        }
+                    )
+                )
+            trials.extend((a, b))
+        decision = decide_suite(manifest, trials)
+        # An inconclusive prefix before the cap is an invalid store, but its
+        # walked rows must still exactly match the independent scoring.
+        expected_reasons = (
+            ("stopped without a decision",)
+            if verdict is Verdict.INCONCLUSIVE and stop < rule.max_rounds
+            else reasons
+        )
+        expected_verdict = Verdict.ERROR if expected_reasons != reasons else verdict
+        assert (decision.verdict, decision.reasons) == (expected_verdict, expected_reasons), name
+        assert len(decision.history) == len(expected)
+        for row, (r, v, why, wp, wb) in zip(decision.history, expected, strict=True):
+            assert (row.round, row.verdict, row.reasons) == (r, v, why), name
+            assert (row.pass_crossed, row.block_crossed) == (
+                wp >= 2 / rule.alpha,
+                wb >= 2 / rule.alpha,
+            ), name
+            assert (row.pass_wealth, row.block_wealth) == (wealth_text(wp), wealth_text(wb)), name
+        print(f"{name}: {decision.verdict}, round {stop}", flush=True)
+
+
+def report_common_mode() -> tuple[OperatingCharacteristics, OperatingCharacteristics]:
+    """ADR 0011 item 6: exact model, outside the independence guarantee."""
+    # The old independent-cell enumerator could never represent a shared round
+    # outcome, so its calibration rows could not expose common-mode inflation.
+    rule = default_rule(20)
+    law = (F(1, 10), F(9, 10), F(0))
+    independent = operating_characteristics((law,) * 20, rule)
+    states = {(0, 0): F(1)}
+    passed = blocked = cost = F(0)
+    for r in range(1, rule.max_rounds + 1):
+        cost += rule.n_cells * sum(states.values(), F(0))
+        incoming: dict[tuple[int, int], F] = {}
+        for (minus, plus), mass in states.items():
+            for d, probability in zip((-1, 0, 1), law, strict=True):
+                if not probability:
+                    continue
+                m = minus + rule.n_cells * (d == -1)
+                p = plus + rule.n_cells * (d == 1)
+                wp, wb = wealth(m, r * rule.n_cells - m - p, p, rule)
+                if wp >= 2 / rule.alpha:
+                    passed += mass * probability
+                elif wb >= 2 / rule.alpha:
+                    blocked += mass * probability
+                else:
+                    incoming[m, p] = incoming.get((m, p), F(0)) + mass * probability
+        states = incoming
+    shared = OperatingCharacteristics(passed, blocked, sum(states.values(), F(0)), cost)
+    assert shared.p_pass + shared.p_block + shared.p_inconclusive == 1
+    print("\nCommon-mode dependence (20 cells, 20 rounds; report only, no nominal-bound assertion)")
+    for label, result in (("independent", independent), ("whole round shares one outcome", shared)):
+        print(
+            f"{label}: false PASS={_decimal(result.p_pass)}, "
+            f"false BLOCK={_decimal(result.p_block)}, "
+            f"expected pairs={_decimal(result.expected_pairs)}"
+        )
+    return independent, shared
 
 
 def report_large_grids(quick: bool = False) -> None:
@@ -534,6 +717,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         check_receipts(bool(args.quick))
         check_floors()
         check_gate_paths()
+        check_gate_overrides()
+        report_common_mode()
         report_large_grids(bool(args.quick))
     except (AssertionError, ArithmeticError, ValueError) as exc:
         print(f"FAIL: {exc}")

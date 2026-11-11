@@ -36,7 +36,7 @@ def suite_experiment_id(manifest: SuiteManifest) -> str:
 def create_suite_manifest(**fields: Any) -> SuiteManifest:
     if "experiment_id" in fields or "record_sha256" in fields:
         raise TypeError("experiment_id and record_sha256 are generated")
-    draft = SuiteManifest(experiment_id="", **fields)
+    draft = SuiteManifest(experiment_id="draft@" + "0" * 64, **fields)
     return SuiteManifest.create(experiment_id=suite_experiment_id(draft), **fields)
 
 

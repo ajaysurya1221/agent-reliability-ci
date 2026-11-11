@@ -11,10 +11,12 @@ Freeze tasks, fault conditions, both arm identities, the oracle, fixtures, budge
 and the entire decision rule before observing outcomes. Cells are the full grid
 of (task, condition), sorted by task id then condition id. There are N cells.
 A round runs each cell exactly once, with one baseline trial A and one candidate
-trial B per cell. Each arm's success is binary: its sealed trial outcome is PASS.
-The oracle, independent of the agent's own success claim, determines success.
+trial B per cell. Define each pair's true, complete binary outcomes Y_A and Y_B
+as the PASS/FAIL outcomes that independent contract grading (oracle and hard
+invariants) would produce without a harness or grader error. These outcomes exist even when an infrastructure error prevents
+observation; they are not conditional on the pair being observed without error.
 
-For cell c let Delta_c = P(B succeeds) - P(A succeeds). The estimand is
+For cell c let Delta_c = E[Y_B - Y_A]. The estimand is
 
     Delta = (1/N) sum_c Delta_c.
 
@@ -24,14 +26,17 @@ A PASS concerns this mean and can hide a regression in a particular cell.
 Per-cell counts are descriptive and never supply another statistical verdict.
 Neither the grid nor its weights may be selected after looking at results.
 
-A non-errored pair contributes d = [B PASS] - [A PASS], in {-1, 0, +1}.
-Linearity gives E[d] = Delta_c regardless of dependence within the pair.
-A pair with either arm ERROR is an errored pair, treated separately below.
+For every pair its complete-outcome difference D = Y_B - Y_A is in {-1, 0, +1}.
+Linearity gives E[D] = Delta_c regardless of dependence within the pair.
+On non-errored pairs the gate observes d = [B PASS] - [A PASS]. A pair with
+either arm ERROR is scored against each test separately, as specified below;
+it is not dropped or counted as an observed zero. Outcome-dependent errors can
+make E[D | non-errored] differ from Delta_c; that conditional mean is not the estimand.
 The registered budget is N times max_rounds pairs; every pair runs two trials.
 All looks are at the ends of complete balanced rounds. A trailing partial
 round is not a statistical look.
 
-Defaults are alpha = 1/20, delta = 1/10, stakes q in (1/4, 1/2), and
+Defaults are alpha = 1/20, delta = 1/10, the stake set {1/4, 1/2}, and
 max_rounds = ceil(400/N). The manifest holds explicit max_rounds and
 max_errored_pairs, not a request to infer them after execution. The default
 error tolerance is ceil(N * max_rounds / 100). It may be set to zero.
@@ -50,7 +55,10 @@ mu_q = q/(1+delta). Through a complete round, for every pair observed so far:
 Each process starts at 1. The mixture averages whole products, not individual
 pair factors. For cumulative counts (m,z,p), a product is the -1 factor to power
 m times the 0 factor to power z times the +1 factor to power p. The kernel uses
-these cumulative powers, not a repeated walk through preceding pairs.
+integer powers for standalone wealth queries. The gate instead carries one
+integer product per stake and direction forward from round to round, with a
+shared denominator in each direction. It never recomputes cumulative wealth
+from scratch at each look.
 
 A crossing is inclusive: wealth >= 2/alpha. Counts, wealth and all comparisons
 that decide use integers or exact rational arithmetic. The six-significant-digit
@@ -151,9 +159,8 @@ than 1. Ending execution at a partial round supplies no protected verdict.
 The wealth construction is referenced to Waudby-Smith and Ramdas,
 [arXiv:2010.09686v7](https://arxiv.org/abs/2010.09686v7), section 2.2
 (Theorem 1) and section 4 (equation 23). The balanced-round AM-GM argument and
-the fixed-mixture step above are this project's own derivations. The local
-phase-0 proof is `plan/exec/v2/spikes/s1c/PROOF.md`; this document writes out the
-argument rather than relying on that file or an external citation.
+the fixed-mixture step above are this project's own derivations. This document
+writes out the complete argument rather than relying on a separate proof file.
 
 ## Assumptions and their failure modes
 
@@ -165,7 +172,11 @@ argument rather than relying on that file or an external citation.
   detecting every hidden dependency is not a capability of this gate.
 - **The same null in every round.** Stationary per-cell laws suffice. Model
   updates, provider drift, changing conditions or scenario selection may break
-  this premise. A pooled mean over rounds does not replace it.
+  this premise. Arm order is chosen afresh by the round hash and can flip between
+  rounds in both seed modes. An effect of executing first or second therefore
+  breaks the same-law-every-round assumption even with fixed seeds. Assume no
+  order effect, or establish the per-round conditional null below; an
+  order-averaged or pooled mean over rounds does not replace it.
 - **Every cell exactly once in each look.** Omissions, unequal repetitions,
   weights, outcome-dependent cell selection or mid-round looks invalidate the
   stated AM-GM step. The gate checks the balanced prefix of the sealed schedule.
@@ -178,6 +189,13 @@ argument rather than relying on that file or an external citation.
   infrastructure errors reduce exposure but cannot establish independence.
   A round is also an interval of wall-clock time. Remaining common-mode effects
   are a limit of the guarantee, not covered by its nominal error budget.
+  In the extreme model from ADR 0011 item 6, with 20 cells and 20 rounds at
+  defaults and P(D=-1)=1/10, P(D=0)=9/10, false PASS increases from 0.9034%
+  with independent cells to 67.2777% when every cell in a round shares one
+  outcome. This is an illustrative dependence model, not a typical inflation
+  rate. The tracked source and exact recomputation are
+  [`report_common_mode`](../bench/selfcheck_suite.py); the corresponding
+  false BLOCK probabilities are 0.4849% and 31.8217%.
 
 For nonstationary conditional laws it is sufficient that, conditional on
 F_(r-1), the cell differences in round r are jointly independent and the
@@ -194,7 +212,9 @@ fault and agent randomness; round-to-round variation must come from other
 outcome randomness, such as live inference. A deterministic agent using only
 that seed repeats its result. The claim is for the registered scenarios over
 outcome randomness. Fixing seeds removes seed changes as a cause of changing
-laws, but does not stop a live provider from drifting.
+laws, but does not stop a live provider from drifting or remove an execution-order
+effect. The seed also changes when any content bound into the rule digest changes;
+"fixed" means fixed across rounds of this experiment.
 
 `per_round` derives a seed for each (round, cell). This is useful for offline
 fixtures. **Its error guarantee requires that in every round the suite mean
@@ -210,7 +230,10 @@ arms, and distinct seeds for distinct cells in each round. A collision is
 refused. Cell order is canonical. A separate hash uses the actual round to
 choose which arm executes first; execution must keep the two arms adjacent in
 one worker slot. This execution requirement is distinct from the gate's
-order-independent validation of supplied envelopes.
+order-independent validation of supplied envelopes. Because the actual round
+is hashed, the arm order can flip across rounds even in fixed mode. If execution
+order affects success, stationarity fails and the per-round null condition above
+is required for the statistical guarantee.
 
 ## Errored pairs and hard invariants
 
@@ -255,10 +278,13 @@ pair still occupies exactly one of minus, zero, plus or errored.
 Before execution, structural validation requires unique task and condition ids;
 nonempty grids; no ceiling faults or decision perturbations; compatible Python
 arms and toolset, or command arms and MCP server; canonical positive rational
-strings in lowest terms; 1/1000000 <= alpha <= 1/2; 0 < delta < 1; and one to
+strings in lowest terms with at most seven digits in each part;
+1/1000000 <= alpha <= 1/2; 0 < delta < 1; and one to
 eight strictly increasing stakes in (0,1). At least one round is required,
 N * max_rounds <= 100000, and error tolerance is between zero and registered
-pairs. Acknowledgement is true if and only if max_rounds is one.
+pairs. Acknowledgement is true if and only if max_rounds is one. The manifest's
+experiment_id must have the shape SuiteId@ followed by 64 lowercase hex digits;
+the gate additionally requires its exact recomputed value.
 
 The statistical plan additionally refuses a budget where a never-differing
 candidate cannot cross by the cap, or where PASS is unreachable after using
@@ -279,6 +305,10 @@ identities match the new schedule. Integrity seals are not authentication.
 
 The gate rebuilds supplied records with Pydantic before reading outcomes, and
 requires canonical JSON, including finite numbers and UTF-8 encodable text.
+Supplied trial seals must already be strings; a bytes seal is rejected before
+coercion. Rebuild dumps suppress serialization warnings even for wrong-typed
+records. Round digests cover that round alone, while the decision-level digest
+covers all supplied trials.
 It checks, in order: manifest values, manifest seal, derived experiment id,
 plan feasibility, trial values, scheduled identities, trial seals, and a
 nonempty exact prefix of complete rounds. All failures are collected in that
@@ -291,8 +321,9 @@ Stored trials after the first decisive or ERROR round, or an inconclusive
 stop before the cap, yield ERROR. Every ERROR has stopped_at_round zero.
 Malformed values and computation failures produce sealed ERROR records rather
 than exceptions; an unsealable decision falls back to a fixed empty template.
-Replay of a decision requires its valid seal and exact equality with a fresh
-recomputation. Replayed trial specs do not match ordinary scheduled specs.
+Replay rebuilds the supplied decision too, then requires its valid seal and exact
+equality with a fresh recomputation. Replayed trial specs do not match ordinary
+scheduled specs.
 None of these checks proves that the claimed execution happened.
 
 ## Calibration and operating characteristics
@@ -311,15 +342,30 @@ The bench checks both errors at the margin and the applicable error just inside
 each null, on grids 1, 2, 5, 10 and 20, at a 400-pair budget. It includes
 homogeneous laws at positive/negative Frechet dependence endpoints and
 independence, and strongly different per-cell laws for N > 1. Offsets are
--1/100, 0 and +1/100 from mean -delta. Its printed maxima describe only this
-finite grid; the proof supplies the universal bound. It separately enumerates
-all 27 and 729 ordered outcome paths on tiny grids through the validating gate,
-comparing all three verdict probabilities and expected pairs exactly.
+-1/100, 0 and +1/100 from mean -delta. The equal-mean three-point family sets
+P(0) freely in {0, 1/10, ..., 9/10, 1/9, 9/20}, with
+P(-1)=(1-P(0)+delta)/2 and P(+1)=(1-P(0)-delta)/2. The bench prints each
+maximum and its exact difference in percentage points from ADR 0011's rounded
+search maxima (2.16%, 1.97%, 1.67%, 1.42%, 1.15%). The copied source row and
+recomputation live in [`ADR_MARGIN_PERCENT`](../bench/selfcheck_suite.py).
+These are finite search grids, not universal maxima; the proof supplies the bound.
+
+The bench separately enumerates all 243 and 729 ordered outcome paths on tiny
+grids through the validating gate, comparing each stopping round and verdict
+with independently multiplied factors, plus all three aggregate verdict
+probabilities and expected pairs with exact enumeration. Its asymmetric laws
+expose reversed difference signs; both PASS and BLOCK occur before the cap on
+multiple paths. Explicit errored-pair paths at and above tolerance, hard
+violations and their priority also use independent expectations. Default rules
+come from a default SuiteManifest through rule_of, so schema-default drift
+cannot hide behind duplicated bench literals.
 
 These concrete ADR 0011 operating-characteristic rows use 20 homogeneous cells,
 20 rounds, and independent arms. The four complete vectors of exact fractions
-from `plan/exec/v2/spikes/s1c/results.json`, Table C, are literal receipts in the
-bench; all four components, including expected pairs, must match exactly.
+are literal Table C receipts in the tracked
+[`bench/selfcheck_suite.py`](../bench/selfcheck_suite.py); the two 0.95-baseline
+rows also appear in [`table_c.json`](../tests/unit/suite/table_c.json).
+All four components, including expected pairs, must match exactly.
 Rounded values below are displays of those receipts:
 
 | Baseline | Candidate | Statistical result probability | Expected pairs |
@@ -353,7 +399,8 @@ v1 method.
 
 A release may state: at default alpha each directional error of the statistical
 verdict is at most 2.5% for the registered suite in fixed mode, under the stated
-independence and per-cell stationarity assumptions; post-run rule changes are
+independence and per-cell stationarity assumptions, including no execution-order
+effect (otherwise the per-round conditional null is required); post-run rule changes are
 detected as inconsistent records; and INCONCLUSIVE preserves uncertainty.
 For per_round mode, include its exact per-round null condition with the claim.
 State whether numbers are proved bounds, finite-grid checks or model projections.

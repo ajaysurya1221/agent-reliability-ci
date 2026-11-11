@@ -137,3 +137,106 @@ The following table lists all 65 failed node ids and their reported error line
 | `tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down` | `E       AssertionError: ['PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', 'Perm...', 'PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', ...]` |
 | `tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store` | `E       AssertionError: SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper–Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK` |
 | `tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay` | `E       assert 3 == 1` |
+
+
+## P1c review fixes — 2026-11-11
+
+Authority: supplied P1c brief and P1-CONTRACT section 8. The 24 review verdicts
+were inspected; the brief's explicit exclusions remain unchanged. No git mutations,
+network access, dependency changes, or edits outside P1a/P1b-owned files.
+
+### Amendments and executable checks
+
+| Section 8 item | Change | Unit proof |
+|---|---|---|
+| 1 | Rational parts bounded to seven digits; formatter unchanged | `test_seven_digit_rationals`, `test_eight_digit_rationals_rejected`, `test_manifest_accepts_seven_digit_parts` |
+| 2 | Manifest experiment id pattern; conforming draft placeholder | `test_experiment_id_shape_rejected`, `test_experiment_id_shape_does_not_assert_digest`, `test_digest_and_create` |
+| 3 | Round digest covers only that round; decision digest still covers every supplied trial | `test_mirrored_fields_hashes_determinism_order_and_replay` |
+| 4 | Reject supplied bytes seals before Pydantic coercion | `test_bytes_seal_rejected_before_coercion` |
+| 5 | Normalize supplied decision before checking its seal and equality | `test_replay_normalizes_plain_string_verdicts` |
+| 6 | Running integer stake products, integer crossing and display; integer-power standalone queries and plan checks | `test_running_integer_products_match_independent_pairwise_factors`, `test_twenty_cells_twenty_rounds_exact_history`, `test_five_thousand_round_store_decides_under_five_seconds` |
+| 7 | Warning-free rebuild dumps | `test_wrong_typed_records_emit_no_warnings` |
+
+The bench now uses asymmetric laws and independently checks every path's stop
+against literal factor products. There are multiple early PASS and early BLOCK
+paths. Mutation tests reject reversed differences, ignored early BLOCK (while
+retaining final-round BLOCK), and zero-scored errors. Additional gate paths check
+errors at/above tolerance and hard-violation priority against independent expectations.
+Defaults come from a SuiteManifest through rule_of; a schema-default mutation test
+verifies that connection. Comments explain why each old check lacked sensitivity.
+
+The free-P(0) margin family, copied ADR rounded targets, exact percentage-point
+differences, and common-mode report are in `bench/selfcheck_suite.py`. The statistics
+document defines complete true outcomes separately from error scoring, explicitly
+connects round-dependent arm order to stationarity, states the default stakes as a
+set, and cites tracked local sources for numeric receipts.
+
+### Fresh focused and bench results
+
+- `.venv/bin/pytest tests/unit/suite tests/unit/selfcheck -q`: exit 0, 286 tests;
+  last line `...................................................................... [100%]`.
+- `.venv/bin/python -m bench.selfcheck_suite`: exit 0;
+  last lines `Run time: 289.244 seconds` / `All suite checks PASS`.
+- `.venv/bin/ruff format --check . && .venv/bin/ruff check . && .venv/bin/basedpyright`:
+  exit 0; `468 files already formatted` / `All checks passed!` /
+  `0 errors, 0 warnings, 0 notes`. No new type ignores.
+- `shasum -a 256 -c FROZEN.sha256`: exit 0, all 54 entries OK; last `uv.lock: OK`.
+
+Fresh finite-grid maxima (probabilities; not universal maxima):
+
+| Cells | False PASS | False BLOCK | Largest, rounded percent |
+|---:|---:|---:|---:|
+| 1 | 0.021200147 | 0.021568198 | 2.16% |
+| 2 | 0.019130461 | 0.019710131 | 1.97% |
+| 5 | 0.016238022 | 0.016672719 | 1.67% |
+| 10 | 0.013901516 | 0.014153883 | 1.42% |
+| 20 | 0.011231322 | 0.011465052 | 1.15% |
+
+Every rounded maximum reproduces the ADR row. The bench also prints the exact
+rational difference from each rounded source percentage rather than claiming
+exact equality to a rounded number. The report-only common-mode model gives false
+PASS 0.009034434 -> 0.672777182, false BLOCK 0.004849156 -> 0.318217140.
+
+### Fresh timing
+
+One cell, default alpha/delta/stakes, tolerance zero, differences `[-1] + [0] * 9`
+repeated through the cap. Store construction and the subsequent explicit seal
+verification are outside the timed `decide_suite` call. Both decisions were sealed
+INCONCLUSIVE with every round present in history.
+
+| Rounds | Store construction | decide_suite |
+|---:|---:|---:|
+| 5,000 | 0.383 s | 0.652 s |
+| 100,000 | 8.628 s | 52.925 s |
+
+Reproduce with `.venv/bin/python` using `gate_manifest(tasks=({"task_id": "one"},),
+max_rounds=rounds, max_errored_pairs=0)`, `store(m, [-1, *([0] * 9)] * (rounds // 10))`,
+and time `decide_suite(m, trials)` with `time.perf_counter`. Helpers are in
+`tests/unit/suite/helpers.py`. Timing is local and hardware-dependent; large-integer
+growth remains real at the largest supported plans. This implementation report is
+not orchestrator acceptance evidence.
+
+
+### Final full-suite run and limits
+
+`.venv/bin/pytest -q`: exit 1, **1,575 passed, 65 failed, 2 skipped**.
+Last line: `FAILED tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay`.
+The final run collected the completed test changes. No suite or selfcheck test failed.
+The exact set of 65 failing node ids equals the table in “Full-suite limits and failures” above;
+those names are the orchestrator's unrestricted rerun list. The first full run had
+also collected five old grid-test expectations before their update; all five pass
+in both the focused run and this final full run.
+
+Current evidence of the environment cause: TCP fixture binds raise PermissionError
+at socketserver.py:478; descendant checks raise PermissionError for `ps`. Fresh
+ordinary MCP and decision fixture probes both return ERROR/harness_error with
+`PermissionError: [Errno <n>] Operation not permitted`. The recipe's persisted
+trials.jsonl likewise contains only ERROR trials with that failure_detail. These
+limitations are not fixed by altering owned suite code. Full-suite cleanliness is
+not claimed; the orchestrator must rerun outside these restrictions.
+
+Risks: timings are local and big-integer growth remains; multi-round suite decision
+seals change under the required per-round digest semantics and need regeneration.
+Suite-wide contracts/budgets, full-rule seed derivation, evaluate_rounds' input
+assumptions, and scoring on outcome remain unchanged. The common-mode row is an
+explicit violation of the proof's independence assumption, not a calibrated design.

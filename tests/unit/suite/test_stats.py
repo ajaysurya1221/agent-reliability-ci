@@ -13,6 +13,7 @@ import pytest
 from arci.suite_schema import SuiteManifest
 from arci.suite_stats import (
     OperatingCharacteristics,
+    RunningWealth,
     SuitePlanError,
     SuiteRule,
     check_suite_plan,
@@ -265,3 +266,22 @@ def test_heterogeneous_margin_and_no_midround_absorption() -> None:
     assert operating_characteristics(deterministic, DEFAULT) == OperatingCharacteristics(
         F(0), F(0), F(1), F(400)
     )
+
+
+@pytest.mark.parametrize(
+    "rule", [DEFAULT, replace(DEFAULT, delta=F(2, 7), stakes=tuple(F(i, 9) for i in range(1, 9)))]
+)
+def test_running_integer_products_match_independent_pairwise_factors(rule: SuiteRule) -> None:
+    passed, blocked = RunningWealth(rule, 1), RunningWealth(rule, -1)
+    pass_stream: list[int] = []
+    block_stream: list[int] = []
+    for minus, zero, plus, errors in ((2, 3, 1, 1), (0, 0, 5, 0), (7, 1, 2, 3), (0, 50, 0, 0)):
+        passed.advance(minus, zero, plus, errors)
+        blocked.advance(minus, zero, plus, errors)
+        pass_stream.extend([-1] * (minus + errors) + [0] * zero + [1] * plus)
+        block_stream.extend([-1] * minus + [0] * zero + [1] * (plus + errors))
+        wp, wb = direct_wealth(pass_stream, rule)[0], direct_wealth(block_stream, rule)[1]
+        assert F(sum(passed.products), passed.denominator) == wp
+        assert F(sum(blocked.products), blocked.denominator) == wb
+        assert (passed.crossed(), blocked.crossed()) == (wp >= 2 / rule.alpha, wb >= 2 / rule.alpha)
+        assert (passed.text(), blocked.text()) == (wealth_text(wp), wealth_text(wb))

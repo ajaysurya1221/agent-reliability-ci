@@ -29,12 +29,12 @@ SUITE_SEED_DERIVATION = "sha256-v1"
 SUITE_MAX_PAIRS = 100_000
 
 SuiteId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")]
-Rational = Annotated[str, Field(pattern=r"^[1-9][0-9]*/[1-9][0-9]*$")]
+Rational = Annotated[str, Field(pattern=r"^[1-9][0-9]{0,6}/[1-9][0-9]{0,6}$")]
 
 
 def parse_rational(text: str) -> Fraction:
     """Read a positive canonical rational, rejecting alternate spellings."""
-    if re.fullmatch(r"[1-9][0-9]*/[1-9][0-9]*", text) is None:
+    if re.fullmatch(r"[1-9][0-9]{0,6}/[1-9][0-9]{0,6}", text) is None:
         raise ValueError("expected a positive rational n/d")
     value = Fraction(text)
     if f"{value.numerator}/{value.denominator}" != text:
@@ -56,7 +56,7 @@ class SuiteTask(Model):
 
 class SuiteManifest(Sealed):
     schema_version: Literal["arci-suite/1"] = SUITE_SCHEMA_VERSION
-    experiment_id: str
+    experiment_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}@[0-9a-f]{64}$")
     created_at: str = ""
     suite_id: SuiteId
     tasks: tuple[SuiteTask, ...] = Field(min_length=1)
