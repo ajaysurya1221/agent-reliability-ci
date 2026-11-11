@@ -1,0 +1,36 @@
+{
+  "sample_count": 12,
+  "other_verification_jobs_running": false,
+  "cpu_count": 15,
+  "load_average_before": [
+    4.34521484375,
+    4.77197265625,
+    4.365234375
+  ],
+  "host_idle_probe": {
+    "error": "[Errno 1] Operation not permitted: '/usr/bin/top'"
+  },
+  "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters/test_runner.py::test_measure_twelve_graded_trials -q -s",
+  "exit_code": 0,
+  "elapsed_seconds": 21.882498542006942,
+  "load_average_after": [
+    4.1806640625,
+    4.69384765625,
+    4.34716796875
+  ],
+  "median_seconds": 1.757636,
+  "samples_seconds": [
+    1.746118041992304,
+    1.754955083000823,
+    1.75699233400519,
+    1.7430062079947675,
+    1.7476734169904375,
+    1.8189993749983842,
+    1.7582805830024881,
+    1.7486820419871947,
+    1.7628160419990309,
+    1.7855515830015065,
+    1.7862185840058373,
+    1.8034449160040822
+  ]
+}

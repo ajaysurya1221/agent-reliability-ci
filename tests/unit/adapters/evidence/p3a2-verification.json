@@ -1,0 +1,290 @@
+{
+  "base_commit": "79ae40102f317624614f90b72bb478c9ab1acad1",
+  "before": {
+    "samples_seconds": [
+      2.388644791994011,
+      2.4154928750067484,
+      2.3582443750055972,
+      2.312037167008384,
+      2.381422250007745,
+      2.3825814579904545,
+      2.3865912920009578,
+      2.3924405419966206,
+      2.363015083989012,
+      1.748508207994746,
+      1.6998294579971116,
+      1.9727252919983584
+    ],
+    "median_seconds": 2.3722186669983785,
+    "n": 12
+  },
+  "mutations": [
+    {
+      "mutation": "schema_source",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_tools.py::test_schema_only_injection_is_rejected"
+      ]
+    },
+    {
+      "mutation": "attempt_index",
+      "exit": 1,
+      "tail": [
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_replay.py::test_mixed_real_and_injected_replay_advances_attempt_index[0]",
+        "FAILED tests/unit/adapters/test_review_replay.py::test_mixed_real_and_injected_replay_advances_attempt_index[1]"
+      ]
+    },
+    {
+      "mutation": "context_chain",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[context-False]"
+      ]
+    },
+    {
+      "mutation": "broad_oserror",
+      "exit": 1,
+      "tail": [
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[oserror-False]",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[file-False]"
+      ]
+    },
+    {
+      "mutation": "lower_501",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[500-True]"
+      ]
+    },
+    {
+      "mutation": "upper_600",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[600-False]"
+      ]
+    },
+    {
+      "mutation": "no_int_guard",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_infrastructure_rule_exact_boundaries[float-False]"
+      ]
+    },
+    {
+      "mutation": "private_alias",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_rejections.py::test_only_public_framework_imports_are_used"
+      ]
+    },
+    {
+      "mutation": "model_budget_carrier",
+      "exit": 1,
+      "tail": [
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_model_budget_carrier_bypasses_recovery_and_backoff[exception]",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_model_budget_carrier_bypasses_recovery_and_backoff[base]",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_model_budget_carrier_bypasses_recovery_and_backoff[retry]"
+      ]
+    },
+    {
+      "mutation": "no_idle_timeout",
+      "exit": 1,
+      "tail": [
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_edges.py::test_serial_gate_timeout_and_reentry_abort_all_waiters[timeout-False]",
+        "FAILED tests/unit/adapters/test_edges.py::test_serial_gate_timeout_and_reentry_abort_all_waiters[timeout-True]"
+      ]
+    },
+    {
+      "mutation": "setup_baseexception",
+      "exit": 1,
+      "tail": [
+        "",
+        ".venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345",
+        "  /Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio",
+        "    self._mark_plugins_for_rewrite(hook, disable_autoload)",
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "=========================== short test summary info ============================",
+        "FAILED tests/unit/adapters/test_review_fixes.py::test_tool_binding_before_first_model_attempt_is_setup_error[failure1-True]"
+      ]
+    }
+  ],
+  "sandbox": {
+    "AF_INET": "PermissionError: [Errno 1] Operation not permitted",
+    "AF_UNIX": "PermissionError: [Errno 1] Operation not permitted",
+    "ps": "PermissionError: [Errno 1] Operation not permitted: 'ps'"
+  },
+  "trial_probes": [
+    {
+      "probe": "mcp",
+      "outcome": "ERROR",
+      "termination": "harness_error",
+      "detail": "PermissionError: [Errno <n>] Operation not permitted"
+    },
+    {
+      "probe": "decisions",
+      "outcome": "ERROR",
+      "termination": "harness_error",
+      "detail": "PermissionError: [Errno <n>] Operation not permitted"
+    }
+  ],
+  "mutated_source_sha256": "41e6604117591b80f27dc9ab4023ac83f5100e7b57154eaa02a61e11f8a7625d",
+  "targeted": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "308",
+    "time": "93.749",
+    "timestamp": "2026-11-11T13:26:35.092698+05:30",
+    "hostname": "Ajays-MacBook-Pro.local",
+    "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters tests/unit/toolbox -q --junitxml=/tmp/p3a2-targeted-latest.xml",
+    "exit": 0
+  },
+  "quality": {
+    "ruff_format": "472 files already formatted",
+    "ruff_check": "All checks passed!",
+    "basedpyright": "0 errors, 0 warnings, 0 notes",
+    "basedpyright_adapters": "0 errors, 0 warnings, 0 notes",
+    "frozen_hashes_ok": 54,
+    "diff_check_exit": 0
+  },
+  "source_sha256": {
+    "src/arci/adapters/langchain.py": "41e6604117591b80f27dc9ab4023ac83f5100e7b57154eaa02a61e11f8a7625d",
+    "src/arci/toolbox.py": "ed37ca7167b649ed67a94b5fea6f2174166b49dbb9a920f9e15bbe7cb6440116"
+  },
+  "scope": {
+    "modified": [
+      "src/arci/adapters/langchain.py",
+      "src/arci/toolbox.py",
+      "tests/unit/adapters/fixtures.py",
+      "tests/unit/adapters/test_edges.py",
+      "tests/unit/adapters/test_lazy_import.py",
+      "tests/unit/adapters/test_rejections.py",
+      "tests/unit/adapters/test_replay_and_order.py",
+      "tests/unit/adapters/test_runner.py"
+    ],
+    "new": [
+      "tests/unit/adapters/checks.py",
+      "tests/unit/adapters/evidence/p3a2-full-suite-failures.json",
+      "tests/unit/adapters/evidence/p3a2-report.md",
+      "tests/unit/adapters/evidence/p3a2-verification.json",
+      "tests/unit/adapters/test_review_fixes.py",
+      "tests/unit/adapters/test_review_replay.py",
+      "tests/unit/adapters/test_review_tools.py"
+    ]
+  },
+  "review": {
+    "finding": "pre-invocation BaseException swallowed by user middleware",
+    "regression": "test_tool_binding_before_first_model_attempt_is_setup_error",
+    "resolved": true,
+    "recheck": "binding and model-budget selection: 7 passed; reviewer ACCEPT"
+  },
+  "full_suite": {
+    "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q --junitxml=/tmp/p3a2-full-final.xml",
+    "exit": 1,
+    "counts": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "65",
+      "skipped": "2",
+      "tests": "1700",
+      "time": "362.823",
+      "timestamp": "2026-11-11T13:25:34.198664+05:30",
+      "hostname": "Ajays-MacBook-Pro.local"
+    },
+    "failed_test_names": "p3a2-full-suite-failures.json",
+    "same_failures_as_first_run": true
+  },
+  "after": {
+    "samples_seconds": [
+      0.9059563340124441,
+      0.878591625005356,
+      0.8749401250097435,
+      0.8717248330067378,
+      0.8782922500104178,
+      0.8836050829995656,
+      0.8833453330007615,
+      0.8812061250064289,
+      0.8767029170121532,
+      0.8752131660003215,
+      0.8834114999917801,
+      0.8834189579938538
+    ],
+    "median_seconds": 0.8798988750058925,
+    "n": 12,
+    "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters/test_runner.py -k measure_twelve -q -s",
+    "exit": 0,
+    "tail": [
+      "ADAPTER_GRADED_TRIAL_MEDIAN_SECONDS=0.879899; n=12; samples=[0.9059563340124441, 0.878591625005356, 0.8749401250097435, 0.8717248330067378, 0.8782922500104178, 0.8836050829995656, 0.8833453330007615, 0.8812061250064289, 0.8767029170121532, 0.8752131660003215, 0.8834114999917801, 0.8834189579938538]",
+      "."
+    ]
+  },
+  "timing_limit": "Local elapsed measurements, not a controlled speedup estimate. Baseline samples varied; after measurement ran after test/reviewer workloads completed. No idle-machine guarantee.",
+  "overhead_cause": "The old oracle lived in fixtures.py, which imports LangChain. The new checks.py consumes serialized snapshot data without importing the optional framework, verified in a fresh grader interpreter."
+}

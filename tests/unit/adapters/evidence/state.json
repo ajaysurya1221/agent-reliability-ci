@@ -1,0 +1,111 @@
+{
+  "mode": "build",
+  "max_iters": 6,
+  "iteration": 2,
+  "stop_reason": "Implementation complete; full-suite verification and host-idle confirmation limited by sandbox",
+  "plan": [
+    "Read contracts and installed APIs (complete)",
+    "Implement adapter runtime and boundary method (complete)",
+    "Exercise requirements and parity with offline fake models (200 focused tests pass, including 2000 stress repetitions)",
+    "Run seven acceptance commands and independent review (complete; 65 outside-path suite failures require unrestricted rerun)"
+  ],
+  "owned": [
+    "src/arci/adapters/__init__.py",
+    "src/arci/adapters/langchain.py",
+    "src/arci/toolbox.py (one method and exception)",
+    "tests/unit/adapters/",
+    "tests/unit/toolbox/test_fail_harness.py",
+    "pyrightconfig.adapters.json"
+  ],
+  "initial_git_status": "clean",
+  "commands": [
+    {
+      "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q",
+      "exit_code": 1,
+      "elapsed_seconds": 467.3,
+      "log": "tests/unit/adapters/evidence/full-suite.log",
+      "last_lines": [
+        "FAILED tests/acceptance/test_mcp_toolset.py::test_a_python_toolset_becomes_an_mcp_environment",
+        "FAILED tests/acceptance/test_mcp_toolset.py::test_fault_injection_and_the_oracle_work_through_the_bridge",
+        "FAILED tests/acceptance/test_runner_replay.py::test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+        "FAILED tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store",
+        "FAILED tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay"
+      ]
+    },
+    {
+      "command": "LANGSMITH_TRACING=false ARCI_REQUIRE_ADAPTERS=1 .venv/bin/pytest tests/unit/adapters tests/unit/toolbox -q",
+      "exit_code": 0,
+      "elapsed_seconds": 107.914,
+      "log": "tests/unit/adapters/evidence/adapter-tests.log",
+      "last_lines": [
+        "........................................................................ [ 36%]",
+        "........................................................................ [ 72%]",
+        "........................................................                 [100%]"
+      ]
+    },
+    {
+      "command": ".venv/bin/ruff format --check .",
+      "exit_code": 0,
+      "elapsed_seconds": 0.078,
+      "log": "tests/unit/adapters/evidence/format.log",
+      "last_lines": [
+        "468 files already formatted"
+      ]
+    },
+    {
+      "command": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02,
+      "log": "tests/unit/adapters/evidence/lint.log",
+      "last_lines": [
+        "All checks passed!"
+      ]
+    },
+    {
+      "command": ".venv/bin/basedpyright",
+      "exit_code": 0,
+      "elapsed_seconds": 3.596,
+      "log": "tests/unit/adapters/evidence/types-core.log",
+      "last_lines": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": ".venv/bin/basedpyright --project pyrightconfig.adapters.json",
+      "exit_code": 0,
+      "elapsed_seconds": 1.057,
+      "log": "tests/unit/adapters/evidence/types-adapters.log",
+      "last_lines": [
+        "0 errors, 0 warnings, 0 notes"
+      ]
+    },
+    {
+      "command": "shasum -a 256 -c FROZEN.sha256",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021,
+      "log": "tests/unit/adapters/evidence/frozen.log",
+      "last_lines": [
+        "tests/acceptance/test_runner_replay.py: OK",
+        "tests/acceptance/test_schedule.py: OK",
+        "tests/acceptance/test_schema.py: OK",
+        "tests/acceptance/test_sequential.py: OK",
+        "tests/acceptance/test_stats_gate.py: OK",
+        "uv.lock: OK"
+      ]
+    }
+  ],
+  "review": {
+    "shape_blocker": false,
+    "confirmed_fixes": [
+      "non-AI response guard before provider output processing",
+      "pending structured-call exclusion",
+      "unmarked distinct-kind custom faults remain ToolFault"
+    ],
+    "independent_serial_probe": "30 repetitions each at index 0 and 20 across 48 calls; stable trace and no later bodies"
+  },
+  "reflection_notes": [
+    "Observed only two reserved-self failures in complete 191-test batch; public StructuredTool.run collides before proxy closure. Move self rejection before handler and keep tool rejection after native validation.",
+    "Stopped first full-suite run before editing; all first-attempt receipts preserved."
+  ]
+}

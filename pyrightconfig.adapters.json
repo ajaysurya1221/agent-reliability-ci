@@ -1,0 +1,10 @@
+{
+  "include": ["src/arci/adapters", "tests/unit/adapters"],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportMissingModuleSource": false
+}

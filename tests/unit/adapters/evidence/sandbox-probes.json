@@ -1,0 +1,14 @@
+[
+  {
+    "fixture": "decision",
+    "outcome": "ERROR",
+    "termination": "harness_error",
+    "failure_detail": "PermissionError: [Errno <n>] Operation not permitted"
+  },
+  {
+    "fixture": "mcp",
+    "outcome": "ERROR",
+    "termination": "harness_error",
+    "failure_detail": "PermissionError: [Errno <n>] Operation not permitted"
+  }
+]

@@ -1,0 +1,688 @@
+{
+  "command": "LANGSMITH_TRACING=false .venv/bin/pytest -q --junitxml=/tmp/p3a2-full-final.xml",
+  "exit": 1,
+  "counts": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "65",
+    "skipped": "2",
+    "tests": "1700",
+    "time": "362.823",
+    "timestamp": "2026-11-11T13:25:34.198664+05:30",
+    "hostname": "Ajays-MacBook-Pro.local"
+  },
+  "same_failures_as_first_run": true,
+  "failures": [
+    {
+      "test": "tests/acceptance/test_decisions.py::test_a_gated_agent_decides_then_acts_and_everything_is_recorded",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='92cc5c2f1f2f26fcfb64ee6386575f17631a9faf93e00607d19447c1123c4ef6', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1650853330065729)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='92cc5c2f1f2f26fcfb64ee6386575f17631a9faf93e00607d19447c1123c4ef6', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1650853330065729)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_the_real_key_never_enters_the_agent_process",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='d1ed19cf7b096a04e0d4530fd98f4870d828616a8296ca58b4d5b95ffb6647d0', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1597747499909019)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='d1ed19cf7b096a04e0d4530fd98f4870d828616a8296ca58b4d5b95ffb6647d0', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1597747499909019)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_local_rejections_are_the_agents_problem_not_the_harness",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f77264cd4af0b8d23a037378788df0d72673bd1cc81a39a8a942f0435d27d366', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16537199998856522)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f77264cd4af0b8d23a037378788df0d72673bd1cc81a39a8a942f0435d27d366', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16537199998856522)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_models_discovery_is_recorded_but_is_not_a_tool_event",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='500420b862699761c3ce98a0090c36d56800616cbdd6ad295f09a544d8eb2e5b', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16840916700311936)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='500420b862699761c3ce98a0090c36d56800616cbdd6ad295f09a544d8eb2e5b', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16840916700311936)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_decisions_after_the_mcp_session_closed_are_still_served_and_recorded",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='29fc85af9cbe296e3d4594b2c5fbd601133474c3d7d68abfae5d2e6d9d250bbc', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1616427919943817)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='29fc85af9cbe296e3d4594b2c5fbd601133474c3d7d68abfae5d2e6d9d250bbc', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1616427919943817)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_budgets_cover_decision_attempts",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='23c231685f908eac86216ff060e175c0476c93b4c13f54a8e6b949b4dae4dd68', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1696752080024453)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='23c231685f908eac86216ff060e175c0476c93b4c13f54a8e6b949b4dae4dd68', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1696752080024453)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_low_confidence_flattens_choices_but_keeps_the_winner",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='b80020fc0fe2c5043c0a9bd3fca16f1ab7787ac265b726bcdbcfd81f41019ad9', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17036591599753592)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='b80020fc0fe2c5043c0a9bd3fca16f1ab7787ac265b726bcdbcfd81f41019ad9', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17036591599753592)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_low_confidence_leaves_an_already_uncertain_answer_alone",
+      "message": "ValueError: not enough values to unpack (expected 1, got 0)",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       ValueError: not enough values to unpack (expected 1, got 0)"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_provider_unavailable_is_529_for_the_rest_of_the_trial",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cbfe1b3563e52eeae1d2c5defbf3dc7e9769da76b0a9e76c2c1459c8d9e7b470', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16119404199707787)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cbfe1b3563e52eeae1d2c5defbf3dc7e9769da76b0a9e76c2c1459c8d9e7b470', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16119404199707787)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_replay_serves_recorded_decisions_and_never_runs_the_fixture",
+      "message": "assert False\n +  where False = any(<generator object test_replay_serves_recorded_decisions_and_never_runs_the_fixture.<locals>.<genexpr> at 0x1098e0ba0>)",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       assert False",
+        "E        +  where False = any(<generator object test_replay_serves_recorded_decisions_and_never_runs_the_fixture.<locals>.<genexpr> at 0x1098e0ba0>)"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_the_gate_blocks_the_abandoning_agent",
+      "message": "assert (0, 0) == (20, 0)\n  \n  At index 0 diff: 0 != 20\n  Use -v to get more diff",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       assert (0, 0) == (20, 0)",
+        "E",
+        "E         At index 0 diff: 0 != 20",
+        "E         Use -v to get more diff"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_diff_hides_the_state_and_still_locates_the_divergence",
+      "message": "AssertionError: assert None == 'decision_low_confidence'\n +  where None = Divergence(common_prefix=2, left=None, right=None, after_injection=None).after_injection",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert None == 'decision_low_confidence'",
+        "E        +  where None = Divergence(common_prefix=2, left=None, right=None, after_injection=None).after_injection"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_minimisation_keeps_only_the_decision_fault",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='16f776069f0e4cbc3e0702684fb3e948b63d51cc14dde79c9355da7fe10977be', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16184887501003686)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='16f776069f0e4cbc3e0702684fb3e948b63d51cc14dde79c9355da7fe10977be', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16184887501003686)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_http_upstream_gets_the_real_key_and_the_pinned_model",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions.py::test_a_real_provider_failure_is_a_harness_fault_and_a_422_is_passed_through",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_hardening.py::test_request_validation_is_total",
+      "message": "AssertionError: ('weird', 'PermissionError: [Errno <n>] Operation not permitted')\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='fc20b156aec74f72fd6271d851541760deacfb94b05f1a0cac515849c4463a80', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16924170800484717)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E           AssertionError: ('weird', 'PermissionError: [Errno <n>] Operation not permitted')",
+        "E           assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E            +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='fc20b156aec74f72fd6271d851541760deacfb94b05f1a0cac515849c4463a80', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16924170800484717)).outcome",
+        "E            +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_hardening.py::test_the_shapes_the_official_sdk_may_send_are_accepted",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='6020d7893e7a4807d9c417bb7287a09e152904bad2473167203950b1240d2b48', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16609883301134687)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='6020d7893e7a4807d9c417bb7287a09e152904bad2473167203950b1240d2b48', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16609883301134687)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_hardening.py::test_one_request_per_connection_so_replay_sees_what_the_agent_saw",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='95e40b0f03527c087afee680b9502492dc756a8e5a17057e1b16b21d90569ab7', schema_version='arci/0...plete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.169760833014152)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='95e40b0f03527c087afee680b9502492dc756a8e5a17057e1b16b21d90569ab7', schema_version='arci/0...plete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.169760833014152)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_hardening.py::test_expect_continue_is_answered_at_once_and_never_admitted",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='abe402d614e5d82e831200b67990b9621a9bbcbbc9d9f8b008bcf27e1096257c', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17056341700663324)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='abe402d614e5d82e831200b67990b9621a9bbcbbc9d9f8b008bcf27e1096257c', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17056341700663324)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_hardening.py::test_the_mcp_server_never_inherits_the_real_key",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='26d80e9198143530cc4c8137d6e20bcdcb2a1911c989363711181db26c2f4b01', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1702297500014538)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='26d80e9198143530cc4c8137d6e20bcdcb2a1911c989363711181db26c2f4b01', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1702297500014538)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_sdk.py::test_the_official_sdk_needs_no_change",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='fd55b8c40a2674fcf89c17ec07135f28a91b357ca7ddd1c963a4b2f308e46afd', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16985120899335016)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='fd55b8c40a2674fcf89c17ec07135f28a91b357ca7ddd1c963a4b2f308e46afd', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16985120899335016)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_sdk.py::test_the_sdk_retries_twice_then_the_agent_degrades",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='8ee5389c7dc64bec2b7de300dc8e44cafa6ae7b206ac1633dbe717899a413d94', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1700980830064509)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='8ee5389c7dc64bec2b7de300dc8e44cafa6ae7b206ac1633dbe717899a413d94', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1700980830064509)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_a_gateway_shaped_upstream_is_accepted_recorded_and_served",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_models_discovery_through_the_prefix",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_one_bounded_wait_on_429_or_529_then_one_recorded_attempt",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_encoding_and_non_json_and_tls_are_one_clear_harness_message",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_the_parent_paces_trial_starts_for_http_upstreams",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_a_failed_resend_is_a_harness_fault_not_an_agent_failure",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_every_probability_must_lie_in_the_unit_interval",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_a_dripping_upstream_is_bounded_by_request_seconds",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_preflight_is_bounded_by_the_same_deadline",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_the_report_lists_decision_tokens_and_cost",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_the_raw_upstream_answer_is_recorded_but_never_served",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='290ff2acf3b9f6193164af0178cb582353f664614df8e265e691be7dc3ae4f23', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16169862500100862)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='290ff2acf3b9f6193164af0178cb582353f664614df8e265e691be7dc3ae4f23', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16169862500100862)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_no_upstream_means_a_null_snapshot",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cbfe1b3563e52eeae1d2c5defbf3dc7e9769da76b0a9e76c2c1459c8d9e7b470', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1637538330105599)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cbfe1b3563e52eeae1d2c5defbf3dc7e9769da76b0a9e76c2c1459c8d9e7b470', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1637538330105599)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_an_error_on_removal_never_establishes_minimality",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='16f776069f0e4cbc3e0702684fb3e948b63d51cc14dde79c9355da7fe10977be', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16845887500676326)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='16f776069f0e4cbc3e0702684fb3e948b63d51cc14dde79c9355da7fe10977be', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16845887500676326)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_minimality_is_never_claimed_for_a_live_upstream",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_preflight_reports_ready_missing_pin_and_unreachable",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_preflight_never_prints_provider_controlled_secrets",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_decisions_v06.py::test_the_gate_and_the_hero_story_hold_through_the_gateway",
+      "message": "PermissionError: [Errno 1] Operation not permitted",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       PermissionError: [Errno 1] Operation not permitted",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/socketserver.py:478: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hardening.py::test_descendants_are_cleaned_up_after_a_successful_trial",
+      "message": "PermissionError: [Errno 1] Operation not permitted: 'ps'",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E                   PermissionError: [Errno 1] Operation not permitted: 'ps'",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1991: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[b-BLOCK]",
+      "message": "AssertionError: ('trial outcome ERROR',)\nassert <Verdict.ERROR: 'ERROR'> is <Verdict.BLOCK: 'BLOCK'>\n +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='d0513937400a9a762568fcc6c7c8f2d90316c1c4f40ab8c6532bf88b571982b4', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: ('trial outcome ERROR',)",
+        "E       assert <Verdict.ERROR: 'ERROR'> is <Verdict.BLOCK: 'BLOCK'>",
+        "E        +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='d0513937400a9a762568fcc6c7c8f2d90316c1c4f40ab8c6532bf88b571982b4', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[a-PASS]",
+      "message": "AssertionError: ('trial outcome ERROR',)\nassert <Verdict.ERROR: 'ERROR'> is <Verdict.PASS: 'PASS'>\n +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='fd65e14cd431651c5846478dab1ba23383a135a37c7b00e8cb990fbfa130fefc', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: ('trial outcome ERROR',)",
+        "E       assert <Verdict.ERROR: 'ERROR'> is <Verdict.PASS: 'PASS'>",
+        "E        +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='fd65e14cd431651c5846478dab1ba23383a135a37c7b00e8cb990fbfa130fefc', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hero_decisions.py::test_frozen_experiment_blocks_the_regression_and_passes_the_repair[c-PASS]",
+      "message": "AssertionError: ('trial outcome ERROR',)\nassert <Verdict.ERROR: 'ERROR'> is <Verdict.PASS: 'PASS'>\n +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='37686fabbfe1cd409843356439672578bc796a1641cba43281e44d3567aa4484', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: ('trial outcome ERROR',)",
+        "E       assert <Verdict.ERROR: 'ERROR'> is <Verdict.PASS: 'PASS'>",
+        "E        +  where <Verdict.ERROR: 'ERROR'> = GateDecision(record_sha256='37686fabbfe1cd409843356439672578bc796a1641cba43281e44d3567aa4484', schema_version='arci/0....al outcome ERROR',)),), verdict=<Verdict.ERROR: 'ERROR'>, exit_code=3, reasons=('trial outcome ERROR',), prior_runs=()).verdict"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hero_decisions.py::test_one_clean_run_hides_the_regression",
+      "message": "AssertionError: ('a', 'PermissionError: [Errno <n>] Operation not permitted')\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='5d49db37e3171a0b4fd2169a683aeb5822e2cd1332db61370500d9afb115c2ab', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16837254099664278)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E           AssertionError: ('a', 'PermissionError: [Errno <n>] Operation not permitted')",
+        "E           assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E            +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='5d49db37e3171a0b4fd2169a683aeb5822e2cd1332db61370500d9afb115c2ab', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16837254099664278)).outcome",
+        "E            +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_hero_decisions.py::test_the_failure_replays_offline_minimises_and_the_repair_passes",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='b733a0537608be046cf6ae7d8657d96238e6f64fbde3f15cfedbdbc95f9be3e2', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1734632920124568)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='b733a0537608be046cf6ae7d8657d96238e6f64fbde3f15cfedbdbc95f9be3e2', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1734632920124568)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_both_clients_pass_without_injection",
+      "message": "AssertionError: good\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cf8664c26cba4c6681c79ea3eb91203118ab0ed8415a93766aa96991646f4da1', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16749516600975767)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E           AssertionError: good",
+        "E           assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E            +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cf8664c26cba4c6681c79ea3eb91203118ab0ed8415a93766aa96991646f4da1', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16749516600975767)).outcome",
+        "E            +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_injected_timeout_separates_the_retrying_client_from_the_broken_one",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f8f38e45b289d3515a4c8e556a416719aa0427628a5d38dee74d57082cf615db', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16427475000091363)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f8f38e45b289d3515a4c8e556a416719aa0427628a5d38dee74d57082cf615db', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16427475000091363)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_a_client_that_never_touches_its_tools_is_failed_by_the_snapshot_oracle",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f27d08778d11bd7edf5f957ff35d2a5780dfe6878e2f590d353255bdf3aced37', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17103029100690037)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='f27d08778d11bd7edf5f957ff35d2a5780dfe6878e2f590d353255bdf3aced37', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17103029100690037)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_timeout_budget_and_cleanup",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='4af3ba322f33195a172a73d52876c6e97d740aecaa39da3f4792b60cbf9996c6', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16954658400209155)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='4af3ba322f33195a172a73d52876c6e97d740aecaa39da3f4792b60cbf9996c6', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16954658400209155)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_replay_mismatch_is_invalid",
+      "message": "AssertionError: tools/call exchanges must be in the recording\nassert []",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: tools/call exchanges must be in the recording",
+        "E       assert []"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_the_repaired_client_passes_the_same_fault_live",
+      "message": "AssertionError: assert <ReplayStatus.REPRODUCED: 'REPRODUCED'> is <ReplayStatus.NOT_REPRODUCED: 'NOT_REPRODUCED'>\n +  where <ReplayStatus.REPRODUCED: 'REPRODUCED'> = ReplayResult(status=<ReplayStatus.REPRODUCED: 'REPRODUCED'>, observed_outcome=<Outcome.ERROR: 'ERROR'>, observed_fingerprint='af39b8383c38bac722a7de49f31abd82909fece710f73e01fad2ed83184df87d', detail='failure reproduced').status\n +  and   <ReplayStatus.NOT_REPRODUCED: 'NOT_REPRODUCED'> = ReplayStatus.NOT_REPRODUCED",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <ReplayStatus.REPRODUCED: 'REPRODUCED'> is <ReplayStatus.NOT_REPRODUCED: 'NOT_REPRODUCED'>",
+        "E        +  where <ReplayStatus.REPRODUCED: 'REPRODUCED'> = ReplayResult(status=<ReplayStatus.REPRODUCED: 'REPRODUCED'>, observed_outcome=<Outcome.ERROR: 'ERROR'>, observed_fingerprint='af39b8383c38bac722a7de49f31abd82909fece710f73e01fad2ed83184df87d', detail='failure reproduced').status",
+        "E        +  and   <ReplayStatus.NOT_REPRODUCED: 'NOT_REPRODUCED'> = ReplayStatus.NOT_REPRODUCED"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_experiment_gate_and_cli_for_command_agents",
+      "message": "assert (0, 0) == (12, 0)\n  \n  At index 0 diff: 0 != 12\n  Use -v to get more diff",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       assert (0, 0) == (12, 0)",
+        "E",
+        "E         At index 0 diff: 0 != 12",
+        "E         Use -v to get more diff"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp.py::test_diff_and_minimise_work_on_command_trials",
+      "message": "AssertionError: assert (None == 'tool_timeout')\n +  where None = Divergence(common_prefix=2, left=None, right=None, after_injection=None).after_injection",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (None == 'tool_timeout')",
+        "E        +  where None = Divergence(common_prefix=2, left=None, right=None, after_injection=None).after_injection"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_leftover_recording_is_invalid_even_when_the_agent_hangs_to_the_deadline",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='7550e6e33d179cea11f55a02bee1bdeb24597579dccaecc592d67d527f91d7e0', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17053862499597017)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='7550e6e33d179cea11f55a02bee1bdeb24597579dccaecc592d67d527f91d7e0', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17053862499597017)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_a_client_protocol_mistake_is_the_agents_problem_not_a_harness_error",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cf95421fb8679b41056b6cb6636d3450deb82cfa3014cba3ac6c210754807a0a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17296433300361969)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='cf95421fb8679b41056b6cb6636d3450deb82cfa3014cba3ac6c210754807a0a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17296433300361969)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_tool_error_text_from_the_bridge_does_not_leak_run_specific_paths",
+      "message": "AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='8f73bb0ec324fe7e94dfbc8354e4b15bfd4e007a501440f5e2291cab7c2c9601', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1669722500082571)).outcome\n +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert (<Outcome.ERROR: 'ERROR'> is <Outcome.FAIL: 'FAIL'>)",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='8f73bb0ec324fe7e94dfbc8354e4b15bfd4e007a501440f5e2291cab7c2c9601', schema_version='arci/0...lete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.1669722500082571)).outcome",
+        "E        +  and   <Outcome.FAIL: 'FAIL'> = Outcome.FAIL"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_large_recordings_are_streamed_not_squeezed_into_one_frame",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='bd9ba80d15c1d3a28180cedc29c6a14c3a84f1d548971f5a53ffbf24fa66178b', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17241062498942483)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='bd9ba80d15c1d3a28180cedc29c6a14c3a84f1d548971f5a53ffbf24fa66178b', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17241062498942483)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_pipelined_large_messages_do_not_deadlock_the_boundary",
+      "message": "AssertionError: PermissionError: [Errno <n>] Operation not permitted\nassert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='e3f44248d2730b0a81b47ac3e1fe6a29c1822ca951a4cc429dac703c40d2edf6', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17642866699316073)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: PermissionError: [Errno <n>] Operation not permitted",
+        "E       assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='e3f44248d2730b0a81b47ac3e1fe6a29c1822ca951a4cc429dac703c40d2edf6', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17642866699316073)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_hardening.py::test_an_infrastructure_exit_code_invalidates_the_trial_instead_of_blaming_the_agent",
+      "message": "AssertionError: assert ('PermissionError: [Errno <n>] Operation not permitted' is not None and 'infrastructure' in 'PermissionError: [Errno <n>] Operation not permitted')\n +  where 'PermissionError: [Errno <n>] Operation not permitted' = TrialEnvelope(record_sha256='47d2a0a68c705c7a1086f331e0efc1e618af657e9873262446762935fd4bc392', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16762179200304672)).failure_detail\n +  and   'PermissionError: [Errno <n>] Operation not permitted' = TrialEnvelope(record_sha256='47d2a0a68c705c7a1086f331e0efc1e618af657e9873262446762935fd4bc392', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16762179200304672)).failure_detail",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: assert ('PermissionError: [Errno <n>] Operation not permitted' is not None and 'infrastructure' in 'PermissionError: [Errno <n>] Operation not permitted')",
+        "E        +  where 'PermissionError: [Errno <n>] Operation not permitted' = TrialEnvelope(record_sha256='47d2a0a68c705c7a1086f331e0efc1e618af657e9873262446762935fd4bc392', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16762179200304672)).failure_detail",
+        "E        +  and   'PermissionError: [Errno <n>] Operation not permitted' = TrialEnvelope(record_sha256='47d2a0a68c705c7a1086f331e0efc1e618af657e9873262446762935fd4bc392', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.16762179200304672)).failure_detail"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_toolset.py::test_a_python_toolset_becomes_an_mcp_environment",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='7bb65b546bc21b9762f79291487bff9ffd3659645f8bcbbbfe5c3f0c7d46ed34', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17372316699766088)).outcome\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='7bb65b546bc21b9762f79291487bff9ffd3659645f8bcbbbfe5c3f0c7d46ed34', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17372316699766088)).outcome",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_mcp_toolset.py::test_fault_injection_and_the_oracle_work_through_the_bridge",
+      "message": "AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>\n +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='3d6125f97e70bfb654f2920c8c2ea685db3b084330695664e64c07061e2d289a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17079370901046786)).outcome\n +    where TrialEnvelope(record_sha256='3d6125f97e70bfb654f2920c8c2ea685db3b084330695664e64c07061e2d289a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17079370901046786)) = _run('good')\n +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: assert <Outcome.ERROR: 'ERROR'> is <Outcome.PASS: 'PASS'>",
+        "E        +  where <Outcome.ERROR: 'ERROR'> = TrialEnvelope(record_sha256='3d6125f97e70bfb654f2920c8c2ea685db3b084330695664e64c07061e2d289a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17079370901046786)).outcome",
+        "E        +    where TrialEnvelope(record_sha256='3d6125f97e70bfb654f2920c8c2ea685db3b084330695664e64c07061e2d289a', schema_version='arci/0...ete_calls=(), recording=(), final_state={}, usage=Usage(tool_calls=0, model_steps=0, wall_seconds=0.17079370901046786)) = _run('good')",
+        "E        +  and   <Outcome.PASS: 'PASS'> = Outcome.PASS"
+      ]
+    },
+    {
+      "test": "tests/acceptance/test_runner_replay.py::test_timeout_mid_call_keeps_the_trace_and_kills_the_whole_process_tree",
+      "message": "PermissionError: [Errno 1] Operation not permitted: 'ps'",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E                   PermissionError: [Errno 1] Operation not permitted: 'ps'",
+        "../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/subprocess.py:1991: PermissionError"
+      ]
+    },
+    {
+      "test": "tests/unit/examples/test_guardrail_agent.py::test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down",
+      "message": "AssertionError: ['PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', 'Perm...', 'PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', ...]\nassert False\n +  where False = all(<generator object test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down.<locals>.<genexpr> at 0x1099f4110>)",
+      "permission_error_in_traceback": true,
+      "error_lines": [
+        "E       AssertionError: ['PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', 'Perm...', 'PermissionError: [Errno <n>] Operation not permitted', 'PermissionError: [Errno <n>] Operation not permitted', ...]",
+        "E       assert False",
+        "E        +  where False = all(<generator object test_offline_run_fails_b_only_on_dangerous_asks_when_the_provider_is_down.<locals>.<genexpr> at 0x1099f4110>)"
+      ]
+    },
+    {
+      "test": "tests/unit/recipes/test_mcp_agent.py::test_the_faulted_run_blocks_with_a_sealed_store",
+      "message": "AssertionError: SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper\u2013Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK\n  run store: /private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\n  \nassert 3 == 1\n +  where 3 = CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\").returncode",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       AssertionError: SMOKE DESIGN: n_per_arm=8 (alpha 0.05, delta 0.1, K=1): under this design's fixed-sample Clopper\u2013Pearson rule two perfect arms cannot PASS below N=42 and a total collapse cannot BLOCK below N=8; expect INCONCLUSIVE. Plan a confirmatory N: arci plan --baseline-rate P --candidate-rate P --target-verdict BLOCK",
+        "E         run store: /private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry",
+        "E",
+        "E       assert 3 == 1",
+        "E        +  where 3 = CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\").returncode"
+      ]
+    },
+    {
+      "test": "tests/unit/recipes/test_mcp_agent.py::test_diff_minimize_bundle_and_replay",
+      "message": "assert 3 == 1\n +  where 3 = CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\").returncode\n +    where CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\") = Run(copy=PosixPath('/private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe'...vate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\")).done",
+      "permission_error_in_traceback": false,
+      "error_lines": [
+        "E       assert 3 == 1",
+        "E        +  where 3 = CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\").returncode",
+        "E        +    where CompletedProcess(args=['/Users/ajay/Developer/.arci-worktrees/wt-v2-adapter/.venv/bin/python', '-P', '-m', 'arci.cli',...ivate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\") = Run(copy=PosixPath('/private/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe'...vate/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/pytest-of-ajay/pytest-12/mcp0/mcp-recipe/runs/mcp-fetch-retry\\n\")).done"
+      ]
+    }
+  ],
+  "skips": [
+    {
+      "test": "tests/acceptance/test_decisions_node.py::test_the_node_agent_tells_a_from_b_through_the_same_boundary",
+      "reason": "@typesafe-ai/sdk not installed in the example"
+    },
+    {
+      "test": "tests/acceptance/test_decisions_node.py::test_one_clean_pair_passes_for_the_node_agent",
+      "reason": "@typesafe-ai/sdk not installed in the example"
+    }
+  ],
+  "sandbox_probes": {
+    "AF_INET": "PermissionError: [Errno 1] Operation not permitted",
+    "AF_UNIX": "PermissionError: [Errno 1] Operation not permitted",
+    "ps": "PermissionError: [Errno 1] Operation not permitted: 'ps'"
+  },
+  "trial_probes": [
+    {
+      "probe": "mcp",
+      "outcome": "ERROR",
+      "termination": "harness_error",
+      "detail": "PermissionError: [Errno <n>] Operation not permitted"
+    },
+    {
+      "probe": "decisions",
+      "outcome": "ERROR",
+      "termination": "harness_error",
+      "detail": "PermissionError: [Errno <n>] Operation not permitted"
+    }
+  ],
+  "limit": "29 failures directly print PermissionError; the other 36 are dependent outcome/recording assertions in socket-dependent tests. Direct socket and ps denial plus representative MCP and decision harness failures are reproduced. Unrestricted full-suite acceptance is not established."
+}
