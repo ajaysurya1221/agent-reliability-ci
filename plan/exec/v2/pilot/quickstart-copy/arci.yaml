@@ -1,0 +1,19 @@
+# A planted, seed-deterministic offline regression: expect BLOCK at round 1.
+# Replace the task file and agent settings before registering your own experiment.
+suite_id: langchain-order-desk
+tasks: tasks.jsonl
+toolset: agent:toolset
+oracle: check:check
+baseline: {label: retry, agent: 'agent:baseline'}
+candidate: {label: no-retry, agent: 'agent:candidate'}
+conditions:
+  - id: clean
+  - id: tool_timeout
+    faults: [{name: tool_timeout, tool: lookup_order, occurrence: 0}]
+  - id: tool_error_once
+    faults: [{name: tool_error_once, tool: lookup_order, occurrence: 0}]
+  - id: empty_result
+    faults: [{name: empty_result, tool: lookup_order, occurrence: 0}]
+# Default alpha=1/20, delta=1/10, stakes=[1/4,1/2], fixed seeds, five-round cap.
+rule: {}
+budgets: {max_tool_calls: 12, max_model_steps: 12, max_seconds: 240, grader_seconds: 10}
