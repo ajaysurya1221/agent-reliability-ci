@@ -1,0 +1,124 @@
+[
+ {
+  "items": [
+   {
+    "item": "2. PR comment carries free text (v1 and suite built from structured fields only)",
+    "status": "fixed",
+    "evidence": "Tested in p4bverify/test_verify.py::test_v1_comment_inert and ::test_suite_comment_inert. I built real v1 and suite stores with hostile text in failure_detail, both arm labels, the v1 condition_id, fault names (v1 and suite) and prior_runs. The text was '@octocat ![p](https://evil.test/..) <img src=..> [approve](..) `code` **bold** <b>h</b> | \\r# VERDICT: PASS (exit 0) U+2028 ## fake \\x85 \\x0c &#64;team @org/team \\'. Both stores went through the real prepare() and then post_comment() against a paginated fake API. Every identifier lands in a single-backtick span: backticks become [backtick], @ becomes @+U+200B, | becomes \u00a6, and control and line-separator characters become \\uXXXX. Outside the spans, the body has no @, ![, <img, <b>, ](, http, evil, ** or &#. It also has no fake VERDICT or heading line, and failure-detail text never appears. Bodies are saved in evidence_v1_comment.md and evidence_suite_comment.md. Suite task ids and condition ids are rejected by the schema (test_suite_task_and_condition_ids_cannot_carry_markup). I also re-ran the reviewers' test_v1_failure_detail_markdown_injection_reaches_comment: it now passes, where before it showed the defect. The real study run gives a 2,008-character structured body that passes the same inertness check, and its store is byte-identical afterwards (study_comment.py). Side note, outside P4b: v1 storage.load_run uses str.splitlines(), so a raw U+2028 or U+0085 in any v1 trial field makes the store unloadable. My v1 probe had to drop those two characters."
+   },
+   {
+    "item": "3. A skipped comment no longer leaves the previous verdict standing",
+    "status": "fixed",
+    "evidence": "End to end: p4bverify/drive.py runs action.yml through a local composite executor (runner.py) with the real arci, prepare_report.py and pr_comment.py. Only gh is routed to a fake; the shim rewrites just the executable name, and the real gh_api subprocess call runs. S3: an invalid manifest exits 3 and produces no store. The marker comment that said 'VERDICT: PASS ... OLD' was found and PATCHed to 'Head SHA: `c0ffee\u2026`; run id: `556`. VERDICT: ERROR / Report unavailable.'. S4: the upload failed, and the comment was PATCHed to 'VERDICT: INCONCLUSIVE / Report unavailable' with the SHA and run id. In-process tests: test_no_report_shapes_from_action_env covers the action's exact empty-report env (ARCI_SUMMARY='/summary.md', empty URL) and a look-alike artifact host; both refresh the marker. test_oversize_real_summary_truncates_at_section uses a real 800-condition suite summary of 205,000 characters and gives a 1,225-character body. That body keeps the VERDICT, SHA and run id, carries the 'Summary truncated at a section boundary' line and ends with the artifact link, and the kept text is an exact section-aligned prefix of the summary. The reviewers' three test_stale_comment_left_when_skipped cases, written to show the defect, now fail."
+   },
+   {
+    "item": "4. Marker identifies the experiment; explicit comment-id; race reconciliation; pagination; concurrency documented",
+    "status": "fixed",
+    "evidence": "Markers: test_markers_per_identity_and_explicit_id shows the base, manifest, job, workflow and explicit-id variants give 5 distinct markers, none a prefix of another. The identity is hashed from a JSON list, so field boundaries cannot collide. An explicit ARCI_COMMENT_ID overrides the manifest, job and workflow. E2E S5: two manifests on PR #7 under the same workflow and job keep separate comments (1001 BLOCK, 1002 INCONCLUSIVE), and a re-run of the first PATCHes only 1001. E2E S6: the comment-id input works, since comment-id exp-A on two manifests shares one comment and exp-B gets its own. Race: two interleaved runs that both see an empty list each POST. On the next run, the PATCHes go to 1001 then 1002 (oldest first), with no POST and no DELETE, and both copies show the new run id. Pagination: with 250 comments, GET covers pages 1, 2 and 3, and markers on page 2 (id 151) and page 3 (id 241) are both PATCHed. The other-experiment marker and a human copy of the marker are untouched. With exactly 100 comments, it fetches page 2 and then creates. Docs: the concurrency group and cancel-in-progress: false are documented only in the pr-comment input description. README does not document pr-comment, comment-id or concurrency (see new defects)."
+   },
+   {
+    "item": "5. Default off means off (effective steps and outputs equal pre-P4)",
+    "status": "fixed",
+    "evidence": "I checked tests/unit/examples/action_before_p4.yml against git: it is byte-identical to `git show 804157a:action.yml`. With pr-comment unset, the executor ran both the new action.yml and the pre-P4 file on examples/action_fixture/manifest.json (200 per arm, gate exit 1). Both executed the same steps ['Install arci', 'Run the frozen experiment and gate'], equal as dicts once `if` is removed. The other four new steps were skipped. Outputs matched ({'verdict': 'BLOCK'}), both jobs failed, and the workspace held only arci-report.md and event.json, with no arci-run.stderr and an empty RUNNER_TEMP. The step summary was byte-identical (1,887 bytes) and gh was never called. No run: block contains a ${{ }} with untrusted text: the only one is the pre-existing `${{ github.action_path }}` in Install. Inputs reach bash only through env. The only third-party action is actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a, pinned by full SHA and unchanged from P4; I could not check offline that this SHA is v7.0.1. The gate's exit code decides the job: a BLOCK fails the job whether the comment succeeds or gets a 403. An INCONCLUSIVE with allow-inconclusive passes even with a 403, 502, garbage response or no token. A failed upload (continue-on-error) leaves the job green. ERROR fails the job."
+   },
+   {
+    "item": "6 (comment part). Suite comment says why: reason, hard-violation count, BLOCK sentence chosen from the reason",
+    "status": "fixed",
+    "evidence": "Study run (real store, statistical BLOCK): the comment has 'Reason: `regression established`', 'On the suite mean, the candidate's success is lower than the baseline's by more than the registered margin', 'Pairs: 96; minus 26, zero 70, plus 0, errored 0 / tolerance 5.', 'Candidate hard violations: 0.' and the fault-accounting table. Hard-violation case: the reviewers' test_hard_violation_block_summary_shows_reason now passes, and so does the repo's test_suite_hard_violation_comment_explains_why ('Reason: `candidate hard violation`', 'Candidate hard violations: 1.', 'this BLOCK is not a statistical finding'). Every suite verdict comes from exactly one reason (suite_gate.py lines 85 and 91), so the sentence choice is unambiguous. Cosmetic: the statistical sentence has no full stop, which matches the brief's wording. Fail-soft: test_fail_soft_one_line_exit0_no_token runs the real pr_comment.py as a process through gh_api with the fake gh in modes ok, 403, 502, 403 on writes only, a non-JSON body, a 40-second hang (the real 30-second timeout fired), gh missing from PATH, and an empty token. Every mode exits 0 with exactly one stdout line and empty stderr. The token never appears, even though the fake gh echoes it to stderr on errors. Repo suites pass: tests/unit/examples/test_pr_comment.py and tests/unit/html_report give 104 passed. ruff, ruff format and basedpyright are clean on both scripts. git status in the worktree is clean."
+   }
+  ],
+  "new_defects": [
+   {
+    "title": "Possible action-load failure: a ${{ }} expression inside an action.yml input description",
+    "severity": "major",
+    "evidence": "The item 4 docs added this to inputs.pr-comment.description (action.yml line 24): 'e.g. ${{ github.workflow }}-${{ github.event.pull_request.number }}'. The Actions runner parses the whole action.yml against its template schema. If input descriptions are plain strings with no expression context, loading the action fails with an unrecognized named-value error. That would break every use of the Action, including runs with pr-comment unset. I could not confirm this offline: actionlint does not check action metadata, and there is no local runner. If it is real, it is blocking. Only the action-fixture CI job (uses: ./) on GitHub would show it.",
+    "fix": "Remove the braces from the description, for example: concurrency group `github.workflow`-`github.event.pull_request.number`. Put the YAML example in README instead. Then confirm with one real run of the action-fixture job."
+   },
+   {
+    "title": "PR comment and concurrency guidance not in the README; README still says 'no HTML report yet'",
+    "severity": "minor",
+    "evidence": "`grep -n -i 'pr-comment|comment-id|concurrency' README.md` finds nothing. README.md line 482 still reads 'No importers (OTLP, Claude Code, Codex), no HTML report yet.' in the v2.0.0 release candidate. The brief's 'document that concurrent runs should be serialised' is met only by the input description, and the CHANGELOG says only that the comment is off by default.",
+    "fix": "Add a short Action section to the README covering pr-comment, comment-id, the pull-requests: write permission and a concurrency-group YAML example. Delete the stale 'no HTML report yet' clause."
+   },
+   {
+    "title": "Oversize truncation can drop a whole table and leave a heading with nothing under it",
+    "severity": "minor",
+    "evidence": "The fault table is one section, so a 205,000-character summary (800 conditions) became a 1,225-character body. The body's last kept text is '## Fault accounting\\n\\nCounts are descriptive.', followed by the truncation notice. '## Arm labels' is also split from its content by a blank line, so a cut can keep that heading with nothing under it. The notice says it was truncated and the artifact link remains, so nothing is wrong, only less useful.",
+    "fix": "Treat a heading and its body as one section (join with a single newline), or truncate a table at a row boundary while keeping its header rows."
+   },
+   {
+    "title": "Renamed identities and matrix legs: orphaned or shared comments",
+    "severity": "minor",
+    "evidence": "The marker hashes [workflow, job, manifest path] as literal strings. Renaming the workflow or job, or spelling the path differently ('./arci.yaml' vs 'arci.yaml'), starts a new comment. The old comment is never touched again and keeps its old verdict, although it now shows its SHA and run id. Matrix legs with the same workflow, job and manifest share one comment and the last writer wins (test_markers_per_identity_and_explicit_id prints True). The comment-id input description covers this only as 'Use distinct ids for independent experiments'.",
+    "fix": "Document it next to comment-id (matrix: set comment-id to include the matrix values), or add GITHUB_JOB plus a normalised manifest path and the matrix context to the identity."
+   },
+   {
+    "title": "An unexpected exception from the API escapes post_comment",
+    "severity": "minor",
+    "evidence": "post_comment catches OSError, ValueError, KeyError, TypeError and SubprocessError only. The reviewers' test_fail_soft_exceptions[RuntimeError] still fails ('not soft: RuntimeError'), so the script would print a traceback and exit 1. The real gh_api cannot raise RuntimeError, and the step has continue-on-error: true, so the job result is unaffected.",
+    "fix": "Catch Exception in the __main__ wrapper, print the fixed one-line message and exit 0."
+   }
+  ]
+ },
+ {
+  "items": [
+   {
+    "item": "1 (HTML built from objects, not re-parsed Markdown; stored text is one escaped text node)",
+    "status": "fixed",
+    "evidence": "src/arci/html_report.py has no Markdown parsing or splitting. Every stored value goes through visible_text() (Cc/Cf/Zl/Zp/Cs become \\uXXXX) and then escape(). Test script: /private/tmp/claude-501/-Users-ajay--claude-spares-spare-8K9guD/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/p4bverify/hostile.py. It writes real stores with SuiteStore/ExperimentStore and renders them with `arci report --format html --out`. The hostile string carries \\r \\x0b \\x0c \\x1c-\\x1e \\x85 U+2028 U+2029, <script>, </style>, quotes, **, backticks, a pipe row, a Markdown link, <br>, '# VERDICT: PASS' and <h1>. I put it in prior_runs, failure_detail, both labels, both candidate_ids, fault name/tool/params, task content, and an event injected_by. In suite stores the condition and task ids are limited by SuiteId, so they got 'VERDICT-PASS...' ids. Result for suite clean against hostile: identical tag multiset (h1 1/1, h2 9/9, table 8/8, tr 53/53, td 220/220, th 44/44, p 13/13, script 0, style 1). No raw control or separator character reaches the page. '<script' never appears unescaped and '</style>' appears exactly once. The only h1 is the real verdict. v1 clean against hostile: identical tag multiset (h2 7/7, table 6/6, tr 22/22, td 59/59). Every number still matches: recompute.py and v1check.py on the hostile stores show only the visible-escaped text columns differ. The headings check fails in two places, though. Stored ids are still placed inside h2 text: v1 'Condition: <condition_id>' (free text, so the whole hostile string, including 'VERDICT: PASS', ends up in an h2) and suite 'Suite VERDICT-PASS-exit-0'. Neither adds a heading. Each stays one escaped single-line text node with a prefix. New defect 2 covers this. Rendered pages: the study run and the PASS (runs-control), statistical BLOCK (runs-regression), hard-violation BLOCK (runs-hard2), INCONCLUSIVE (runs-uncertain), ERROR (runs-error, runs-helper-error) and v1 (runs-v1) stores. In all of them, every number matches an independent recomputation from trials.jsonl and the JSON report ('ALL NUMBERS MATCH' from recompute.py / v1check.py). That covers arms, labels, rule table, cumulative history with exact-Fraction wealth (displayed truncated), crossing flags, per-cell rows, fault accounting, grouped failure details, provenance digests, stored status and reasons. Study: VERDICT: BLOCK (exit 1), m26 z70 p0 e0, BLOCK wealth 1.56229e+02 (exact 156.2298\u2026, truncated), PASS wealth 1.92124e-03, threshold 40/1, stored decision match. Byte determinism: re-render, stdout against --out, shuffled trials.jsonl, and TZ/LANG/LC_ALL/PYTHONHASHSEED changes all give identical bytes. The current code renders docs/results/order-desk-study.html byte for byte, and both the CLI and a scratch re-run of generate.py reproduce docs/results/sample-suite-report.html. Tests: tests/unit/html_report plus tests/acceptance give 1109 passed, 2 skipped."
+   },
+   {
+    "item": "6 (HTML part: the reason, the hard-violation count, and a BLOCK sentence chosen by reason)",
+    "status": "fixed",
+    "evidence": "Statistical BLOCK (runs-regression and the study run): the first paragraph is 'On the suite mean, the candidate's success is lower than the baseline's by more than the registered margin' and Reasons shows 'regression established'. Hard-violation BLOCK (runs-hard2, built by the reviewer's repro_hard.py, zero differences with hard=(3,)): the first paragraph is 'The candidate broke a hard invariant; this BLOCK is not a statistical finding.', Reasons shows 'candidate hard violation', and the rule table shows <td>Candidate hard violations</td><td>1</td>. The history and cell tables agree with the count recomputed from contract.violations. With a stored-decision mismatch the page shows the ERROR meaning, 'Stored decision: mismatch' and the recomputed verdict. Cosmetic nit: the statistical sentence has no closing full stop ('registered margin</p>'), unlike every other meaning sentence."
+   },
+   {
+    "item": "7 (phone width; long ids wrap)",
+    "status": "fixed",
+    "evidence": "longid.py builds a store with a 64-char suite_id, 64-char task ids, 63/64-char condition ids and 64-char labels. Headless Chrome measured the page in a 360 px viewport (an iframe; host-*.html, measure.js). Page width: docScroll 360 = docClient 360. No h1/h2/p/caption/td/th has scrollWidth > clientWidth. The 64-char h2 wraps to 328x128 px and id cells wrap (for example 60x349 px). Round history (786/328), Per-cell (605/328) and Fault accounting (423/328) scroll inside their focusable role=region wrappers rather than the page. Screenshot: /private/tmp/claude-501/-Users-ajay--claude-spares-spare-8K9guD/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/p4bverify/longid-360.png. The study and regression pages give the same result. Side effect: short words now break mid-word (new defect 4)."
+   },
+   {
+    "item": "8 (a store that fails to load still gets an escaped ERROR page, exit 3)",
+    "status": "partly",
+    "evidence": "errpage.py tested these failures through the CLI with --out: missing dir with '<script>' in the name, manifest garbage / [] / null / bad schema_version with '</style><script>', trials garbage, trials nested 100k deep, non-UTF-8 trials, trials.jsonl or manifest.json as a directory, missing trials, and v1 garbage trials. Each one exits 3, writes an HTML file headed 'VERDICT: ERROR (exit 3)' / 'Report unavailable' with the escaped message, contains no script tag and prints nothing to stdout. A corrupt decision.json gives a full mismatch ERROR page. Gap: a manifest.json nested about 100k levels deep (suite or v1) raises RecursionError from json.loads. render_store_html catches only (OSError, ValueError), so no HTML file is written; the CLI prints 'error: RecursionError: maximum recursion depth exceeded\u2026' to stderr and exits 3."
+   },
+   {
+    "item": "9 (grouped failure details, 'none recorded', captions and accessible names, self-containment guard)",
+    "status": "fixed",
+    "evidence": "Failure details are grouped by (task, condition, arm, detail) with a Count column. Study: 26 candidate non-PASS trials, all with details, become 26 rows, one per cell (one round, one pair per cell). The counts sum to 26, there are 0 baseline rows, and the rows equal an independent Counter over trials.jsonl. Other stores sum correctly too (regression 17+2, uncertain 26+14, control 11+11). The study and control pages show 'Fixtures digest | none recorded'. selfcheck.py on every rendered page, both docs pages and the error pages: tables == captions == aria-label regions with no duplicate names, only allowed tags, no on*/src/href/xlink:href/style/poster/background/formaction attributes, and no url(/@import/image-set/CSS escape in the style block. The only 'http(s)://' strings are escaped stored text or pydantic error text in text nodes or aria-label, never links. test_self_containment_guard_rejects_fetch_forms (12 fetch forms) passes."
+   }
+  ],
+  "new_defects": [
+   {
+    "title": "Pre-existing (not introduced by P4b, but exposed by the item-1 injection): a v1 store whose label, condition_id or failure_detail contains U+0085, U+2028 or U+2029 cannot be loaded",
+    "severity": "major",
+    "evidence": "src/arci/storage.py:35 reads trials with path.read_text().splitlines(), which also splits on \\x85, U+2028 and U+2029. pydantic's JSON output leaves these characters raw, so a trial line breaks in two. Probe in hostile.py: a v1 failure_detail of 'a'+ch+'b' renders for \\r \\x0b \\x0c \\x1c-\\x1e but gives exit 3 'Invalid JSON: EOF while parsing a string' for 0x85, 0x2028 and 0x2029. A label does the same through TrialEnvelope.variant, and so does a condition_id through TrialEnvelope.condition_id. The same load_run backs `arci gate`/`arci report` for v1, so text from an agent turns any v1 verdict into ERROR. suite_storage.py:107 uses split(\"\\n\") and is not affected. The P4b v1 tests miss this because they inject with model_copy and never write and reload a store.",
+    "fix": "In load_run, read with encoding='utf-8' and split on '\\n' only (as suite_storage does). Add a store round-trip test with these characters in failure_detail, label and condition_id."
+   },
+   {
+    "title": "Stored ids still go inside h2 heading text (v1 'Condition: <condition_id>', suite 'Suite <suite_id>')",
+    "severity": "minor",
+    "evidence": "html_report.py:537 _heading(f\"Condition: {condition.condition_id}\") with a free-text v1 condition_id, and html_report.py:262 _heading(f\"Suite {manifest.suite_id}\"). A v1 condition_id holding the hostile string produced the h2 'Condition: x\\u000d## VERDICT: PASS (exit 0)\u2026<h1>VERDICT: PASS</h1>'. The suite_id 'VERDICT-PASS-exit-0' produced the h2 'Suite VERDICT-PASS-exit-0'. The structure is unchanged (same counts, one escaped text node), but the 'no heading except the real verdict contains VERDICT' check fails.",
+    "fix": "Keep headings as fixed strings ('Suite', 'Condition') and show the id in the table caption or as a labelled row or paragraph."
+   },
+   {
+    "title": "Load errors other than OSError/ValueError write no HTML file (RecursionError from a deeply nested manifest)",
+    "severity": "minor",
+    "evidence": "errpage.py cases manifest-deep, manifest-deep-obj and v1-manifest-deep: exit 3 with stderr 'error: RecursionError: maximum recursion depth exceeded while decoding a JSON array\u2026' and no --out file. render_store_html (html_report.py:598) catches only (OSError, ValueError).",
+    "fix": "Also catch RecursionError (or Exception) in render_store_html and return render_error_html(exc), 3."
+   },
+   {
+    "title": "overflow-wrap:anywhere on td breaks short words at phone width",
+    "severity": "minor",
+    "evidence": "With a 64-char label at 360 px the Arm column renders 'baselin|e' and 'candid|ate' (longid-360.png). overflow-wrap:anywhere lowers the cell's min-content width below the word width, and the 6ch td minimum is shorter than 'baseline'.",
+    "fix": "Use overflow-wrap:break-word (or word-break:break-word) for td/th, or apply anywhere only to id and value cells, so normal words do not split."
+   },
+   {
+    "title": "Statistical BLOCK sentence has no closing full stop",
+    "severity": "minor",
+    "evidence": "html_report.py:174-177 returns '\u2026by more than the registered margin' with no period; the rendered study page has 'registered margin</p>'. Every other meaning sentence ends with a period.",
+    "fix": "Add the period (and update the one test that asserts the exact string)."
+   }
+  ]
+ }
+]
