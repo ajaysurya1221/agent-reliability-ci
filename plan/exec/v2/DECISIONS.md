@@ -107,3 +107,10 @@ merged into `v2/integration` and ADR 0012's frozen changes were made there, earl
 D-04 planned, which also lets hosted CI check the adapter. `uv.lock` added LangChain's
 packages and changed no existing version; it resolves `langchain 1.4.10`. The version stays
 1.0.0 until the release record. Remaining work runs on `v2/integration`, one task at a time.
+
+## D-10: the public study compares two local models, pre-registered (2026-11-11)
+
+Baseline `gemma4:12b-mlx`, candidate `qwen3.5:4b-mlx`, the order-desk suite, defaults,
+temperature 0.7, per-round seeds: `study/PREREGISTRATION.md`, pushed before any trial. The
+pilot showed the retry setting barely matters with real models, so the arms differ in the
+model alone. Run from a checkout pinned at `804157a` so later edits cannot touch it.
