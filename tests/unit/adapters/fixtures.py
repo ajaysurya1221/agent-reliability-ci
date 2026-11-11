@@ -151,6 +151,8 @@ def runner_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
 
                 return Command(update={})
             return object()
+        if task.get("key_error"):
+            raise KeyError("zzz")
         if task.get("tool_timeout_error"):
             raise TimeoutError("real tool timeout")
         if task.get("real_error"):
@@ -164,6 +166,8 @@ def runner_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
 
 
 def runner_spec() -> dict[str, Any]:
+    if _task.get("setup_error"):
+        raise ValueError("settings unavailable")
     middleware: list[AgentMiddleware[Any, Any, Any]] = []
     if _task.get("retry_tools"):
         middleware.append(
@@ -210,11 +214,3 @@ class ErrnoPolicy(AgentMiddleware[Any, Any, Any]):
 
 
 toolset, baseline, candidate = make_adapter(runner_tools, runner_spec, runner_spec)
-
-
-def oracle(task: dict[str, JsonValue], state: dict[str, JsonValue]) -> bool:
-    return (
-        not task.get("reject_oracle", False)
-        and set(state) == {"final_output", "structured_response", "state"}
-        and state["final_output"] == "done"
-    )

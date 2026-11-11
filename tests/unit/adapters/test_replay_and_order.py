@@ -84,7 +84,7 @@ def test_replay_unrecoverable_error_types_latch_harness(case: str) -> None:
     elif case == "ambiguous":
         shadow = type("ValueError", (Exception,), {})
         error = ValueError("failure")
-        declared = [shadow]
+        declared = [shadow, type("ValueError", (Exception,), {})]
     else:
         error = CustomError("failure")
         declared = []

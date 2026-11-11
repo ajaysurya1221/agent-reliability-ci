@@ -313,17 +313,24 @@ def test_reserved_boundary_argument_names_are_explicit_rejections(
         func=body,
     )
     adapter = make_adapter(lambda _task, _seed: [tool], spec, spec)
-    _, box, _ = boundary(adapter, recording=() if replay_mode else None)
     with pytest.raises(HarnessError, match="reserved boundary argument name"):
-        adapter.baseline({"input": "x"}, box, random.Random(7))
-    assert box.harness_fault and box.tool_calls == 0
+        if replay_mode:
+            box = ToolBox({}, Budgets(), lambda _kind, _payload: None, mode=ToolMode.REPLAY)
+            adapter.baseline({"input": "x"}, box, random.Random(7))
+        else:
+            adapter.toolset({"input": "x"}, 7)
 
 
-def test_only_public_framework_imports_are_used() -> None:
-    """Requirement 5: the runtime never imports private or unexported framework helpers."""
-    tree = ast.parse(Path(implementation.__file__).read_text())
+def assert_public_framework_source(source: str) -> None:
+    tree = ast.parse(source)
     framework = ("langchain", "langgraph", "langsmith", "httpx")
+    roots: set[str] = set()
     for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for name in node.names:
+                if name.name.startswith(framework):
+                    assert not any(part.startswith("_") for part in name.name.split("."))
+                    roots.add(name.asname or name.name.split(".")[0])
         if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(framework):
             assert node.module is not None
             assert not any(part.startswith("_") for part in node.module.split("."))
@@ -332,8 +339,42 @@ def test_only_public_framework_imports_are_used() -> None:
             for name in node.names:
                 assert not name.name.startswith("_")
                 assert hasattr(module, name.name)
+                roots.add(name.asname or name.name)
                 if exported is not None:
                     assert name.name in exported
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            parts: list[str] = []
+            value: ast.expr = node
+            while isinstance(value, ast.Attribute):
+                parts.append(value.attr)
+                value = value.value
+            if isinstance(value, ast.Name) and value.id in roots:
+                # Python's documented data-model/ABC introspection is not a private API.
+                assert not any(
+                    p.startswith("_") and not (p.startswith("__") and p.endswith("__"))
+                    for p in parts
+                )
+
+
+def test_only_public_framework_imports_are_used() -> None:
+    """Requirement 5 / finding 31f: include ordinary imports and alias attribute access."""
+    assert_public_framework_source(Path(implementation.__file__).read_text())
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import langchain_core.tools.base as tools\ntools._format_output",
+        "import langchain_core.tools.base\nlangchain_core.tools.base._format_output",
+        "from langchain_core.tools import base as tools\ntools._format_output",
+        "import langgraph._internal",
+    ],
+)
+def test_private_api_audit_catches_alias_access(source: str) -> None:
+    """Finding 31f: the policy check itself catches private names through ast.Import."""
+    with pytest.raises(AssertionError):
+        assert_public_framework_source(source)
 
 
 @pytest.mark.parametrize("replay_mode", [False, True])

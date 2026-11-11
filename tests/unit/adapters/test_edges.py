@@ -6,6 +6,7 @@ import asyncio
 import importlib.util
 import os
 import random
+import threading
 from typing import Any, cast
 
 import pytest
@@ -164,11 +165,28 @@ def test_serial_gate_timeout_and_reentry_abort_all_waiters(
         "reentry": "tool call re-entry",
         "outside": "tool call outside current message",
     }[case]
-    with pytest.raises(HarnessError, match=reason) as first:
-        outer.wrap_tool_call(request, handler)
+    # Finding 31g: a removed deadline must fail this test, never hang pytest.
+    errors: list[BaseException] = []
+
+    def dispatch() -> None:
+        try:
+            outer.wrap_tool_call(request, handler)
+        except BaseException as exc:
+            errors.append(exc)
+
+    waiter = threading.Thread(target=dispatch, daemon=True)
+    waiter.start()
+    waiter.join(timeout=1)
+    stalled = waiter.is_alive()
+    if stalled:
+        session.abort(HarnessError("test cleanup"))
+        waiter.join(timeout=1)
+    assert not stalled, "order gate failed to detect an idle deadlock"
+    assert len(errors) == 1 and isinstance(errors[0], HarnessError)
+    assert reason in str(errors[0])
     with pytest.raises(HarnessError) as second:
         outer.wrap_tool_call(request, handler)
-    assert first.value is second.value
+    assert errors[0] is second.value
     assert box.harness_fault
 
 

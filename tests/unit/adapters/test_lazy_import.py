@@ -67,3 +67,32 @@ print("missing-extra diagnostic verified")
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "missing-extra diagnostic verified" in result.stdout
+
+
+def test_grader_check_import_is_framework_free() -> None:
+    """Findings 23, 35: grading a serialized snapshot must not import LangChain again."""
+    import json
+
+    request = {
+        "contract": {"oracle": "tests.unit.adapters.checks:oracle"},
+        "events": [],
+        "task": {},
+        "final_state": {"final_output": "done", "structured_response": None, "state": None},
+        "run_oracle": True,
+    }
+    script = """
+import sys
+from arci.grade import main
+assert main() == 0
+frameworks = {'langchain', 'langchain_core', 'langgraph', 'langsmith'}
+assert not any(name.split('.')[0] in frameworks for name in sys.modules)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        input=json.dumps(request),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["success"] is True

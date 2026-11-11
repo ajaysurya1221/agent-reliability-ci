@@ -122,6 +122,15 @@ class ToolBox:
         return tuple(self.__recorded)
 
     @property
+    def is_replay(self) -> bool:
+        """Whether this boundary serves recordings instead of registered tools."""
+        return self.__mode is ToolMode.REPLAY
+
+    def uses_tools(self, tools: Mapping[str, Callable[..., JsonValue]] | None) -> bool:
+        """Check registration identity without exposing or executing the tool mapping."""
+        return self.__tools is tools
+
+    @property
     def tool_calls(self) -> int:
         return self.__tool_calls
 

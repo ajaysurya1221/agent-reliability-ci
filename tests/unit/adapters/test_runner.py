@@ -49,7 +49,7 @@ def manifest(
         task_id="single-task",
         task={"input": "find answer", **(task or {})},
         toolset=f"{FIXTURE}:toolset",
-        contract=ContractSpec(oracle=f"{FIXTURE}:oracle"),
+        contract=ContractSpec(oracle="tests.unit.adapters.checks:oracle"),
         baseline=ArmSpec(label="baseline", agent=f"{FIXTURE}:baseline"),
         candidate=ArmSpec(label="candidate", agent=f"{FIXTURE}:candidate"),
         conditions=(
@@ -221,3 +221,38 @@ def test_real_tool_timeout_is_an_agent_failure_not_infrastructure() -> None:
     assert trial.outcome is Outcome.FAIL
     assert trial.termination is Termination.CRASH
     assert trial.recording[0].result.error_kind == "error"
+
+
+def test_misconfigured_experiment_cannot_pass_v1_gate() -> None:
+    """Findings 1, 11, 28: real setup-error trials invalidate even a permissive gate."""
+    from arci.gate import decide
+    from arci.schema import Verdict
+
+    # At this prespecified coarse margin, two all-crash arms would pass the old adapter.
+    data = manifest(task={"setup_error": True}).model_dump(exclude={"record_sha256"})
+    data.update(n_per_arm=2, delta=0.99)
+    plan = Manifest.create(**data)
+    trials = [run_trial(spec, lambda _event: None, plan.contract) for spec in build_schedule(plan)]
+    assert all(
+        t.outcome is Outcome.ERROR and t.termination is Termination.HARNESS_ERROR for t in trials
+    )
+    assert all("ValueError: settings unavailable" in (t.failure_detail or "") for t in trials)
+    assert decide(plan, trials).verdict is Verdict.ERROR
+    from arci.schema import TrialEnvelope
+
+    crashed = []
+    for trial in trials:
+        data = trial.model_dump(exclude={"record_sha256"})
+        data.update(outcome=Outcome.FAIL, termination=Termination.CRASH)
+        crashed.append(TrialEnvelope.create(**data))
+    assert decide(plan, crashed).verdict is Verdict.PASS
+
+
+def test_uncaught_keyerror_bundle_reproduces() -> None:
+    """Findings 8, 22, 26: a real tool KeyError must replay with the same crash fingerprint."""
+    plan = manifest(task={"key_error": True})
+    spec = build_schedule(plan)[0]
+    trial = run_trial(spec, lambda _event: None, plan.contract)
+    assert trial.outcome is Outcome.FAIL and trial.termination is Termination.CRASH
+    assert trial.failure_detail == "KeyError: 'zzz'"
+    assert replay(make_bundle(plan, trial, spec)).status is ReplayStatus.REPRODUCED

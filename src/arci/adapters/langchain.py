@@ -3,25 +3,37 @@
 Middleware is trusted: replacing a request's tool or answering without its handler
 bypasses recording for that call. Validators execute twice on the same raw input;
 validators with side effects are unsupported. Replay reconstructs only exception
-classes and scrubbed text, never attributes or exact messages. A policy can take a
-different path and still reproduce when sequence, outcome and fingerprint agree.
+classes and round-trippable scrubbed diagnostics, never attributes or exact messages.
+A policy can take a different path and still reproduce when sequence, outcome and fingerprint agree.
 Provider retries belong in the model client's settings. The inner handler includes
 LangChain binding/output processing; infrastructure-shaped errors there are also
 classified as infrastructure. Serial execution includes retry backoff. Custom
 injectors should set injected_by: an unmarked error-kind result is indistinguishable
 from a real error in replay and follows the same class-name reconstruction rule.
+For built-in faults, before-hook failures are injected errors; value-only after
+faults (empty_result and decision_low_confidence) preserve any real error. Its
+original exception is raised live and reconstructed in replay despite the fault tag.
+User error_types override builtin names. Reconstructed exceptions must format to
+the exact recorded diagnostic;
+unrecoverable text (including scrubbed non-literal KeyError keys) is a harness error.
 """
 
 from __future__ import annotations
 
+import ast
 import builtins
 import copy
 import inspect
 import json
 import random
+import socket
+import ssl
 import threading
+import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import asdict, dataclass, is_dataclass
+from functools import partial
 from typing import Any, NamedTuple, NoReturn, Protocol, cast, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel, JsonValue, TypeAdapter
@@ -35,7 +47,7 @@ from arci.interfaces import (
     ToolFault,
     ToolSetFactory,
 )
-from arci.toolbox import HarnessError
+from arci.toolbox import HarnessError, format_diagnostic
 
 try:
     from httpx import TransportError
@@ -49,10 +61,12 @@ try:
     )
     from langchain.agents.structured_output import AutoStrategy, ProviderStrategy, ToolStrategy
     from langchain_core.callbacks import BaseCallbackHandler
-    from langchain_core.messages import AIMessage, ToolMessage
+    from langchain_core.language_models import BaseChatModel
+    from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, LLMResult
     from langchain_core.runnables import RunnableConfig
-    from langchain_core.tools import BaseTool, InjectedToolArg, StructuredTool
+    from langchain_core.tools import BaseTool, InjectedToolArg, StructuredTool, Tool
+    from langgraph.errors import GraphInterrupt
     from langgraph.prebuilt import ToolRuntime
     from langgraph.runtime import Runtime
     from langgraph.types import Command
@@ -96,6 +110,11 @@ class Adapter(NamedTuple):
 class _Boundary(ToolBoxProtocol, Protocol):
     def fail_harness(self, detail: str) -> NoReturn: ...
 
+    @property
+    def is_replay(self) -> bool: ...
+
+    def uses_tools(self, tools: Mapping[str, Callable[..., JsonValue]] | None) -> bool: ...
+
 
 class _Stop(BaseException):
     def __init__(self, cause: BaseException) -> None:
@@ -113,7 +132,9 @@ class _Session:
         self.entered: set[str] = set()
         self.next_index = 0
         self.owner: int | None = None
+        self.idle_since = time.monotonic()
         self.attempt = 0
+        self.model_started = False
         self.model_region = threading.local()
 
     def abort(self, exc: BaseException) -> BaseException:
@@ -141,6 +162,10 @@ class _Session:
         except (BudgetExceeded, ReplayMiss) as exc:
             raise self.abort(_Stop(exc)) from None
         except HarnessError as exc:
+            raise self.abort(exc) from None
+        except Exception:
+            raise
+        except BaseException as exc:
             raise self.abort(exc) from None
 
 
@@ -177,23 +202,42 @@ class _World:
             self.reject("async invocation")
         if inspect.iscoroutinefunction(getattr(tool, "func", None)):
             self.reject("async invocation")
-        sources: list[Any] = [tool.get_input_schema()]
+        if {"tool", "self"}.intersection(tool.args):
+            self.reject("reserved boundary argument name")
+        # Tool's public single-input args differ from its inferred implementation schema.
+        sources: list[Any] = (
+            [] if isinstance(tool, Tool) and tool.args_schema is None else [tool.get_input_schema()]
+        )
         sources.extend(getattr(tool, key, None) for key in ("func", "coroutine"))
+        # Inspect the user implementation of the ABC's extension points through
+        # standard Python reflection, without importing any framework helper.
+        for method in BaseTool.__abstractmethods__:
+            implementation = getattr(tool, method)
+            if not implementation.__module__.startswith("langchain_core."):
+                sources.append(implementation)
         for source in sources:
             if source is None:
                 continue
+            signature_source = source
+            while isinstance(source, partial):
+                source = source.func
             try:
                 annotations = get_type_hints(source, include_extras=True)
             except (NameError, TypeError):
                 self.reject("unresolved tool annotations")
             if "runtime" in annotations:
                 self.reject("injected tool arguments")
-            if (
-                callable(source)
-                and not isinstance(source, type)
-                and {"runtime", "callbacks"}.intersection(inspect.signature(source).parameters)
-            ):
-                self.reject("injected tool arguments")
+            if callable(signature_source) and not isinstance(signature_source, type):
+                parameters = inspect.signature(signature_source).parameters
+                if {"tool", "self"}.intersection(parameters):
+                    self.reject("reserved boundary argument name")
+                injected_names = {"runtime", "run_manager"}
+                # Stock Runnable/retriever wrappers accept callbacks internally;
+                # user-declared callback injection remains unsupported.
+                if not getattr(source, "__module__", "").startswith("langchain_core."):
+                    injected_names.add("callbacks")
+                if injected_names.intersection(parameters):
+                    self.reject("injected tool arguments")
             if any(_injected(annotation) for annotation in annotations.values()):
                 self.reject("injected tool arguments")
 
@@ -202,6 +246,8 @@ class _World:
             try:
                 # Public run treats a dictionary as arguments, even type='tool_call'.
                 value: Any = tool.run(arguments)
+            except GraphInterrupt:
+                self.reject("interrupted run")
             except Exception as exc:
                 self.original = exc
                 raise
@@ -233,11 +279,22 @@ def _injected(annotation: Any) -> bool:
 
 
 def _proxy(tool: BaseTool, function: Callable[..., Any]) -> BaseTool:
+    shared: dict[str, Any] = {
+        "name": tool.name,
+        "description": tool.description,
+        "extras": copy.deepcopy(tool.extras),
+        "metadata": copy.deepcopy(tool.metadata),
+        "tags": copy.deepcopy(tool.tags),
+    }
+    if isinstance(tool, Tool):
+
+        def invoke(*arguments: Any, **kwargs: Any) -> Any:
+            del arguments  # A Tool supplies its single input positionally; raw args are captured.
+            return function(**kwargs)
+
+        return Tool(func=invoke, args_schema=tool.args_schema, **shared)
     return StructuredTool(
-        name=tool.name,
-        description=tool.description,
-        args_schema=tool.args_schema or tool.get_input_schema(),
-        func=function,
+        args_schema=tool.args_schema or tool.get_input_schema(), func=function, **shared
     )
 
 
@@ -246,10 +303,12 @@ def _infra(exc: Exception) -> bool:
     response_status = getattr(getattr(exc, "response", None), "status_code", None)
     return (
         any(
-            isinstance(code, int) and (code == 429 or 500 <= code <= 599)
+            isinstance(code, int) and (code in {401, 403, 407, 408, 429} or 500 <= code <= 599)
             for code in (status, response_status)
         )
-        or isinstance(exc, (ConnectionError, TimeoutError, TransportError))
+        or isinstance(
+            exc, (ConnectionError, TimeoutError, TransportError, socket.gaierror, ssl.SSLError)
+        )
         or any(
             cls.__name__ in {"APIConnectionError", "APITimeoutError"} for cls in type(exc).__mro__
         )
@@ -299,6 +358,7 @@ class _Outer(Middleware):
             session.indices = {cast(str, value): index for index, value in enumerate(ids)}
             session.entered.clear()
             session.next_index = 0
+            session.idle_since = time.monotonic()
 
     def wrap_tool_call(
         self, request: ToolCallRequest, handler: ToolHandler
@@ -313,14 +373,17 @@ class _Outer(Middleware):
                 session.fail("tool call re-entry")
             session.entered.add(call_id)
             index = session.indices[call_id]
-            ready = session.condition.wait_for(
-                lambda: session.terminal is not None or index == session.next_index,
-                timeout=WAIT_SECONDS,
-            )
+            while index != session.next_index:
+                session.check()
+                remaining = None
+                if session.owner is None:
+                    remaining = WAIT_SECONDS - (time.monotonic() - session.idle_since)
+                    if remaining <= 0:
+                        session.fail("tool order wait timeout")
+                session.condition.wait(timeout=remaining)
             session.check()
-            if not ready:
-                session.fail("tool order wait timeout")
             session.owner = threading.get_ident()
+            session.condition.notify_all()
         try:
             result = handler(request)
             session.check()
@@ -330,6 +393,7 @@ class _Outer(Middleware):
         finally:
             with session.condition:
                 session.owner = None
+                session.idle_since = time.monotonic()
                 session.next_index += 1
                 session.condition.notify_all()
 
@@ -367,9 +431,12 @@ class _Inner(Middleware):
                 response = handler(request)
             finally:
                 session.model_region.active = False
-        except Exception as exc:
-            if _infra(exc):
+        except BaseException as exc:
+            session.check()
+            if isinstance(exc, Exception) and _infra(exc):
                 session.fail("LangChain adapter infrastructure error", unsupported=False)
+            if not session.model_started:
+                session.fail(f"agent setup failed: {format_diagnostic(exc)}")
             raise
         if not response.result or not isinstance(response.result[0], AIMessage):
             session.fail("non-AI model response")
@@ -392,28 +459,38 @@ class _Inner(Middleware):
             self.session.replay
             and fault.kind == "error"
             and recorded is not None
-            and recorded.result.injected_by is None
+            and recorded.result.injected_by in (None, "empty_result", "decision_low_confidence")
         ):
             name = fault.detail.split(":", 1)[0]
-            classes = {
-                value
-                for value in vars(builtins).values()
-                if isinstance(value, type)
-                and issubclass(value, Exception)
-                and value.__name__ == name
-            }
-            classes.update(value for value in self.errors if value.__name__ == name)
+            classes = {value for value in self.errors if format_diagnostic(value.__name__) == name}
+            if not classes:
+                classes = {
+                    value
+                    for value in vars(builtins).values()
+                    if isinstance(value, type)
+                    and issubclass(value, Exception)
+                    and value.__name__ == name
+                }
             if len(classes) != 1:
                 self.session.fail("unreconstructable tool error")
-            try:
-                message = fault.detail[len(name) :].removeprefix(": ")
-                selected = next(iter(classes))
-                reconstructed = selected(message)
-                if not isinstance(reconstructed, selected):
-                    self.session.fail("unreconstructable tool error")
-            except BaseException:
-                self.session.fail("unreconstructable tool error")
-            raise reconstructed
+            message = fault.detail[len(name) :].removeprefix(": ")
+            arguments: list[Any] = [message]
+            with suppress(ValueError, SyntaxError):
+                arguments.append(ast.literal_eval(message))
+            selected = next(iter(classes))
+            for argument in arguments:
+                try:
+                    reconstructed = selected(argument)
+                    matches = (
+                        isinstance(reconstructed, selected)
+                        and format_diagnostic(reconstructed) == fault.detail
+                    )
+                except BaseException:
+                    continue
+                if matches:
+                    raise reconstructed
+            self.session.fail("unreconstructable tool error")
+
         exception = self.faults.get(fault.kind)
         if exception is not None:
             try:
@@ -459,6 +536,13 @@ class _ResponseGuard(BaseCallbackHandler):
     def __init__(self, session: _Session) -> None:
         self.session = session
 
+    def on_chat_model_start(
+        self, serialized: dict[str, Any], messages: list[list[BaseMessage]], **kwargs: Any
+    ) -> None:
+        # Binding and input processing can fail before the provider is ever invoked.
+        if getattr(self.session.model_region, "active", False):
+            self.session.model_started = True
+
     def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
         if not getattr(self.session.model_region, "active", False):
             return
@@ -503,8 +587,12 @@ def make_adapter(
         nonlocal active
         try:
             active = _World(make_tools(task, seed))
-        except Exception:
-            raise HarnessError("LangChain adapter unsupported: tool factory failed") from None
+        except HarnessError:
+            raise
+        except BaseException as exc:
+            raise HarnessError(
+                f"LangChain adapter unsupported: tool factory failed: {format_diagnostic(exc)}"
+            ) from None
         return active
 
     def arm(builder: AgentSpec) -> AgentFn:
@@ -516,24 +604,59 @@ def make_adapter(
                 raise HarnessError("LangChain adapter unsupported: boundary lacks fail_harness")
             session = _Session(
                 cast(_Boundary, boundary),
-                replay=active is None or bool(getattr(boundary, "recording", ())),
+                replay=bool(getattr(boundary, "is_replay", False)),
             )
+            try:
+                return execute(task, session)
+            except _Stop as exc:
+                raise exc.cause from None
+            except HarnessError:
+                raise
+            except BaseException as exc:
+                session.check()
+                if not session.model_started:
+                    session.fail(f"agent setup failed: {format_diagnostic(exc)}")
+                raise
+
+        def execute(task: dict[str, JsonValue], session: _Session) -> dict[str, JsonValue]:
+            if not session.replay and not session.boundary.uses_tools(
+                active.tools if active is not None else None
+            ):
+                session.fail("mismatched adapter toolset")
             try:
                 world = active if active is not None else _World(make_tools(task, 0))
             except HarnessError as exc:
                 session.fail(str(exc).removeprefix("LangChain adapter unsupported: "))
-            except Exception:
-                session.fail("tool factory failed")
+            except BaseException as exc:
+                session.fail(f"tool factory failed: {format_diagnostic(exc)}")
             world.session = session
-            kwargs = dict(builder())
+            settings: Any = builder()
+            if not isinstance(settings, Mapping):
+                raise TypeError("agent settings must be a mapping")
+            kwargs = dict(settings)
             for key in kwargs:
                 if key not in {"model", "system_prompt", "middleware", "response_format", "name"}:
                     session.fail(f"create_agent key {key}")
             if "model" not in kwargs:
                 session.fail("missing model")
+            if not isinstance(kwargs["model"], (str, BaseChatModel)):
+                session.fail("invalid model")
             middleware: list[Middleware] = list(kwargs.pop("middleware", ()))
             if any(getattr(item, "tools", ()) for item in middleware):
                 session.fail("middleware-owned tools")
+            for item in middleware:
+                for hook in (
+                    "before_agent",
+                    "before_model",
+                    "after_model",
+                    "after_agent",
+                    "wrap_model_call",
+                    "wrap_tool_call",
+                ):
+                    if getattr(type(item), "a" + hook) is not getattr(
+                        AgentMiddleware, "a" + hook
+                    ) and getattr(type(item), hook) is getattr(AgentMiddleware, hook):
+                        session.fail("async invocation")
             handle_errors = getattr(kwargs.get("response_format"), "handle_errors", None)
             if callable(handle_errors) and not (
                 isinstance(handle_errors, type) and issubclass(handle_errors, Exception)
@@ -542,6 +665,7 @@ def make_adapter(
 
             def placeholder(**arguments: Any) -> None:
                 del arguments
+                session.fail("proxy tool executed outside the boundary")
 
             proxies = [_proxy(tool, placeholder) for tool in world.objects]
             structured_names: set[str] = set()
@@ -562,13 +686,10 @@ def make_adapter(
                 graph_input: Any = {"messages": [{"role": "user", "content": task["input"]}]}
             else:
                 graph_input = task_to_input(task)
-            try:
-                result: Any = graph.invoke(
-                    graph_input, config={"callbacks": [_ResponseGuard(session)]}
-                )
-                session.check()
-            except _Stop as exc:
-                raise exc.cause from None
+            result: Any = graph.invoke(graph_input, config={"callbacks": [_ResponseGuard(session)]})
+            session.check()
+            if result.get("__interrupt__"):
+                session.fail("interrupted run")
             messages = result.get("messages", ())
             final = next(
                 (message.text for message in reversed(messages) if isinstance(message, AIMessage)),
