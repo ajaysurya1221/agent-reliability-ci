@@ -20,7 +20,9 @@ from arci.demo.run import check_keep, default_workers, run_demo
 from arci.descriptor import (
     DescriptorError,
     compile_descriptor,
+    compile_run_descriptor,
     is_descriptor_path,
+    is_suite_descriptor,
     render_schema,
 )
 
@@ -69,6 +71,10 @@ from arci.schema import (
     Verdict,
 )
 from arci.storage import load_run
+from arci.suite_gate import decide_suite, replay_suite_decision
+from arci.suite_runner import run_suite
+from arci.suite_schema import SUITE_SCHEMA_VERSION, SuiteDecision, SuiteManifest
+from arci.suite_storage import load_suite_run, manifest_schema_version
 from arci.trace_check import check_traces, render_trace_check
 
 
@@ -288,7 +294,22 @@ def smoke_followup(manifest: Manifest) -> str:
 
 def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
     # --- descriptor ---
-    manifest = _run_manifest(manifest_path)
+    if is_descriptor_path(manifest_path):
+        try:
+            loaded = compile_run_descriptor(manifest_path, out_dir=out_dir)
+        except DescriptorError as exc:
+            raise CliError(str(exc)) from None
+    elif _suite_input(manifest_path):
+        loaded = SuiteManifest.model_validate_json(Path(manifest_path).read_text(encoding="utf-8"))
+    else:
+        loaded = _run_manifest(manifest_path)
+    if isinstance(loaded, SuiteManifest):
+        trials = run_suite(loaded, out_dir, workers=workers)
+        suite_decision = decide_suite(loaded, trials)
+        _print(_suite_summary(suite_decision, len(trials)))
+        print(f"run store: {(Path(out_dir) / loaded.experiment_id).resolve()}", file=sys.stderr)
+        return suite_decision.exit_code
+    manifest = loaded
     # --- end descriptor ---
     # --- smoke ---
     notice = smoke_notice(manifest)
@@ -435,6 +456,129 @@ def _cmd_preflight(
     return 0
 
 
+def _suite_summary(decision: SuiteDecision, trials: int) -> str:
+    last = decision.history[-1] if decision.history else None
+    lines = [
+        f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})",
+        f"reason: {'; '.join(decision.reasons)}",
+        f"stopping round: {decision.stopped_at_round}",
+        f"pairs: {trials // 2} ({trials} trials)",
+    ]
+    if last is not None:
+        c = last.counts
+        lines += [
+            f"counts: minus={c.minus}, zero={c.zero}, plus={c.plus}, errored={c.errored}",
+            f"PASS wealth: {last.pass_wealth}; threshold: {decision.threshold}; "
+            f"crossed: {last.pass_crossed}",
+            f"BLOCK wealth: {last.block_wealth}; threshold: {decision.threshold}; "
+            f"crossed: {last.block_crossed}",
+            f"errored pairs: {c.errored}; tolerance: {decision.max_errored_pairs}",
+            f"candidate hard violations: {last.candidate_hard_violations}",
+        ]
+    else:
+        lines += [
+            "counts: unavailable (invalid evidence)",
+            f"PASS wealth: unavailable; threshold: {decision.threshold}",
+            f"BLOCK wealth: unavailable; threshold: {decision.threshold}",
+            f"errored pairs: unavailable; tolerance: {decision.max_errored_pairs}",
+        ]
+    if decision.scenario_seeds == "per_round":
+        lines.append(
+            "scenario_seeds: per_round. Assuming joint independence across cells within rounds "
+            "and across rounds (or the conditional form), each directional statistical error "
+            f"is at most alpha/2 (alpha={decision.alpha}); "
+            "Its error guarantee requires that in every round the "
+            "suite mean over that round's scenario instances obey the relevant null, with the "
+            "independence conditions above (or their conditional form)."
+        )
+        lines.append(
+            "ARCI does not check or enforce this premise; "
+            "there is no guarantee averaged over seeds."
+        )
+    else:
+        lines.append(
+            "scenario_seeds: fixed. For the registered scenarios, each directional statistical "
+            f"error is at most alpha/2 (alpha={decision.alpha}), under joint independence across "
+            "cells and rounds and stationary per-cell laws, including no execution-order effect."
+        )
+    lines.append(
+        "The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule."
+    )
+    if decision.prior_runs:
+        lines.append("prior runs: " + ", ".join(decision.prior_runs))
+    return "\n".join(lines) + "\n"
+
+
+def _cmd_suite_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -> int:
+    if junit_path is not None:
+        raise CliError("suite support for gate --junit is not built yet")
+    manifest, trials = load_suite_run(run_dir)
+    decision = decide_suite(manifest, trials)
+    stored = Path(run_dir) / "decision.json"
+    matches = True
+    comparison = "stored decision: absent"
+    if stored.exists():
+        try:
+            previous = SuiteDecision.model_validate_json(stored.read_text(encoding="utf-8"))
+            matches = replay_suite_decision(previous, manifest, trials)
+        except (ValueError, OSError):
+            matches = False
+        comparison = (
+            "stored decision: MATCH" if matches else "stored decision: MISMATCH (ERROR, exit 3)"
+        )
+    summary = _suite_summary(decision, len(trials)) + comparison + "\n"
+    if not matches:
+        summary = "VERDICT: ERROR (exit 3)\n" + summary.replace(
+            "VERDICT:", "recomputed verdict:", 1
+        )
+    _print(summary)
+    if markdown_path is not None:
+        _write(markdown_path, summary)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        _write(summary_path, summary)
+    return decision.exit_code if matches else 3
+
+
+def _suite_input(path: str) -> bool:
+    source = Path(path)
+    try:
+        # Never consume pipes, device files, or even regular files aliased to stdin.
+        resolved = source.resolve()
+        if resolved.is_relative_to("/dev/fd") or resolved.is_relative_to("/proc"):
+            return False
+        if source.is_file():
+            stdin = os.fstat(0)
+            current = source.stat()
+            if (current.st_dev, current.st_ino) == (stdin.st_dev, stdin.st_ino):
+                return False
+        if is_descriptor_path(source) and source.is_file():
+            return is_suite_descriptor(source)
+        if source.is_dir() or source.is_file():
+            return manifest_schema_version(source) == SUITE_SCHEMA_VERSION
+    except (OSError, ValueError):
+        return False
+    return False
+
+
+def _deferred_suite_command(values: dict[str, object]) -> bool:
+    command = str(values["command"])
+    fields = {
+        "report": ("run_dir",),
+        "triage": ("run_dir",),
+        "diff": ("run_dir",),
+        "minimize": ("run_dir",),
+        "bundle": ("run_dir",),
+        "replay": ("bundle_json",),
+        "trace-check": ("baseline_run", "candidate_run"),
+        "plan": ("suite_input",),
+    }.get(command, ())
+    if any(isinstance(value := values.get(field), str) and _suite_input(value) for field in fields):
+        print(f"suite support for {command} is not built yet")
+        return True
+    return False
+
+
 def _invalid_store_report(exc: BaseException) -> str:
     return (
         f"# ARCI gate\n\nRun store validation failed: {_one_line(exc)}\n\nVERDICT: ERROR (exit 3)\n"
@@ -442,7 +586,12 @@ def _invalid_store_report(exc: BaseException) -> str:
 
 
 def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -> int:
+    suite = _suite_input(run_dir)
+    if suite and junit_path is not None:
+        raise CliError("JUnit export for suites is not built yet")
     try:
+        if suite:
+            return _cmd_suite_gate(run_dir, junit_path, markdown_path)
         manifest, trials = load_run(run_dir)
     except Exception as exc:
         _print(_invalid_store_report(exc))
@@ -588,7 +737,7 @@ def _cmd_minimize(run_dir: str, trial_id: str, out_path: str) -> int:
     return 0
 
 
-def _parser() -> _Parser:
+def _parser(*, suite_probe: bool = False) -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -620,7 +769,7 @@ def _parser() -> _Parser:
     gate.add_argument("--markdown", metavar="PATH")
 
     report = commands.add_parser("report", help="render a stored run")
-    report.add_argument("run_dir", metavar="RUN_DIR")
+    report.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
     report.add_argument("--format", choices=("md", "junit"), default="md")
     report.add_argument(
         "--pass-k",
@@ -638,15 +787,17 @@ def _parser() -> _Parser:
             "Domain: clopper_pearson, K=1, one look, N <= 400; other designs are refused."
         ),
     )
-    plan_command.add_argument("--baseline-rate", type=float, required=True, metavar="P")
-    plan_command.add_argument("--candidate-rate", type=float, required=True, metavar="P")
+    if suite_probe:
+        plan_command.add_argument("suite_input", nargs="?")
+    plan_command.add_argument("--baseline-rate", type=float, required=not suite_probe, metavar="P")
+    plan_command.add_argument("--candidate-rate", type=float, required=not suite_probe, metavar="P")
     plan_command.add_argument("--alpha", type=float, default=0.05)
     plan_command.add_argument("--delta", type=float, default=0.10)
     plan_command.add_argument(
         "--n-grid", default=",".join(map(str, DEFAULT_N_GRID)), metavar="N,N,..."
     )
     plan_command.add_argument(
-        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=True
+        "--target-verdict", choices=("PASS", "BLOCK", "INCONCLUSIVE"), required=not suite_probe
     )
     plan_command.add_argument("--target-probability", type=float, default=0.80, metavar="P")
     plan_command.add_argument(
@@ -666,19 +817,21 @@ def _parser() -> _Parser:
     )
 
     bundle = commands.add_parser("bundle", help="create a portable failure bundle")
-    bundle.add_argument("run_dir", metavar="RUN_DIR")
-    bundle.add_argument("trial_id", metavar="TRIAL_ID")
-    bundle.add_argument("--out", required=True, metavar="PATH")
+    bundle.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    bundle.add_argument("trial_id", metavar="TRIAL_ID", nargs="?" if suite_probe else None)
+    bundle.add_argument("--out", required=not suite_probe, metavar="PATH")
     bundle.add_argument("--root", metavar="DIR")
     bundle.add_argument("--include", action="append", default=[], metavar="RELPATH")
 
     replay_command = commands.add_parser("replay", help="replay a failure bundle")
-    replay_command.add_argument("bundle_json", metavar="BUNDLE_JSON")
+    replay_command.add_argument(
+        "bundle_json", metavar="BUNDLE_JSON", nargs="?" if suite_probe else None
+    )
 
     diff = commands.add_parser("diff", help="find the first divergence between two trials")
-    diff.add_argument("run_dir", metavar="RUN_DIR")
-    diff.add_argument("trial_a", metavar="TRIAL_A")
-    diff.add_argument("trial_b", metavar="TRIAL_B")
+    diff.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    diff.add_argument("trial_a", metavar="TRIAL_A", nargs="?" if suite_probe else None)
+    diff.add_argument("trial_b", metavar="TRIAL_B", nargs="?" if suite_probe else None)
     diff.add_argument("--all-steps", action="store_true")
 
     trace_check = commands.add_parser(
@@ -689,10 +842,16 @@ def _parser() -> _Parser:
             "(exit 3). This is not a statistical verdict, authentication, or replay verification."
         ),
     )
-    trace_check.add_argument("baseline_run", metavar="BASE_RUN")
-    trace_check.add_argument("baseline_trial_id", metavar="BASE_TRIAL")
-    trace_check.add_argument("candidate_run", metavar="CAND_RUN")
-    trace_check.add_argument("candidate_trial_id", metavar="CAND_TRIAL")
+    trace_check.add_argument("baseline_run", metavar="BASE_RUN", nargs="?" if suite_probe else None)
+    trace_check.add_argument(
+        "baseline_trial_id", metavar="BASE_TRIAL", nargs="?" if suite_probe else None
+    )
+    trace_check.add_argument(
+        "candidate_run", metavar="CAND_RUN", nargs="?" if suite_probe else None
+    )
+    trace_check.add_argument(
+        "candidate_trial_id", metavar="CAND_TRIAL", nargs="?" if suite_probe else None
+    )
     trace_check.add_argument("--format", choices=("text", "json"), default="text")
 
     triage = commands.add_parser(
@@ -705,14 +864,14 @@ def _parser() -> _Parser:
             "Tool names, pointers and hashes may disclose information."
         ),
     )
-    triage.add_argument("run_dir", metavar="RUN_DIR")
+    triage.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
     triage.add_argument("--trial", metavar="CANDIDATE_ID", help="select one candidate trial")
     triage.add_argument("--format", choices=("text", "json"), default="text")
 
     minimize = commands.add_parser("minimize", help="minimize a failing trial's faults")
-    minimize.add_argument("run_dir", metavar="RUN_DIR")
-    minimize.add_argument("trial_id", metavar="TRIAL_ID")
-    minimize.add_argument("--out", required=True, metavar="PATH")
+    minimize.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
+    minimize.add_argument("trial_id", metavar="TRIAL_ID", nargs="?" if suite_probe else None)
+    minimize.add_argument("--out", required=not suite_probe, metavar="PATH")
 
     # --- demo ---
     demo = commands.add_parser(
@@ -906,7 +1065,12 @@ def _dispatch(values: dict[str, object]) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI and translate user-facing errors to exit code 3."""
     try:
-        namespace = _parser().parse_args(argv)
+        arguments = sys.argv[1:] if argv is None else argv
+        if "--help" not in arguments and "-h" not in arguments:
+            probe, _ = _parser(suite_probe=True).parse_known_args(arguments)
+            if _deferred_suite_command(cast(dict[str, object], vars(probe))):
+                return 3
+        namespace = _parser().parse_args(arguments)
         return _dispatch(cast(dict[str, object], vars(namespace)))
     except CliError as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
