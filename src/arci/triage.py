@@ -424,6 +424,12 @@ def _suite_comparison(run_dir: Path | str, baseline_id: str, candidate_id: str) 
             sources[0],
             sources[1],
             difference,
+            TraceCheckResult("MATCH", "").limitations
+            + (
+                ("Fixture identities are empty; environment equality is declaration-only.",)
+                if not manifest.fixtures_sha256
+                else ()
+            ),
         )
     except (OSError, ValueError, TypeError, UnicodeError, RecursionError, KeyError):
         return TraceCheckResult("INVALID", "Suite store is invalid or unavailable.")

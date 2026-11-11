@@ -183,15 +183,45 @@ def suite_plan(
     projection: dict[str, str] | None = None
     status = "floors only: no model supplied"
     if laws is not None:
-        # The packed DP's integer width is proportional to the denominator bits
-        # across all pairs. Bound that as well as the number of count states.
+        # Bound packed-integer work, rather than rejecting ordinary default budgets
+        # just above 400 pairs. Zero-probability outcomes remove a state dimension
+        # (common homogeneous agreement models have only two outcomes).
+        pairs = manifest.registered_pairs
         bits = (
             sum(math.lcm(*(p.denominator for p in law)).bit_length() for law in laws)
             * rule.max_rounds
         )
-        if manifest.registered_pairs > 400 or bits > 8192:
+        minus = any(law[0] for law in laws)
+        plus = any(law[2] for law in laws)
+        dimensions = int(minus) + int(plus)
+        states_work = (
+            (pairs + 1) * (pairs + 2) * (2 * pairs + 3) // 6 - 1
+            if dimensions == 2
+            else (pairs + 1) * (pairs + 2) // 2 - 1
+            if dimensions == 1
+            else pairs
+        )
+        bit_work = states_work * (bits + 1)
+        # Calibrated against the exact kernel; this is a conservative admission
+        # estimate, not a wall-clock guarantee. Boundary construction also costs
+        # O(sum(round_pairs**2)) regardless of outcome support.
+        boundary_work = (
+            rule.n_cells**2
+            * rule.max_rounds
+            * (rule.max_rounds + 1)
+            * (2 * rule.max_rounds + 1)
+            // 6
+        )
+        if bits > 8192:
             status = (
-                "grid or rational precision too large to enumerate in reasonable time; floors only"
+                f"rational precision too large to enumerate: {bits} denominator bits "
+                "exceeds limit 8192; floors only"
+            )
+        elif bit_work > 100_000_000_000 or boundary_work > 100_000_000:
+            status = (
+                f"estimated work too large to enumerate: {bit_work} packed bit-operations "
+                f"(limit 100000000000), {boundary_work} boundary states "
+                "(limit 100000000); floors only"
             )
         else:
             oc = operating_characteristics(laws, rule)
@@ -209,7 +239,7 @@ def suite_plan(
             "alpha": manifest.alpha,
             "delta": manifest.delta,
             "stakes": manifest.stakes,
-            "threshold": str(rule.threshold),
+            "threshold": f"{rule.threshold.numerator}/{rule.threshold.denominator}",
             "n_cells": rule.n_cells,
             "max_rounds": rule.max_rounds,
             "scenario_seeds": manifest.scenario_seeds,
@@ -238,19 +268,38 @@ def suite_plan(
             "Cells and rounds are independent, each cell has the same joint law "
             "in every round; no errors or hard violations. These are model projections, "
             "not measured live-agent behavior or a guarantee averaged over seeds."
-        ),
+        )
+        if laws is not None
+        else None,
         "status": status,
         "projection": projection,
     }
 
 
+def _six_places(value: str) -> str:
+    exact = Fraction(value)
+    truncated = exact.numerator * 1_000_000 // exact.denominator
+    decimal = f"{truncated // 1_000_000}.{truncated % 1_000_000:06d}"
+    if exact and not truncated:
+        return "<0.000001 (positive)"
+    return decimal
+
+
 def render_suite_plan(document: dict[str, object]) -> str:
-    """Render exact rationals without rounding a probability to zero or one."""
-    lines = ["# Suite plan", "", str(document["model"]), "", str(document["assumptions"]), ""]
+    """Readable truncated decimals; machine output retains the exact fractions."""
+    lines = ["# Suite plan", "", str(document["model"]), ""]
+    if document["assumptions"] is not None:
+        lines.extend([str(document["assumptions"]), ""])
     for section in ("rule", "floors", "projection"):
         values = document[section]
         if isinstance(values, dict):
-            lines.extend(f"{key}: {value}" for key, value in values.items())
+            if section == "projection":
+                lines.append("Decimals are truncated to six places; exact fractions are in JSON.")
+            for key, value in values.items():
+                display = _six_places(str(value)) if section == "projection" else value
+                if key == "stakes" and isinstance(value, (tuple, list)):
+                    display = ", ".join(str(stake) for stake in value)
+                lines.append(f"{key}: {display}")
             lines.append("")
     lines.extend([str(document["status"]), ""])
     warnings = document["warnings"]

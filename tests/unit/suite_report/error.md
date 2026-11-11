@@ -1,6 +1,6 @@
 # Suite suite-acceptance
 
-VERDICT: ERROR (exit 3)
+VERDICT: ERROR (exit 3); stored decision: absent
 
 Reasons: errored pairs exceed max_errored_pairs
 
@@ -62,10 +62,10 @@ Recorded tool_finish injections, grouped by declared fault name; repeated declar
 | `store_error_late` | `tool_error_once` | baseline | 5 | 0 | 0 | declared, never fired |
 | `store_error_late` | `tool_error_once` | candidate | 5 | 0 | 0 | declared, never fired |
 
-## Earlier runs on this candidate are never hidden
+## Prior runs recorded in the manifest; discovery covers the output root only
 
 - `earlier`
 
 A new campaign does not reset the error budget. Integrity seals do not authenticate execution.
 
-VERDICT: ERROR (exit 3)
+VERDICT: ERROR (exit 3); stored decision: absent

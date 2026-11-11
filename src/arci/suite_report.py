@@ -9,13 +9,22 @@ from arci.report import fault_accounting, fault_markdown
 from arci.schema import TrialEnvelope
 from arci.suite_schema import SuiteDecision, SuiteManifest
 
-# Verbatim sentences from docs/STATISTICS_SUITE.md, with source line wraps removed.
+# Guarantees from docs/STATISTICS_SUITE.md, qualified for standalone reports.
 FIXED_GUARANTEE = "The claim is for the registered scenarios over outcome randomness."
 PER_ROUND_GUARANTEE = (
-    "Its error guarantee requires that in every round the suite mean "
+    "The per_round error guarantee requires that in every round the suite mean "
     "over that round's scenario instances obey the relevant null, with the "
-    "independence conditions above (or their conditional form)."
+    "joint independence across cells and rounds (or its conditional form)."
 )
+SEED_LIMITATION = (
+    "There is no guarantee averaged over seeds: a deterministic hash of "
+    "registered content is not a sampling distribution."
+)
+PRIOR_RUNS = "Prior runs recorded in the manifest; discovery covers the output root only"
+INTEGRITY_LIMITATION = (
+    "A new campaign does not reset the error budget. Integrity seals do not authenticate execution."
+)
+WEALTH_DISPLAY = "Wealth displays are truncated; exact crossing flags decide against the threshold."
 CELL_WARNING = "A suite-mean PASS can hide a regression in one cell."
 ASSUMPTIONS = (
     "Statistical directional error bounds are alpha/2 under joint independence across "
@@ -35,15 +44,27 @@ def guarantee(seed_mode: str) -> str:
 
 
 def render_suite_json(
-    manifest: SuiteManifest, decision: SuiteDecision, trials: Sequence[TrialEnvelope]
+    manifest: SuiteManifest,
+    decision: SuiteDecision,
+    trials: Sequence[TrialEnvelope],
+    *,
+    stored_status: str = "absent",
 ) -> str:
     return (
         json.dumps(
             {
                 "decision": decision.model_dump(mode="json"),
+                "stored_decision_status": stored_status,
+                "exit_code": 3 if stored_status == "mismatch" else decision.exit_code,
+                "prior_runs_scope": PRIOR_RUNS,
+                "integrity_limitation": INTEGRITY_LIMITATION,
+                "seed_limitation": SEED_LIMITATION
+                if manifest.scenario_seeds == "per_round"
+                else None,
                 "guarantee": guarantee(manifest.scenario_seeds),
                 "assumptions": ASSUMPTIONS,
                 "cell_warning": CELL_WARNING,
+                "wealth_display": WEALTH_DISPLAY,
                 "cells_role": "descriptive; no per-cell statistical verdict",
                 "observed_trials": len(trials),
                 "fault_accounting": fault_accounting(manifest.conditions, trials),
@@ -56,13 +77,24 @@ def render_suite_json(
 
 
 def render_suite_markdown(
-    manifest: SuiteManifest, decision: SuiteDecision, trials: Sequence[TrialEnvelope]
+    manifest: SuiteManifest,
+    decision: SuiteDecision,
+    trials: Sequence[TrialEnvelope],
+    *,
+    stored_status: str = "absent",
 ) -> str:
     last = decision.history[-1] if decision.history else None
+    verdict_line = (
+        "VERDICT: ERROR (exit 3); stored decision: mismatch; "
+        f"recomputed verdict: {decision.verdict.value}"
+        if stored_status == "mismatch"
+        else f"VERDICT: {decision.verdict.value} (exit {decision.exit_code}); "
+        f"stored decision: {stored_status}"
+    )
     lines = [
         f"# Suite {_cell(manifest.suite_id)}",
         "",
-        f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})",
+        verdict_line,
         "",
         "Reasons: " + "; ".join(_cell(reason) for reason in decision.reasons),
         "",
@@ -84,8 +116,7 @@ def render_suite_markdown(
         lines.extend(
             [
                 "",
-                "There is no guarantee averaged over seeds: a deterministic hash of "
-                "registered content is not a sampling distribution.",
+                SEED_LIMITATION,
             ]
         )
     lines.extend(
@@ -93,7 +124,7 @@ def render_suite_markdown(
             "",
             "## Round history (cumulative)",
             "",
-            "Wealth displays are truncated; exact crossing flags decide against the threshold.",
+            WEALTH_DISPLAY,
             "",
             "| Round | Pairs | Minus | Zero | Plus | Errored / tolerance | Hard violations | "
             "PASS wealth | BLOCK wealth | Threshold | PASS crossed | BLOCK crossed | Verdict |",
@@ -131,17 +162,16 @@ def render_suite_markdown(
             f"{c.plus} | {c.errored} | {cell.candidate_hard_violations} |"
         )
     lines.extend(fault_markdown(manifest.conditions, trials))
-    lines.extend(["", "## Earlier runs on this candidate are never hidden", ""])
+    lines.extend(["", f"## {PRIOR_RUNS}", ""])
     lines.extend(f"- `{_cell(run)}`" for run in decision.prior_runs)
     if not decision.prior_runs:
         lines.append("- None recorded.")
     lines.extend(
         [
             "",
-            "A new campaign does not reset the error budget. Integrity seals do not "
-            "authenticate execution.",
+            INTEGRITY_LIMITATION,
             "",
-            f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})",
+            verdict_line,
         ]
     )
     return "\n".join(lines) + "\n"

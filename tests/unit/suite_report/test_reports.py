@@ -123,7 +123,14 @@ def test_seed_guarantee_and_invalid_history() -> None:
 
     statistics = " ".join(Path("docs/STATISTICS_SUITE.md").read_text().replace("**", "").split())
     for mode in ("fixed", "per_round"):
-        assert guarantee(mode) in statistics
+        if mode == "fixed":
+            assert guarantee(mode) in statistics
+        else:
+            assert (
+                "in every round the suite mean over that round's scenario instances "
+                "obey the relevant null" in guarantee(mode)
+            )
+            assert "per_round" in guarantee(mode) and "above" not in guarantee(mode)
         m = suite_manifest(max_rounds=4, scenario_seeds=mode)
         trials = round_trials(m, 1, [0] * 20)[:1]
         report = render_suite_markdown(m, decide_suite(m, trials), trials)

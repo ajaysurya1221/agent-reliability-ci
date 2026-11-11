@@ -59,6 +59,12 @@ def test_suite_triage_and_diff(tmp_path: Path, capsys: pytest.CaptureFixture[str
     pair = doc["selected_pairs"][0]
     assert pair["baseline_trial_id"] == baseline.trial_id
     assert pair["comparison"]["status"] == "DRIFT"
+    from arci.trace_check import TraceCheckResult
+
+    assert pair["comparison"]["limitations"] == [
+        *TraceCheckResult("MATCH", "").limitations,
+        "Fixture identities are empty; environment equality is declaration-only.",
+    ]
     assert pair["comparison"]["first_difference"]["path"] == "/payload/result/ok"
     assert pair["first_difference_context"]["candidate"]["seq"] == 1
     for extra in ([], ["--other-run", str(other.run_dir)]):

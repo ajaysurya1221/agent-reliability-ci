@@ -1,6 +1,6 @@
 # Suite suite-acceptance
 
-VERDICT: INCONCLUSIVE (exit 2)
+VERDICT: INCONCLUSIVE (exit 2); stored decision: absent
 
 Reasons: no test crossed
 
@@ -65,10 +65,10 @@ Recorded tool_finish injections, grouped by declared fault name; repeated declar
 | `store_error_late` | `tool_error_once` | baseline | 20 | 0 | 0 | declared, never fired |
 | `store_error_late` | `tool_error_once` | candidate | 20 | 0 | 0 | declared, never fired |
 
-## Earlier runs on this candidate are never hidden
+## Prior runs recorded in the manifest; discovery covers the output root only
 
 - `earlier`
 
 A new campaign does not reset the error budget. Integrity seals do not authenticate execution.
 
-VERDICT: INCONCLUSIVE (exit 2)
+VERDICT: INCONCLUSIVE (exit 2); stored decision: absent
