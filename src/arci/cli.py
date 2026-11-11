@@ -657,7 +657,24 @@ def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -
     return decision.exit_code
 
 
-def _cmd_report(run_dir: str, report_format: str, pass_k: str | None = None) -> int:
+def _cmd_report(
+    run_dir: str, report_format: str, pass_k: str | None = None, out: str | None = None
+) -> int:
+    if out is not None and report_format != "html":
+        raise CliError("--out is supported for --format html only")
+
+    if report_format == "html":
+        from arci.html_report import render_store_html
+
+        if pass_k is not None:
+            raise CliError("--pass-k is reported in the md format only")
+        html, code = render_store_html(run_dir)
+        if out is None:
+            _print(html)
+        else:
+            _write(out, html)
+        return code
+
     if _suite_input(run_dir):
         if report_format == "junit" or pass_k is not None:
             print("suite support for report is not built yet")
@@ -856,7 +873,8 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
 
     report = commands.add_parser("report", help="render a stored run")
     report.add_argument("run_dir", metavar="RUN_DIR", nargs="?" if suite_probe else None)
-    report.add_argument("--format", choices=("md", "json", "junit"), default="md")
+    report.add_argument("--format", choices=("md", "json", "junit", "html"), default="md")
+    report.add_argument("--out", metavar="FILE", help="write HTML to FILE instead of stdout")
     report.add_argument(
         "--pass-k",
         metavar="K,K,...",
@@ -1079,6 +1097,7 @@ def _dispatch(values: dict[str, object]) -> int:
             cast(str, values["run_dir"]),
             cast(str, values["format"]),
             cast(str | None, values["pass_k"]),
+            cast(str | None, values["out"]),
         )
     if command == "plan":
         suite_input = cast(str | None, values.get("suite_input"))
