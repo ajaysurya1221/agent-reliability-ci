@@ -600,10 +600,12 @@ against Jev. Reviewed by the senior consultant (gpt-6-astra, xhigh) on 2026-09-2
   built yet, without reporting a store-validation failure. Both run and gate print
   the seed-mode guarantee qualified by the frozen statistics document; per_round
   includes its per-round-null condition in the same sentence.
-- `report`, `triage`, `diff`, `minimize`, `bundle`, `replay`, `trace-check` and
-  `plan` refuse suite inputs with exit 3 and the one-line message
-  `suite support for <command> is not built yet`. Dispatch uses parsed inputs,
-  including abbreviated options; output paths are not inputs. Their v1 routes remain intact.
+- `minimize`, `bundle`, `replay` and `trace-check` refuse suite inputs with exit 3
+  and the one-line message `suite support for <command> is not built yet`.
+  `report`, `triage`, `diff` and `plan` accept suite inputs; a command or export
+  format that is not built for suites refuses with the same message, never with a
+  store-validation failure. Dispatch uses parsed inputs, including abbreviated
+  options; output paths are not inputs. Every v1 route remains intact.
 - The packaged `arci.demo.suite` fixture has five tasks by four conditions,
   seeded control/regression/uncertain agents, and no model call. Every agent's
   success depends on a uniform eight-way draw from the trial RNG: success rates
