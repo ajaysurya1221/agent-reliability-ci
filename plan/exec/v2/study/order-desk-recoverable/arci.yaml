@@ -1,0 +1,36 @@
+suite_id: order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable
+tasks: tasks.jsonl
+toolset: agent:toolset
+oracle: check:check
+baseline:
+  label: gemma4-12b
+  agent: agent:baseline
+  candidate_id: ollama:gemma4:12b-mlx-ctx32k
+candidate:
+  label: qwen3.5-4b
+  agent: agent:candidate
+  candidate_id: ollama:qwen3.5:4b-mlx-ctx32k
+conditions:
+- id: clean
+- id: tool_timeout
+  faults:
+  - name: tool_timeout
+    tool: lookup_order
+    occurrence: 0
+- id: tool_error_once
+  faults:
+  - name: tool_error_once
+    tool: lookup_order
+    occurrence: 0
+- id: empty_result
+  faults:
+  - name: empty_result
+    tool: lookup_order
+    occurrence: 0
+rule:
+  scenario_seeds: per_round
+budgets:
+  max_tool_calls: 12
+  max_model_steps: 12
+  max_seconds: 120
+  grader_seconds: 20
