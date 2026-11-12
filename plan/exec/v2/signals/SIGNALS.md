@@ -16,3 +16,4 @@ Public counters only. Unique visitors come from GitHub's 14-day traffic window.
 - 2026-11-12: posted to r/LangChain by the maintainer (account u/Own_Task_7982), flair "Projects", title "I put create_agent behind a fault-injecting regression gate, pre-registered a test, and my own prediction lost". Body: `launch/reddit-body.md`. The first attempt was refused by Reddit's parser; the table and code formatting were removed.
 - Hacker News: Show HN refused on 2026-11-12 because the account is new to the site. Not posted. To retry after the account has a comment history.
 - Day counting for the thresholds starts 2026-11-12, the day of the first post, so the scheduled snapshots (19 Nov, 26 Nov, 12 Dec) stand as they are.
+- 2026-11-13: correction added to `study/RESULT.md` after a reader's comment on the Reddit thread: run 1 measured wrong first tool calls in a set-up where they were fatal, not a general capability gap. A second pre-registered run follows.

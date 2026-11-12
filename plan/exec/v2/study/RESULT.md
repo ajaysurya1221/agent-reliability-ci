@@ -15,6 +15,35 @@ Pairs: 26 where only the baseline passed, 70 ties, 0 where only the candidate pa
 errored. BLOCK wealth 156.2 against the threshold 40; PASS wealth 0.0019. `arci gate`
 re-derives the same decision from the store.
 
+## Correction (2026-11-13)
+
+A reader, u/Significant_Tune9219, pointed out in the
+[r/LangChain thread](https://www.reddit.com/r/LangChain/comments/1xtror1/i_put_create_agent_behind_a_faultinjecting/)
+that the run cannot separate "the 4B model reasons worse" from "the 4B model needs tighter
+tool contracts". The stored run confirms it:
+
+- 23 of the candidate's 26 failures are `ValueError: unknown SKU` from `check_stock`.
+- In 21 of those 23, the model's first and only tool call was `check_stock` with the order
+  id as the SKU (for example `sku: "ORD-103"`); it never called `lookup_order`. In the
+  other 2 it looked the order up first and then passed a wrong SKU.
+- The tool raises an exception. The retry middleware in this set-up handles only timeouts
+  and runtime errors, so the model was never shown "unknown SKU" and had no chance to
+  correct itself. One wrong call ended the trial.
+- The baseline's first call was `lookup_order` in all 96 trials.
+
+So this run measured: **the 4B model makes a wrong first call more often, in a set-up
+where a wrong call is fatal.** It did not measure whether the 4B model can do the task
+when a tool error is returned to it.
+
+This file originally said of these failures: "This is a capability gap on one task type,
+not a robustness gap." That sentence claimed more than was measured and is replaced below.
+The verdict, the counts and the report are unchanged: BLOCK at round 1 stands for the
+experiment as registered.
+
+A second, separately pre-registered run asks the question the reader raised, with the tool
+error returned to the model in both arms: `PREREGISTRATION-run-2.md`, result in
+`RESULT-run-2.md` once it has run. The two runs answer different questions.
+
 ## Where the candidate failed (descriptive, not part of the verdict)
 
 | Condition | Candidate passed |
@@ -33,7 +62,8 @@ re-derives the same decision from the store.
   The candidate sometimes never looked the order up at all, so the fault had nothing to
   hit. Without that table the faulted conditions would look like a fair comparison.
 - The failures are not caused by the injected faults: the clean condition fails as often.
-  This is a capability gap on one task type, not a robustness gap.
+  They are wrong first tool calls on one task type, in a set-up that gave the model no
+  chance to recover from them (see the correction above).
 
 ## What this run does and does not show
 
