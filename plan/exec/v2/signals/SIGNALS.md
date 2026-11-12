@@ -17,3 +17,4 @@ Public counters only. Unique visitors come from GitHub's 14-day traffic window.
 - Hacker News: Show HN refused on 2026-11-12 because the account is new to the site. Not posted. To retry after the account has a comment history.
 - Day counting for the thresholds starts 2026-11-12, the day of the first post, so the scheduled snapshots (19 Nov, 26 Nov, 12 Dec) stand as they are.
 - 2026-11-13: correction added to `study/RESULT.md` after a reader's comment on the Reddit thread: run 1 measured wrong first tool calls in a set-up where they were fatal, not a general capability gap. A second pre-registered run follows.
+- 2026-11-13: run 2 (tool errors returned to the model, pre-registered at `6fbdb1c`) ended INCONCLUSIVE after 5 rounds: baseline 480 of 480, candidate 428 of 480. Written expectation was INCONCLUSIVE. Result: `study/RESULT-run-2.md`.

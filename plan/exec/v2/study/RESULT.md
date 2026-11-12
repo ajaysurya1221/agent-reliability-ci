@@ -42,7 +42,11 @@ experiment as registered.
 
 A second, separately pre-registered run asks the question the reader raised, with the tool
 error returned to the model in both arms: `PREREGISTRATION-run-2.md`, result in
-`RESULT-run-2.md` once it has run. The two runs answer different questions.
+[`RESULT-run-2.md`](RESULT-run-2.md). The two runs answer different questions.
+
+Run 2 ended INCONCLUSIVE after 5 rounds (2026-11-13): the 12B agent passed 480 of 480
+trials and the 4B agent 428 of 480. Shown the error, the 4B model went on to look the order
+up in 106 of the 108 trials that began with the wrong call, and 68 of those 108 passed.
 
 ## Where the candidate failed (descriptive, not part of the verdict)
 
