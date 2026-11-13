@@ -17,7 +17,13 @@ from typing import cast
 from pydantic import JsonValue
 
 from arci import __version__
-from arci.report import USD_PER_MTOK_INPUT, fault_accounting
+from arci.report import (
+    TOOL_OUTCOMES_HEADING,
+    TOOL_OUTCOMES_INTRO,
+    USD_PER_MTOK_INPUT,
+    fault_accounting,
+    tool_outcomes,
+)
 from arci.schema import (
     DECISION_TOOL,
     ArmStats,
@@ -156,6 +162,64 @@ def _faults(conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]) ->
             )
             if rows
             else _p("No faults declared.")
+        )
+    )
+
+
+def _tool_outcomes(trials: Sequence[TrialEnvelope]) -> str:
+    summary = tool_outcomes(trials)
+    return (
+        _heading(TOOL_OUTCOMES_HEADING)
+        + _p(TOOL_OUTCOMES_INTRO)
+        + _table(
+            "Tool outcomes by arm",
+            (
+                "Arm",
+                "Trials",
+                "Trials with an uninjected failure",
+                "Then passed",
+                "Then not passed",
+            ),
+            [
+                [
+                    r["arm"],
+                    r["trials"],
+                    r["uninjected_failure_trials"],
+                    r["uninjected_then_passed"],
+                    r["uninjected_then_not_passed"],
+                ]
+                for r in summary["arms"]
+            ],
+        )
+        + (
+            _table(
+                "Recorded attempts by tool and arm",
+                (
+                    "Tool",
+                    "Arm",
+                    "Trials",
+                    "Started in",
+                    "Not started in",
+                    "Starts",
+                    "Uninjected failures",
+                    "Trials with one",
+                ),
+                [
+                    [
+                        r["tool"],
+                        r["arm"],
+                        r["trials"],
+                        r["trials_started"],
+                        r["trials_not_started"],
+                        r["starts"],
+                        r["uninjected_failures"],
+                        r["uninjected_failure_trials"],
+                    ]
+                    for r in summary["tools"]
+                ],
+            )
+            if summary["tools"]
+            else _p("No tool starts recorded.")
         )
     )
 
@@ -371,7 +435,7 @@ def render_suite_html(
             for c in decision.cells
         ],
     )
-    body += _faults(manifest.conditions, trials) + _details(trials)
+    body += _faults(manifest.conditions, trials) + _tool_outcomes(trials) + _details(trials)
     body += _heading(PRIOR_RUNS)
     body += "".join(_p(run) for run in decision.prior_runs) or _p("None recorded.")
     body += _p(INTEGRITY_LIMITATION)

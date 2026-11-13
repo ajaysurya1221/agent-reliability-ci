@@ -70,6 +70,11 @@ tasks never call are diluted into ties; fault accounting in the report shows how
 A wrong argument that raises `ValueError` crashes the trial unless the agent handles it; the
 example middleware does not retry that exception.
 
+The descriptive tool-outcomes section shows recorded starts and failures without an injection
+marker for each tool and arm, plus how many trials with those failures passed or did not pass.
+Middleware retries count as attempts; the trace does not establish why a call failed, and a tool
+with no recorded start may simply not be needed by the task. These counts decide nothing.
+
 ## Failure classification
 
 The table describes **trial outcomes**. A suite tolerates its registered number of errored pairs

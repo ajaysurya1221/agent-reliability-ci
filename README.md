@@ -1,20 +1,42 @@
 # Did this change make your agent less reliable?
 
-ARCI (agent-reliability-ci) runs your baseline and candidate repeatedly under the same predeclared
-tasks and injected tool faults, grades each run with an independent success check, returns `PASS`,
-`BLOCK`, `INCONCLUSIVE` or `ERROR` with an exit code, and can replay a recorded failure offline.
+[![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
+[![CI](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
 
-Try it without cloning (seeded fixture, no model call):
+You swapped the model, edited the prompt or removed a retry. ARCI (agent-reliability-ci) runs the
+old agent and the new one on the same tasks, injects tool timeouts, errors and empty results, and
+answers `PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR`, with an exit code for CI and a stated limit on
+how often a `PASS` or a `BLOCK` is wrong.
+
+Try it on a LangChain `create_agent` example. Offline, scripted model, no API key:
 
 ```bash
-uvx --from agent-reliability-ci arci demo
+pip install 'agent-reliability-ci[langchain]'
+mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
 ```
 
-Replace these example references with your project's importable Python functions:
+```text
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 1
+pairs: 96 (192 trials)
+baseline 96/96 passed, candidate 48/96 passed
+```
+
+The candidate in that example is the baseline with one retry removed. Clean runs pass; the
+injected faults expose it.
+
+- **Swapping the model?** Set two model ids and run the same suite:
+  [docs/recipes/model-swap.md](docs/recipes/model-swap.md).
+- **Your own `create_agent` agent:** [docs/recipes/langchain.md](docs/recipes/langchain.md).
+- **Not on LangChain?** Any two Python callables work:
 
 ```bash
 uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed && arci run arci.yaml
 ```
+
+- **No install, seeded fixture, no model call:** `uvx --from agent-reliability-ci arci demo`
 
 `baseline + candidate → same predeclared tasks/faults → repeated trials → verdict → minimise/replay`
 
@@ -33,8 +55,8 @@ inference, and trace divergence shows where runs differ, not why.
 **Suites.** v1 gates one task under a few fault conditions. A suite registers many tasks by
 fault conditions and gates the suite average, in rounds, stopping as soon as the evidence
 decides. A PASS covers the average and can hide a regression in one task, so the per-task
-table sits beside every verdict. Nothing can PASS before about 80 paired runs at the
-default margin. The statistics and their assumptions are in
+table sits beside every verdict. Verdicts are given only at the end of complete rounds; when every
+pair is a tie, a PASS needs 79 pairs at the default margin. The statistics and their assumptions are in
 [docs/STATISTICS_SUITE.md](docs/STATISTICS_SUITE.md).
 
 **LangChain.** If your agent is built with `create_agent`, ARCI can run it behind its tool
@@ -50,12 +72,50 @@ construction. To compare real models, see
 [examples/langchain_quickstart](examples/langchain_quickstart/README.md) and the
 [recipe](docs/recipes/langchain.md).
 
-**One recorded comparison.** A pre-registered run of that example on two local models
-(12B baseline, 4B candidate, temperature 0.7) ended in `BLOCK` after one round: 96 of 96
-against 70 of 96, with the prediction written beforehand being `PASS`. The report also
-showed the injected fault firing in 24 of 24 baseline trials but 18 to 20 of 24 candidate
-trials per faulted condition. It is one comparison on one suite and says nothing about
-these models elsewhere. Report: [docs/results/order-desk-study.html](docs/results/order-desk-study.html).
+**Two recorded comparisons.** Both pre-registered, with the prediction written first, on two
+local models (12B baseline, 4B candidate, temperature 0.7) and the 24-task example.
+
+| | Run 1: a wrong tool call ends the trial | Run 2: the tool's error is returned to the model |
+|---|---|---|
+| Prediction | `PASS` (wrong) | `INCONCLUSIVE` (right) |
+| Verdict | `BLOCK` after 1 round | `INCONCLUSIVE` after 5 rounds |
+| Baseline passed | 96 of 96 | 480 of 480 |
+| Candidate passed | 70 of 96 | 428 of 480 |
+
+Run 1's write-up first called the gap a capability gap. A reader pointed out that the tool
+raised an exception the model never saw, so one wrong call was fatal. The correction and
+run 2 came from that comment. In run 2 the small model made the same wrong first call as
+often, recovered from it in most trials, and still failed where two things went wrong in
+one trial. These are two runs on one suite and say nothing about the models elsewhere.
+Write-up: [docs/results/order-desk-study.md](docs/results/order-desk-study.md). Reports:
+[run 1](docs/results/order-desk-study.html), [run 2](docs/results/order-desk-study-run-2.html).
+
+**Since 2.1.** Suite reports show, per arm, which tools were never called and how many trials
+had a tool failure that no injected fault explains and then passed or failed. The quickstart
+compares two different models with everything else equal
+([model swap](docs/recipes/model-swap.md)).
+
+## Related tools
+
+Checked in November 2026; corrections are welcome as issues.
+
+- Fault injection for agent tool calls:
+  [agentchaos-sdk](https://pypi.org/project/agentchaos-sdk/),
+  [probe-ai](https://pypi.org/project/probe-ai/),
+  [flakestorm](https://pypi.org/project/flakestorm/),
+  [chaos-agents](https://pypi.org/project/chaos-agents/),
+  [agentfuzz](https://pypi.org/project/agentfuzz/).
+- Sequential tests with a bounded false-alarm rate for agent verifiers:
+  [E-valuator](https://arxiv.org/abs/2512.03109).
+- Repeated runs against a pass-rate threshold in pytest:
+  [pytest-agent-eval](https://github.com/datarootsio/pytest-agent-eval).
+- Evaluation platforms and frameworks (LangSmith, promptfoo, DeepEval, Inspect AI, Braintrust,
+  Phoenix) score and compare runs; use them for that.
+
+What ARCI adds is the join: injected tool faults, a baseline-against-candidate verdict fixed
+before the run, a stated bound on each kind of wrong verdict, and a count of whether each
+fault fired. We did not find another tool that does all four together. If you know one,
+please open an issue.
 
 ## Try the offline demo
 
