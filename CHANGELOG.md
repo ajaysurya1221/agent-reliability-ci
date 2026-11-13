@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## v2.1.0 (2026-11-13)
+
+- **Added:** tool outcomes in suite reports (Markdown, HTML and the JSON key
+  `tool_outcomes`): per arm, how many trials had a recorded tool failure without an
+  injection marker and how many of those passed; per tool, trials with and without a
+  recorded start. Descriptive only; the record does not show why a call failed.
+- **Fixed:** the LangChain quickstart, run with two different model ids, also removed the
+  candidate's retry, so a model comparison mixed two changes. Different ids now keep the
+  same retry, prompt and temperature in both arms and label the arms with the model ids at
+  registration. Equal ids and the offline demo are unchanged. New recipe
+  `docs/recipes/model-swap.md`.
+- **Corrected:** the README said nothing can PASS before about 80 paired runs. That is the
+  figure when every pair is a tie (79 at the defaults); pairs in the candidate's favour
+  cross sooner. Verdicts are given only at the end of complete rounds.
+- **Docs:** `docs/results/order-desk-study.md` records both pre-registered runs of the
+  example on two local models and the correction to run 1's first write-up. New README
+  first screen and a "Related tools" section. Design record 0014.
+- **Tests:** one adapter test replaced `ast.literal_eval` for the whole process and failed
+  on langchain-core 1.8.0, where set-up reaches that function through `inspect`. The adapter
+  now holds its own reference and the test replaces only that. No behaviour change.
+- **Unchanged:** every stored record, v1 (`arci/0.5`) report output (the HTML footer shows
+  the new version), the statistics.
+
 ## v2.0.0 (2026-11-11)
 
 - **Added:** suite experiments (`arci-suite/1`). An `arci.yaml` with `tasks:` registers a

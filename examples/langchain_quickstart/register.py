@@ -21,6 +21,12 @@ def register(root: Path) -> None:
     data.setdefault("rule", {})["scenario_seeds"] = (
         "fixed" if settings["baseline"] == "offline:scripted" else "per_round"
     )
+    model_swap = settings["baseline"] != settings["candidate"]
+    # ArmSpec.label accepts any string, so preserve the full provider:model ids.
+    for arm, fixed in (("baseline", "retry"), ("candidate", "no-retry")):
+        if isinstance(data[arm], str):  # a bare `module:function` arm is also valid
+            data[arm] = {"agent": data[arm]}
+        data[arm]["label"] = settings[arm] if model_swap else fixed
     tasks_path.write_text("".join(json.dumps(task) + "\n" for task in tasks))
     descriptor.write_text(yaml.safe_dump(data, sort_keys=False))
 

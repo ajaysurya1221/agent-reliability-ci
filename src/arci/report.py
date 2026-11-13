@@ -36,6 +36,162 @@ class FaultAccounting(TypedDict):
     status: str
 
 
+class ArmToolSummary(TypedDict):
+    arm: str
+    trials: int
+    uninjected_failure_trials: int
+    uninjected_then_passed: int
+    uninjected_then_not_passed: int
+
+
+class ToolOutcomeRow(TypedDict):
+    arm: str
+    tool: str
+    trials: int
+    trials_started: int
+    trials_not_started: int
+    starts: int
+    uninjected_failures: int
+    uninjected_failure_trials: int
+
+
+class ToolOutcomes(TypedDict):
+    arms: list[ArmToolSummary]
+    tools: list[ToolOutcomeRow]
+
+
+TOOL_OUTCOMES_HEADING = "Tool outcomes (descriptive)"
+TOOL_OUTCOMES_INTRO = (
+    "Counts of recorded tool attempts. An uninjected failure is a recorded tool_finish "
+    "that failed with no injection marker; the record does not show why it failed, and "
+    "an earlier injected fault can be the cause. A tool with no recorded start in a trial "
+    "may simply not be needed by that task; compare the two arms. Retries by middleware "
+    "count as attempts. Counts are descriptive and decide nothing."
+)
+
+
+def tool_outcomes(trials: Sequence[TrialEnvelope]) -> ToolOutcomes:
+    """Count recorded attempts literally, without inferring a failure's cause."""
+    arms = [
+        ArmToolSummary(
+            arm=arm,
+            trials=0,
+            uninjected_failure_trials=0,
+            uninjected_then_passed=0,
+            uninjected_then_not_passed=0,
+        )
+        for arm in ("baseline", "candidate")
+    ]
+    by_arm = {row["arm"]: row for row in arms}
+    starts: Counter[tuple[str, str]] = Counter()
+    started: Counter[tuple[str, str]] = Counter()
+    failures: Counter[tuple[str, str]] = Counter()
+    failed: Counter[tuple[str, str]] = Counter()
+    tools: set[str] = set()
+    for trial in trials:
+        summary = by_arm.get(trial.arm)
+        if summary is None:
+            continue
+        summary["trials"] += 1
+        trial_started: set[tuple[str, str]] = set()
+        trial_failed: set[tuple[str, str]] = set()
+        for event in trial.events:
+            tool = event.payload.get("tool")
+            if not isinstance(tool, str):
+                continue
+            key = (trial.arm, tool)
+            marker = event.payload.get("injected_by")
+            if event.kind == "tool_start":
+                starts[key] += 1
+                trial_started.add(key)
+                tools.add(tool)
+            elif (
+                event.kind == "tool_finish"
+                and event.payload.get("ok") is False
+                and (marker is None or (isinstance(marker, str) and marker == ""))
+            ):
+                failures[key] += 1
+                trial_failed.add(key)
+                tools.add(tool)
+        started.update(trial_started)
+        failed.update(trial_failed)
+        if trial_failed:
+            summary["uninjected_failure_trials"] += 1
+            if trial.outcome is Outcome.PASS:
+                summary["uninjected_then_passed"] += 1
+            else:
+                summary["uninjected_then_not_passed"] += 1
+    rows = [
+        ToolOutcomeRow(
+            arm=summary["arm"],
+            tool=tool,
+            trials=summary["trials"],
+            trials_started=started[summary["arm"], tool],
+            trials_not_started=summary["trials"] - started[summary["arm"], tool],
+            starts=starts[summary["arm"], tool],
+            uninjected_failures=failures[summary["arm"], tool],
+            uninjected_failure_trials=failed[summary["arm"], tool],
+        )
+        for tool in sorted(tools)
+        for summary in arms
+    ]
+    return ToolOutcomes(arms=arms, tools=rows)
+
+
+def _tool_outcome_span(tool: str) -> str:
+    if not tool:
+        return "(empty name)"
+    # report._cell stays as v1 has it; a bare CR is a Markdown line ending too.
+    value = _cell(tool).replace("\r", "<br>")
+    longest = run = 0
+    for char in value:
+        run = run + 1 if char == "`" else 0
+        longest = max(longest, run)
+    fence = "`" * (longest + 1)
+    # Padding separates a literal backtick from the fence and preserves edge spaces.
+    padding = (
+        " "
+        if longest or (value.startswith(" ") and value.endswith(" ") and value.strip(" "))
+        else ""
+    )
+    return f"{fence}{padding}{value}{padding}{fence}"
+
+
+def tool_outcomes_markdown(trials: Sequence[TrialEnvelope]) -> list[str]:
+    summary = tool_outcomes(trials)
+    lines = [
+        "",
+        f"## {TOOL_OUTCOMES_HEADING}",
+        "",
+        TOOL_OUTCOMES_INTRO,
+        "",
+        "| Arm | Trials | Trials with an uninjected failure | Then passed | Then not passed |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    lines.extend(
+        f"| {row['arm']} | {row['trials']} | {row['uninjected_failure_trials']} | "
+        f"{row['uninjected_then_passed']} | {row['uninjected_then_not_passed']} |"
+        for row in summary["arms"]
+    )
+    lines.append("")
+    if not summary["tools"]:
+        return [*lines, "No tool starts recorded."]
+    lines.extend(
+        [
+            "| Tool | Arm | Trials | Started in | Not started in | Starts | "
+            "Uninjected failures | Trials with one |",
+            "|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    lines.extend(
+        f"| {_tool_outcome_span(row['tool'])} | {row['arm']} | {row['trials']} | "
+        f"{row['trials_started']} | {row['trials_not_started']} | {row['starts']} | "
+        f"{row['uninjected_failures']} | {row['uninjected_failure_trials']} |"
+        for row in summary["tools"]
+    )
+    return lines
+
+
 def _fault_name(fault: FaultSpec) -> str | None:
     """Resolve the runner's recorded name without loading user code in this process."""
     from arci.perturb import REGISTRY

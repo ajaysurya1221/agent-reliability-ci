@@ -65,6 +65,17 @@ Recorded tool_finish injections, grouped by declared fault name; repeated declar
 | `store_error_late` | `tool_error_once` | baseline | 20 | 0 | 0 | declared, never fired |
 | `store_error_late` | `tool_error_once` | candidate | 20 | 0 | 0 | declared, never fired |
 
+## Tool outcomes (descriptive)
+
+Counts of recorded tool attempts. An uninjected failure is a recorded tool_finish that failed with no injection marker; the record does not show why it failed, and an earlier injected fault can be the cause. A tool with no recorded start in a trial may simply not be needed by that task; compare the two arms. Retries by middleware count as attempts. Counts are descriptive and decide nothing.
+
+| Arm | Trials | Trials with an uninjected failure | Then passed | Then not passed |
+|---|---:|---:|---:|---:|
+| baseline | 80 | 0 | 0 | 0 |
+| candidate | 80 | 0 | 0 | 0 |
+
+No tool starts recorded.
+
 ## Prior runs recorded in the manifest; discovery covers the output root only
 
 - `earlier`

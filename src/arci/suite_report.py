@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from arci.report import fault_accounting, fault_markdown
+from arci.report import fault_accounting, fault_markdown, tool_outcomes, tool_outcomes_markdown
 from arci.schema import TrialEnvelope
 from arci.suite_schema import SuiteDecision, SuiteManifest
 
@@ -68,6 +68,7 @@ def render_suite_json(
                 "cells_role": "descriptive; no per-cell statistical verdict",
                 "observed_trials": len(trials),
                 "fault_accounting": fault_accounting(manifest.conditions, trials),
+                "tool_outcomes": tool_outcomes(trials),
             },
             sort_keys=True,
             indent=2,
@@ -162,6 +163,7 @@ def render_suite_markdown(
             f"{c.plus} | {c.errored} | {cell.candidate_hard_violations} |"
         )
     lines.extend(fault_markdown(manifest.conditions, trials))
+    lines.extend(tool_outcomes_markdown(trials))
     lines.extend(["", f"## {PRIOR_RUNS}", ""])
     lines.extend(f"- `{_cell(run)}`" for run in decision.prior_runs)
     if not decision.prior_runs:

@@ -19,10 +19,13 @@ Open [agent.py](../../examples/langchain_quickstart/agent.py). Its statements, i
    be positive; `ARCI_QUICKSTART_TEMPERATURE` overrides it for both arms. Ollama reasoning
    is disabled; other providers retain the registered `provider_default` policy. The offline
    model is deterministic at temperature 0. No provider is contacted at module import.
-3. `ToolRetryMiddleware` grants the baseline one retry and the candidate none, with zero
-   delay and no jitter. It handles `TimeoutError` and `RuntimeError`, returning a tool-error
+3. With equal registered model ids (including the offline model), `ToolRetryMiddleware`
+   grants the baseline one retry and the candidate none, with zero delay and no jitter.
+   With two different ids both arms keep one retry, so only the model differs (since
+   2.1.0; see [model swap](model-swap.md)), and registration labels the arms with the ids. It handles `TimeoutError` and `RuntimeError`, returning a tool-error
    message when attempts run out. Both arms use the same scripted model, which abandons an
-   unrecovered error. Removing the middleware retry is the only planted difference.
+   unrecovered error. In the offline demo, removing the middleware retry is the only planted
+   difference.
 4. The returned dictionary contains `model`, `middleware` and `system_prompt`: ordinary
    `create_agent` settings, with the same instructions for both arms. The two small settings
    functions select the arm. They are called afresh inside the trial worker.
@@ -69,6 +72,11 @@ idempotent too. A tool fault that never reaches its selected tool never fires. A
 tasks never call are diluted into ties; fault accounting in the report shows how often they fired.
 A wrong argument that raises `ValueError` crashes the trial unless the agent handles it; the
 example middleware does not retry that exception.
+
+The descriptive tool-outcomes section shows recorded starts and failures without an injection
+marker for each tool and arm, plus how many trials with those failures passed or did not pass.
+Middleware retries count as attempts; the trace does not establish why a call failed, and a tool
+with no recorded start may simply not be needed by the task. These counts decide nothing.
 
 ## Failure classification
 
@@ -136,7 +144,8 @@ for synthetic errors; changed diagnostics or synthetic class-like text can cause
 ## Cost and interpretation
 
 Each clean trial uses two or three tool attempts and three or four model calls. An empty lookup
-adds one model call and one tool attempt. The baseline's exception retry adds a tool attempt
+adds one model call and one tool attempt. An exception retry (baseline only, or both arms in
+a model swap) adds a tool attempt
 inside the middleware without an extra model call. The registered per-trial limits are six of
 each and 15 seconds. There are 192 trials per complete round and at most 960 over the default
 five rounds. Offline provider cost is zero; real inference cost is the sum of model input/output

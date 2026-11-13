@@ -72,6 +72,27 @@ be replaced with the tasks**; unsupported wording is a setup ERROR, not a tied F
 Run `python register.py` after changing tasks or inference settings and before a new experiment.
 The scaffold uses editable example names, never credentials.
 
+## Swap the model
+
+With your provider integration installed and credentials configured, set two different
+`provider:model` ids, register them, and run (replace these example ids with installed models):
+
+```sh
+export ARCI_QUICKSTART_BASELINE='ollama:baseline' ARCI_QUICKSTART_CANDIDATE='ollama:candidate'
+python register.py
+arci run arci.yaml
+```
+
+Different real ids compare a model swap: both arms retry once. Equal real ids compare
+removing the retry: baseline retries once, candidate never retries. Unset variables use
+`offline:scripted` in both arms and keep that same retry-change demo.
+Changed in 2.1.0: a different-model run no longer removes the candidate's retry.
+The system prompt, middleware settings and temperature match in a model swap. The exception
+is `reasoning=False`, passed only for Ollama ids; other providers keep their default.
+Registration labels each arm with its full model id for a swap, or restores `retry` /
+`no-retry` for equal ids. Labels are sealed before the run, never changed in a saved report.
+See the [model-swap recipe](../../docs/recipes/model-swap.md) for verdicts and tool-error handling.
+
 ## Switch to real models
 
 For an already-running local Ollama service with two installed tool-capable models, install
@@ -105,7 +126,7 @@ policy into `quickstart_settings` on every task. These values enter the sealed m
 experiment id through task content; they are checked against the environment before tools or
 models run, including when running an old sealed manifest. A mismatch is a setup ERROR: restore
 the registered environment or register a new experiment. Registration rewrites `tasks.jsonl`
-and the descriptor's seed mode; choose your budgets before running.
+and the descriptor's seed mode and arm labels; choose your budgets before running.
 
 Changing these registered settings, task content, conditions, budgets, rule, agent references
 or prior-run list changes the experiment id. Changing environment variables alone does not
