@@ -1,5 +1,5 @@
 TITLE:
-A 4B model passed 73% of what a 12B did on tool tasks. Returning tool errors to it instead of crashing made that 89%. Pre-registered, with the place it still breaks.
+A 4B model passed 73% of a 12B's tool tasks when a wrong tool call crashed the run, and 89% in a second run where the error was returned to it. Pre-registered, with the place it still breaks.
 
 BODY:
 I wanted to know if a 4B local model could replace a 12B one in a small tool-using agent, so I ran it as an experiment with the prediction written down first. Both models on Ollama, one laptop, temperature 0.7, no API.
@@ -20,15 +20,15 @@ Set-up: 24 order-desk tasks (refund, refund and add a note, check stock and add 
 
 The test could not decide whether the 4B is within 10 points of the 12B: the gap landed at 10.8. So the honest verdict is inconclusive, not "good enough".
 
-**Where it still breaks.** Two things going wrong in one trial. When the 4B made the wrong first call and then the lookup came back empty (the injected fault), it passed 0 of 26. It read the error, did the right thing next, got nothing back, and stopped. The 12B retried the empty lookup every time, 120 of 120. With only one thing going wrong, the 4B recovered in 52 of 58.
+**Where it still breaks.** Two things going wrong in one trial. When the 4B made the wrong first call and then the lookup came back empty (the injected fault), it passed 0 of 26. It read the error, did the right thing next, got nothing back, and stopped. The 12B retried the empty lookup every time, 120 of 120. With only the wrong first call going wrong (clean and timeout conditions), it went on to pass 52 of 58.
 
 What I took from it:
 
-* If you are testing a small model with tools, check whether your tools raise or return their errors. It moved this result from 73% to 89%.
+* If you are testing a small model with tools, check whether your tools raise or return their errors. In run 2, 77 of the 4B's 428 passes came after an error that would have ended the trial in run 1.
 * Single-fault tests flattered the small model. The gap was in the compound case.
 * Reading sample outputs would not have shown any of this. Counting what each trial did with its tools did.
 
-Limits: one suite, one prompt, two models, one machine, and the breakdowns were chosen after seeing the data. It says nothing about these models in general.
+Limits: one suite, one prompt, two models, one machine. The two runs used different seeds, so 73% against 89% is two observations, not a measured effect. The breakdowns were chosen after seeing the data. It says nothing about these models in general.
 
 The harness is my own open-source tool (ARCI, a regression gate for agents: it runs baseline and candidate on the same tasks with injected tool faults and gives a verdict with a stated error bound). Both runs, the pre-registrations and the correction are here:
 

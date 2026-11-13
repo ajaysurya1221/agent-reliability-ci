@@ -90,8 +90,11 @@ These cuts were chosen after seeing the data. They describe this run and decide 
 
 ## What this run does and does not show
 
-It shows that returning tool errors to the model removes most of the gap that run 1
-measured, on this suite. It does not show the 4B agent is an acceptable replacement: the
+It shows that, with tool errors returned to the model, 77 of the 4B agent's 428 passes came
+after a tool error that would have ended the trial under run 1's set-up. (Reworded on
+2026-11-13 after review: this sentence first said returning errors "removes most of the gap
+that run 1 measured"; the two runs differ in rounds and seeds, so the difference between
+them is not a measured effect.) It does not show the 4B agent is an acceptable replacement: the
 test did not reach PASS, and one cell family (stock-note tasks with an empty lookup) fails
 far more often than the rest. It does not show anything about other tasks, other prompts,
 or these models in general. It is one run on one machine with two local models.
