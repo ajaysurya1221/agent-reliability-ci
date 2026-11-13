@@ -106,7 +106,8 @@ def test_literal_parse_failure_only_discards_candidate(
         def broken(value: Any) -> Any:
             raise parse_error("parse failed")
 
-        monkeypatch.setattr(implementation.ast, "literal_eval", broken)
+        # Patch the adapter's own reference: inspect also calls ast.literal_eval at set-up.
+        monkeypatch.setattr(implementation, "_literal_eval", broken)
     _, replayed, _ = boundary(adapter, recording=live.recording)
     with pytest.raises(BaseException) as caught:
         adapter.baseline({"input": "x"}, replayed, random.Random())

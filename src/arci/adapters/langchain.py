@@ -101,6 +101,8 @@ ToolHandler = Callable[[ToolCallRequest], ToolMessage | Command[Any]]
 ModelHandler = Callable[[ModelRequest[None]], ModelResponse[Any]]
 WAIT_SECONDS = 30.0
 _JSON = TypeAdapter(JsonValue)
+# Own reference: a test that breaks this parser must not break the stdlib's other callers.
+_literal_eval = ast.literal_eval
 
 
 class Adapter(NamedTuple):
@@ -488,7 +490,7 @@ class _Inner(Middleware):
             message = fault.detail[len(name) :].removeprefix(": ")
             arguments: list[Any] = [message]
             with suppress(BaseException):
-                arguments.append(ast.literal_eval(message))
+                arguments.append(_literal_eval(message))
             selected = next(iter(classes))
             for argument in arguments:
                 try:

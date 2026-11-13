@@ -772,7 +772,11 @@ def make_tools(task: dict[str, JsonValue], seed: int) -> ToolEnv:
     )
 '''.lstrip("\n"),
     "agent.py": r'''
-"""Swap the two model ids to compare real agents with identical inference settings."""
+"""Different model ids keep both arms' retry and inference settings equal.
+
+Exception: reasoning=False is passed only for Ollama; other providers keep their
+default reasoning policy. Equal ids (including offline) compare removing a retry.
+"""
 
 from __future__ import annotations
 
@@ -792,8 +796,7 @@ def settings(candidate: bool) -> dict[str, Any]:
     registered = resolve_settings()
     arm = "candidate" if candidate else "baseline"
     model_id = str(registered[arm])
-    # Keep inference settings identical. Ollama's optional reasoning mode is disabled
-    # for both arms; other providers keep their default reasoning mode in both arms.
+    # Shared temperature; reasoning=False only for Ollama, provider defaults otherwise.
     inference: dict[str, Any] = {"temperature": registered["temperature"]}
     if registered[f"{arm}_reasoning"] is False:
         inference["reasoning"] = False
@@ -802,10 +805,10 @@ def settings(candidate: bool) -> dict[str, Any]:
         if model_id != "offline:scripted"
         else OfflineModel(responses=[])
     )
-    # Baseline retries a transient read failure inside the recorded tool boundary.
-    # Candidate removes that retry: clean tests pass, injected exceptions expose it.
+    # Different ids isolate the model swap; equal ids retain the retry-change demo.
+    model_swap = registered["baseline"] != registered["candidate"]
     retry = ToolRetryMiddleware(
-        max_retries=0 if candidate else 1,
+        max_retries=0 if candidate and not model_swap else 1,
         initial_delay=0,
         jitter=False,
         retry_on=(TimeoutError, RuntimeError),
@@ -1022,6 +1025,12 @@ def register(root: Path) -> None:
     data.setdefault("rule", {})["scenario_seeds"] = (
         "fixed" if settings["baseline"] == "offline:scripted" else "per_round"
     )
+    model_swap = settings["baseline"] != settings["candidate"]
+    # ArmSpec.label accepts any string, so preserve the full provider:model ids.
+    for arm, fixed in (("baseline", "retry"), ("candidate", "no-retry")):
+        if isinstance(data[arm], str):  # a bare `module:function` arm is also valid
+            data[arm] = {"agent": data[arm]}
+        data[arm]["label"] = settings[arm] if model_swap else fixed
     tasks_path.write_text("".join(json.dumps(task) + "\n" for task in tasks))
     descriptor.write_text(yaml.safe_dump(data, sort_keys=False))
 

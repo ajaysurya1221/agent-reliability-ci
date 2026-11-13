@@ -139,7 +139,10 @@ def tool_outcomes(trials: Sequence[TrialEnvelope]) -> ToolOutcomes:
 
 
 def _tool_outcome_span(tool: str) -> str:
-    value = _cell(tool)
+    if not tool:
+        return "(empty name)"
+    # report._cell stays as v1 has it; a bare CR is a Markdown line ending too.
+    value = _cell(tool).replace("\r", "<br>")
     longest = run = 0
     for char in value:
         run = run + 1 if char == "`" else 0
@@ -147,7 +150,9 @@ def _tool_outcome_span(tool: str) -> str:
     fence = "`" * (longest + 1)
     # Padding separates a literal backtick from the fence and preserves edge spaces.
     padding = (
-        " " if longest or (value.startswith(" ") and value.endswith(" ") and value.strip()) else ""
+        " "
+        if longest or (value.startswith(" ") and value.endswith(" ") and value.strip(" "))
+        else ""
     )
     return f"{fence}{padding}{value}{padding}{fence}"
 

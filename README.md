@@ -1,15 +1,14 @@
 # Did this change make your agent less reliable?
 
 [![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
-[![CI](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/pypi/pyversions/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
 
 You swapped the model, edited the prompt or removed a retry. ARCI (agent-reliability-ci) runs the
-old agent and the new one on the same tasks, injects tool timeouts, errors and empty results, and
-answers `PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR`, with an exit code for CI and a stated limit on
-how often a `PASS` or a `BLOCK` is wrong.
+old agent and the new one on the same predeclared tasks, injects tool timeouts, errors and empty
+results, and returns `PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR` with an exit code. A statistical
+`PASS` or `BLOCK` is wrong at most 2.5% of the time each, at the defaults and under assumptions
+ARCI states and does not check.
 
-Try it on a LangChain `create_agent` example. Offline, scripted model, no API key:
+A LangChain `create_agent` example, offline, no API key:
 
 ```bash
 pip install 'agent-reliability-ci[langchain]'
@@ -18,25 +17,15 @@ mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
 
 ```text
 VERDICT: BLOCK (exit 1)
-reason: regression established
-stopping round: 1
 pairs: 96 (192 trials)
 baseline 96/96 passed, candidate 48/96 passed
 ```
 
-The candidate in that example is the baseline with one retry removed. Clean runs pass; the
-injected faults expose it.
-
-- **Swapping the model?** Set two model ids and run the same suite:
-  [docs/recipes/model-swap.md](docs/recipes/model-swap.md).
-- **Your own `create_agent` agent:** [docs/recipes/langchain.md](docs/recipes/langchain.md).
-- **Not on LangChain?** Any two Python callables work:
-
-```bash
-uv tool install agent-reliability-ci && arci init checkout-retry --baseline app.v1:run --candidate app.v2:run --toolset tests.world:make_world --oracle tests.world:passed && arci run arci.yaml
-```
-
-- **No install, seeded fixture, no model call:** `uvx --from agent-reliability-ci arci demo`
+The candidate is the baseline with one retry removed. Next:
+[swap the model](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/model-swap.md) ·
+[your own agent](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/langchain.md) ·
+[plain Python functions](#gate-your-own-agent) ·
+no install: `uvx --from agent-reliability-ci arci demo`
 
 `baseline + candidate → same predeclared tasks/faults → repeated trials → verdict → minimise/replay`
 
@@ -57,7 +46,7 @@ fault conditions and gates the suite average, in rounds, stopping as soon as the
 decides. A PASS covers the average and can hide a regression in one task, so the per-task
 table sits beside every verdict. Verdicts are given only at the end of complete rounds; when every
 pair is a tie, a PASS needs 79 pairs at the default margin. The statistics and their assumptions are in
-[docs/STATISTICS_SUITE.md](docs/STATISTICS_SUITE.md).
+[docs/STATISTICS_SUITE.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS_SUITE.md).
 
 **LangChain.** If your agent is built with `create_agent`, ARCI can run it behind its tool
 boundary: you supply your tools, two settings functions and a check.
@@ -69,8 +58,8 @@ mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
 
 That runs a 24-task example offline with a scripted model and ends in `BLOCK`, by
 construction. To compare real models, see
-[examples/langchain_quickstart](examples/langchain_quickstart/README.md) and the
-[recipe](docs/recipes/langchain.md).
+[examples/langchain_quickstart](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/examples/langchain_quickstart/README.md) and the
+[recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/langchain.md).
 
 **Two recorded comparisons.** Both pre-registered, with the prediction written first, on two
 local models (12B baseline, 4B candidate, temperature 0.7) and the 24-task example.
@@ -85,19 +74,22 @@ local models (12B baseline, 4B candidate, temperature 0.7) and the 24-task examp
 Run 1's write-up first called the gap a capability gap. A reader pointed out that the tool
 raised an exception the model never saw, so one wrong call was fatal. The correction and
 run 2 came from that comment. In run 2 the small model made the same wrong first call as
-often, recovered from it in most trials, and still failed where two things went wrong in
-one trial. These are two runs on one suite and say nothing about the models elsewhere.
-Write-up: [docs/results/order-desk-study.md](docs/results/order-desk-study.md). Reports:
-[run 1](docs/results/order-desk-study.html), [run 2](docs/results/order-desk-study-run-2.html).
+often and went on to pass in most of those trials; 77 of its passes came after a tool error
+that would have ended the trial under run 1's set-up. Most of its remaining failures (41 of
+52) had both an injected fault and a tool error of this kind in one trial. These are two runs on one suite and say nothing about the models elsewhere.
+Write-up: [docs/results/order-desk-study.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md). Reports:
+[run 1](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.html), [run 2](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study-run-2.html).
 
 **Since 2.1.** Suite reports show, per arm, which tools were never called and how many trials
-had a tool failure that no injected fault explains and then passed or failed. The quickstart
+had a recorded tool failure without an injection marker, and how many of those passed. The
+record does not show why a call failed. The quickstart
 compares two different models with everything else equal
-([model swap](docs/recipes/model-swap.md)).
+([model swap](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/model-swap.md)).
 
 ## Related tools
 
-Checked in November 2026; corrections are welcome as issues.
+As each project describes itself; read in November 2026, not tested here. Corrections are
+welcome as issues.
 
 - Fault injection for agent tool calls:
   [agentchaos-sdk](https://pypi.org/project/agentchaos-sdk/),
@@ -112,8 +104,8 @@ Checked in November 2026; corrections are welcome as issues.
 - Evaluation platforms and frameworks (LangSmith, promptfoo, DeepEval, Inspect AI, Braintrust,
   Phoenix) score and compare runs; use them for that.
 
-What ARCI adds is the join: injected tool faults, a baseline-against-candidate verdict fixed
-before the run, a stated bound on each kind of wrong verdict, and a count of whether each
+What ARCI adds is the join: injected tool faults, a baseline-against-candidate verdict from a rule
+fixed before the run, a stated bound on each kind of wrong statistical verdict, and a count of whether each
 fault fired. We did not find another tool that does all four together. If you know one,
 please open an issue.
 
@@ -616,7 +608,7 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 **Availability:** v1.0.0 adds one-command native-run triage and cross-run trace comparison.
 Install `agent-reliability-ci==1.0.0` from PyPI or use Action tag `v1.0.0`.
-The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
+The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
 publishing with attestations. The packaged demo, descriptors, initialization,
@@ -624,7 +616,7 @@ planner and opt-in pass^k reporting remain available from the v0.8.0 release.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/v1.0.0)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 [![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)

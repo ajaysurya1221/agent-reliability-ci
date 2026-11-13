@@ -221,6 +221,10 @@ def test_unknown_arms_ignored_and_pass_uses_enum_identity() -> None:
         ("`", "`` ` ``"),
         ("a\nb", "`a<br>b`"),
         (" padded ", "`  padded  `"),
+        ("a\rb", "`a<br>b`"),
+        ("a\r\nb", "`a<br><br>b`"),
+        (" \u00a0 ", "`  \u00a0  `"),
+        ("", "(empty name)"),
     ],
 )
 def test_markdown_code_span_escaping(name: str, span: str) -> None:
