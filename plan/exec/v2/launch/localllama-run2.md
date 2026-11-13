@@ -32,9 +32,9 @@ Limits: one suite, one prompt, two models, one machine. The two runs used differ
 
 The harness is my own open-source tool (ARCI, a regression gate for agents: it runs baseline and candidate on the same tasks with injected tool faults and gives a verdict with a stated error bound). Both runs, the pre-registrations and the correction are here:
 
-Run 2: https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2/phase0/plan/exec/v2/study/RESULT-run-2.md
+Both runs and the correction: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md
 
-Run 1 and the correction: https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2/phase0/plan/exec/v2/study/RESULT.md
+To try the same comparison on your own two models: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/model-swap.md
 
 Repo: https://github.com/ajaysurya1221/agent-reliability-ci
 
