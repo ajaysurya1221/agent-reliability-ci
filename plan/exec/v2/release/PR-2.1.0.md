@@ -17,6 +17,6 @@ Two readers of the public study asked what each arm did with its tools; one show
 - The new section reproduces the hand counts from both stored study runs (run 2 candidate: 2 never looked up, 124 with an uninjected failure, 77 passed, 47 not).
 - Blind tests written from the contract by a separate agent (51); two adversarial reviews with a skeptic per finding; 17 confirmed minor findings fixed, none blocking.
 - Full suite in the core environment; adapter tests on the locked LangChain set and on the latest release; strict type check in both configurations; lint; frozen hashes; calibration bench.
-- Not done: a live round on real models with 2.1.0 (the local model server was not running).
+- One live round of the 2.1.0 quickstart in model-swap mode on two local Ollama models (192 trials): arms labelled with the model ids, the same retry in both arms, tool outcomes rendered, verdict re-derived by `arci gate`. A release check, not evidence.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
