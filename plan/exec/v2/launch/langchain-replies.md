@@ -4,39 +4,62 @@ Thread: https://www.reddit.com/r/LangChain/comments/1xtror1/i_put_create_agent_b
 
 Plain text on purpose: Reddit refused the formatted post body on 12 Nov.
 
-## 1. To u/Significant_Tune9219 (post first; it carries the promised run)
+State of the thread on 14 Nov 2026, 12:47 (from the maintainer's saved copy): the first
+three replies (to u/Significant_Tune9219, u/ChemicalExcellent463 and the comment a moderator
+later removed) were posted on 13 Nov, before v2.1.0. Two comments are unanswered, and one
+side thread is open. The replies below are for those.
 
-You were right, and the stored run confirmed it: the tool raised an exception, the model never saw "unknown SKU", and one wrong call ended the trial. So run 1 could not separate "reasons worse" from "needs a recoverable tool contract". I added a dated correction to the result and credited you.
+Every number below was recounted from the stored run 2 trials on 14 Nov by an agent that
+did not use the write-ups, and the wording was reviewed by a second one
+(`wf_d99c3c71-887`). Changes that review forced are listed at the end.
 
-I then pre-registered a second run with one change, the same in both arms: the tool's error is returned to the model instead of crashing the trial.
+## A. To u/Significant_Tune9219, under "Thanks for rerunning it. With the gap at 10.8 against a 10 point margin, breaking the 4B failures down by error category might show..."
 
-Result: INCONCLUSIVE after 5 rounds. 12B passed 480 of 480, 4B passed 428 of 480 (89.2%; it was 72.9% in run 1, on different seeds, so that is two observations and not a measured effect). The gap is 10.8 points against a 10-point margin, so the test could not decide either way in the registered budget.
+The breakdown points that way, with one limit: in run 2 both models had the error returned, so it shows where the 4B still failed, not what returning the error changed.
 
-The categories you asked for, 4B model, 480 trials:
-- Never called the lookup at all: 2
-- Had a tool failure with no injected fault, then passed: 77
-- Had one, then failed: 47
+51 of the 52 4B failures are on the stock-note tasks. On those tasks the 4B passed:
 
-It still makes the wrong first call as often (108 of 160 stock-note trials). Shown the error, it went on to look the order up in 106 of those 108, and 68 passed.
+- no injected fault: 34 of 40
+- injected timeout: 38 of 40
+- injected error, once: 30 of 40
+- injected empty result: 7 of 40
 
-What is left is mostly one cell: stock-note tasks where the lookup returns an injected empty result. 7 of 40 passed there, and 0 of 26 after a wrong first call. Two things going wrong in one trial is where it breaks.
+The most common wrong step is the same in every row: the stock tool called first, with the order id as the product code. That happened in 108 of the 160 trials, and 40 of the 51 failures began that way. After that wrong first call the 4B passed:
 
-Your category idea is now in the tool: v2.1.0 prints this table in every report, and the quickstart compares two models with everything else equal.
+- no injected fault, or injected timeout: 52 of 58
+- injected error, once: 16 of 24
+- injected empty result: 0 of 26
 
-Both runs and the correction: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md
+In 21 of those 26 it got "unknown SKU", looked the order up once, got the empty result, and stopped. The empty result went with failure even without the wrong first call: 7 of the other 14 trials in that row failed. Across all tasks under the empty result, the 12B looked the order up a second time in 120 of 120 trials; the 4B in 87 of 120.
 
-## 2. To u/ChemicalExcellent463
+So in this run a wrong first call on its own was usually followed by a pass, and a wrong first call plus an empty lookup never was. Caveats: I chose these cuts after seeing the data, they are all counted by hand from the stored trials, and it is one run.
 
-Honest answer: in run 1 it answered with nothing. Its first and only call was the stock tool with the order id as the product code (sku: "ORD-103"), the tool raised, and the trial crashed before the model could say anything. That was 21 of the 23 unknown-SKU failures.
+Your earlier idea is in the tool now: since 2.1.0 the suite report prints, per model, the tool failures that were not injected, split by pass or fail.
 
-So "skipped the lookup" was mostly "crashed before it could look anything up". I re-ran with the error returned to the model (pre-registered again). Now only 2 of 480 trials end without a lookup; in 106 of 108 trials that start with the wrong call, it reads the error and looks the order up next.
+## B. To u/ChemicalExcellent463, under "...saw the error. did the 4B clear your original PASS rule on the rerun?" (the reply below the second answer to them)
 
-When it still fails, it usually says so plainly: it reports that the order id is not a valid product code, or that the order came back empty, and stops instead of retrying.
+No. Same rule as run 1: a 10-point margin, at most 5 rounds, and at most a 2.5% chance each of a wrong PASS or a wrong BLOCK (under the independence assumptions the report prints). It ended INCONCLUSIVE: 12B passed 480 of 480, 4B passed 428 of 480.
 
-Write-up of both runs: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md
+The observed gap is 10.8 points, almost on the margin, which is where this test needs the most paired trials. Each of the two tests keeps a score that starts at 1 and has to reach 40 to decide. PASS ended at 0.02 and BLOCK at 0.49, so neither was close. I registered 5 rounds and did not extend the budget after seeing the result.
 
-## 3. To u/localhost_0000
+So the rerun does not show the 4B is within 10 points, and does not show it is outside. Run 1's BLOCK stands for run 1's set-up, where a wrong call ended the trial.
 
-Noted, that is one vote for interrupts, and "the human as one more flaky tool" is the framing I would use: an approval step that can time out, refuse, or answer late, declared as a fault like any other.
+## C. Optional, to u/Ludynia_Keyko, under "with tool calling you also get the reverse where the fault fires twice on a retry loop and skews the latency numbers"
 
-Today the adapter rejects interrupts outright rather than half-supporting them. I have not designed this yet, so no promise on timing. If you have a concrete flow (who approves what, and what should happen on no answer), I would like to see it.
+Fair point. In this suite each faulted condition declares one fault, on the first call to the lookup tool. A retry is a new call and runs without it, so the fault fires at most once per trial; you would have to declare a second fault on the second call to hit the retry too. The report counts injections and the trials where it fired, and each attempt gets its own start and finish record.
+
+The gate report has no latency numbers; each trial is scored pass or fail. The only timing in my write-ups is a median seconds per trial for each model, and that includes any retry, so I have not solved the skew you describe.
+
+## Already posted on 13 Nov (kept for the record)
+
+- To u/Significant_Tune9219: the run 2 result and the three category counts. That reply says "89.2%, up from 72.9% in run 1" and "a tool error of its own making". The records were later reworded: the two runs differ in rounds and seeds, so the difference is not a measured effect, and the trace shows a tool failure with no injected fault, not its cause.
+- To u/ChemicalExcellent463: what the 4B model answered when it skipped the lookup.
+- To the comment a moderator removed: one vote for interrupts, no promise.
+
+## What the 14 Nov review changed in the first draft of A, B and C
+
+- A opened with "That is what the breakdown shows" and closed with "returning the error covers a single mistake and does nothing for a mistake plus an empty lookup". Both arms had the error returned, so the run cannot say what returning it changed. Reworded to describe the run.
+- A said "The mistake is the same in every row". Only 40 of the 51 stock-note failures begin with the wrong first call (5 of 6, 1 of 2, 8 of 10, 26 of 33 by row). Reworded, and the error-once row (16 of 24) and the 7 of 14 line added so no row is left out.
+- A said 2.1.0 prints the counts "in every report". It is in suite reports only (Markdown, HTML, JSON), not v1 reports, JUnit or the gate summary. The repeated link was dropped.
+- B said "5% error bound". The records state 2.5% per direction, under assumptions; "evidence 0.02" had no scale, so the start value 1 is now stated.
+- C said "it fires at most once per trial" as if general. True for one fault declared on one tool and one call; a user can declare more. C also said "I do not report latency at all"; the study write-ups give a median seconds per trial.
