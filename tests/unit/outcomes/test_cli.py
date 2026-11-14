@@ -325,16 +325,6 @@ def test_inference_error_prints_stdout_only(
     assert "errored pairs exceed max_errored_pairs" in captured.out
 
 
-def test_packaged_example_placeholder(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    output_json = tmp_path / "decision.json"
-    refusal(
-        ["verdict", "--example", "--json", str(output_json)],
-        "the packaged example is not installed",
-        capsys,
-    )
-    assert output_json.is_file()
-
-
 def test_verdict_rule_writes_complete_false_registration(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

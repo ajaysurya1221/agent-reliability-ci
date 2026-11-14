@@ -1329,7 +1329,30 @@ def _cmd_outcome_verdict(values: dict[str, object]) -> int:
 
     rule = cast(str | None, values["rule"])
     if values["example"]:
-        decision = empty_decision("the packaged example is not installed")
+        from contextlib import ExitStack
+        from importlib.resources import as_file, files
+
+        from arci.outcome_schema import OutcomeDecision
+
+        example = files("arci.demo.outcomes").joinpath("order-desk-run-1")
+        with ExitStack() as resources:
+            rule_path, baseline_path, candidate_path = (
+                resources.enter_context(as_file(example.joinpath(name)))
+                for name in ("rule.yaml", "baseline.csv", "candidate.csv")
+            )
+            _outcome_paths(
+                {
+                    **values,
+                    "rule": str(rule_path),
+                    "baseline": [str(baseline_path)],
+                    "candidate": [str(candidate_path)],
+                }
+            )
+            decision = decide_outcomes(rule_path, [baseline_path], [candidate_path])
+        decision = OutcomeDecision.create(
+            **decision.model_dump(exclude={"record_sha256", "notices"}),
+            notices=(*decision.notices, text("F14")),
+        )
     elif rule is None:
         decision = empty_decision(text("E15", reason="a rule file is required"))
     else:
