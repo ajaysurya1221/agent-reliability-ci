@@ -41,7 +41,11 @@ the offline demo or these native-store diagnostics.
 run in balanced rounds), suite support in `run`, `gate`, `report`, `triage`,
 `diff` and `plan`, Markdown/JSON/HTML suite reports with fault accounting, and
 the optional `langchain` extra. 2.1.0 added a "tool outcomes" section to suite
-reports and did not change any record kind, command or exit code.
+reports and did not change any record kind, command or exit code. 2.2.0 added
+the `arci-outcomes/1` record kind (a verdict from pass/fail outcomes another
+tool already produced) and the commands `arci verdict`, `arci verdict-rule`
+and `arci verdict --example`; it did not change any existing record kind,
+command or exit code.
 
 Kept stable through 2.x, each because an existing test pins it:
 
@@ -56,9 +60,13 @@ Kept stable through 2.x, each because an existing test pins it:
   importable without the extra: `tests/unit/adapters/test_lazy_import.py`.
 - The v1 (`arci/0.5`) JSON report is pinned byte for byte:
   `tests/unit/suite_report/test_v1_json_pin.py`.
+- The `arci-outcomes/1` schema version, verdict exit codes PASS/0, BLOCK/1,
+  INCONCLUSIVE/2, ERROR/3, the `OutcomeDecision` JSON artifact's fields, and the
+  fixed texts (including F1's descriptive-verdict label and the F15/F16 crossing
+  reasons it renders in place of the suite's): `tests/acceptance/test_outcomes.py`.
 
 Not promised: the wording and layout of the suite Markdown and HTML reports; `minimize`,
 `bundle`, `replay`, `trace-check` and JUnit for suites (each currently refuses); the
-LangChain adapter's internal call shape, async agents or interrupts; and anything else
-design records 0011-0014 list as not built. Each of those may change without a
-major-version bump.
+LangChain adapter's internal call shape, async agents or interrupts; the terminal and
+Markdown layout of an `arci verdict` report; and anything else design records 0011-0015
+list as not built. Each of those may change without a major-version bump.

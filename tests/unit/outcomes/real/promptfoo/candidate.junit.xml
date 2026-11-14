@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites errors="3" failures="3" name="promptfoo" skipped="0" tests="12" time="0.009">
+  <testsuite errors="3" failures="3" name="[candidate] prompt 1" skipped="0" tests="12" time="0.009" timestamp="2026-11-14T17:14:30.995Z">
+    <testcase name="test 1: word-alpha" time="0.002" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 2: word-alpha" time="0.001" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 3: word-alpha" time="0.001" classname="[candidate] prompt 1">
+      <failure message="Assertion failed" type="assertion">Score: 0
+Reason: Assertion failed
+Failed assertions:
+- contains</failure>
+    </testcase>
+    <testcase name="test 4: word-beta" time="0.001" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 5: word-beta" time="0.001" classname="[candidate] prompt 1">
+      <failure message="Assertion failed" type="assertion">Score: 0
+Reason: Assertion failed
+Failed assertions:
+- contains</failure>
+    </testcase>
+    <testcase name="test 6: word-beta" time="0.001" classname="[candidate] prompt 1">
+      <failure message="Assertion failed" type="assertion">Score: 0
+Reason: Assertion failed
+Failed assertions:
+- contains</failure>
+    </testcase>
+    <testcase name="test 7" time="0" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 8" time="0.001" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 9" time="0.001" classname="[candidate] prompt 1"></testcase>
+    <testcase name="test 10: word-boom" time="0" classname="[candidate] prompt 1">
+      <error message="Evaluation error" type="error">Reason: Evaluation error</error>
+    </testcase>
+    <testcase name="test 11: word-boom" time="0" classname="[candidate] prompt 1">
+      <error message="Evaluation error" type="error">Reason: Evaluation error</error>
+    </testcase>
+    <testcase name="test 12: word-boom" time="0" classname="[candidate] prompt 1">
+      <error message="Evaluation error" type="error">Reason: Evaluation error</error>
+    </testcase>
+  </testsuite>
+</testsuites>

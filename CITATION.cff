@@ -7,8 +7,8 @@ authors:
     given-names: Ajay Surya
 repository-code: "https://github.com/ajaysurya1221/agent-reliability-ci"
 license: Apache-2.0
-version: "2.1.0"
-date-released: "2026-11-13"
+version: "2.2.0"
+date-released: "2026-11-15"
 keywords:
   - ai-agents
   - reliability
@@ -23,4 +23,4 @@ references:
       - family-names: Senthilrajan
         given-names: Ajay Surya
     url: "https://github.com/ajaysurya1221/agent-reliability-ci/blob/evidence-2026-10-06/docs/reports/ci-gate-2026-10-06/REPORT.md"
-    date-released: "2026-10-06"
+    date-released: "2026-11-15"

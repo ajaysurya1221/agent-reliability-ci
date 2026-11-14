@@ -1,0 +1,38 @@
+"""Copy generated tool outputs into the fixture directory, replacing local paths and the host name.
+
+Usage: python3.14 scrub.py SRC_ROOT DEST_ROOT   (needs Python 3.14 for Zstandard zip entries)
+Only byte substitutions are made; structure and every other value are as the tools wrote them.
+"""
+import re, sys, zipfile
+from pathlib import Path
+
+SUBS = [
+    (re.compile(rb"/private/tmp/claude-\d+/[^/\"\\ ]+/[0-9a-f-]{36}/scratchpad/t0"), b"/work"),
+    # The same prefix cut short by a wrapped traceback.
+    (re.compile(rb"/private/tmp/claude-\d+/-[A-Za-z0-9_-]+(/[0-9a-f-]+)?(/scratchpad)?"), b"/work"),
+    (re.compile(rb"/Users/[^/\"\\ ]+/\.npm/_npx/[0-9a-f]+"), b"/npx"),
+    (re.compile(rb'hostname="[^"]*"'), b'hostname="host"'),
+]
+
+def scrub(data: bytes) -> bytes:
+    for pattern, repl in SUBS:
+        data = pattern.sub(repl, data)
+    return data
+
+def copy_plain(src: Path, dst: Path) -> None:
+    dst.write_bytes(scrub(src.read_bytes()))
+
+def copy_zip(src: Path, dst: Path) -> None:
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w") as zout:
+        for info in zin.infolist():
+            zout.writestr(info.filename, scrub(zin.read(info)), compress_type=info.compress_type)
+
+src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+for fmt, ext in (("eval", "eval"), ("json", "json")):
+    for arm in ("baseline", "candidate"):
+        (f,) = (src / "out-inspect" / fmt / arm).glob(f"*.{ext}")
+        (copy_zip if ext == "eval" else copy_plain)(f, dst / "inspect" / f"{arm}.{ext}")
+for name in ("baseline.json", "candidate.json", "baseline-single.json", "candidate.junit.xml"):
+    copy_plain(src / "pf" / name, dst / "promptfoo" / name)
+for name in ("single.xml", "repeat.xml"):
+    copy_plain(src / "pt" / name, dst / "pytest" / name)

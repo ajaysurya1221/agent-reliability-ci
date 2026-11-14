@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 from arci.hashing import canonical_json, hash_record
@@ -19,7 +20,30 @@ from arci.suite_schema import (
     format_rational,
     parse_rational,
 )
-from arci.suite_stats import RunningWealth, check_suite_plan, rule_of
+from arci.suite_stats import RunningWealth, SuiteRule, check_suite_plan, rule_of
+
+
+@dataclass(frozen=True)
+class RoundIncrement:
+    minus: int
+    zero: int
+    plus: int
+    errored: int
+    candidate_hard_violations: int
+
+
+@dataclass(frozen=True)
+class RoundLook:
+    round: int
+    pairs: int
+    counts: SuiteCounts
+    candidate_hard_violations: int
+    pass_wealth: str
+    block_wealth: str
+    pass_crossed: bool
+    block_crossed: bool
+    verdict: Verdict
+    reasons: tuple[str, ...]
 
 
 def _is_string(value: object) -> bool:
@@ -92,41 +116,28 @@ def _round_verdict(
     return Verdict.INCONCLUSIVE, ("no test crossed",)
 
 
-def evaluate_rounds(
-    manifest: SuiteManifest, trials: Sequence[TrialEnvelope]
-) -> tuple[SuiteRoundDecision, ...]:
-    """Walk valid scheduled trials, ignoring an incomplete trailing round."""
-    rounds: dict[int, list[TrialEnvelope]] = {}
-    for trial in trials:
-        rounds.setdefault(pair_round(trial.pair_id), []).append(trial)
-    rule = rule_of(manifest)
+def walk_rounds(
+    rule: SuiteRule, per_round_counts: Iterable[RoundIncrement]
+) -> tuple[RoundLook, ...]:
+    """Accumulate complete rounds through the first decision or registered cap."""
     counts = _Counts()
     passed, blocked = RunningWealth(rule, 1), RunningWealth(rule, -1)
-    history: list[SuiteRoundDecision] = []
-    for r in range(1, manifest.max_rounds + 1):
-        current = rounds.get(r, [])
-        if len(current) != 2 * manifest.n_cells:
-            break
-        before = (counts.minus, counts.zero, counts.plus, counts.errored)
-        by_id = {trial.trial_id: trial for trial in current}
-        for trial in current:
-            if trial.arm == "baseline":
-                counts.add(trial, by_id[f"{trial.pair_id}:candidate"])
-        changes = tuple(
-            a - b
-            for a, b in zip(
-                (counts.minus, counts.zero, counts.plus, counts.errored), before, strict=True
-            )
-        )
+    history: list[RoundLook] = []
+    for r, increment in enumerate(islice(per_round_counts, rule.max_rounds), 1):
+        counts.minus += increment.minus
+        counts.zero += increment.zero
+        counts.plus += increment.plus
+        counts.errored += increment.errored
+        counts.hard += increment.candidate_hard_violations
+        changes = (increment.minus, increment.zero, increment.plus, increment.errored)
         passed.advance(*changes)
         blocked.advance(*changes)
         pc, bc = passed.crossed(), blocked.crossed()
-        verdict, reasons = _round_verdict(counts, manifest.max_errored_pairs, pc, bc)
+        verdict, reasons = _round_verdict(counts, rule.max_errored_pairs, pc, bc)
         history.append(
-            SuiteRoundDecision(
+            RoundLook(
                 round=r,
-                pairs=r * manifest.n_cells,
-                trials_sha256=_digest(current),
+                pairs=r * rule.n_cells,
                 counts=counts.model(),
                 candidate_hard_violations=counts.hard,
                 pass_wealth=passed.text(),
@@ -140,6 +151,50 @@ def evaluate_rounds(
         if verdict is not Verdict.INCONCLUSIVE:
             break
     return tuple(history)
+
+
+def evaluate_rounds(
+    manifest: SuiteManifest, trials: Sequence[TrialEnvelope]
+) -> tuple[SuiteRoundDecision, ...]:
+    """Walk valid scheduled trials, ignoring an incomplete trailing round."""
+    rounds: dict[int, list[TrialEnvelope]] = {}
+    for trial in trials:
+        rounds.setdefault(pair_round(trial.pair_id), []).append(trial)
+    rule = rule_of(manifest)
+    digests: list[str] = []
+
+    def increments() -> Iterator[RoundIncrement]:
+        for r in range(1, manifest.max_rounds + 1):
+            current = rounds.get(r, [])
+            if len(current) != 2 * manifest.n_cells:
+                break
+            counts = _Counts()
+            by_id = {trial.trial_id: trial for trial in current}
+            for trial in current:
+                if trial.arm == "baseline":
+                    counts.add(trial, by_id[f"{trial.pair_id}:candidate"])
+            # Keep pairing and digest work lazy: a stop must not inspect later rounds.
+            digests.append(_digest(current))
+            yield RoundIncrement(
+                counts.minus, counts.zero, counts.plus, counts.errored, counts.hard
+            )
+
+    return tuple(
+        SuiteRoundDecision(
+            round=look.round,
+            pairs=look.pairs,
+            trials_sha256=digests[look.round - 1],
+            counts=look.counts,
+            candidate_hard_violations=look.candidate_hard_violations,
+            pass_wealth=look.pass_wealth,
+            block_wealth=look.block_wealth,
+            pass_crossed=look.pass_crossed,
+            block_crossed=look.block_crossed,
+            verdict=look.verdict,
+            reasons=look.reasons,
+        )
+        for look in walk_rounds(rule, increments())
+    )
 
 
 def _cells(manifest: SuiteManifest, trials: Sequence[TrialEnvelope]) -> tuple[SuiteCellStats, ...]:

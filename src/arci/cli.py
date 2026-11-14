@@ -59,7 +59,6 @@ from arci.planning import (
 )
 from arci.reliability import validate_ks
 from arci.replay import make_bundle, replay
-from arci.report import fault_accounting, render_junit, render_markdown
 from arci.runner import run_experiment
 from arci.schedule import build_schedule
 from arci.schema import (
@@ -77,7 +76,6 @@ from arci.schema import (
 )
 from arci.storage import load_run
 from arci.suite_gate import decide_suite, replay_suite_decision
-from arci.suite_report import render_suite_json, render_suite_markdown
 from arci.suite_runner import run_suite
 from arci.suite_schema import SUITE_SCHEMA_VERSION, SuiteDecision, SuiteManifest
 from arci.suite_storage import load_suite_run, manifest_schema_version
@@ -325,6 +323,8 @@ def smoke_followup(manifest: Manifest) -> str:
 
 
 def _cmd_run(manifest_path: str, out_dir: str, workers: int) -> int:
+    from arci.report import render_markdown
+
     # --- descriptor ---
     if is_descriptor_path(manifest_path):
         try:
@@ -633,6 +633,8 @@ def _invalid_store_report(exc: BaseException) -> str:
 
 
 def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -> int:
+    from arci.report import render_junit, render_markdown
+
     suite = _suite_input(run_dir)
     if suite and junit_path is not None:
         raise CliError("JUnit export for suites is not built yet")
@@ -660,6 +662,9 @@ def _cmd_gate(run_dir: str, junit_path: str | None, markdown_path: str | None) -
 def _cmd_report(
     run_dir: str, report_format: str, pass_k: str | None = None, out: str | None = None
 ) -> int:
+    from arci.report import fault_accounting, render_junit, render_markdown
+    from arci.suite_report import render_suite_json, render_suite_markdown
+
     if out is not None and report_format != "html":
         raise CliError("--out is supported for --format html only")
 
@@ -1070,6 +1075,91 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
         "--force", action="store_true", help="replace an existing regular file at --out"
     )
     # --- end init ---
+    verdict = commands.add_parser(
+        "verdict",
+        help="decide from imported outcomes",
+        allow_abbrev=False,
+        usage=(
+            "%(prog)s RULE --baseline FILE... --candidate FILE...\n"
+            "                    [--format auto|csv|jsonl|junit|inspect]\n"
+            "                    [--previous DECISION.json] [--json PATH] [--markdown PATH]\n"
+            "       %(prog)s --example [--json PATH] [--markdown PATH]"
+        ),
+    )
+    verdict.add_argument("rule", metavar="RULE", nargs="?", help="read the imported-outcomes rule")
+    verdict.add_argument(
+        "--baseline",
+        metavar="FILE",
+        nargs="*",
+        help="read baseline outcome files in the given order",
+    )
+    verdict.add_argument(
+        "--candidate",
+        metavar="FILE",
+        nargs="*",
+        help="read candidate outcome files in the given order",
+    )
+    verdict.add_argument(
+        "--format",
+        choices=("auto", "csv", "jsonl", "junit", "inspect"),
+        default="auto",
+        help="choose the input format; auto uses file extensions",
+    )
+    verdict.add_argument(
+        "--previous",
+        metavar="DECISION.json",
+        help="check the rule and supplied rounds against a previous decision",
+    )
+    verdict.add_argument("--json", metavar="PATH", help="write the sealed JSON decision")
+    verdict.add_argument(
+        "--markdown", metavar="PATH", help="write the Markdown report with the full task table"
+    )
+    verdict.add_argument(
+        "--example", action="store_true", help="run on the packaged order-desk outcomes"
+    )
+
+    verdict_rule = commands.add_parser(
+        "verdict-rule",
+        help="extract an imported-outcomes rule",
+        allow_abbrev=False,
+        usage=(
+            "%(prog)s --tasks FILE... --out RULE\n"
+            "                         [--format auto|csv|jsonl|junit|inspect]\n"
+            "                         [--score NAME] [--pass-at-least RATIONAL]\n"
+            "                         [--suite-id ID] [--alpha RATIONAL] [--margin RATIONAL]\n"
+            "                         [--max-rounds N] [--max-errored-pairs N]"
+        ),
+    )
+    verdict_rule.add_argument(
+        "--tasks", metavar="FILE", nargs="*", help="extract task ids from these outcome files"
+    )
+    verdict_rule.add_argument(
+        "--out", metavar="RULE", help="create a rule declaring fixed_before_runs: false"
+    )
+    verdict_rule.add_argument(
+        "--format",
+        choices=("auto", "csv", "jsonl", "junit", "inspect"),
+        default="auto",
+        help="choose the input format; auto uses file extensions",
+    )
+    for name, metavar, description in (
+        ("score", "NAME", "select one Inspect scorer by name"),
+        (
+            "pass-at-least",
+            "RATIONAL",
+            "map numeric Inspect scores at or above this rational to pass",
+        ),
+        ("suite-id", "ID", "name the rule's suite (default: imported-outcomes)"),
+        ("alpha", "RATIONAL", "set alpha as a rational (default: 1/20)"),
+        ("margin", "RATIONAL", "set the non-inferiority margin as a rational (default: 1/10)"),
+        ("max-rounds", "N", "set the registered round budget (default: ceil(400 / task count))"),
+        (
+            "max-errored-pairs",
+            "N",
+            "set the error tolerance (default: ceil(registered pairs / 100))",
+        ),
+    ):
+        verdict_rule.add_argument(f"--{name}", metavar=metavar, help=description)
     return parser
 
 
@@ -1243,10 +1333,224 @@ def _dispatch(values: dict[str, object]) -> int:
     raise CliError(f"unknown command: {command}")
 
 
+def _outcome_options(arguments: list[str]) -> set[str]:
+    """Reject repeated options before argparse can overwrite the earlier value."""
+    from arci.importers import OutcomeError
+    from arci.outcome_report import text
+
+    seen: set[str] = set()
+    for argument in arguments[1:]:
+        if argument == "--":
+            break
+        if not argument.startswith("--") and argument != "-h":
+            continue
+        option = argument.split("=", 1)[0]
+        if option == "-h":
+            option = "--help"
+        if option in seen:
+            raise OutcomeError(text("E20", option=option))
+        seen.add(option)
+    return seen
+
+
+def _outcome_paths(values: dict[str, object]) -> None:
+    """Complete step-one path checks before any input or rule is opened."""
+    import unicodedata
+
+    from arci.importers import OutcomeError
+    from arci.outcome_report import text
+
+    discovery = values["command"] == "verdict-rule"
+    inputs = (
+        cast(list[str] | None, values.get("tasks")) or []
+        if discovery
+        else (cast(list[str] | None, values.get("baseline")) or [])
+        + (cast(list[str] | None, values.get("candidate")) or [])
+        + [str(values[key]) for key in ("rule", "previous") if values.get(key) is not None]
+    )
+    output_keys = ("out",) if discovery else ("json", "markdown")
+    outputs = [str(values[key]) for key in output_keys if values.get(key) is not None]
+
+    def folded(value: Path) -> str:
+        # One spelling for names a volume may treat as one file: letter case and the
+        # composed or decomposed form of an accented character.
+        return unicodedata.normalize("NFC", str(value)).casefold()
+
+    occupied = [Path(path).resolve() for path in inputs]
+    for path in outputs:
+        resolved = Path(path).resolve()
+        if any(
+            folded(resolved) == folded(other)
+            or (resolved.exists() and other.exists() and os.path.samefile(resolved, other))
+            for other in occupied
+        ):
+            raise OutcomeError(text("E17", path=path))
+        occupied.append(resolved)
+    for path in outputs:
+        if not Path(path).resolve().parent.is_dir():
+            raise OutcomeError(text("E18", path=path))
+    if discovery and outputs and os.path.lexists(outputs[0]):
+        raise OutcomeError(text("E22", path=outputs[0]))
+
+
+def _cmd_outcome_verdict(values: dict[str, object]) -> int:
+    from arci.importers import OutcomeError
+    from arci.outcome_report import render_markdown, render_terminal, text
+    from arci.outcomes import decide_outcomes, empty_decision
+
+    rule = cast(str | None, values["rule"])
+    if values["example"]:
+        from contextlib import ExitStack
+        from importlib.resources import as_file, files
+
+        from arci.outcome_schema import OutcomeDecision
+
+        example = files("arci.demo.outcomes").joinpath("order-desk-run-1")
+        with ExitStack() as resources:
+            rule_path, baseline_path, candidate_path = (
+                resources.enter_context(as_file(example.joinpath(name)))
+                for name in ("rule.yaml", "baseline.csv", "candidate.csv")
+            )
+            _outcome_paths(
+                {
+                    **values,
+                    "rule": str(rule_path),
+                    "baseline": [str(baseline_path)],
+                    "candidate": [str(candidate_path)],
+                }
+            )
+            decision = decide_outcomes(rule_path, [baseline_path], [candidate_path])
+        decision = OutcomeDecision.create(
+            **decision.model_dump(exclude={"record_sha256", "notices"}),
+            notices=(*decision.notices, text("F14")),
+        )
+    elif rule is None:
+        decision = empty_decision(text("E15", reason="a rule file is required"))
+    else:
+        decision = decide_outcomes(
+            rule,
+            cast(list[str], values["baseline"]),
+            cast(list[str], values["candidate"]),
+            fmt=cast(str, values["format"]),
+            previous=cast(str | None, values["previous"]),
+        )
+    # The order is part of the contract: a later failure leaves earlier bytes intact.
+    for key in ("json", "markdown"):
+        path = cast(str | None, values[key])
+        if path is not None:
+            try:
+                content = (
+                    decision.model_dump_json(indent=2) + "\n"
+                    if key == "json"
+                    else render_markdown(decision)
+                )
+                _write(path, content)
+            except Exception:
+                raise OutcomeError(text("E19", path=path)) from None
+    if decision.last_round_evaluated == 0:
+        _outcome_error(decision.reasons[0])
+    else:
+        _print(render_terminal(decision))
+    return decision.exit_code
+
+
+def _cmd_outcome_rule(values: dict[str, object]) -> int:
+    from contextlib import suppress
+
+    import yaml
+
+    from arci.importers import OutcomeError, round_label
+    from arci.outcome_report import text
+    from arci.outcomes import discover_rule
+
+    options: dict[str, object] = {}
+    for key in (
+        "suite_id",
+        "alpha",
+        "margin",
+        "max_rounds",
+        "max_errored_pairs",
+        "score",
+        "pass_at_least",
+    ):
+        value = values[key]
+        if value is not None:
+            if key in ("max_rounds", "max_errored_pairs"):
+                # Invalid integers stay intact for the ordered rule-field E15 check.
+                with suppress(ValueError):
+                    value = round_label(str(value))
+            options[key] = value
+    rule = discover_rule(
+        cast(list[str], values["tasks"]), fmt=cast(str, values["format"]), **options
+    )
+    path = cast(str, values["out"])
+    try:
+        content = yaml.safe_dump(rule.model_dump(mode="json", exclude_none=True), sort_keys=False)
+        # Exclusive creation also refuses a path created after the step-one check.
+        with Path(path).open("x", encoding="utf-8") as destination:
+            destination.write(content)
+    except FileExistsError:
+        raise OutcomeError(text("E22", path=path)) from None
+    except Exception:
+        raise OutcomeError(text("E19", path=path)) from None
+    _print(text("F13"))
+    return 0
+
+
+def _outcome_error(reason: str) -> None:
+    """Preserve opaque diagnostics while keeping stderr to one physical line."""
+    from arci.outcome_report import escape_terminal
+
+    print(f"error: {escape_terminal(reason)}", file=sys.stderr)
+
+
+def _outcomes_main(arguments: list[str]) -> int:
+    """Keep the imported-outcomes error contract isolated from existing commands."""
+    from arci.importers import OutcomeError
+    from arci.outcome_report import text
+
+    try:
+        options = _outcome_options(arguments)
+        values = cast(dict[str, object], vars(_parser().parse_args(arguments)))
+        if values["command"] == "verdict":
+            if values["example"]:
+                if values["rule"] is not None or options - {
+                    "--example",
+                    "--json",
+                    "--markdown",
+                    "--help",
+                }:
+                    raise OutcomeError(text("E21"))
+            else:
+                for arm in ("baseline", "candidate"):
+                    if not values[arm]:
+                        raise OutcomeError(text("E16", arm=arm))
+        else:
+            if not values["tasks"]:
+                raise CliError("no input files were given for --tasks")
+            if values["out"] is None:
+                raise CliError("--out is required")
+        _outcome_paths(values)
+        if values["command"] == "verdict":
+            return _cmd_outcome_verdict(values)
+        return _cmd_outcome_rule(values)
+    except SystemExit as exc:
+        # argparse's help path is successful; invalid syntax uses _Parser.error.
+        return 0 if exc.code == 0 else 3
+    except (OutcomeError, CliError) as exc:
+        _outcome_error(str(exc))
+        return 3
+    except Exception as exc:
+        _outcome_error(str(exc))
+        return 3
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI and translate user-facing errors to exit code 3."""
     try:
         arguments = sys.argv[1:] if argv is None else argv
+        if arguments and arguments[0] in ("verdict", "verdict-rule"):
+            return _outcomes_main(arguments)
         v1_plan = False
         if "--help" not in arguments and "-h" not in arguments:
             probe, _ = _parser(suite_probe=True).parse_known_args(arguments)

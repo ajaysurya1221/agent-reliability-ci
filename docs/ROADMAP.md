@@ -7,8 +7,9 @@ v0.7.0 runs it against Jev and publishes an intent-routing calibration audit, an
 the onboarding path (PyPI, `arci demo`, `arci.yaml` and `arci init`) whose target, a first
 experiment in ten minutes, is measured by `docs/measurement/ttfv-protocol.md` and not yet
 established by cold-reader receipts. v1.0.0 adds `trace-check` and `triage`. v2.0.0 adds
-multi-task suites with a sequential decision rule and the LangChain adapter, and v2.1.0 adds
-tool outcomes in suite reports and a clean model swap in the quickstart.
+multi-task suites with a sequential decision rule and the LangChain adapter, v2.1.0 adds
+tool outcomes in suite reports and a clean model swap in the quickstart, and v2.2.0 adds
+a verdict from pass/fail outcomes another tool produced.
 
 ## Done in v0.2
 
@@ -87,6 +88,17 @@ model ([model-swap recipe](recipes/model-swap.md)). The second pre-registered ru
 order-desk study, and a write-up of both runs with the correction to run 1's first write-up
 ([results/order-desk-study.md](results/order-desk-study.md)). See design record 0014.
 
+## Done in v2.2.0
+
+A verdict from pass/fail outcomes another tool already produced: `arci verdict`,
+`arci verdict-rule` and `arci verdict --example`, reading Inspect AI JSON logs, pytest JUnit
+XML, and CSV/JSONL, with `--previous` to add rounds later and a `fixed_before_runs`
+declaration that labels a verdict descriptive or bound-claiming
+([verdict recipe](recipes/verdict.md), design record 0015). The suite decision loop was
+extracted into `walk_rounds`, shared with suites, no behaviour change. Not in 2.2.0: reading
+an Inspect `.eval` file directly, promptfoo, the GitHub Action's verdict mode, and HTML
+output for imported outcomes.
+
 ## Next
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
@@ -98,7 +110,8 @@ stronger bets near the margin, and every item design record 0013 lists as not bu
 suites (`minimize`, `bundle`, `replay` and `trace-check` for suite stores, JUnit for suites,
 tools with injected arguments, MCP clients other than ARCI's own revision, and command-agent
 suites beyond what the schema already allows, which are untested end to end). There is one
-framework adapter, for LangChain.
+framework adapter, for LangChain. Design record 0015 defers, for imported outcomes: reading an
+Inspect `.eval` file directly, promptfoo, the GitHub Action's verdict mode, and HTML output.
 
 On compound fault conditions: a condition can already list several faults (`faults:` in
 `arci.yaml`, applied together in order), in v1 and in suites. What 2.1.0 does not have is a

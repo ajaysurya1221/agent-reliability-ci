@@ -1,0 +1,60 @@
+"""Generate real Inspect AI logs offline (no model key): two arms, 3 epochs, one errored sample.
+
+Usage: python inspect_gen.py OUT_DIR
+Deterministic: pass/fail depends only on (arm, sample id, epoch).
+"""
+
+import hashlib
+import sys
+
+from inspect_ai import Task, eval
+from inspect_ai.dataset import Sample
+from inspect_ai.model import ModelOutput
+from inspect_ai.scorer import includes, match
+from inspect_ai.solver import Generate, TaskState, solver
+
+SAMPLES = [Sample(id=f"task-{i:02d}", input=f"Say the word w{i}", target=f"w{i}") for i in range(8)]
+SAMPLES.append(Sample(id=7001, input="Say the word n1", target="n1"))  # an integer id
+
+
+def _fails(arm: str, sample_id: object, epoch: int, rate: int) -> bool:
+    digest = hashlib.sha256(f"{arm}|{sample_id}|{epoch}".encode()).digest()
+    return digest[0] % 100 < rate
+
+
+@solver
+def scripted(arm: str, fail_rate: int, error_on: tuple[object, int] | None = None):
+    async def solve(state: TaskState, generate: Generate) -> TaskState:
+        if error_on is not None and (state.sample_id, state.epoch) == error_on:
+            raise RuntimeError("simulated infrastructure failure")
+        wrong = _fails(arm, state.sample_id, state.epoch, fail_rate)
+        text = "nope" if wrong else str(state.target.text)
+        state.output = ModelOutput.from_content(model="mockllm/model", content=text)
+        return state
+
+    return solve
+
+
+def task(arm: str, fail_rate: int, error_on: tuple[object, int] | None) -> Task:
+    return Task(
+        name="order_words",
+        dataset=SAMPLES,
+        solver=scripted(arm, fail_rate, error_on),
+        scorer=[match(), includes()],
+    )
+
+
+if __name__ == "__main__":
+    out = sys.argv[1]
+    for fmt in ("eval", "json"):
+        for arm, rate, err in (("baseline", 10, None), ("candidate", 40, ("task-03", 2))):
+            logs = eval(
+                task(arm, rate, err),
+                model="mockllm/model",
+                epochs=3,
+                log_dir=f"{out}/{fmt}/{arm}",
+                log_format=fmt,
+                fail_on_error=False,
+                display="none",
+            )
+            print(fmt, arm, logs[0].status, logs[0].location)

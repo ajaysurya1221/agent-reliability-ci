@@ -223,18 +223,25 @@ def default_max_errored_pairs(n_cells: int, max_rounds: int) -> int:
     return (n_cells * max_rounds + 99) // 100
 
 
-def check_suite_plan(manifest: SuiteManifest) -> tuple[str, ...]:
-    rule = rule_of(manifest)
+def check_rule_plan(rule: SuiteRule) -> tuple[str, ...]:
     if never_differs_pass_round(rule) is None:
         raise SuitePlanError("budget cannot establish PASS for a candidate that never differs")
     if not _ratio_crossed(
         *_wealth_ratio(
-            rule.max_errored_pairs, 0, manifest.registered_pairs - rule.max_errored_pairs, rule, 1
+            rule.max_errored_pairs,
+            0,
+            rule.n_cells * rule.max_rounds - rule.max_errored_pairs,
+            rule,
+            1,
         ),
         rule,
     ):
         raise SuitePlanError("PASS unreachable once max_errored_pairs is used")
     return ("max_rounds below 3: few looks",) if rule.max_rounds < 3 else ()
+
+
+def check_suite_plan(manifest: SuiteManifest) -> tuple[str, ...]:
+    return check_rule_plan(rule_of(manifest))
 
 
 @dataclass(frozen=True)
