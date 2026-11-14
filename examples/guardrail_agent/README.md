@@ -12,10 +12,10 @@ the shipped fail-closed rule and a fail-open variant?**
 
 | File | Origin |
 |---|---|
-| `hook_runtime.py` | Verbatim copy of frontier-scout `frontier_scout/agent_firewall/hook_runtime.py` at commit `58b0b17` (PR #74). stdlib only; sha256 `0e38c80304eed706a179ed24f2970e1d31e534820ecdd7bb45ec8cad5ae22a63`. |
-| `policy.json` | frontier-scout's own dogfood policy at the same commit (`frontier-scout.policy.json`, without the `decision_model` section). sha256 `cba9e633d749aafcbab72b1c24426984a7fa5985b65feb9f8850029a6b2cfb29`. |
+| `hook_runtime.py` | Verbatim copy of frontier-scout `frontier_scout/agent_firewall/hook_runtime.py` at commit `58b0b17` (PR #74). stdlib only; sha256 of the original, which is this file without its five-line header, `0e38c80304eed706a179ed24f2970e1d31e534820ecdd7bb45ec8cad5ae22a63`. |
+| `policy.json` | frontier-scout's own dogfood policy at the same commit (`frontier-scout.policy.json`, unchanged; its `decision_model` section was added later). sha256 `cba9e633d749aafcbab72b1c24426984a7fa5985b65feb9f8850029a6b2cfb29`. |
 | `commands.jsonl` | The 324 labelled commands of frontier-scout's `docs/evaluation/decision-model/` (effect class plus three literal yes/no labels: destructive, secret exposure, privilege). sha256 `6404e88894ec9186c67eb7a01906d143a97fd01b8a59318819eba550e6d1e17a`. |
-| `answers.jsonl` | `jev-1.13.0`'s answers to the hook's four questions, two passes, 2026-10-03. sha256 `698b6f90b0c3d8d629c4abf5e419abcd327c8740d73cb344d317f5882ea9d037`. |
+| `answers.jsonl` | Verbatim copy of frontier-scout's `docs/evaluation/decision-model/answers.jsonl` at the same commit: `jev-1.13.0`'s answers to the hook's four questions, two passes, 2026-10-03. sha256 `698b6f90b0c3d8d629c4abf5e419abcd327c8740d73cb344d317f5882ea9d037`. |
 | `world.py` | The task (commands without labels), the seeded pick, the MCP environment with one tool, `record(decision, static, applied)`, and the oracle. |
 | `agent.py` | The guard: variants `a`, `b`, `c` below. Talks to the decision boundary through `hook_runtime.ask_decision_model`, unchanged. |
 | `decisions.py` | Fixture upstream: answers each command with its recorded pass-1 answer, Choice probabilities reconstructed from the recorded confidence. |
