@@ -83,7 +83,8 @@ def round_label(value: object) -> int:
     """Accept only a plain decimal integer with at most nine digits."""
     if type(value) is int and -999_999_999 <= value <= 999_999_999:
         return value
-    if isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]{1,9}", value):
+    # No sign prefix other than a minus and no leading zeros: "+1" and "01" are not labels.
+    if isinstance(value, str) and re.fullmatch(r"-?(0|[1-9][0-9]{0,8})", value):
         return int(value)
     raise ValueError("round or epoch must be a decimal integer of at most 9 digits")
 

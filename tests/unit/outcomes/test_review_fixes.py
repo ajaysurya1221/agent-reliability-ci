@@ -61,6 +61,30 @@ def test_b1_alias_outputs_never_write(
     assert not untouched.exists()
 
 
+def test_b1_two_new_outputs_in_composed_and_decomposed_form_never_write(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # "é" as one code point and as "e" plus a combining accent name one file on some volumes.
+    rule, baseline, candidate = inputs(tmp_path)
+    composed = tmp_path / "r\u00e9sultat.json"
+    decomposed = tmp_path / "re\u0301sultat.json"
+    argv = [*command(rule, baseline, candidate), "--json", str(composed)]
+    assert main([*argv, "--markdown", str(decomposed)]) == 3
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.endswith("is both an output and an input, or is named twice\n")
+    assert not composed.exists() and not decomposed.exists()
+
+
+@pytest.mark.parametrize("label", ["01", "+1", "1.0", " 1", "1e0"])
+def test_round_labels_are_plain_decimal(tmp_path: Path, label: str) -> None:
+    from arci.importers import round_label
+
+    with pytest.raises(ValueError):
+        round_label(label)
+    assert round_label("1") == 1 and round_label("-1") == -1 and round_label("0") == 0
+
+
 def test_b2_numeric_score_limits_finish_under_two_seconds() -> None:
     # A subprocess timeout kills the old unbounded Fraction conversion safely.
     script = """

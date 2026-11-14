@@ -1355,6 +1355,8 @@ def _outcome_options(arguments: list[str]) -> set[str]:
 
 def _outcome_paths(values: dict[str, object]) -> None:
     """Complete step-one path checks before any input or rule is opened."""
+    import unicodedata
+
     from arci.importers import OutcomeError
     from arci.outcome_report import text
 
@@ -1368,11 +1370,17 @@ def _outcome_paths(values: dict[str, object]) -> None:
     )
     output_keys = ("out",) if discovery else ("json", "markdown")
     outputs = [str(values[key]) for key in output_keys if values.get(key) is not None]
+
+    def folded(value: Path) -> str:
+        # One spelling for names a volume may treat as one file: letter case and the
+        # composed or decomposed form of an accented character.
+        return unicodedata.normalize("NFC", str(value)).casefold()
+
     occupied = [Path(path).resolve() for path in inputs]
     for path in outputs:
         resolved = Path(path).resolve()
         if any(
-            str(resolved).casefold() == str(other).casefold()
+            folded(resolved) == folded(other)
             or (resolved.exists() and other.exists() and os.path.samefile(resolved, other))
             for other in occupied
         ):
