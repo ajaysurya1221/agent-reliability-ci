@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Docs:** `NOTICE` now also names the four files of `examples/guardrail_agent` that
+  were taken from frontier-scout and the two datasets whose label names the calibration
+  results use, and carries the MIT permission notice for the portions received under that
+  licence. The example's README no longer says a section was removed from `policy.json`
+  (the file is unchanged). `docs/ROADMAP.md` records v2.0.0 and v2.1.0 and no longer
+  presents the earlier candidate list as the plan. The README's Roadmap, Development,
+  Availability and GitHub Actions passages describe 2.1.0 instead of 1.0.0, and its limits
+  list no longer says an unfired fault goes unreported. `CITATION.cff` gives version 2.1.0.
+  No code change.
+
 ## v2.1.0 (2026-11-13)
 
 - **Added:** tool outcomes in suite reports (Markdown, HTML and the JSON key

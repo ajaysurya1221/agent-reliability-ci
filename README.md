@@ -474,15 +474,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v1.0.0`, the released feature set (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==1.0.0`). See
+This example pins `v2.1.0`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.1.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v1.0.0
+- uses: ajaysurya1221/agent-reliability-ci@v2.1.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -498,9 +498,9 @@ there for steps that run after the gate. This repository's own CI runs the test 
 re-derives the archived decisions, smoke-tests the built wheel on Linux and macOS, and runs the Action
 on a committed fixture that must BLOCK.
 
-The v2.0.0 release candidate adds opt-in `pr-comment: "true"`: it uploads the offline HTML
-report and creates or updates a PR summary. These inputs are not available on the v1.0.0 tag
-above; use a verified v2 revision. Grant `pull-requests: write` and serialize runs for each PR:
+Since v2.0.0 the Action has an opt-in `pr-comment: "true"`: it uploads the offline HTML
+report and creates or updates a PR summary. Grant `pull-requests: write` and serialize runs for
+each PR:
 
 ```yaml
 permissions:
@@ -548,8 +548,9 @@ never change the gate result. Racing duplicate comments are refreshed on the nex
 - **Reference validation executes user code.** `arci init` validates Python references by importing
   them, and calls the toolset factory once, in a child process; import-time code runs.
 - **Declaring a fault does not guarantee injection.** A fault names a tool; if the agent never calls
-  that tool at that occurrence, the condition runs clean and nothing says so. Inspect the recorded
-  calls to confirm injection.
+  that tool at that occurrence, the condition runs clean. Since 2.0.0 the fault accounting section
+  of a report counts, per arm, the trials each declared fault fired in, and marks a fault that
+  never fired.
 - Command agents get one stdio MCP server (revision 2026-07-28), serial tool calls, no HTTP
   transport, no concurrent decisions.
 - No importers (OTLP, Claude Code, Codex). POSIX only: on Windows the package
@@ -571,22 +572,28 @@ from it, and it shares no runtime layer with the maintainer's sibling projects A
 Frontier Scout. [NOTICE](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/NOTICE) records two adaptations from evalopt under MIT with attribution: the
 canonical JSON hashing helpers in `src/arci/hashing.py` and the self-sealing decision pattern in
 `src/arci/schema.py`, both attributed source adaptation inside the frozen manifest, not a dependency.
+It also names the four files of the `examples/guardrail_agent` example that were taken from
+Frontier Scout under MIT; that example is in the repository and not in the PyPI package.
 ARCI is not a successor to, conformance target for or drop-in replacement for evalopt, and nothing
 here claims adoption, performance or superiority.
 
 ## Roadmap
 
-Most valuable first: per-request pacing through parent IPC; counterfactual replay of recorded
-decisions, if it can be done without overstating what a re-perturbed recording proves; extending
-the intent-routing calibration audit to labelled coding-agent permission decisions, with a
-separate protocol and explicit limits. Full list in [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
+Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
+asks for it, or when a recorded run shows the need. What is not in 2.1.0 (interrupts, async
+agents, a suite example with several faults in one condition, a second framework adapter, the
+v1 commands that do not yet accept suites) and the earlier candidate list (last revised for
+v0.8.0) are in [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
 
 ## Development
 
-**How it was built.** One maintainer, September to October 2026, with Claude Code and Codex as
-pair-programmers (recorded in the commit messages). The experiment design, the decision rule and
-its calibration, the trust model and the acceptance tests are the maintainer's own; the retry
-demo, the calibration table and the test suite reproduce from a clean clone. Issues and PRs welcome.
+**How it was built.** One maintainer, September to November 2026, with Claude Code and Codex as
+pair-programmers (recorded in the commit messages). Through v1.0.0 the experiment design, the
+decision rule and its calibration, the trust model and the acceptance tests are the maintainer's
+own. For 2.0.0 and 2.1.0 the design records were drafted by Claude as orchestrator and approved
+by the maintainer, and the implementation was by Codex from written briefs (design records 0011
+to 0014). The retry demo, the calibration table and the test suite reproduce from a clean clone.
+Issues and PRs welcome.
 
 ```bash
 uv sync
@@ -606,13 +613,14 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v1.0.0 adds one-command native-run triage and cross-run trace comparison.
-Install `agent-reliability-ci==1.0.0` from PyPI or use Action tag `v1.0.0`.
+**Availability:** v2.1.0 is the current release. Install `agent-reliability-ci==2.1.0` from PyPI
+(`agent-reliability-ci[langchain]==2.1.0` for the LangChain adapter) or use Action tag `v2.1.0`.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
-publishing with attestations. The packaged demo, descriptors, initialization,
-planner and opt-in pass^k reporting remain available from the v0.8.0 release.
+publishing with attestations. The single-task gate, `triage`, `trace-check`, the packaged demo,
+descriptors, initialization, planner and opt-in pass^k reporting from earlier releases remain
+available.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
