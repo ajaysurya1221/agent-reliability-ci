@@ -1,0 +1,274 @@
+[
+ [
+  null,
+  {
+   "findings": [
+    {
+     "title": "--previous round-count check (E26) runs before the input, cross-file and normalisation checks, so it hides E1/E2/E3/E4/E5/E6/E27",
+     "severity": "major",
+     "file": "src/arci/outcomes.py",
+     "line": 785,
+     "description": "ADR 0015, 'Validation and errors', says validation stops at the first failure in a fixed order: '3. --previous structure (E24, E25, E27). 4. Input files ... E1, E2, E6 ... 5. Across files: ... (E3) ... (E4) ... (E5). 6. The --previous comparison: E26, which needs this call's round count, then E23 and E28.' Item 8 also says E26 applies only 'Once this call's inputs are validated'. decide_outcomes runs a pre-check, _prospective_round_count (lines 785-787), right after E25 and before the E27 normalisation check. Input parsing (_read_inputs) and _validate_rounds run later. When a longer predecessor is given, E26 is reported in place of the first real fault. The exit code is still 3, but the single stderr reason is the wrong one. A predecessor that was written under another normalisation and supplied more rounds is reported as a round-count problem, not as E27.",
+     "repro": "Rule: schema_version arci-outcomes/1, suite_id s, fixed_before_runs true, tasks [a, b], max_rounds 200. Three CSV rounds per arm (a,pass / b,pass) gave prev.json (INCONCLUSIVE, rounds_supplied 3). (1) `arci verdict rule.yaml --baseline b1.csv bad.csv --candidate c1.csv c2.csv --previous prev.json`, where bad.csv holds `zzz,pass`, prints `error: the previous decision supplied 3 rounds; this call supplies 2`. Without --previous the same inputs print `error: unknown task id: zzz` (E1, step 4). (2) `--baseline b1.csv b2.csv --candidate c1.csv c2.csv c3.csv --previous prev.json` prints E26, while the spec's step 5 gives `arms supply different rounds: baseline [1, 2], candidate [1, 2, 3]` (E5). (3) prev.json was re-sealed with normalisation 2 through OutcomeDecision.create. With 2 rounds it prints E26 in place of `the previous decision used normalisation 2; this call uses 1` (E27, step 3). With 3 rounds it prints E27 correctly.",
+     "suggested_fix": "Remove the early _prospective_round_count E26 check, or move the E27 normalisation check ahead of it and keep the early check only where it cannot hide another fault. The E26 check after _validate_rounds (line 810) already applies the rule in the specified position."
+    }
+   ],
+   "checked_ok": [
+    "Inference goes only through suite_gate.walk_rounds. In 1,500 random tables (1-12 tasks, 1-6 rounds, random tolerance, stakes, margin and alpha, missing and error outcomes mixed, fixed_before_runs true and false), the round history, cumulative counts and verdict all matched an independent reference built on suite_stats.scored_wealth and crossed. No mismatches; the verdicts were PASS, INCONCLUSIVE, ERROR (errored pairs over the tolerance) and one BLOCK. A search of small tables did not find one where both wealths cross at once, so the 'both tests crossed' ERROR was never exercised.",
+    "A missing outcome (absent row, absent Inspect score, absent epoch sample) is counted as errored against both tests, never as a tie (_Counts.add treats None like error)",
+    "Per-task counts and the sums in the JSON cover rounds 1 to last_round_evaluated only. walk_rounds uses a lazy islice over the increments generator, so rounds after the stop are never counted. Task totals matched the reference in every fuzz case.",
+    "Rounds after the stopping round are still read, hashed and validated before inference; F10 gives the number excluded",
+    "F8/F9 matched a brute-force search with scored_wealth in every INCONCLUSIVE fuzz case. The ADR's worked example (50 tasks, 8 rounds, 50 ties) gives F8 r=1, p=50.",
+    "Round digests: null for missing and 'error' are distinct. A predecessor with a missing outcome against a re-run that has an explicit error gives E28. Re-ordering rows inside a file does not change the digest.",
+    "--previous: a changed rule (margin, or fixed_before_runs false vs true) gives E23; a changed prefix gives E28; a longer predecessor gives E26; an ERROR predecessor goes through the E25 path; another normalisation gives E27 when the round counts agree",
+    "fixed_before_runs false: F1 is line 1 on stdout and the first line of the Markdown, F5/F6 are absent, and F15/F16 replace the crossing reasons at the top level and in every JSON history entry. Verdict and exit code are identical to the true case.",
+    "The --example output reproduces the ADR's round 1 exactly: 26/70/0, PASS wealth 1.92124e-03, BLOCK wealth 1.56229e+02, BLOCK, exit 1, and the F14 notice"
+   ]
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "corrected_severity": "major",
+   "evidence": "I reproduced it in a mktemp -d directory, using the rule (schema_version arci-outcomes/1, suite_id s, fixed_before_runs true, tasks [a, b], max_rounds 200) and three tie CSV rounds per arm. That gave prev.json, INCONCLUSIVE with 3 rounds.\n\n(1) `--baseline b1.csv bad.csv --candidate c1.csv c2.csv --previous prev.json`, where bad.csv holds `zzz,pass`, prints \"error: the previous decision supplied 3 rounds; this call supplies 2\" (rc 3). Without --previous it prints \"error: unknown task id: zzz\" (E1).\n\n(2) `--baseline b1.csv b2.csv --candidate c1.csv c2.csv c3.csv --previous prev.json` prints the same E26 line. Without --previous it prints \"error: arms supply different rounds: baseline [1, 2], candidate [1, 2, 3]\" (E5).\n\n(3) I did not re-run the E27 case through the CLI. The code orders it the same way: src/arci/outcomes.py lines 785-787 raise E26 from `_prospective_round_count`, and the E27 normalisation check comes after it at lines 788-789. The unit test tests/unit/outcomes/test_previous_validation.py::test_e26_precedes_e27 asserts that E26-before-E27 ordering on purpose, and test_e26_precedes_input_outcome_error asserts E26 before an input outcome error.\n\nBoth contradict the source of truth. V3-CONTRACT.md names docs/design/0015-imported-outcomes.md first and points to its \"steps 1 to 6\". ADR 0015, \"Validation and errors\", says: \"Validation stops at the first failure ... 3. `--previous` structure (E24, E25, E27). 4. Input files ... E1, E2, E6 ... 5. Across files ... (E5). 6. The `--previous` comparison: E26, which needs this call's round count, then E23 and E28.\" Item 8 of the ADR says E26 applies \"Once this call's inputs are validated\".\n\nThe exit code is still 3 and there is no wrong verdict, so this is not a blocker. The user does get the wrong single reason, which hides the real input fault or the normalisation mismatch. Acceptance test test_e26_a_previous_decision_with_more_rounds uses valid inputs, so it does not depend on the early check.",
+   "minimal_fix": "Delete the early check in decide_outcomes, src/arci/outcomes.py lines 785-787 (`supplied = _prospective_round_count(...)` and its E26 raise). Then E27 runs right after E25, and the existing E26 check after `_validate_rounds` (line 810) covers step 6. `_prospective_round_count` can then be removed. Rewrite the two unit tests in tests/unit/outcomes/test_previous_validation.py that encode the wrong order (test_e26_precedes_e27 and test_e26_precedes_input_outcome_error) to expect E27 and the input error instead."
+  }
+ ],
+ [
+  null,
+  {
+   "findings": [
+    {
+     "title": "--previous: E26 is raised before step-4/5 input validation and before E27 (step 3), contrary to the ordered list",
+     "severity": "major",
+     "file": "src/arci/outcomes.py",
+     "line": 785,
+     "description": "The record's 'Validation and errors' list puts '3. --previous structure (E24, E25, E27)', then '4. Input files ... E1, E2, E6, ...', '5. Across files (E3, E4, E5)', and last '6. The --previous comparison: E26, which needs this call's round count, then E23 and E28.' decide_outcomes calls _prospective_round_count and raises E26 (lines 785-787) before the E27 check (788-789) and before _read_inputs/_validate_rounds. So a call with an unknown task id, a bad outcome, an out-of-range or non-contiguous round, or a predecessor under a different normalisation reports E26 instead of the earlier fault. The unit tests test_e26_precedes_e27 and test_e26_precedes_input_outcome_error in tests/unit/outcomes/test_previous_validation.py assert this order, which contradicts the record. V3-CONTRACT says the record wins.",
+     "repro": "Rule rule.yaml with tasks [a,b] and fixed_before_runs: true. Make prev2.json from a 2-round run (b2.csv used for both arms). Then: `arci verdict rule.yaml --baseline b1.csv --candidate c1bad.csv --previous prev2.json`, where b1.csv has a,b in round 1 and c1bad.csv has rows a and zzz. It prints 'error: the previous decision supplied 2 rounds; this call supplies 1'. Without --previous the same inputs give 'error: unknown task id: zzz' (E1, step 4). Second case: reseal prev2.json with normalisation 2 (prevnorm2.json) and run `arci verdict rule.yaml --baseline b1.csv --candidate b1.csv --previous prevnorm2.json`. It prints E26 instead of E27 'the previous decision used normalisation 2; this call uses 1'.",
+     "suggested_fix": "Remove the prospective E26 check. After the E25 check, run E27, then step 4 and step 5, then E26/E23/E28 as the code already does at lines 809-816. Update the two unit tests."
+    },
+    {
+     "title": "verdict-rule checks rule-option fields out of record order: score/pass_at_least before suite_id/alpha, and only those two before inputs are read",
+     "severity": "minor",
+     "file": "src/arci/outcomes.py",
+     "line": 831,
+     "description": "Record: 'Field order, first failure reported: schema_version, suite_id, tasks, alpha, margin, stakes, max_rounds ..., max_errored_pairs, score, pass_at_least, fixed_before_runs'. The ordered list also puts rule fields (step 2) before input files (step 4). discover_rule validates --score and --pass-at-least first (lines 831-838). It then reads the inputs and checks --suite-id, --alpha, --margin, --max-rounds and --max-errored-pairs last, in _rule_from_mapping. Two faulty options report the later field. A bad --alpha is reported only after an input error, while a bad --pass-at-least is reported before one. No test covers verdict-rule option ordering.",
+     "repro": "`arci verdict-rule --tasks b1.csv --out x2.yaml --suite-id 'bad id' --score ''` gives 'error: ... rule: score must be a non-empty string', where suite_id comes first in the record. `arci verdict-rule --tasks b1.csv --out x2.yaml --alpha 2/40 --pass-at-least 0.5` reports pass_at_least, not alpha. `arci verdict-rule --tasks bad.csv --out x1.yaml --alpha 2/40`, with bad.csv having outcome 'maybe', reports E10. The same file with `--pass-at-least 0.5` reports E15.",
+     "suggested_fix": "Validate all option-supplied fields in record order with one routine, either all before reading inputs (tasks aside) or all after. Add a test."
+    },
+    {
+     "title": "E14 cannot be raised for CSV; a CSV row without a round value gives E6",
+     "severity": "minor",
+     "file": "src/arci/outcomes.py",
+     "line": 284,
+     "description": "Record, Neutral CSV and JSONL: 'Within one file either every row carries round or none does, and a mixture is E14' applies to both formats. For CSV, 'round' in record is decided by the header, so every row 'carries' round and E14 is unreachable. A row with an empty round cell fails the integer check (line 290) and gives E6. Only the JSONL form of E14 is tested (acceptance test_e14_round_on_some_rows_only, unit test_validation E14 case).",
+     "repro": "mix.csv: 'task_id,outcome,round\\na,pass,1\\nb,pass,\\n'. Run `arci verdict rule.yaml --baseline mix.csv --candidate mix.csv`. It prints 'error: unreadable or unsupported input: mix.csv'. The JSONL equivalent prints 'error: mix.jsonl gives round on some rows and not others'.",
+     "suggested_fix": "For CSV, treat an empty round cell as 'does not carry round' (has_round = record.get('round', '') != '') so a mixture is E14. Add a CSV E14 test."
+    },
+    {
+     "title": "verdict-rule step-1 refusals use non-record text ('for --tasks', '--out is required')",
+     "severity": "minor",
+     "file": "src/arci/cli.py",
+     "line": 1457,
+     "description": "The record says each fixed string 'is printed verbatim'. E16 is 'no input files were given for <arm>', and the library's discover_rule renders it as text('E16', arm='tasks'), giving 'no input files were given for tasks'. The CLI instead raises CliError('no input files were given for --tasks'), so the two entry points disagree. A missing --out gives '--out is required', which is not a fixed string in the record.",
+     "repro": "`arci verdict-rule --out x9.yaml` gives 'error: no input files were given for --tasks'. Calling discover_rule([]) raises 'no input files were given for tasks'. `arci verdict-rule --tasks b1.csv` gives 'error: --out is required'.",
+     "suggested_fix": "Use text('E16', ...) with the same placeholder value in both places. Either add a fixed string for a missing --out to the record or make --out required in argparse."
+    },
+    {
+     "title": "Second console command agent-reliability-ci is absent and untested",
+     "severity": "minor",
+     "file": "pyproject.toml",
+     "line": 50,
+     "description": "Decision item 10: 'A second console command agent-reliability-ci shares the entry point, so uvx agent-reliability-ci verdict --example works.' [project.scripts] lists only 'arci', .venv/bin has no agent-reliability-ci, and no test refers to it. pyproject.toml is frozen and the record defers the re-freeze to the release, so this may be pending release work. It is listed so it is not lost.",
+     "repro": "`grep -A3 'project.scripts' pyproject.toml` shows only `arci = \"arci.cli:main\"`. `ls .venv/bin | grep agent` finds nothing. `grep -l agent-reliability-ci tests/acceptance/test_outcomes.py tests/unit/outcomes/*.py` finds nothing.",
+     "suggested_fix": "At the release re-freeze, add `agent-reliability-ci = \"arci.cli:main\"` and a test that the entry point is declared."
+    }
+   ],
+   "checked_ok": [
+    "Fixed text F1-F16, E1-E29 and W1 in outcome_report.FIXED_TEXT match the record verbatim",
+    "Rule field order in the rule file (schema_version, suite_id, tasks, alpha, ..., fixed_before_runs, then check_rule_plan); explicit nulls and duplicate keys refused",
+    "Defaults expanded before hashing: an omitted-defaults rule and a fully explicit, reordered rule give one digest; pass_at_least '+2/4' and '1/2' give one digest",
+    "Fixed empty template fields for E15 (rule and rule_sha256 null, counts 0, statements F2 only, notices empty) and for a valid-rule E1 (rule filled in)",
+    "JSON artifact fields match the OutcomeDecision table plus record_sha256",
+    "verdict-rule writes a complete expanded rule with fixed_before_runs false, prints F13, and verdict accepts it (JUnit including skipped/error; Inspect integer ids quoted as strings)",
+    "--format auto maps extensions only: .eval E7, unknown E8",
+    "Packaged example: 96 tasks, 26/70/0, BLOCK at round 1, wealths 1.92124e-03 and 1.56229e+02, F1 first line, F16 in reasons and history, F14 notice",
+    "F8 matches the record's example: 50 tasks, 8 rounds, round-1 ties give 1 more round (50 pairs)",
+    "Rounds after the stopping round are excluded from counts, keep their digests, and F10 prints",
+    "Inference-time ERROR from the errored-pair tolerance keeps history, last_round_evaluated 1, stopped_at_round 0",
+    "Inspect E11, E12, E13 (integer and string across arms), and E10 for a number without pass_at_least",
+    "Step-1 ordering E20, E21, E16, E17, E18, E22",
+    "Notice order W1, F12, F7, F8/F9, F10, F14; statements F1, F2, F3, F4, then F5 and F6 only when fixed_before_runs is true",
+    "The listed acceptance and unit tests pass (all green)"
+   ]
+  }
+ ],
+ [
+  null,
+  {
+   "findings": [
+    {
+     "title": "E17 output/input collision check misses case-variant paths on macOS; --json/--markdown overwrites an input or the rule file",
+     "severity": "blocker",
+     "file": "src/arci/cli.py",
+     "line": 1312,
+     "description": "_outcome_paths compares Path(...).resolve() values. On the default case-insensitive APFS volume, resolve() does not fold case, so `B.CSV` and `b.csv` compare unequal although they are the same file. The decision is then written over the input with _write (cli.py:133, a plain write_text). The spec (0015, Validation step 1) says: \"an output path equal to another output path or to any input path, compared after resolution (E17)\". The same gap lets --json or --markdown overwrite the rule file or the --previous record. Comparing os.stat st_dev/st_ino for paths that exist, or os.path.samefile, would also catch hard links.",
+     "repro": "In a mktemp dir on macOS: write rule.yaml (50 tasks t0..t49, max_rounds 8, fixed_before_runs true), b.csv (all pass) and c.csv (t0..t19 fail). Run `arci verdict rule.yaml --baseline b.csv --candidate c.csv --json B.CSV`. It exits 1 with BLOCK and no E17, and b.csv (456 bytes of CSV before) now holds 14847 bytes of decision JSON starting `{\"record_sha256\": ...`. The user's input data is destroyed.",
+     "suggested_fix": "After resolve(), also treat two paths as equal when both exist and os.path.samefile() is true, or compare (st_dev, st_ino), before anything is written."
+    },
+    {
+     "title": "Inspect numeric score with a huge decimal exponent hangs the verdict when pass_at_least is set",
+     "severity": "blocker",
+     "file": "src/arci/importers/inspect_log.py",
+     "line": 53,
+     "description": "loads_json parses floats as Decimal, and _outcome then calls Fraction(value) on a finite Decimal. For a value like 1e999999999, Fraction(Decimal) calls as_integer_ratio and builds 10**999999999, which takes unbounded CPU and memory. A 14-byte score value stalls the gate indefinitely instead of giving pass/fail or E6. The same path is reachable from `arci verdict-rule --pass-at-least`.",
+     "repro": "Rule ir.yaml: 50 tasks '0'..'49', max_rounds 8, fixed_before_runs true, pass_at_least: 1/2. Use two valid Inspect JSON logs (epochs 1, sample_ids 0..49, one scorer m, every value 1), and in the candidate change one sample's score value to `1e999999999`. `timeout 60 arci verdict ir.yaml --baseline ib.json --candidate ic.json` produced no output and was killed at 60 s (59.4 s user CPU).",
+     "suggested_fix": "Compare without expanding the exponent: compare Decimal against the threshold numerator and denominator with a bounded exponent check, or refuse (E6/E10) scores whose adjusted exponent is above a small bound before calling Fraction."
+    },
+    {
+     "title": "YAML 1.1 octal integers are silently reinterpreted: max_rounds: 010 registers 8 rounds",
+     "severity": "minor",
+     "file": "src/arci/outcomes.py",
+     "line": 196,
+     "description": "_RuleLoader derives from yaml.SafeLoader, which applies YAML 1.1 integer resolution. A leading-zero integer is read as octal (and 0b1000 as binary). The rule is accepted, and the digest and decision record a different max_rounds from the one written. The spec types max_rounds and max_errored_pairs as \"integer\", and a user who writes 010 means ten.",
+     "repro": "A rule with `max_rounds: 010` (50 tasks, fixed_before_runs true) runs normally and the --json record shows \"max_rounds\": 8. `max_rounds: 0b1000` is also accepted as 8.",
+     "suggested_fix": "Override the int resolver so that only plain decimal [-+]?(0|[1-9][0-9]*) resolves to int; anything else stays a string and is refused with E15."
+    },
+    {
+     "title": "E26 is reported before input-file errors, contrary to the ordered validation list",
+     "severity": "minor",
+     "file": "src/arci/outcomes.py",
+     "line": 785,
+     "description": "With --previous, decide_outcomes calls _prospective_round_count and raises E26 before _read_inputs validates the files. The spec (0015, Validation and errors) orders input-file faults (step 4: E1, E2, E6, E10, ...) before \"6. The --previous comparison: E26, which needs this call's round count\", and the function's own docstring says it is \"deferring input errors to step four\". A malformed input is therefore reported as a round-count mismatch. The verdict is ERROR either way.",
+     "repro": "Make prev.json from a 2-round INCONCLUSIVE run (pb.csv twice against pc.csv twice). Then run `arci verdict rule.yaml --baseline pbad.csv --candidate pc.csv --previous prev.json`, where every outcome in pbad.csv is `PASS`. It prints `error: the previous decision supplied 2 rounds; this call supplies 1`. Without --previous the same input gives E10, `outcome PASS for t0 cannot be read as pass, fail or error`.",
+     "suggested_fix": "Drop the early E26 pre-check, or run it only after _read_inputs and _validate_rounds succeed. The later check at line 810 already covers E26."
+    },
+    {
+     "title": "A CSV with a trailing blank line is refused as E6",
+     "severity": "minor",
+     "file": "src/arci/outcomes.py",
+     "line": 264,
+     "description": "_neutral uses csv.reader, which yields [] for a blank line. That empty row fails `len(values) != len(header)` and gives E6 \"invalid row\". JSONL explicitly skips blank lines, and _prospective_round_count reads the same file with csv.DictReader, which skips blank rows, so the two readers disagree. A file ending in an extra newline, common after `echo >>` or some editors, is refused as unreadable.",
+     "repro": "Take a valid b.csv, append one '\\n' to make blank.csv, and run `arci verdict rule.yaml --baseline blank.csv --candidate c.csv`. It prints `error: unreadable or unsupported input: blank.csv`, while the same file without the trailing blank line gives BLOCK.",
+     "suggested_fix": "Skip rows where values == [] (as DictReader does), or document that blank CSV lines are E6 and use the same rule in _prospective_round_count."
+    }
+   ],
+   "checked_ok": [
+    "YAML rule loader: duplicate keys (including through merge keys) give E15; !!python/object tags are refused; explicit nulls, floats for rationals, booleans for integers and a top-level list give E15; a merge key with an anchor in a valid position works",
+    "CSV: duplicate header, ragged rows, a round of +1 or 01 (read as round 1), round 0 or negative (E3), 1.0/1e0/' 2' (E6), a quoted embedded newline in task_id (E1), extra columns ignored, BOM stripped",
+    "JSONL: duplicate keys, NaN and trailing commas give E6; a float round gives E6; CR line endings are accepted",
+    "JUnit: DOCTYPE/ENTITY refused; a declared encoding 'UTF8' is accepted; nesting 200000 levels deep does not crash; failure with skipped gives error (ERROR verdict); a comment after the declaration is fine",
+    "Inspect: an integer and a string id that collide give E13; 'P' and null values give E10; true, 'C', 1 and 1.0 with pass_at_least are read correctly; header epochs disagreeing with the other arm give E5; a sample with an error object and no scores gives error",
+    "Paths: output into a missing directory gives E18; a directory as output gives E19; a directory as input gives E8/E6; a ../-relative alias of an input is caught by E17; no traceback was reached (generic exceptions are caught in _outcomes_main)",
+    "Extension dispatch: an upper-case .CSV gives E8 under auto"
+   ]
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "evidence": "I reproduced this on macOS (case-insensitive APFS) in a mktemp directory, using copies of the packaged example (src/arci/demo/outcomes/order-desk-run-1).\n\n1. `arci verdict rule.yaml --baseline b.csv --candidate c.csv --json B.CSV` printed BLOCK, exited 1 and raised no E17. b.csv grew from 2614 bytes of CSV to 28659 bytes, and the file now begins `{\"record_sha256\": \"c9ff24e8...`. The baseline input was overwritten with the decision JSON.\n2. `--markdown RULE.YAML` overwrote rule.yaml the same way. Its first line is now the Markdown report (\"Descriptive verdict: the rule file declares...\"), not the YAML comment header.\n3. Control: `--json b.csv` with the exact same spelling correctly gives \"error: b.csv is both an output and an input, or is named twice\".\n\nCause: cli.py lines 1312-1316 compare `Path(p).resolve()` values for equality. resolve() does not fold case on APFS, so `B.CSV` and `b.csv` look different even though they are the same file. Lines 1367-1376 then call `_write` (cli.py:133, a plain `write_text`) on that path.\n\nThe spec, 0015 line 185, requires an output path \"equal to ... any input path, compared after resolution (E17)\". Two names for the same file should count as equal after resolution, and the user's input or rule file is destroyed. This counts as \"data written where it should not be\", so it is a blocker. The same gap applies to `--previous` and, for verdict-rule, to `--out` against `--tasks`, although E22 already refuses any existing `--out`. Hard links are missed for the same reason.",
+   "corrected_severity": "blocker",
+   "minimal_fix": "In `_outcome_paths`, check whether an output names the same file as any input before anything is opened or written. First compare the resolved paths as now. Then, if the output path exists, also raise E17 when `os.path.samefile(output, input)` is true for any input. For two outputs that might both be new files, also compare `os.path.normcase` of the resolved paths, or check samefile after creating the first one. A simple version is to collect the `(st_dev, st_ino)` of every existing input and raise E17 when an existing output's stat matches one of them."
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "evidence": "I reproduced it. In a mktemp scratch directory I made a rule ir.yaml (schema_version arci-outcomes/1, tasks '0'..'49', max_rounds 8, fixed_before_runs true, pass_at_least 1/2) and two Inspect JSON logs: epochs 1, sample_ids 0..49, one scorer m, every value 1.\n\nControl: with one candidate value changed to 0.7, `arci verdict ir.yaml --baseline ib.json --candidate ic.json` returns at once with \"VERDICT: INCONCLUSIVE (exit 2)\".\n\nBug: with that one value set to 1e999999999, `timeout 30 arci verdict ...` printed nothing and was killed at 30 s, with 29.61 s of user CPU at 99%.\n\nCause: src/arci/importers/__init__.py:72 `loads_json` uses `parse_float=Decimal`. Then src/arci/importers/inspect_log.py:51-53 rejects only non-finite Decimals and calls `Fraction(value) >= threshold`. `Fraction(Decimal('1e999999999'))` builds 10**999999999, so a 14-byte input never finishes.\n\nThe specification (0015, around lines 144 and 167) says a numeric score becomes pass or fail through `pass_at_least`, and an unreadable input or non-finite number is E6. Either way the importer must answer, and a hang never does. Under the task's definitions a non-terminating gate counts with crash or traceback, so it is a blocker.\n\nI did not separately test the reviewer's claim about `verdict-rule --pass-at-least`. The `verdict` path above is enough to establish the defect.",
+   "corrected_severity": "blocker",
+   "minimal_fix": "In `_outcome` (inspect_log.py:51-53), never turn a Decimal into a Fraction when its exponent is huge. Option 1: if `value.adjusted()` is outside a small bound (for example abs > 4000), decide directly. A large positive exponent means the score is far above or below any threshold, depending on its sign. A large negative exponent means it is effectively 0, so compare 0 with the threshold. Option 2: refuse such values with E6. Otherwise, compare exactly with `Decimal` against `Decimal(threshold.numerator) / threshold.denominator` under a bounded context, or compare `value * threshold.denominator >= threshold.numerator` using Decimal arithmetic. Apply the same bound in the `pass_at_least` rational parser."
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "evidence": "I reproduced the reported behaviour. I made a 2-round decision (prev2.json, with b2.csv for both arms; rule tasks [a,b], fixed_before_runs: true). Then `arci verdict rule.yaml --baseline b1.csv --candidate c1bad.csv --previous prev2.json` printed \"error: the previous decision supplied 2 rounds; this call supplies 1\". The same inputs without --previous printed \"error: unknown task id: zzz\" (E1, step 4). So E26 is reported ahead of an input fault from step 4.\n\nThe specification (docs/design/0015-imported-outcomes.md) contradicts this in two places. \"Validation and errors\" orders step 3 as \"`--previous` structure (E24, E25, E27)\", step 4 as input files (E1, E2, E6...), step 5 as across files (E3, E4, E5), and step 6 as \"The `--previous` comparison: E26, which needs this call's round count, then E23 and E28.\" Line 86 adds \"Once this call's inputs are validated it must not hold more rounds than this call (E26)\". V3-CONTRACT line 3 says the record wins.\n\nThe cause is in src/arci/outcomes.py. Lines 785-787 call _prospective_round_count and raise E26. That happens before the E27 check at lines 788-789 and before _read_inputs/_validate_rounds. The unit tests test_e26_precedes_e27 and test_e26_precedes_input_outcome_error in tests/unit/outcomes/test_previous_validation.py both pass, so they confirm the code reports E26 where E27 or a step-4 error should come first. No acceptance test requires the early E26. The verdict is still ERROR with exit 3, so only the reason reported is wrong. That makes this major, not a blocker.",
+   "corrected_severity": "major",
+   "minimal_fix": "In decide_outcomes, delete the prospective E26 check at src/arci/outcomes.py lines 785-787, so that after E25 the code runs E27 directly. The existing E26 check after _validate_rounds (around line 810) already covers step 6. _prospective_round_count then has no caller and can be removed. Rewrite test_e26_precedes_e27 so it expects E27, and test_e26_precedes_input_outcome_error so it expects the step-4 outcome error."
+  }
+ ],
+ [
+  null,
+  {
+   "findings": [
+    {
+     "title": "Terminal report and stderr pass ANSI escape sequences and vertical tab/form feed from task ids straight through: a crafted id can wipe the F1 line and the real verdict, print a fake PASS, and hide the honesty statements",
+     "severity": "blocker",
+     "file": "src/arci/outcome_report.py",
+     "line": 198,
+     "description": "In terminal mode `_lines` escapes only `\\r` and `\\n` in task ids (lines 198-200). It does not escape `|`, and it leaves ESC (0x1b), BEL, backspace, \\v, \\f and other C0/C1 controls alone. Task ids are opaque strings taken from CSV/JSONL/JUnit/Inspect, so any byte string can reach the report. Any task the candidate did worse on is printed in the terminal task table, so the id's raw escape sequences go to stdout. The same holds for the one-line stderr diagnostics: `_outcome_error` (cli.py:1429-1431) also escapes only \\r and \\n, so E1 'unknown task id: <id>' and the path-bearing reasons (E6, E8 and others) emit raw ESC and \\v. A terminal then shows the error as more than one line, or redraws it.",
+     "repro": "mktemp -d. Write base.jsonl with 50 'pass' rows (t00..t49) plus one row whose task_id is \"x\\u001b[2J\\u001b[HVERDICT: PASS (exit 0)\\u001b[8m\" with outcome pass. Write cand.jsonl identical except that row is 'fail'. Run `arci verdict-rule --tasks base.jsonl --out rule.yaml`, then `arci verdict rule.yaml --baseline base.jsonl --candidate cand.jsonl > term.txt`. The result is exit 2 (INCONCLUSIVE), and `/bin/cat -v term.txt` shows the task row `x^[[2J^[[HVERDICT: PASS (exit 0)^[[8m | 1 | 1 | 0 | 1 | 0 | 0 | 0`. On a real terminal, ESC[2J ESC[H clears the screen, which erases the 'Descriptive verdict: ...' F1 line and 'VERDICT: INCONCLUSIVE (exit 2)', and writes 'VERDICT: PASS (exit 0)' at the top. ESC[8m (conceal) then hides the rest of the output, including F2, F3 and F4. stderr case: add a candidate row with task_id \"zz\\u001b[2K\\u001b[1Gok\\u000bmore\". This gives exit 3, and `cat -v` of stderr shows `error: unknown task id: zz^[[2K^[[1Gok^Kmore`. The ^K vertical tab renders as two lines, and ESC[2K ESC[1G erases the 'error: unknown task id:' prefix on screen.",
+     "suggested_fix": "Escape every non-printable character in ids and paths before terminal and stderr output, for example with a single helper that maps all C0/C1 controls, DEL and U+2028/U+2029 to \\xNN or \\uNNNN, applied in `_lines` (terminal and Markdown) and in `_outcome_error`. Also escape `|` in the terminal table so an id cannot add fake columns."
+    },
+    {
+     "title": "Markdown report does not neutralise HTML or block markup in task ids: '<!--' hides F2, F3, F4 and every notice, and '# VERDICT: PASS (exit 0)' renders a PASS heading in an INCONCLUSIVE report",
+     "severity": "blocker",
+     "file": "src/arci/outcome_report.py",
+     "line": 198,
+     "description": "In Markdown mode a task id has only `|` escaped, plus \\r and \\n turned into literal backslash sequences. A row that starts with an id beginning `<!--` opens an HTML block (CommonMark type 2) that runs to a `-->` that never comes, so everything after it is swallowed: the rest of the task table, F2, F3, F4 and the notices (F7, F8, F12). A row starting with '#' ends the table and becomes an ATX heading. The task ids are sorted and '#' and '<' sort before letters, so these rows come early. The contract (V3-CONTRACT 'Where text goes') says the Markdown must carry every statement and notice verbatim. ADR 0015 says the recipe appends this Markdown to the GitHub step summary.",
+     "repro": "(1) The rule and inputs are as in finding 1, but the failing ids are '<!--', '`code', 'a|b'. Run `arci verdict rule.yaml --baseline base.jsonl --candidate cand.jsonl --markdown out.md`, then `pandoc -f gfm -t plain out.md | grep -E 'Imported outcomes|error bound depends|ARCI checked|registered rounds'`. This prints nothing: F2, F3, F4 and F7 are gone from the rendered text, and `pandoc -t html` shows them inside an unclosed `<!--` comment that starts at the task row. (2) A fresh dir with 50 tied tasks plus a failing task id '# VERDICT: PASS (exit 0)'. The verdict is INCONCLUSIVE (exit 2), yet `pandoc -f gfm -t html out.md` contains `<h1 ...>VERDICT: PASS (exit 0) | 1 | 1 | 0 | 1 | 0 | 0 | 0</h1>`, a top-level PASS heading.",
+     "suggested_fix": "Render task ids in Markdown as escaped inline text. One option is to backslash-escape every ASCII punctuation character (CommonMark allows `\\` before any of them) and also escape `|`. Another is to wrap each id in a code span sized to its backticks, escape `|` inside, and HTML-escape `<`, `>` and `&`. Start every table row with a leading `| ` so no row can begin a block construct."
+    },
+    {
+     "title": "Terminal overflow line points to Markdown and JSON outputs that were never requested, and does not say how to get them",
+     "severity": "minor",
+     "file": "src/arci/outcome_report.py",
+     "line": 207,
+     "description": "When more than 10 tasks qualify, the terminal always prints TERMINAL_TASK_OVERFLOW, '{n} more such tasks are in the Markdown and JSON outputs'. It does this even when neither --markdown nor --json was given, so no such outputs exist. A first-time user running the example is told the data is somewhere it is not, and nothing tells them to re-run with --json PATH or --markdown PATH.",
+     "repro": "From an empty directory, `arci verdict --example` prints '16 more such tasks are in the Markdown and JSON outputs' (exit 1). `ls` shows no files were written.",
+     "suggested_fix": "Print this line only when an output was written, naming its path. Otherwise say to re-run with --markdown PATH or --json PATH to see all tasks."
+    },
+    {
+     "title": "`arci verdict --help` shows RULE, --baseline and --candidate as optional and gives no description for any option, including --example",
+     "severity": "minor",
+     "file": "src/arci/cli.py",
+     "line": 1081,
+     "description": "ADR 0015 'Command grammar' gives `arci verdict RULE --baseline FILE... --candidate FILE...`, with RULE and both arms required unless --example is used. The parser declares `rule` with nargs='?' and the arms with nargs='*', so the usage line is `arci verdict [-h] [--baseline [FILE ...]] [--candidate [FILE ...]] ... [--example] [RULE]`. That tells a new user every input is optional, and `--baseline` with zero files looks valid. No option has help text, so the help never explains --example, --previous or what the verdict means. `verdict-rule --help` likewise shows --tasks and --out as optional, with no descriptions.",
+     "repro": "`arci verdict --help` and `arci verdict-rule --help` both exit 0 and print the bracketed usage with empty option descriptions. `arci verdict` with no arguments prints only 'error: no input files were given for baseline' and does not mention that a RULE is needed.",
+     "suggested_fix": "Add a `usage=` string that matches the ADR grammar, plus a one-line help for each option, without changing parsing so the ordered E-codes are kept."
+    },
+    {
+     "title": "Markdown task table has no blank line after its heading, so CommonMark/GFM renderers that do not let a table interrupt a paragraph show it as one run-on paragraph",
+     "severity": "minor",
+     "file": "src/arci/outcome_report.py",
+     "line": 186,
+     "description": "For Markdown, `lines.extend((\"\", heading))` is followed directly by the table header row with no empty line in between. The per-round table is preceded by a blank line and renders as a table, but the task table is not. This was checked only with pandoc's gfm reader. GitHub's cmark-gfm may split the paragraph, so the effect depends on the renderer.",
+     "repro": "Run `arci verdict r.yaml --baseline b.csv --candidate b.csv --markdown o.md` on any two-task CSV, then `pandoc -f gfm -t html o.md`. The output contains `<p>Task counts through round 1 Task | Pairs | ... --- | --- ... t1 | 1 | 1 | 1 | 0 | 1 | 0 | 0 ...</p>`, not a `<table>`. Inserting a blank line after the heading makes pandoc render a proper table.",
+     "suggested_fix": "In Markdown mode, emit an empty line between the 'Task counts through round k' heading and the table header."
+    }
+   ],
+   "checked_ok": [
+    "Full test suite (tests/acceptance + tests/unit) passes on the worktree.",
+    "Existing command help (run, gate, report, diff, minimize, bundle, replay, trace-check, init, plan, triage, schema, preflight, top-level) is byte-identical to origin/main, apart from verdict and verdict-rule being added to the command list and choice errors; the moved arci.report/suite_report imports are not referenced as cli attributes anywhere in src/tests/bench/examples.",
+    "Importing arci.cli and running `arci --help` loads none of arci.outcomes, arci.outcome_*, arci.importers, xml, arci.report or arci.suite_report.",
+    "`arci verdict --example` works from an empty directory and when arci is imported from a zip (simulating non-filesystem package resources); it writes no files and exits 1 with F1 as line 1 and F14 present. A wheel could not be built offline (hatchling not installed).",
+    "Validation errors tested (E15 directory rule, E16, E19 unwritable or directory --json/--markdown/--out, E21, E22, E8, E24 missing/dir previous, argparse unknown option): exit 3, empty stdout, exactly one stderr line, no traceback.",
+    "Markdown first non-empty line is F1 for a descriptive rule, including on a pre-inference ERROR with a valid rule; JSON reasons in descriptive mode are F15/F16 at top level and in history.",
+    "Fixed strings F1-F8, F10-F12, F14 appear verbatim on single lines in terminal and Markdown output for scenarios (a) example, (b) one round of 50 tasks, (c) eight rounds of 50 ties with fixed_before_runs true (PASS at round 2, F10 '6 rounds ... excluded', F5/F6 present only when true)."
+   ]
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "evidence": "I reproduced both cases.\n\nThe code: src/arci/outcome_report.py lines 196-203. In Markdown mode a task id gets only `|` -> `\\|` and CR/LF -> literal `\\r`/`\\n`. Table rows are written without a leading `| `, so a row that begins with block syntax ends the table.\n\n(1) Scratch dir from mktemp -d, 23 tasks in JSONL; '<!--', '`code' and 'a|b' fail in the candidate, the rest pass in both arms. I ran `arci verdict-rule --tasks base.jsonl --out rule.yaml`, then `arci verdict rule.yaml --baseline base.jsonl --candidate cand.jsonl --markdown out.md`: exit 2, INCONCLUSIVE. out.md has the row `<!-- | 1 | 1 | 0 | 1 | 0 | 0 | 0` straight after the table separator. `pandoc -f gfm -t plain out.md | grep -cE 'Imported outcomes|error bound depends|ARCI checked|registered rounds'` prints 0. `pandoc -t html` passes everything from that row to the end of the file through as an unclosed comment: the rest of the table, F2, F3, F4 and the notices. In a rendered step summary all the honesty text is hidden.\n\n(2) Second scratch dir: 51 tasks, the one failing id is '# VERDICT: PASS (exit 0)'. The run exits 2 (INCONCLUSIVE). `pandoc -f gfm -t html out.md` gives `<h1 id=\"verdict-pass-exit-0--1--1--0--1--0--0--0\">VERDICT: PASS (exit 0)` ... at top level.\n\nSeverity: the raw .md file does contain every fixed string verbatim, so the literal contract test (\"the fixed strings appear verbatim (not split by markup)\") passes on raw bytes. The breakage only shows when the Markdown is rendered, as in the GitHub step summary the recipe targets. It also needs task ids that start with block syntax (`<!--`, `#`, `>` and so on), and real ids rarely do. So the defect is real, but major rather than blocker. The verdict itself and the exit code are correct.",
+   "corrected_severity": "major",
+   "minimal_fix": "In Markdown mode (outcome_report.py around line 198), render the task id as escaped inline text:\n- Backslash-escape every ASCII punctuation character: `re.sub(r'([!-/:-@\\[-`{-~])', r'\\\\\\1', task_id)`. This also covers `|`.\n- Keep the CR/LF escaping.\n- Write every table row, header and separator lines included, with a leading `| ` and a trailing ` |`. Then no row can open an HTML block, a heading or a block quote."
+  }
+ ],
+ [
+  null,
+  {
+   "real": true,
+   "evidence": "Reproduced in a fresh mktemp dir (/var/folders/2k/b4x5xvk54w36pjwr4kxjgx7w0000gn/T/tmp.acY0upvwX6). I wrote base.jsonl and cand.jsonl as described and ran `arci verdict-rule --tasks base.jsonl --out rule.yaml` (exit 0), then `arci verdict rule.yaml --baseline base.jsonl --candidate cand.jsonl > term.txt`. The result was exit 2 (INCONCLUSIVE). `od -c` of the task row shows the raw bytes `x 033 [ 2 J 033 [ H VERDICT: PASS (exit 0) 033 [ 8 m | 1 | 1 | 0 | 1 | 0 | 0 | 0`. For the stderr case, a cand2.jsonl with an extra row `zz\\x1b[2K\\x1b[1Gok\\x0bmore` gave exit 3, and stderr held the raw bytes `error: unknown task id: zz 033[2K 033[1Gok \\v more \\n`. So the code passes ESC and VT straight through. src/arci/outcome_report.py lines 198-200 replace only \\r and \\n (and `|` only in Markdown). cli.py `_outcome_error` also replaces only \\r and \\n. The code comment there says the escaping is meant to \"keep stderr to one physical line\", and V3-CONTRACT.md:21-22 requires a validation ERROR to print \"exactly one line on stderr\", so the intent is clear and the fix is incomplete.\n\nThe finding overstates the severity, though. The computed verdict, the exit code (2 or 3), and every honesty statement are correctly present in the byte stream. Only a terminal's rendering of them can be spoofed. In the stdout case, the hostile id must also be registered in the rule's own task list, which the rule author controls, before it can appear in the task table. Nothing is written where it should not be, and nothing crashes. Under the task's severity scale (blocker = wrong verdict, wrong or missing honesty statement, crash, misplaced data), this is not a blocker. It is display hardening, so it is minor. A side note: an earlier attempt of mine read another agent's scratch directory, but the reproduction above used only my own fresh directory.",
+   "corrected_severity": "minor",
+   "minimal_fix": "Add one helper, for example `_printable(s)`. It maps every character with unicodedata.category starting with 'C' (C0/C1 controls including ESC, BEL, BS, VT, FF and DEL) and U+2028/U+2029 to a `\\xNN` or `\\uNNNN` escape, and keeps the existing `\\r` and `\\n` escapes. Apply it to task ids in outcome_report._lines in both terminal and Markdown mode, and to the reason string in cli._outcome_error. Also escape `|` in terminal mode, as Markdown mode already does."
+  }
+ ]
+]
