@@ -11,6 +11,11 @@
   Availability and GitHub Actions passages describe 2.1.0 instead of 1.0.0, and its limits
   list no longer says an unfired fault goes unreported. `CITATION.cff` gives version 2.1.0.
   No code change.
+- **Docs:** the sealed stores of both runs of the order-desk study are committed under
+  `docs/results/order-desk-study/`, with a test that re-derives both decisions from the
+  trials. New `docs/PROVENANCE.md`. `docs/COMPATIBILITY.md` gains a section on what 2.x
+  added and what is kept stable. The README's "Related tools" names seven more projects.
+  No code change.
 
 ## v2.1.0 (2026-11-13)
 

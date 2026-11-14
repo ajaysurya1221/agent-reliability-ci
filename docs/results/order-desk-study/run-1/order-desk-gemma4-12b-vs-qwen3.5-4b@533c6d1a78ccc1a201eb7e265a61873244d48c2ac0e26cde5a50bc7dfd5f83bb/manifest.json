@@ -1,0 +1,452 @@
+{
+  "record_sha256": "64d65d2c75a6e6bf397b0a260d26f8335a1f40202c18598717876ad97ded18ae",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb",
+  "created_at": "",
+  "suite_id": "order-desk-gemma4-12b-vs-qwen3.5-4b",
+  "tasks": [
+    {
+      "task_id": "desk-01",
+      "task": {
+        "input": "Refund order ORD-101.",
+        "order_id": "ORD-101",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-02",
+      "task": {
+        "input": "Refund order ORD-102 and add a refunded note.",
+        "order_id": "ORD-102",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-03",
+      "task": {
+        "input": "Check stock for order ORD-103 and add a stock note.",
+        "order_id": "ORD-103",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-04",
+      "task": {
+        "input": "Refund order ORD-104.",
+        "order_id": "ORD-104",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-05",
+      "task": {
+        "input": "Refund order ORD-105 and add a refunded note.",
+        "order_id": "ORD-105",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-06",
+      "task": {
+        "input": "Check stock for order ORD-106 and add a stock note.",
+        "order_id": "ORD-106",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-07",
+      "task": {
+        "input": "Refund order ORD-107.",
+        "order_id": "ORD-107",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-08",
+      "task": {
+        "input": "Refund order ORD-108 and add a refunded note.",
+        "order_id": "ORD-108",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-09",
+      "task": {
+        "input": "Check stock for order ORD-109 and add a stock note.",
+        "order_id": "ORD-109",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-10",
+      "task": {
+        "input": "Refund order ORD-110.",
+        "order_id": "ORD-110",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-11",
+      "task": {
+        "input": "Refund order ORD-111 and add a refunded note.",
+        "order_id": "ORD-111",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-12",
+      "task": {
+        "input": "Check stock for order ORD-112 and add a stock note.",
+        "order_id": "ORD-112",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-13",
+      "task": {
+        "input": "Refund order ORD-113.",
+        "order_id": "ORD-113",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-14",
+      "task": {
+        "input": "Refund order ORD-114 and add a refunded note.",
+        "order_id": "ORD-114",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-15",
+      "task": {
+        "input": "Check stock for order ORD-115 and add a stock note.",
+        "order_id": "ORD-115",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-16",
+      "task": {
+        "input": "Refund order ORD-116.",
+        "order_id": "ORD-116",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-17",
+      "task": {
+        "input": "Refund order ORD-117 and add a refunded note.",
+        "order_id": "ORD-117",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-18",
+      "task": {
+        "input": "Check stock for order ORD-118 and add a stock note.",
+        "order_id": "ORD-118",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-19",
+      "task": {
+        "input": "Refund order ORD-119.",
+        "order_id": "ORD-119",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-20",
+      "task": {
+        "input": "Refund order ORD-120 and add a refunded note.",
+        "order_id": "ORD-120",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-21",
+      "task": {
+        "input": "Check stock for order ORD-121 and add a stock note.",
+        "order_id": "ORD-121",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-22",
+      "task": {
+        "input": "Refund order ORD-122.",
+        "order_id": "ORD-122",
+        "action": "refund",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-23",
+      "task": {
+        "input": "Refund order ORD-123 and add a refunded note.",
+        "order_id": "ORD-123",
+        "action": "refund_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-24",
+      "task": {
+        "input": "Check stock for order ORD-124 and add a stock note.",
+        "order_id": "ORD-124",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "condition_id": "clean",
+      "faults": []
+    },
+    {
+      "condition_id": "tool_timeout",
+      "faults": [
+        {
+          "name": "tool_timeout",
+          "bucket": "falsify",
+          "tool": "lookup_order",
+          "at_occurrence": 0,
+          "params": {}
+        }
+      ]
+    },
+    {
+      "condition_id": "tool_error_once",
+      "faults": [
+        {
+          "name": "tool_error_once",
+          "bucket": "falsify",
+          "tool": "lookup_order",
+          "at_occurrence": 0,
+          "params": {}
+        }
+      ]
+    },
+    {
+      "condition_id": "empty_result",
+      "faults": [
+        {
+          "name": "empty_result",
+          "bucket": "falsify",
+          "tool": "lookup_order",
+          "at_occurrence": 0,
+          "params": {}
+        }
+      ]
+    }
+  ],
+  "toolset": "agent:toolset",
+  "mcp_server": null,
+  "contract": {
+    "oracle": "check:check",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "gemma4-12b",
+    "agent": "agent:baseline",
+    "command": null,
+    "candidate_id": "ollama:gemma4:12b-mlx-ctx32k"
+  },
+  "candidate": {
+    "label": "qwen3.5-4b",
+    "agent": "agent:candidate",
+    "command": null,
+    "candidate_id": "ollama:qwen3.5:4b-mlx-ctx32k"
+  },
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "max_rounds": 5,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 5,
+  "seed_derivation": "sha256-v1",
+  "acknowledge_single_round": false,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 12,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

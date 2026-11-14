@@ -63,3 +63,9 @@ The pre-registered guardrail experiment (frontier-scout's tool-call guard under 
 against the live endpoint), with its sealed stores, preflight receipt, minimised and replayed
 failure, and a write-up generated from the committed evidence:
 [guardrail/README.md](guardrail/README.md).
+
+## The order-desk study's raw stores
+
+The sealed suite stores behind [order-desk-study.md](order-desk-study.md), both runs, with
+the exact command to re-derive each decision from a clone:
+[order-desk-study/README.md](order-desk-study/README.md).

@@ -96,11 +96,23 @@ welcome as issues.
   [probe-ai](https://pypi.org/project/probe-ai/),
   [flakestorm](https://pypi.org/project/flakestorm/),
   [chaos-agents](https://pypi.org/project/chaos-agents/),
-  [agentfuzz](https://pypi.org/project/agentfuzz/).
+  [agentfuzz](https://pypi.org/project/agentfuzz/),
+  [agentic-chaos](https://github.com/DeepAgentLabs/agentic-chaos), and the chaos testing in
+  [Strands Evals](https://github.com/strands-agents/evals).
 - Sequential tests with a bounded false-alarm rate for agent verifiers:
   [E-valuator](https://arxiv.org/abs/2512.03109).
-- Repeated runs against a pass-rate threshold in pytest:
-  [pytest-agent-eval](https://github.com/datarootsio/pytest-agent-eval).
+- Three-valued verdicts (PASS, FAIL, INCONCLUSIVE) for agent regression testing:
+  [AgentAssay](https://arxiv.org/abs/2603.02601).
+- Statistical comparison of two evaluation runs from their result files:
+  [evalsig](https://pypi.org/project/evalsig/) (paired tests, sequential testing and a
+  release gate), and the evaluation comparison in
+  [inspect-mlflow](https://inspect-mlflow.readthedocs.io/en/latest/comparison.html)
+  (McNemar's test on two Inspect AI logs).
+- Repeated trials with confidence intervals:
+  [agentrial](https://github.com/alepot55/agentrial). Repeated runs against a pass-rate
+  threshold in pytest: [pytest-agent-eval](https://github.com/datarootsio/pytest-agent-eval).
+- A reliability platform for tool-using agents with fault injection and statistical scoring:
+  [agent-reliability](https://github.com/karthikrshet/agent-reliability).
 - Evaluation platforms and frameworks (LangSmith, promptfoo, DeepEval, Inspect AI, Braintrust,
   Phoenix) score and compare runs; use them for that.
 
@@ -594,6 +606,8 @@ own. For 2.0.0 and 2.1.0 the design records were drafted by Claude as orchestrat
 by the maintainer, and the implementation was by Codex from written briefs (design records 0011
 to 0014). The retry demo, the calibration table and the test suite reproduce from a clean clone.
 Issues and PRs welcome.
+Where the code came from and who holds it: [docs/PROVENANCE.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/PROVENANCE.md).
+Commercial and partnership questions: see the maintainer's GitHub profile.
 
 ```bash
 uv sync
