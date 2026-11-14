@@ -225,7 +225,7 @@ def test_opaque_id_line_breaks_are_escaped_only_on_stderr(
     output_json = tmp_path / "decision.json"
     refusal(
         [*command(rule, baseline, candidate), "--json", str(output_json)],
-        "unknown task id: unknown\\nforged line\\rreturn",
+        "unknown task id: unknown\\x0aforged line\\x0dreturn",
         capsys,
     )
     from arci.outcome_schema import OutcomeDecision
@@ -240,7 +240,7 @@ def test_path_line_breaks_are_escaped_on_direct_error_path(
 ) -> None:
     rule, baseline, candidate = inputs(tmp_path)
     output = tmp_path / "unknown\nparent" / "decision.json"
-    escaped = str(output).replace("\n", "\\n")
+    escaped = str(output).replace("\n", "\\x0a")
     refusal(
         [*command(rule, baseline, candidate), "--json", str(output)],
         f"the directory for {escaped} does not exist",
@@ -254,7 +254,7 @@ def test_non_utf8_path_returns_sealed_error_instead_of_raising(
     rule, _, candidate = inputs(tmp_path)
     baseline = tmp_path / "undecodable\udcff.jsonl"
     output_json = tmp_path / "decision.json"
-    escaped = str(baseline).encode("utf-8", errors="backslashreplace").decode("utf-8")
+    escaped = str(baseline).replace("\udcff", "\\\\udcff")
     refusal(
         [*command(rule, baseline, candidate), "--json", str(output_json)],
         f"unreadable or unsupported input: {escaped}",

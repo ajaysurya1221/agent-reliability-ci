@@ -361,7 +361,7 @@ def test_cross_file_duplicate_identity_is_retained() -> None:
 
 
 def test_huge_epoch_header_is_a_lazy_range() -> None:
-    actual = parse_inspect(inspect_log(epochs=10**12))
+    actual = parse_inspect(inspect_log(epochs=999_999_999))
     assert isinstance(actual.rounds, range)
-    assert actual.rounds == range(1, 10**12 + 1)
+    assert actual.rounds == range(1, 1_000_000_000)
     assert len(actual.rows) == 1

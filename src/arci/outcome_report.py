@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import re
+import string
+import unicodedata
 
 from arci.outcome_schema import OutcomeDecision
 
 # Terminal layout, separate from the statistical statements and notices.
 TERMINAL_TASK_HEADING = "Tasks where the candidate did worse or a pair errored, through round {k}"
-TERMINAL_TASK_OVERFLOW = "{n} more such tasks are in the Markdown and JSON outputs"
+TERMINAL_TASK_OVERFLOW = (
+    "{n} more such tasks: add --markdown PATH or --json PATH for the full table"
+)
 
 # Single source for ADR 0015 fixed text, including all validation reasons.
 FIXED_TEXT: dict[str, str] = {
@@ -131,17 +135,79 @@ def _reason(reason: str, descriptive: bool) -> str:
     return reason
 
 
+def escape_terminal(value: str) -> str:
+    """Render opaque text visibly, without terminal controls or ambiguous escapes."""
+    result: list[str] = []
+    for char in value:
+        if char == "\\":
+            result.append("\\\\")
+        elif unicodedata.category(char).startswith("C") or char in "\u2028\u2029":
+            code = ord(char)
+            result.append(
+                f"\\x{code:02x}"
+                if code <= 0xFF
+                else f"\\u{code:04x}"
+                if code <= 0xFFFF
+                else f"\\U{code:08x}"
+            )
+        else:
+            result.append(char)
+    return "".join(result)
+
+
+def _escape(value: str, *, markdown: bool) -> str:
+    safe = escape_terminal(value)
+    if markdown:
+        safe = "".join("\\" + char if char in string.punctuation else char for char in safe)
+    return safe
+
+
+def _message(value: str, *, markdown: bool) -> str:
+    """Keep fixed prose verbatim; escape only opaque diagnostic placeholders.
+
+    Records store rendered reasons, so recover their fixed template at the display
+    boundary. Captured values are never interpreted again as templates or markup.
+    """
+    if not markdown:
+        return escape_terminal(value)
+    for tag, template in FIXED_TEXT.items():
+        parts = re.split(r"<[A-Za-z0-9_]+>", template)
+        if len(parts) == 1:
+            if value == template:
+                return value
+            continue
+        # Standing notices interpolate generated integers/rationals, never raw text.
+        placeholder = "(.*?)" if tag.startswith("E") else r"([0-9]+(?:/[0-9]+)?)"
+        match = re.fullmatch(placeholder.join(re.escape(part) for part in parts), value, re.DOTALL)
+        if match is not None:
+            if not tag.startswith("E"):
+                return value
+            return parts[0] + "".join(
+                _escape(group, markdown=True) + part
+                for group, part in zip(match.groups(), parts[1:], strict=True)
+            )
+    if value in {
+        "non-inferiority established",
+        "regression established",
+        "no test crossed",
+        "both tests crossed",
+        "errored pairs exceed max_errored_pairs",
+    }:
+        return value
+    return _escape(value, markdown=True)
+
+
 def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
     descriptive = decision.rule is not None and not decision.rule.fixed_before_runs
     lines = [text("F1")] if descriptive else []
-    if markdown and lines:
-        lines.append("")
     lines.append(f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})")
     lines.append("")
-    lines.extend(_reason(reason, descriptive) for reason in decision.reasons)
+    lines.extend(
+        _message(_reason(reason, descriptive), markdown=markdown) for reason in decision.reasons
+    )
     if not markdown:
         for notice in decision.notices:
-            lines.extend(("", notice))
+            lines.extend(("", _message(notice, markdown=False)))
     if decision.rule_sha256 is not None:
         lines.extend(("", f"Rule SHA-256: {decision.rule_sha256}"))
     if decision.history:
@@ -150,17 +216,18 @@ def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
             "Round | Pairs | Minus | Zero | Plus | Errored | PASS wealth | BLOCK wealth | "
             "PASS crossed | BLOCK crossed | Verdict"
         )
-        lines.append(header)
+        lines.append(f"| {header} |")
         if markdown:
-            lines.append(" | ".join(["---"] * 11))
+            lines.append("| " + " | ".join(["---"] * 11) + " |")
         for look in decision.history:
             counts = look.counts
-            lines.append(
+            row = (
                 f"{look.round} | {look.pairs} | {counts.minus} | {counts.zero} | "
                 f"{counts.plus} | {counts.errored} | {look.pass_wealth} | "
                 f"{look.block_wealth} | {look.pass_crossed} | {look.block_crossed} | "
                 f"{look.verdict.value}"
             )
+            lines.append(f"| {row} |")
         lines.extend(
             (
                 "",
@@ -184,34 +251,38 @@ def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
             else TERMINAL_TASK_HEADING.format(k=decision.last_round_evaluated)
         )
         lines.extend(("", heading))
+        if markdown:
+            lines.append("")
         if tasks:
-            lines.append(
+            header = (
                 "Task | Pairs | Baseline successes | Candidate successes | "
                 "Minus | Zero | Plus | Errored"
             )
+            lines.append(f"| {header} |")
             if markdown:
-                lines.append(" | ".join(["---"] * 8))
+                lines.append("| " + " | ".join(["---"] * 8) + " |")
         else:
             lines.append("none")
         for task in tasks:
             counts = task.counts
-            task_id = task.task_id.replace("|", "\\|") if markdown else task.task_id
-            # Escape line breaks so task identifiers cannot splice report lines.
-            task_id = task_id.replace("\r", "\\r").replace("\n", "\\n")
-            lines.append(
+            task_id = _escape(task.task_id, markdown=markdown)
+            row = (
                 f"{task_id} | {task.pairs} | {task.baseline_successes} | "
                 f"{task.candidate_successes} | {counts.minus} | {counts.zero} | "
                 f"{counts.plus} | {counts.errored}"
             )
+            lines.append(f"| {row} |")
+        if markdown and tasks:
+            lines.append("")
         if omitted:
             lines.append(TERMINAL_TASK_OVERFLOW.format(n=omitted))
     for statement in decision.statements:
         if descriptive and statement == text("F1"):
             continue
-        lines.extend(("", statement))
+        lines.extend(("", _message(statement, markdown=markdown)))
     if markdown:
         for notice in decision.notices:
-            lines.extend(("", notice))
+            lines.extend(("", _message(notice, markdown=True)))
     return lines
 
 

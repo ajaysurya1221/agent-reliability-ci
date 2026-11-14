@@ -6,6 +6,7 @@ Importing this package does not import an XML parser or any optional evaluation 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal
@@ -69,11 +70,35 @@ def _constant(value: str) -> Any:
     raise ValueError(f"non-finite JSON number: {value}")
 
 
-def loads_json(value: str) -> Any:
+def decimal_in_bounds(value: Decimal) -> bool:
+    """Check size before any exponent expansion or integer-ratio conversion."""
+    return (
+        value.is_finite()
+        and -400 <= value.adjusted() <= 400
+        and len(value.as_tuple().digits) <= 400
+    )
+
+
+def round_label(value: object) -> int:
+    """Accept only a plain decimal integer with at most nine digits."""
+    if type(value) is int and -999_999_999 <= value <= 999_999_999:
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]{1,9}", value):
+        return int(value)
+    raise ValueError("round or epoch must be a decimal integer of at most 9 digits")
+
+
+def _integer(value: str) -> int | Decimal:
+    # Keep oversized scores available for sample-level E10, without creating big ints.
+    return int(value) if len(value.lstrip("-")) <= 400 else Decimal(value)
+
+
+def loads_json(value: str, *, allow_nonfinite: bool = False) -> Any:
     """Read JSON without duplicate keys or binary rounding of decimal scores."""
     return json.loads(
         value,
         object_pairs_hook=_object,
         parse_float=Decimal,
-        parse_constant=_constant,
+        parse_int=_integer,
+        parse_constant=Decimal if allow_nonfinite else _constant,
     )

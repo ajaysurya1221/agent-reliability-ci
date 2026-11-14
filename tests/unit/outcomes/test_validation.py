@@ -580,14 +580,14 @@ def test_huge_inspect_epoch_count_is_rejected_before_expansion(tmp_path: Path) -
     raw["eval"]["config"]["epochs"] = 10**12
     path = write(tmp_path, "a.json", json.dumps(raw))
     actual = decide_outcomes(rule_file(tmp_path), [path], [path])
-    assert actual.reasons == ("round 201 is outside 1 to 200",)
+    assert actual.reasons == (f"unreadable or unsupported input: {path}",)
 
 
 def test_huge_inspect_epoch_count_does_not_limit_inventory_discovery(tmp_path: Path) -> None:
     from arci.outcomes import discover_rule
 
     raw = json.loads(inspect_source())
-    raw["eval"]["config"]["epochs"] = 10**12
+    raw["eval"]["config"]["epochs"] = 999_999_999
     path = write(tmp_path, "a.json", json.dumps(raw))
     actual = discover_rule([path])
     assert actual.tasks == ("a", "b")

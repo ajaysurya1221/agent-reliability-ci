@@ -270,11 +270,19 @@ def test_terminal_tasks_filter_sort_and_cap_without_truncating_artifacts() -> No
     decision = _decision(fixed=True).model_copy(update={"tasks": tasks})
     before = decision.model_dump_json()
     report = render_terminal(decision)
-    rows = [line.split(" | ")[0] for line in report.splitlines() if " | " in line]
+    rows = [
+        line.split(" | ")[0].removeprefix("| ") for line in report.splitlines() if " | " in line
+    ]
     assert rows[3:] == ["most-minus", "more-errors", *(f"task-{n:02}" for n in range(8))]
-    overflow = "3 more such tasks are in the Markdown and JSON outputs"
-    assert report.splitlines()[report.splitlines().index(overflow) - 1].startswith("task-07 | ")
-    assert all(f"{task.task_id} | " in render_markdown(decision) for task in tasks)
+    overflow = "3 more such tasks: add --markdown PATH or --json PATH for the full table"
+    assert report.splitlines()[report.splitlines().index(overflow) - 1].startswith("| task-07 | ")
+    # No line of the terminal report begins with text taken from a task id.
+    assert all(
+        not line.startswith(tuple(task.task_id for task in tasks)) for line in report.splitlines()
+    )
+    assert all(
+        task.task_id.replace("-", "\\-") + " | " in render_markdown(decision) for task in tasks
+    )
     assert decision.model_dump_json() == before
     assert len(OutcomeDecision.model_validate_json(before).tasks) == 15
     assert overflow not in decision.statements + decision.notices

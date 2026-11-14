@@ -134,23 +134,23 @@ def test_invalid_seal_of_error_is_e24_before_e25(tmp_path: Path) -> None:
     )
 
 
-def test_e26_precedes_e27(tmp_path: Path) -> None:
+def test_e27_precedes_e26(tmp_path: Path) -> None:
     rule, baseline, candidate = campaign(tmp_path, rounds=2)
     original = decide_outcomes(rule, [baseline], [candidate])
     previous = save(tmp_path, reseal(original, normalisation=2))
     baseline.write_text("task_id,outcome\na,pass\nb,pass\n")
     candidate.write_text(baseline.read_text())
     actual = decide_outcomes(rule, [baseline], [candidate], previous=previous)
-    assert actual.reasons == ("the previous decision supplied 2 rounds; this call supplies 1",)
+    assert actual.reasons == ("the previous decision used normalisation 2; this call uses 1",)
 
 
-def test_e26_precedes_input_outcome_error(tmp_path: Path) -> None:
+def test_input_outcome_error_precedes_e26(tmp_path: Path) -> None:
     rule, baseline, candidate = campaign(tmp_path, rounds=2)
     previous = save(tmp_path, decide_outcomes(rule, [baseline], [candidate]))
     baseline.write_text("task_id,outcome\na,unreadable\nb,pass\n")
     candidate.write_text("task_id,outcome\na,pass\nb,pass\n")
     actual = decide_outcomes(rule, [baseline], [candidate], previous=previous)
-    assert actual.reasons == ("the previous decision supplied 2 rounds; this call supplies 1",)
+    assert actual.reasons == ("outcome unreadable for a cannot be read as pass, fail or error",)
 
 
 def test_e27_precedes_input_identity_error(tmp_path: Path) -> None:
@@ -189,4 +189,4 @@ def test_huge_inspect_epochs_with_previous_are_bounded(tmp_path: Path) -> None:
         )
     )
     actual = decide_outcomes(rule, [path], [path], previous=previous)
-    assert actual.reasons == ("round 201 is outside 1 to 200",)
+    assert actual.reasons == (f"unreadable or unsupported input: {path}",)

@@ -1076,31 +1076,90 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
     )
     # --- end init ---
     verdict = commands.add_parser(
-        "verdict", help="decide from imported outcomes", allow_abbrev=False
+        "verdict",
+        help="decide from imported outcomes",
+        allow_abbrev=False,
+        usage=(
+            "%(prog)s RULE --baseline FILE... --candidate FILE...\n"
+            "                    [--format auto|csv|jsonl|junit|inspect]\n"
+            "                    [--previous DECISION.json] [--json PATH] [--markdown PATH]\n"
+            "       %(prog)s --example [--json PATH] [--markdown PATH]"
+        ),
     )
-    verdict.add_argument("rule", metavar="RULE", nargs="?")
-    verdict.add_argument("--baseline", metavar="FILE", nargs="*")
-    verdict.add_argument("--candidate", metavar="FILE", nargs="*")
+    verdict.add_argument("rule", metavar="RULE", nargs="?", help="read the imported-outcomes rule")
     verdict.add_argument(
-        "--format", choices=("auto", "csv", "jsonl", "junit", "inspect"), default="auto"
+        "--baseline",
+        metavar="FILE",
+        nargs="*",
+        help="read baseline outcome files in the given order",
     )
-    verdict.add_argument("--previous", metavar="DECISION.json")
-    verdict.add_argument("--json", metavar="PATH")
-    verdict.add_argument("--markdown", metavar="PATH")
-    verdict.add_argument("--example", action="store_true")
+    verdict.add_argument(
+        "--candidate",
+        metavar="FILE",
+        nargs="*",
+        help="read candidate outcome files in the given order",
+    )
+    verdict.add_argument(
+        "--format",
+        choices=("auto", "csv", "jsonl", "junit", "inspect"),
+        default="auto",
+        help="choose the input format; auto uses file extensions",
+    )
+    verdict.add_argument(
+        "--previous",
+        metavar="DECISION.json",
+        help="check the rule and supplied rounds against a previous decision",
+    )
+    verdict.add_argument("--json", metavar="PATH", help="write the sealed JSON decision")
+    verdict.add_argument(
+        "--markdown", metavar="PATH", help="write the Markdown report with the full task table"
+    )
+    verdict.add_argument(
+        "--example", action="store_true", help="run on the packaged order-desk outcomes"
+    )
 
     verdict_rule = commands.add_parser(
-        "verdict-rule", help="extract an imported-outcomes rule", allow_abbrev=False
+        "verdict-rule",
+        help="extract an imported-outcomes rule",
+        allow_abbrev=False,
+        usage=(
+            "%(prog)s --tasks FILE... --out RULE\n"
+            "                         [--format auto|csv|jsonl|junit|inspect]\n"
+            "                         [--score NAME] [--pass-at-least RATIONAL]\n"
+            "                         [--suite-id ID] [--alpha RATIONAL] [--margin RATIONAL]\n"
+            "                         [--max-rounds N] [--max-errored-pairs N]"
+        ),
     )
-    verdict_rule.add_argument("--tasks", metavar="FILE", nargs="*")
-    verdict_rule.add_argument("--out", metavar="RULE")
     verdict_rule.add_argument(
-        "--format", choices=("auto", "csv", "jsonl", "junit", "inspect"), default="auto"
+        "--tasks", metavar="FILE", nargs="*", help="extract task ids from these outcome files"
     )
-    for name in ("score", "pass-at-least", "suite-id", "alpha", "margin"):
-        verdict_rule.add_argument(f"--{name}")
-    for name in ("max-rounds", "max-errored-pairs"):
-        verdict_rule.add_argument(f"--{name}", metavar="N")
+    verdict_rule.add_argument(
+        "--out", metavar="RULE", help="create a rule declaring fixed_before_runs: false"
+    )
+    verdict_rule.add_argument(
+        "--format",
+        choices=("auto", "csv", "jsonl", "junit", "inspect"),
+        default="auto",
+        help="choose the input format; auto uses file extensions",
+    )
+    for name, metavar, description in (
+        ("score", "NAME", "select one Inspect scorer by name"),
+        (
+            "pass-at-least",
+            "RATIONAL",
+            "map numeric Inspect scores at or above this rational to pass",
+        ),
+        ("suite-id", "ID", "name the rule's suite (default: imported-outcomes)"),
+        ("alpha", "RATIONAL", "set alpha as a rational (default: 1/20)"),
+        ("margin", "RATIONAL", "set the non-inferiority margin as a rational (default: 1/10)"),
+        ("max-rounds", "N", "set the registered round budget (default: ceil(400 / task count))"),
+        (
+            "max-errored-pairs",
+            "N",
+            "set the error tolerance (default: ceil(registered pairs / 100))",
+        ),
+    ):
+        verdict_rule.add_argument(f"--{name}", metavar=metavar, help=description)
     return parser
 
 
@@ -1309,12 +1368,16 @@ def _outcome_paths(values: dict[str, object]) -> None:
     )
     output_keys = ("out",) if discovery else ("json", "markdown")
     outputs = [str(values[key]) for key in output_keys if values.get(key) is not None]
-    occupied = {Path(path).resolve() for path in inputs}
+    occupied = [Path(path).resolve() for path in inputs]
     for path in outputs:
         resolved = Path(path).resolve()
-        if resolved in occupied:
+        if any(
+            str(resolved).casefold() == str(other).casefold()
+            or (resolved.exists() and other.exists() and os.path.samefile(resolved, other))
+            for other in occupied
+        ):
             raise OutcomeError(text("E17", path=path))
-        occupied.add(resolved)
+        occupied.append(resolved)
     for path in outputs:
         if not Path(path).resolve().parent.is_dir():
             raise OutcomeError(text("E18", path=path))
@@ -1388,7 +1451,7 @@ def _cmd_outcome_rule(values: dict[str, object]) -> int:
 
     import yaml
 
-    from arci.importers import OutcomeError
+    from arci.importers import OutcomeError, round_label
     from arci.outcome_report import text
     from arci.outcomes import discover_rule
 
@@ -1407,7 +1470,7 @@ def _cmd_outcome_rule(values: dict[str, object]) -> int:
             if key in ("max_rounds", "max_errored_pairs"):
                 # Invalid integers stay intact for the ordered rule-field E15 check.
                 with suppress(ValueError):
-                    value = int(str(value))
+                    value = round_label(str(value))
             options[key] = value
     rule = discover_rule(
         cast(list[str], values["tasks"]), fmt=cast(str, values["format"]), **options
@@ -1428,8 +1491,9 @@ def _cmd_outcome_rule(values: dict[str, object]) -> int:
 
 def _outcome_error(reason: str) -> None:
     """Preserve opaque diagnostics while keeping stderr to one physical line."""
-    escaped = reason.replace("\r", "\\r").replace("\n", "\\n")
-    print(f"error: {escaped}", file=sys.stderr)
+    from arci.outcome_report import escape_terminal
+
+    print(f"error: {escape_terminal(reason)}", file=sys.stderr)
 
 
 def _outcomes_main(arguments: list[str]) -> int:
@@ -1469,7 +1533,7 @@ def _outcomes_main(arguments: list[str]) -> int:
         _outcome_error(str(exc))
         return 3
     except Exception as exc:
-        print(f"error: {_one_line(exc)}", file=sys.stderr)
+        _outcome_error(str(exc))
         return 3
 
 

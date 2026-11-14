@@ -14,7 +14,9 @@ from arci.importers import (
     ParsedInput,
     Row,
     check_identity,
+    decimal_in_bounds,
     loads_json,
+    round_label,
 )
 from arci.outcome_report import text as fixed_text
 
@@ -47,9 +49,12 @@ def _outcome(value: Any, task_id: str, threshold: Fraction | None) -> OutcomeVal
         return "pass"
     if value == "I" or value is False:
         return "fail"
-    if isinstance(value, int | Decimal) and not isinstance(value, bool) and threshold is not None:
-        if isinstance(value, Decimal) and not value.is_finite():
-            raise ValueError("non-finite score")
+    if (
+        isinstance(value, int | Decimal)
+        and not isinstance(value, bool)
+        and threshold is not None
+        and decimal_in_bounds(Decimal(value))
+    ):
         return "pass" if Fraction(value) >= threshold else "fail"
     raise OutcomeError(fixed_text("E10", value=value, id=task_id))
 
@@ -71,12 +76,13 @@ def read(
     if Path(path).suffix.lower() == ".eval":
         raise OutcomeError(fixed_text("E7"))
     try:
-        log = _mapping(loads_json(text.removeprefix("\ufeff")))
+        log = _mapping(loads_json(text.removeprefix("\ufeff"), allow_nonfinite=True))
         evaluation = _mapping(log["eval"])
         config = _mapping(evaluation["config"])
         epochs = config["epochs"]
         if type(epochs) is not int or epochs < 1:
             raise ValueError("epochs must be a positive integer")
+        epochs = round_label(epochs)
         dataset = _mapping(evaluation["dataset"])
         types: dict[str, type[Any]] = {}
         inventory: set[str] = set()
@@ -110,6 +116,7 @@ def read(
             epoch = sample["epoch"]
             if type(epoch) is not int:
                 raise ValueError("epoch must be an integer")
+            epoch = round_label(epoch)
             check_identity(task_id, epoch, arm=arm, tasks=tasks, seen=seen)
             if task_id not in inventory or not 1 <= epoch <= epochs:
                 raise ValueError("sample disagrees with the header")

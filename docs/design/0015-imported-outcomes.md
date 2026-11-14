@@ -171,6 +171,17 @@ a header and no rows, a JSONL file with no object, a JUnit file with no test cas
 with no samples. A file that has records but lacks some registered tasks is not this case; those
 are missing outcomes.
 
+**Numbers and text from inputs.** A round or epoch label is a plain decimal integer of at most
+nine digits, else E6. A numeric Inspect score that is not finite, has more than 400 digits or an
+exponent outside -400 to 400 is E10, and the rule's `pass_at_least` has the same bound (E15), so
+no input can make the arithmetic unbounded. The rule's integers are plain decimal: `010`,
+`0b1000`, `0x10` and `1_000` are not integers here (E15). In a CSV file a completely blank line
+is skipped; a `round` column that is empty on some or all rows is E14. Every string that comes
+from an input (a task id, a path, a value) is printed with control and format characters shown
+as escapes, and in Markdown with its punctuation escaped as well, so an id cannot redraw the
+terminal, start a heading or comment out the statements that follow it. The JSON artifact keeps
+the strings as they were.
+
 **Choosing the parser.** `--format auto`, the default, maps by extension only: `.csv` csv, `.jsonl`
 jsonl, `.xml` junit, `.json` inspect, `.eval` E7, any other extension E8. Nothing inspects content.
 An explicit `--format` applies to every file in the call.
@@ -181,9 +192,10 @@ One ordered list. Validation stops at the first failure and reports it, exit 3, 
 reason on stderr and no traceback.
 
 1. **Command line and paths.** A repeated option (E20); `--example` with any other input (E21); a
-   missing or empty `--baseline` or `--candidate` (E16); an output path equal to another output path
-   or to any input path, compared after resolution (E17); an output whose parent directory does not
-   exist (E18); for `verdict-rule`, an `--out` that exists (E22).
+   missing or empty `--baseline` or `--candidate` (E16); an output path naming the same file as
+   another output or any input, by resolved path, by `os.path.samefile`, or by the resolved paths
+   being equal apart from letter case (E17); an output whose parent directory does not exist (E18);
+   for `verdict-rule`, an `--out` that exists (E22).
 2. **Rule fields**, in the order of "Record models" (E15 for any of them).
 3. **`--previous` structure** (E24, E25, E27).
 4. **Input files**, in argument order, baseline before candidate, each file's records in file

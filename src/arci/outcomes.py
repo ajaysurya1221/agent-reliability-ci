@@ -7,6 +7,7 @@ import io
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from fractions import Fraction
 from itertools import pairwise
 from pathlib import Path
@@ -23,6 +24,7 @@ from arci.importers import (
     Row,
     check_identity,
     loads_json,
+    round_label,
 )
 from arci.outcome_report import text
 from arci.outcome_schema import (
@@ -71,9 +73,31 @@ def _mapping(loader: _RuleLoader, node: yaml.MappingNode) -> dict[str, Any]:
 
 _RuleLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _mapping)
 
+# Copy the resolver table: the stricter grammar must not change other YAML readers.
+_RuleLoader.yaml_implicit_resolvers = {
+    key: [(tag, pattern) for tag, pattern in entries if tag != "tag:yaml.org,2002:int"]
+    for key, entries in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+_PLAIN_INTEGER = re.compile(r"[-+]?(0|[1-9][0-9]*)\Z")
+_RuleLoader.add_implicit_resolver("tag:yaml.org,2002:int", _PLAIN_INTEGER, list("-+0123456789"))
+
+
+def _rule_integer(loader: _RuleLoader, node: yaml.ScalarNode) -> int | Decimal:
+    spelling = loader.construct_scalar(node)
+    if _PLAIN_INTEGER.fullmatch(spelling) is None:
+        raise ValueError("expected a plain decimal integer")
+    # Oversized values stay non-integers for the ordered field validation below.
+    return int(spelling) if len(spelling.lstrip("+-")) <= 9 else Decimal(spelling)
+
+
+_RuleLoader.add_constructor("tag:yaml.org,2002:int", _rule_integer)
+
 
 def _signed_rational(value: object) -> str:
-    if not isinstance(value, str) or re.fullmatch(r"[+-]?[0-9]+/[1-9][0-9]*", value) is None:
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"[+-]?[0-9]{1,400}/[1-9][0-9]{0,399}", value) is None
+    ):
         raise ValueError("pass_at_least must be a finite rational n/d")
     number = Fraction(value)
     return f"{number.numerator}/{number.denominator}"
@@ -262,6 +286,8 @@ def _neutral(
             ):
                 raise ValueError("invalid header")
             for values in reader:
+                if not values:
+                    continue
                 if len(values) != len(header):
                     raise ValueError("invalid row")
                 yield dict(zip(header, values, strict=True))
@@ -282,16 +308,17 @@ def _neutral(
         if not isinstance(task, str):
             raise ValueError("invalid task id")
         has_round = "round" in record
+        if fmt == "csv" and has_round and record["round"] == "":
+            raise OutcomeError(text("E14", path=path))
         if labelled is not None and has_round != labelled:
             raise OutcomeError(text("E14", path=path))
         labelled = has_round
         r: Any = record.get("round", position)
         if fmt == "csv" and has_round:
-            if not isinstance(r, str) or re.fullmatch(r"[+-]?[0-9]+", r) is None:
-                raise ValueError("invalid round")
-            r = int(r)
+            r = round_label(r)
         if type(r) is not int:
             raise ValueError("invalid round")
+        r = round_label(r)
         check_identity(task, r, arm=arm, tasks=tasks, seen=seen)
         value = record["outcome"]
         if not isinstance(value, str) or value not in {"pass", "fail", "error"}:
@@ -459,6 +486,11 @@ def empty_decision(
 def _previous(path: PathLike) -> OutcomeDecision:
     try:
         raw = loads_json(Path(path).read_text(encoding="utf-8-sig"))
+        # Bound the embedded rational before the record model converts it to Fraction.
+        if isinstance(raw, dict) and isinstance(raw.get("rule"), dict):
+            threshold = raw["rule"].get("pass_at_least")
+            if threshold is not None:
+                _signed_rational(threshold)
         previous = OutcomeDecision.model_validate(raw)
         if not previous.validate_seal():
             raise ValueError("seal invalid")
@@ -567,54 +599,6 @@ def _previous(path: PathLike) -> OutcomeDecision:
     except Exception as exc:
         reason = "invalid record" if isinstance(exc, ValidationError) else str(exc).splitlines()[0]
         raise OutcomeError(text("E24", reason=reason)) from None
-
-
-def _prospective_round_count(
-    baseline: Sequence[PathLike], candidate: Sequence[PathLike], fmt: str
-) -> int | None:
-    """Read only round metadata for E26, deferring input errors to step four.
-
-    No outcomes or identities are validated here and no inference runs. If metadata
-    itself cannot be read, its input error is reported by the normal ordered reader.
-    """
-    sets: list[set[int]] = []
-    try:
-        for paths in (baseline, candidate):
-            rounds: set[int] = set()
-            for position, path in enumerate(paths, 1):
-                parser = _format(str(path), fmt)
-                if parser == "junit":
-                    rounds.add(position)
-                    continue
-                source = Path(path).read_text(encoding="utf-8-sig")
-                if parser == "inspect":
-                    epochs = loads_json(source)["eval"]["config"]["epochs"]
-                    if type(epochs) is not int or not 1 <= epochs <= 100_000:
-                        return None
-                    rounds.update(range(1, epochs + 1))
-                    continue
-                records: list[dict[str, Any]]
-                if parser == "csv":
-                    records = list(csv.DictReader(io.StringIO(source), strict=True))
-                else:
-                    records = [loads_json(line) for line in source.split("\n") if line.strip()]
-                if not records:
-                    rounds.add(position)
-                for record in records:
-                    r = record.get("round", position)
-                    if parser == "csv" and isinstance(r, str) and re.fullmatch(r"[+-]?[0-9]+", r):
-                        r = int(r)
-                    if type(r) is not int:
-                        return None
-                    rounds.add(r)
-            sets.append(rounds)
-        common = sets[0] & sets[1]
-        k = 0
-        while k + 1 in common:
-            k += 1
-        return k
-    except Exception:
-        return None
 
 
 @dataclass
@@ -782,9 +766,6 @@ def decide_outcomes(
         if predecessor is not None:
             if predecessor.verdict is Verdict.ERROR:
                 raise OutcomeError(text("E25", path=previous))
-            supplied = _prospective_round_count(baseline, candidate, fmt)
-            if supplied is not None and predecessor.rounds_supplied > supplied:
-                raise OutcomeError(text("E26", k=predecessor.rounds_supplied, j=supplied))
             if predecessor.normalisation != NORMALISATION:
                 raise OutcomeError(text("E27", v=predecessor.normalisation, w=NORMALISATION))
         data = _read_inputs(
