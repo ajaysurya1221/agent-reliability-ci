@@ -1,7 +1,20 @@
 # Changelog
 
-## Unreleased
+## v2.2.0 (2026-11-15)
 
+- **Added:** `arci verdict`, `arci verdict-rule` and `arci verdict --example`: a baseline-
+  against-candidate verdict from pass/fail outcomes another tool already produced (Inspect AI
+  JSON logs, JUnit XML, or CSV/JSONL), using ARCI's existing decision rule. `--previous
+  DECISION.json` continues an earlier import under the same rule. The rule's required
+  `fixed_before_runs` declares whether it was fixed before either arm ran; `verdict-rule`
+  always writes `false`, which labels the output a descriptive verdict and withholds the error
+  bound. A second console script, `agent-reliability-ci`, shares the entry point. New
+  `bench/export_outcomes.py` (the store exporter) and the packaged
+  `examples/outcomes/order-desk/` example files. Design record 0015.
+- **Changed:** the suite decision loop was extracted into `walk_rounds`, shared by suites and
+  imported outcomes, with no behaviour change to either path.
+- **Not in this release:** reading an Inspect `.eval` file directly, promptfoo, the GitHub
+  Action's verdict mode, and HTML output for imported outcomes.
 - **Docs:** `NOTICE` now also names the four files of `examples/guardrail_agent` that
   were taken from frontier-scout and the two datasets whose label names the calibration
   results use, and carries the MIT permission notice for the portions received under that

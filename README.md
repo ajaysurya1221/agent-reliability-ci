@@ -39,6 +39,31 @@ choosing a larger confirmatory run.
 ARCI observes calls that cross its tool boundary. It is not a sandbox, it does not replay model
 inference, and trace divergence shows where runs differ, not why.
 
+## New in 2.2: a verdict from results another tool produced
+
+**Imported outcomes.** `arci verdict` decides a baseline against a candidate from pass/fail
+results another tool already produced (Inspect AI, pytest, or CSV/JSONL), using ARCI's existing
+decision rule; `arci verdict-rule` writes a rule file from those results' task ids. ARCI runs
+nothing on this path: no fault injection, no fault accounting, no replay.
+
+```bash
+uvx --from agent-reliability-ci arci verdict --example
+```
+
+```text
+Descriptive verdict: the rule file declares it was written after outcomes existed. The error bound is not claimed.
+VERDICT: BLOCK (exit 1)
+
+BLOCK threshold crossed
+```
+
+Once installed: `arci verdict --example` (drop the `uvx --from agent-reliability-ci` prefix).
+
+A rule written from files that already exist is always labelled a **descriptive verdict** and
+never claims the error bound; claiming the bound needs a rule written and declared
+`fixed_before_runs: true` before either arm ran. See the
+[verdict recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/verdict.md).
+
 ## New in 2.0: many tasks, and LangChain agents
 
 **Suites.** v1 gates one task under a few fault conditions. A suite registers many tasks by
@@ -486,15 +511,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v2.1.0`, the current release (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==2.1.0`). See
+This example pins `v2.2.0`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.2.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v2.1.0
+- uses: ajaysurya1221/agent-reliability-ci@v2.2.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -565,8 +590,11 @@ never change the gate result. Racing duplicate comments are refreshed on the nex
   never fired.
 - Command agents get one stdio MCP server (revision 2026-07-28), serial tool calls, no HTTP
   transport, no concurrent decisions.
-- No importers (OTLP, Claude Code, Codex). POSIX only: on Windows the package
-  installs and `arci --help` runs, but experiments are unsupported.
+- **Since 2.2.0**, `arci verdict` reads pass/fail outcomes another tool already produced
+  (Inspect AI JSON logs, JUnit XML, CSV, JSONL) and gives a verdict only; there are still no
+  trace importers (OTLP, Claude Code, Codex), and imported outcomes cannot be replayed,
+  minimised or fault-accounted. POSIX only: on Windows the package installs and `arci --help`
+  runs, but experiments are unsupported.
 
 **Related work:** [Documentation comparison, checked 2026-10-05; not a matched benchmark.](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/reports/ci-gate-2026-10-06/REPORT.md#6-related-work-and-honest-positioning)
 
@@ -592,10 +620,11 @@ here claims adoption, performance or superiority.
 ## Roadmap
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need. What is not in 2.1.0 (interrupts, async
-agents, a suite example with several faults in one condition, a second framework adapter, the
-v1 commands that do not yet accept suites) and the earlier candidate list (last revised for
-v0.8.0) are in [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
+asks for it, or when a recorded run shows the need. What is not in 2.2.0 (reading an Inspect
+`.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
+example with several faults in one condition, a second framework adapter, the v1 commands that
+do not yet accept suites) and the earlier candidate list (last revised for v0.8.0) are in
+[docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
 
 ## Development
 
@@ -603,8 +632,10 @@ v0.8.0) are in [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliabil
 pair-programmers (recorded in the commit messages). Through v1.0.0 the experiment design, the
 decision rule and its calibration, the trust model and the acceptance tests are the maintainer's
 own. For 2.0.0 and 2.1.0 the design records were drafted by Claude as orchestrator and approved
-by the maintainer, and the implementation was by Codex from written briefs (design records 0011
-to 0014). The retry demo, the calibration table and the test suite reproduce from a clean clone.
+by the maintainer; for 2.2.0 the maintainer approved the plan, and design record 0015 was drafted
+by Claude and reviewed twice by Codex. The implementation of all three was by Codex from written
+briefs (design records 0011 to 0015). The retry demo, the calibration table and the test suite reproduce from
+a clean clone.
 Issues and PRs welcome.
 Where the code came from and who holds it: [docs/PROVENANCE.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/PROVENANCE.md).
 Commercial and partnership questions: see the maintainer's GitHub profile.
@@ -627,8 +658,8 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v2.1.0 is the current release. Install `agent-reliability-ci==2.1.0` from PyPI
-(`agent-reliability-ci[langchain]==2.1.0` for the LangChain adapter) or use Action tag `v2.1.0`.
+**Availability:** v2.2.0 is the current release. Install `agent-reliability-ci==2.2.0` from PyPI
+(`agent-reliability-ci[langchain]==2.2.0` for the LangChain adapter) or use Action tag `v2.2.0`.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
