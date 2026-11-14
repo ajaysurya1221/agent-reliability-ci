@@ -14,6 +14,10 @@ working records (pre-registrations, rendered reports, full write-ups) are on the
 [`v2/phase0`](https://github.com/ajaysurya1221/agent-reliability-ci/tree/v2/phase0/plan/exec/v2/study).
 The run stores and logs are kept by the maintainer and are not in the repository.
 
+Update: the two runs' sealed stores are now committed under
+[`order-desk-study/`](order-desk-study/README.md), with a test that re-derives both decisions
+from the trials.
+
 | | Run 1 (2026-11-11) | Run 2 (2026-11-13) |
 |---|---|---|
 | Set-up | A tool's `ValueError` (a wrong argument) ends the trial | The same, but a tool's `ValueError` is returned to the model, in both arms |

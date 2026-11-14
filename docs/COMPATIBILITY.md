@@ -34,3 +34,31 @@ See [the trust model](TRUST_MODEL.md), [statistics](STATISTICS.md) and
 supported runtime; Windows installation/help smoke coverage is not full runtime
 support. Live providers and arbitrary external trace formats are not covered by
 the offline demo or these native-store diagnostics.
+
+## The 2.x additions
+
+2.0.0 added the `arci-suite/1` record kind (a grid of tasks by fault conditions,
+run in balanced rounds), suite support in `run`, `gate`, `report`, `triage`,
+`diff` and `plan`, Markdown/JSON/HTML suite reports with fault accounting, and
+the optional `langchain` extra. 2.1.0 added a "tool outcomes" section to suite
+reports and did not change any record kind, command or exit code.
+
+Kept stable through 2.x, each because an existing test pins it:
+
+- The `arci-suite/1` schema version and the `SuiteManifest`/`SuiteDecision`
+  shapes it validates against: `tests/acceptance/test_suite_schema.py` (frozen).
+- Suite exit codes PASS/0, BLOCK/1, INCONCLUSIVE/2, ERROR/3, including that an
+  unsupported suite operation refuses with exit 3: `tests/unit/suite_cli/test_cli.py`.
+- The keys of the suite JSON report keep their names and meaning; keys may be
+  added, as 2.1.0 added `tool_outcomes`. The current content is checked against
+  stored fixtures: `tests/unit/suite_report/test_reports.py`.
+- `arci` import and `arci --help` never load `langchain`, so the core stays
+  importable without the extra: `tests/unit/adapters/test_lazy_import.py`.
+- The v1 (`arci/0.5`) JSON report is pinned byte for byte:
+  `tests/unit/suite_report/test_v1_json_pin.py`.
+
+Not promised: the wording and layout of the suite Markdown and HTML reports; `minimize`,
+`bundle`, `replay`, `trace-check` and JUnit for suites (each currently refuses); the
+LangChain adapter's internal call shape, async agents or interrupts; and anything else
+design records 0011-0014 list as not built. Each of those may change without a
+major-version bump.

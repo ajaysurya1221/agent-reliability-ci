@@ -3,6 +3,10 @@
 `default_report_sha256.json` holds the SHA-256 of `arci report STORE --format md|junit` for every
 committed store under `docs/results/`, recorded with the code before `--pass-k` existed. Without
 the flag the report must stay byte-identical to those recordings.
+
+Suite stores (`arci-suite/1`) are outside this pin: `arci report` refuses `--pass-k` and the
+JUnit format for them. `tests/unit/docs/test_order_desk_stores.py` re-derives the decisions of
+the committed suite stores.
 """
 
 from __future__ import annotations
@@ -33,7 +37,11 @@ def _report(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, s
 
 
 def test_every_committed_store_is_recorded() -> None:
-    stores = {p.parent.relative_to(RESULTS).as_posix() for p in RESULTS.rglob("manifest.json")}
+    stores = {
+        p.parent.relative_to(RESULTS).as_posix()
+        for p in RESULTS.rglob("manifest.json")
+        if json.loads(p.read_text(encoding="utf-8")).get("schema_version") != "arci-suite/1"
+    }
     recorded = {key.split("|", 1)[0] for key in RECORDED}
     assert stores <= recorded
     assert {VALID_STORE, INVALID_STORE} <= recorded
