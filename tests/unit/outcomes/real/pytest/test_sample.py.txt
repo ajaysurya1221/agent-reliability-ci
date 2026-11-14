@@ -1,0 +1,29 @@
+import pytest
+
+
+@pytest.fixture
+def broken():
+    raise RuntimeError("setup failed")
+
+
+@pytest.mark.parametrize("word", ["alpha", "beta"])
+def test_word(word):
+    assert word != "beta"
+
+
+def test_plain():
+    assert True
+
+
+@pytest.mark.skip(reason="not today")
+def test_skipped():
+    assert True
+
+
+def test_setup_error(broken):
+    assert True
+
+
+class TestGroup:
+    def test_inside(self):
+        assert True

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="1" skipped="1" tests="6" time="0.014" timestamp="2026-11-14T22:42:56.302081+05:30" hostname="host"><testcase classname="test_sample" name="test_word[alpha]" time="0.000" /><testcase classname="test_sample" name="test_word[beta]" time="0.000"><failure message="AssertionError: assert 'beta' != 'beta'">word = 'beta'
+
+    @pytest.mark.parametrize("word", ["alpha", "beta"])
+    def test_word(word):
+&gt;       assert word != "beta"
+E       AssertionError: assert 'beta' != 'beta'
+
+test_sample.py:11: AssertionError</failure></testcase><testcase classname="test_sample" name="test_plain" time="0.000" /><testcase classname="test_sample" name="test_skipped" time="0.000"><skipped type="pytest.skip" message="not today">/work/pt/test_sample.py:18: not today</skipped></testcase><testcase classname="test_sample" name="test_setup_error" time="0.000"><error message="failed on setup with &quot;RuntimeError: setup failed&quot;">@pytest.fixture
+    def broken():
+&gt;       raise RuntimeError("setup failed")
+E       RuntimeError: setup failed
+
+test_sample.py:6: RuntimeError</error></testcase><testcase classname="test_sample.TestGroup" name="test_inside" time="0.000" /></testsuite></testsuites>

@@ -1,0 +1,11 @@
+// Offline provider: answers the expected word, or "nope" with probability FAIL_RATE.
+class ScriptedProvider {
+  constructor(options) { this.rate = Number((options.config || {}).failRate || 0); this.label = options.label; }
+  id() { return 'scripted'; }
+  async callApi(prompt, context) {
+    const word = context.vars.word;
+    if (word === 'boom' ) { throw new Error('simulated infrastructure failure'); }
+    return { output: Math.random() < this.rate ? 'nope' : `the word is ${word}` };
+  }
+}
+module.exports = ScriptedProvider;
