@@ -1,12 +1,16 @@
 [project]
 name = "agent-reliability-ci"
-version = "2.1.0"
+version = "2.2.0"
 description = "Regression testing for stochastic AI agents: frozen experiments, fault injection, replayable reduced failures."
 readme = "README.md"
 license = "Apache-2.0"
+authors = [{ name = "Ajay Surya Senthilrajan" }]
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
-keywords = ["ai-agents", "reliability", "fault-injection", "statistics", "evaluation", "reproducibility"]
+keywords = [
+  "ai-agents", "reliability", "fault-injection", "statistics", "evaluation", "reproducibility",
+  "testing", "llm", "regression", "ci", "pytest",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
@@ -49,6 +53,8 @@ Issues = "https://github.com/ajaysurya1221/agent-reliability-ci/issues"
 
 [project.scripts]
 arci = "arci.cli:main"
+# The distribution name as a command, so `uvx agent-reliability-ci ...` works (ADR 0015).
+agent-reliability-ci = "arci.cli:main"
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]

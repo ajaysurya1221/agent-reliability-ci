@@ -408,11 +408,27 @@ and ERROR construction stay with their existing callers.
 - `pyproject.toml`: version 2.2.0; keywords gain testing, llm, regression, ci, pytest; the second
   console script `agent-reliability-ci`; `authors` with the maintainer's name as it stands in
   `NOTICE`, no email. `uv.lock`: the project's own version entry only.
-- `docs/AGENT_SEMANTICS.md`: one added section, proposed in the appendix below. No existing
-  sentence changes meaning for v1 or for suites.
-- `FROZEN.sha256`: the entries above re-hashed; new entries for `docs/STATISTICS_OUTCOMES.md`,
-  `src/arci/outcome_schema.py`, `tests/acceptance/test_outcomes*.py` and this record.
-- `src/arci/__init__.py`: `__version__ = "2.2.0"` (not frozen; listed for completeness).
+- `docs/AGENT_SEMANTICS.md`: one added section, the appendix below. No existing sentence changes.
+- `FROZEN.sha256`: the three entries above re-hashed; five new entries: this record,
+  `docs/STATISTICS_OUTCOMES.md`, `src/arci/outcome_schema.py`, `tests/acceptance/test_outcomes.py`
+  and `tests/acceptance/outcomes_helpers.py`. 71 entries.
+- Not frozen, listed for completeness: `src/arci/__init__.py` (`__version__ = "2.2.0"`) and
+  `CITATION.cff` (version and date).
+
+## How it was checked
+
+- Kernel extraction: every existing acceptance and suite test unchanged and passing;
+  `bench.selfcheck_suite --quick` prints the same lines before and after apart from its runtime.
+- Acceptance tests: 123 tests written from this record by an agent that could not see the code.
+  120 passed on first contact; two were slips in the tests and one was a gap in the code (an
+  input with no records). The orchestrator adjudicated each against this record.
+- Both runs of the order-desk study, exported from their stores as CSV, reproduce their stored
+  verdicts, counts and wealth strings through `arci verdict`.
+- Adversarial review, four lenses, each finding reproduced by a second agent
+  (`plan/exec/v2/reviews/V2.2-review-workflow.json` on the branch `v2/phase0`): an output could
+  overwrite an input on a case-insensitive volume; a score with a huge exponent hung the command;
+  control characters and markup in task ids reached the terminal and the Markdown report; one
+  `--previous` check ran too early. All fixed, each with a test.
 
 ## What is not in 2.2.0
 
@@ -503,8 +519,8 @@ acceptance tests rely on.
 >   refused. CSV and JSONL rows carry `task_id`, `outcome` and optionally `round`, every row in one
 >   file alike, and `--format auto` maps by extension only.
 > - The decision separates `statements`, the standing texts in print order, from `notices`. An ERROR
->   raised before any input is read carries the imported-outcomes notice and its reason only; the
->   sentence naming what ARCI checked prints only when inputs were validated. Exit codes are PASS 0,
+>   raised before inference carries the imported-outcomes notice and its reason only; the sentence
+>   naming what ARCI checked appears only in a decision reached by inference. Exit codes are PASS 0,
 >   BLOCK 1, INCONCLUSIVE 2, ERROR 3. Only the rule digest and the round digests are
 >   machine-independent; the seal also covers input hashes and the paths as given, and no seal
 >   establishes execution.

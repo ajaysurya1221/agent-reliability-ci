@@ -617,3 +617,45 @@ against Jev. Reviewed by the senior consultant (gpt-6-astra, xhigh) on 2026-09-2
   INCONCLUSIVE probability respectively at least 0.999. These are projections
   under independent uniform draws, not evidence of provider independence or a
   guarantee averaged over deterministic hash-derived seeds.
+
+## Imported outcomes (`arci-outcomes/1`)
+
+- Not a suite: no `SuiteManifest`, store, `TrialEnvelope` or `spec_sha256`. Statistical parameters
+  come only from the rule file, whose digest is `hash_record` of the expanded rule. A cell is a
+  task id, opaque; a round is one complete pass of every registered task by both arms; a format
+  with its own round label supplies the round from it, and file position is used only for a format
+  carrying none.
+- The rule carries a required boolean `fixed_before_runs`, part of its digest, declared by the
+  author and never verified. False makes the descriptive notice the first line of every output,
+  suppresses the bound sentence and the rendered-alpha line, and renders the two crossing reasons
+  as the threshold-crossed pair of 0015's fixed text. Verdict and exit code are the same either
+  way; the rule digest and the decision seal are not.
+- Read, hash, parse and structurally validate every supplied input before any inference, in the
+  ordered list of ADR 0015, reporting the first failure as exit 3 with its fixed reason and no
+  traceback. A malformed rule reads no input and gives that record's fixed empty template.
+- A supplied round must be complete for both arms and the arms must supply the same set of rounds
+  1 to k. A missing outcome inside a round is an errored pair, scored as -1 in PASS wealth and +1
+  in BLOCK wealth through the registered tolerance, never dropped and never an observed zero. The
+  tolerance is checked at each complete round end, not during validation.
+- Decide only at complete round ends, through `walk_rounds`, and stop at the first
+  non-INCONCLUSIVE round; priority is the suite's without the hard-violation step. Every count,
+  per round and per task, covers rounds 1 to `last_round_evaluated`; later supplied rounds
+  contribute only their `outcomes_sha256`, which is
+  `hash_record({"normalisation": <v>, "outcomes": [[arm, task_id, outcome_or_null], ...]})` over
+  all registered positions sorted by arm then task id. An ERROR during inference keeps the history
+  through its round and has `stopped_at_round` 0. With `--previous`, validate the predecessor's
+  seal and cross-field consistency before comparing the recomputed rule digest and every round it
+  supplied.
+- Outcome values are `pass`, `fail` and `error`. One Inspect JSON log per arm, its epochs its
+  rounds, one selected scorer for the whole import, `"C"` pass, `"I"` fail, a boolean itself, a
+  number only through `pass_at_least`, an `error` object `error`, an absent selected score a
+  missing outcome, anything else exit 3. JUnit `<failure>` is fail while `<error>` and `<skipped>`
+  are `error` and outrank it; input is decoded as UTF-8 before `<!DOCTYPE` and `<!ENTITY` are
+  refused. CSV and JSONL rows carry `task_id`, `outcome` and optionally `round`, every row in one
+  file alike, and `--format auto` maps by extension only.
+- The decision separates `statements`, the standing texts in print order, from `notices`. An ERROR
+  raised before inference carries the imported-outcomes notice and its reason only; the sentence
+  naming what ARCI checked appears only in a decision reached by inference. Exit codes are PASS 0,
+  BLOCK 1, INCONCLUSIVE 2, ERROR 3. Only the rule digest and the round digests are
+  machine-independent; the seal also covers input hashes and the paths as given, and no seal
+  establishes execution.
