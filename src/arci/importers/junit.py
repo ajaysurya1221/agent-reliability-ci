@@ -52,4 +52,6 @@ def read(
             else "pass"
         )
         rows.append(Row(task_id, position, outcome))
+    if not rows:
+        raise OutcomeError(fixed_text("E6", path=path))
     return ParsedInput(tuple(rows), (position,), assigned=True)

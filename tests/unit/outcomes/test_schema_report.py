@@ -19,6 +19,7 @@ from arci.outcome_schema import (
     OutcomeRule,
     OutcomeTaskCounts,
 )
+from arci.outcomes import empty_decision
 from arci.schema import Verdict
 from arci.suite_schema import SuiteCounts
 
@@ -200,7 +201,93 @@ def test_reports_have_all_verbatim_qualifications_and_counts(fixed: bool) -> Non
         assert "a" * 64 in report
         assert "1 | 2 | 0 | 2 | 0 | 0 | 1.08429e+00" in report
         assert text("F11", k=1) + ": 0" in report
-        assert "a | 1 | 1 | 1 | 0 | 1 | 0 | 0" in report
+    assert "a | 1 | 1 | 1 | 0 | 1 | 0 | 0" in render_markdown(decision)
+    assert "a | 1 | 1 | 1 | 0 | 1 | 0 | 0" not in render_terminal(decision)
+
+
+@pytest.mark.parametrize("fixed", [False, True])
+@pytest.mark.parametrize("validated_rounds", [None, 1, 10])
+def test_empty_template_statements_are_f2_alone(fixed: bool, validated_rounds: int | None) -> None:
+    decision = empty_decision(
+        "invalid input", _rule(fixed_before_runs=fixed), validated_rounds=validated_rounds
+    )
+    assert decision.statements == (text("F2"),)
+    assert decision.rounds_registered == 0
+    assert decision.validate_seal()
+
+
+@pytest.mark.parametrize("fixed", [False, True])
+@pytest.mark.parametrize("projection", ["F8", "F9"])
+def test_terminal_section_order(fixed: bool, projection: str) -> None:
+    notices = (
+        text("W1"),
+        text("F12"),
+        text("F7", k=1, N=200),
+        text(projection, r=39, p=78),
+        text("F10", n=2),
+        text("F14"),
+    )
+    decision = _decision(fixed=fixed).model_copy(update={"notices": notices})
+    report = render_terminal(decision)
+    sections = ([text("F1")] if not fixed else []) + [
+        "VERDICT: INCONCLUSIVE (exit 2)",
+        "no test crossed",
+        *notices,
+        "Rule SHA-256:",
+        "Round | Pairs |",
+        "errored pairs through round 1: 0",
+        "Tasks where the candidate did worse or a pair errored, through round 1\nnone",
+        *(statement for statement in decision.statements if statement != text("F1")),
+    ]
+    positions = [report.index(section) for section in sections]
+    assert positions == sorted(positions)
+
+
+def test_terminal_tasks_filter_sort_and_cap_without_truncating_artifacts() -> None:
+    # Input order deliberately disagrees with every terminal ordering key.
+    metrics = [(f"task-{n:02}", 1, 0) for n in reversed(range(10))] + [
+        ("errors-only", 0, 4),
+        ("more-errors", 1, 2),
+        ("most-minus", 2, 0),
+        ("ties-only", 0, 0),
+        ("improved", 0, 0),
+    ]
+    tasks = tuple(
+        OutcomeTaskCounts(
+            task_id=task_id,
+            pairs=4,
+            baseline_successes=minus,
+            candidate_successes=int(task_id == "improved"),
+            counts=SuiteCounts(
+                minus=minus,
+                zero=4 - minus - errored - int(task_id == "improved"),
+                plus=int(task_id == "improved"),
+                errored=errored,
+            ),
+        )
+        for task_id, minus, errored in metrics
+    )
+    decision = _decision(fixed=True).model_copy(update={"tasks": tasks})
+    before = decision.model_dump_json()
+    report = render_terminal(decision)
+    rows = [line.split(" | ")[0] for line in report.splitlines() if " | " in line]
+    assert rows[3:] == ["most-minus", "more-errors", *(f"task-{n:02}" for n in range(8))]
+    overflow = "3 more such tasks are in the Markdown and JSON outputs"
+    assert report.splitlines()[report.splitlines().index(overflow) - 1].startswith("task-07 | ")
+    assert all(f"{task.task_id} | " in render_markdown(decision) for task in tasks)
+    assert decision.model_dump_json() == before
+    assert len(OutcomeDecision.model_validate_json(before).tasks) == 15
+    assert overflow not in decision.statements + decision.notices
+
+
+def test_terminal_includes_tasks_with_only_errored_pairs() -> None:
+    decision = _decision(fixed=True)
+    task = decision.tasks[0].model_copy(
+        update={"counts": SuiteCounts(minus=0, zero=0, plus=0, errored=1)}
+    )
+    report = render_terminal(decision.model_copy(update={"tasks": (task,)}))
+    assert "a | 1 | 1 | 1 | 0 | 0 | 0 | 1" in report
+    assert "more such tasks" not in report
 
 
 @pytest.mark.parametrize(

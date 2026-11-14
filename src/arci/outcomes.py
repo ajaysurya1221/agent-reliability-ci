@@ -251,10 +251,7 @@ def _neutral(
     tasks: frozenset[str] | None,
     seen: set[tuple[str, int]],
 ) -> ParsedInput:
-    csv_labelled = False
-
     def records() -> Iterator[dict[str, Any]]:
-        nonlocal csv_labelled
         if fmt == "csv":
             reader = csv.reader(io.StringIO(source, newline=""), strict=True)
             header = next(reader, None)
@@ -264,7 +261,6 @@ def _neutral(
                 or not {"task_id", "outcome"} <= set(header)
             ):
                 raise ValueError("invalid header")
-            csv_labelled = "round" in header
             for values in reader:
                 if len(values) != len(header):
                     raise ValueError("invalid row")
@@ -302,11 +298,8 @@ def _neutral(
             raise OutcomeError(text("E10", value=value, id=task))
         rows.append(Row(task, r, cast(OutcomeValue, value)))
         rounds.add(r)
-    # An unlabelled empty file still supplies its positional round, with every pair missing.
     if not rows:
-        if csv_labelled:
-            raise ValueError("an empty labelled file supplies no logical round")
-        rounds.add(position)
+        raise ValueError("input has no records")
     return ParsedInput(tuple(rows), tuple(sorted(rounds)), not bool(labelled))
 
 
@@ -440,9 +433,7 @@ def _validate_rounds(data: _Inputs, rule: OutcomeRule) -> int:
 def empty_decision(
     reason: str, rule: OutcomeRule | None = None, *, validated_rounds: int | None = None
 ) -> OutcomeDecision:
-    statements = [text("F2")]
-    if validated_rounds is not None:
-        statements.append(text("F4", k=validated_rounds))
+    """Return the fixed template, independent of any validated input prefix."""
     return OutcomeDecision.create(
         schema_version=OUTCOMES_SCHEMA_VERSION,
         rule=rule,
@@ -459,7 +450,7 @@ def empty_decision(
         verdict=Verdict.ERROR,
         exit_code=3,
         reasons=(reason,),
-        statements=tuple(statements),
+        statements=(text("F2"),),
         notices=(),
         previous_sha256=None,
     )

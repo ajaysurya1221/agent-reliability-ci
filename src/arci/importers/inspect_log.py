@@ -128,6 +128,8 @@ def read(
                 selected = _mapping(scores[score])
                 outcome = _outcome(selected.get("value"), task_id, pass_at_least)
             rows.append(Row(task_id, epoch, outcome))
+        if not rows:
+            raise ValueError("input has no samples")
         return ParsedInput(
             tuple(rows),
             range(1, epochs + 1),

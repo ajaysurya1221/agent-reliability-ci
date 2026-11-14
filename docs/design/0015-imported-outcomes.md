@@ -36,7 +36,8 @@ compares nothing. What this path has: one rule in one file, exact rational arith
    exist; the author edits the file when the rule really did come first. With `true`, F3's
    conditions, F5 and F6 print and the verdict reasons are the suite's. With `false`, F1 is the
    first line of every output, F5 and F6 do not print, and the two crossing reasons render as F15
-   and F16; this is a rendering rule for this path only and `walk_rounds` is untouched. The verdict
+   and F16, at the top level and in each history entry; this is a rendering rule for this path
+   only and `walk_rounds` is untouched. The verdict
    and the exit code are identical either way. The rule digest and the decision seal are not: the
    declaration is a rule field, so the two cases are different registrations.
 
@@ -63,11 +64,12 @@ compares nothing. What this path has: one rule in one file, exact rational arith
    cannot be read as a total over everything supplied.
 
 7. **Fewer rounds than `max_rounds` may be supplied.** With no crossing the verdict is INCONCLUSIVE
-   and the report prints F7, then F8 or F9: the smallest number of further complete rounds of
-   non-errored ties that would cross, computed exactly from the current counts, or that no such
-   round exists inside the registered rounds. F8 and F9 print for INCONCLUSIVE only. Ties are not
-   the fastest route, so the figure is neither a floor nor a ceiling, and the arithmetic threshold
-   and the next permitted look are different numbers.
+   and the report prints F7, which every decision reached by inference prints, then F8 or F9: the
+   smallest number of further complete rounds of non-errored ties that would cross, computed
+   exactly from the current counts, or that no such round exists inside the registered rounds. F8
+   and F9 print for INCONCLUSIVE only. Ties are not the fastest route, so the figure is neither a
+   floor nor a ceiling, and the arithmetic threshold and the next permitted look are different
+   numbers.
 
 8. **`--previous DECISION.json`.** Re-running later with more rounds under the same rule is the
    intended use, and this option binds the earlier rounds. Every supplied round gets
@@ -80,11 +82,12 @@ compares nothing. What this path has: one rule in one file, exact rational arith
    id canonicalisation, scorer selection or outcome mapping raises `normalisation`, which the
    decision records. The predecessor is validated before anything is compared: readable, sealed,
    rounds contiguous from 1, a digest present for every round it supplied, same `normalisation`
-   (E24, E27); not an ERROR decision (E25); no more rounds than this call (E26). Then its rule
-   digest, recomputed from its embedded rule, must equal this call's (E23) and every round it
-   supplied must have the same digest here (E28). It establishes nothing else: not that any run
-   happened, not preregistration, not that the predecessor is authentic, not that another campaign
-   was not run and discarded. Without it nothing binds the earlier rounds.
+   (E24, E27); not an ERROR decision (E25). Once this call's inputs are validated it must not hold
+   more rounds than this call (E26), its rule digest, recomputed from its embedded rule, must equal
+   this call's (E23), and every round it supplied must have the same digest here (E28). It
+   establishes nothing else: not that any run happened, not preregistration, not that the
+   predecessor is authentic, not that another campaign was not run and discarded. Without it
+   nothing binds the earlier rounds.
 
 9. **Outcome values** are `pass`, `fail` and `error`. Infrastructure failures must be `error`;
    recording one as `fail` breaks condition (e) and ARCI cannot detect it. A missing outcome in a
@@ -142,17 +145,17 @@ through `pass_at_least`, anything else is E10. A duplicate (sample, epoch) is E2
 a retry; a registered sample absent from an epoch is a missing outcome.
 
 **JUnit XML.** Root `<testsuite>` or `<testsuites>`, every test case below it visited recursively
-once. The file is decoded as UTF-8, a byte-order mark allowed; bytes that are not valid UTF-8, or an
-XML declaration naming another encoding, are E6, and the refusal of `<!DOCTYPE` and `<!ENTITY` runs
-on the decoded text. The id is `classname::name`, both parts non-empty (E29), unique in the file
-including delimiter collisions (E2). One file is one round for its arm, from file position.
-`<failure>` is fail, `<error>` is `error` and a `<skipped>` case is `error`; when status children
-coexist `<error>` or `<skipped>` outranks `<failure>`, which outranks a pass. There is no exception
-for an unregistered id: an id not in the rule is E1 wherever it occurs, skipped or not.
-`verdict-rule` lists every id it finds, skipped ones included, and the recipe says to deselect tests
-at the source rather than in the rule. Repeat suffixes such as pytest-repeat's `[i-n]` stay literal
-ids: pairing fails against an unsuffixed inventory, and suffixes discovered into the rule become
-distinct cells.
+once. The file is decoded as UTF-8, a byte-order mark allowed; bytes that are not valid UTF-8, or
+an XML declaration naming another encoding, are E6, and the refusal of `<!DOCTYPE` and `<!ENTITY`,
+also E6, runs on the decoded text. The id is `classname::name`, both parts non-empty (E29), unique
+in the file including delimiter collisions (E2). One file is one round for its arm, from file
+position. `<failure>` is fail, `<error>` is `error` and a `<skipped>` case is `error`; when status
+children coexist `<error>` or `<skipped>` outranks `<failure>`, which outranks a pass. There is no
+exception for an unregistered id: an id not in the rule is E1 wherever it occurs, skipped or not.
+`verdict-rule` lists every id it finds, skipped ones included, and the recipe says to deselect
+tests at the source rather than in the rule. Repeat suffixes such as pytest-repeat's `[i-n]` stay
+literal ids: pairing fails against an unsuffixed inventory, and suffixes discovered into the rule
+become distinct cells.
 
 **Neutral CSV and JSONL.** UTF-8, a byte-order mark allowed. CSV is comma-delimited with standard
 double-quote escaping and a header row; JSONL is one object per non-blank newline-delimited record.
@@ -162,6 +165,11 @@ lower case, anything else E10, and ids must be strings and are not coerced. With
 every row carries `round` or none does, and a mixture is E14; when none does, the file's position
 among its arm's files is its round. A duplicate header, a duplicate key in one record, a malformed
 row and a non-finite number are E6.
+
+**An input with no records** is E6 in every format: an empty or whitespace-only file, a CSV with
+a header and no rows, a JSONL file with no object, a JUnit file with no test case, an Inspect log
+with no samples. A file that has records but lacks some registered tasks is not this case; those
+are missing outcomes.
 
 **Choosing the parser.** `--format auto`, the default, maps by extension only: `.csv` csv, `.jsonl`
 jsonl, `.xml` junit, `.json` inspect, `.eval` E7, any other extension E8. Nothing inspects content.
@@ -177,12 +185,12 @@ reason on stderr and no traceback.
    or to any input path, compared after resolution (E17); an output whose parent directory does not
    exist (E18); for `verdict-rule`, an `--out` that exists (E22).
 2. **Rule fields**, in the order of "Record models" (E15 for any of them).
-3. **`--previous` structure** (E24, E25, E26, E27).
+3. **`--previous` structure** (E24, E25, E27).
 4. **Input files**, in argument order, baseline before candidate, each file's records in file
    order: E1, E2, E6, E7, E8, E9, E10, E11, E12, E13, E14, E29 as the format sections define them.
 5. **Across files**: a round label outside 1 to `max_rounds` (E3); rounds not contiguous from 1
    (E4); arms not supplying the same set of rounds 1 to k (E5).
-6. **The `--previous` comparison** (E23, E28).
+6. **The `--previous` comparison**: E26, which needs this call's round count, then E23 and E28.
 
 W1 is printed, not fatal. The errored-pair tolerance is not on this list: it is checked during
 inference and gives the inherited ERROR reason. Artifacts are written after the decision is
@@ -227,13 +235,13 @@ The decision, `OutcomeDecision`, sealed like other ARCI records:
 | `rule` | `OutcomeRule` or null | null with `rule_sha256`; rationals as canonical strings |
 | `normalisation` | integer | the version the round digests were taken under |
 | `inputs` | list of `OutcomeInput` | argument order, baseline before candidate |
-| `rounds_registered` | integer | `max_rounds`, or 0 without a valid rule |
+| `rounds_registered` | integer | `max_rounds`; 0 in the fixed empty template |
 | `rounds_supplied` | integer | complete rounds found in the inputs |
 | `last_round_evaluated` | integer | the last round inference reached, 0 if none |
 | `round_digests` | list of `OutcomeRoundDigest` | ascending by round, every supplied round |
 | `history` | list of `OutcomeRoundLook` | ascending, rounds 1 to `last_round_evaluated` |
 | `tasks` | list of `OutcomeTaskCounts` | sorted by `task_id` |
-| `stopped_at_round` | integer | the deciding round; 0 for every ERROR, as in the suite |
+| `stopped_at_round` | integer | the last round evaluated; 0 for every ERROR, as the suite has |
 | `verdict` | Verdict | PASS, BLOCK, INCONCLUSIVE or ERROR |
 | `exit_code` | integer | 0, 1, 2, 3 in that order |
 | `reasons` | list of strings | the verdict reasons |
@@ -241,7 +249,8 @@ The decision, `OutcomeDecision`, sealed like other ARCI records:
 | `notices` | list of strings | the situational texts, in print order |
 | `previous_sha256` | string or null | the predecessor's seal, null without `--previous` |
 
-- `OutcomeInput`: `path` as given, `sha256`, `arm`, `format`, `rounds` (ascending integers).
+- `OutcomeInput`: `path` as given, `sha256`, `arm`, `format` (`csv`, `jsonl`, `junit` or
+  `inspect`), `rounds` (ascending integers).
 - `OutcomeRoundDigest`: `round`, `outcomes_sha256`.
 - `OutcomeRoundLook`: `round`, `pairs`, `counts` (`minus`, `zero`, `plus`, `errored`),
   `pass_wealth`, `block_wealth`, `pass_crossed`, `block_crossed`, `verdict`, `reasons`.
@@ -253,8 +262,8 @@ The **fixed empty template** carries every ERROR raised before inference: `rule`
 null for a malformed rule and filled in otherwise, `normalisation` current, `inputs`,
 `round_digests`, `history` and `tasks` empty, `rounds_registered`, `rounds_supplied`,
 `last_round_evaluated` and `stopped_at_round` 0, verdict ERROR, exit code 3, `reasons` holding the
-one fixed reason, `statements` holding F2 alone when no input was read and F2 with F4 when inputs
-were validated, `notices` empty, `previous_sha256` null.
+one fixed reason, `statements` holding F2 alone, `notices` empty, `previous_sha256` null. F4
+never appears in it: the template has no supplied rounds to name.
 
 Only the rule digest and each round's `outcomes_sha256` are the same on every machine for the same
 rule and the same normalised outcomes. The decision seal also covers the input file hashes and the

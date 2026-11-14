@@ -51,7 +51,7 @@ def save(tmp_path: Path, decision: OutcomeDecision) -> Path:
 
 def test_genuine_inference_error_is_e25(tmp_path: Path) -> None:
     rule, baseline, candidate = campaign(tmp_path, tolerance=0)
-    candidate.write_text("task_id,outcome\n")
+    candidate.write_text("task_id,outcome\na,pass\n")
     original = decide_outcomes(rule, [baseline], [candidate])
     assert original.verdict is Verdict.ERROR and original.last_round_evaluated == 1
     assert original.history[-1].verdict is Verdict.ERROR
@@ -113,7 +113,7 @@ def test_forged_top_level_error_is_e24_before_e25(tmp_path: Path) -> None:
 
 def test_inference_error_missing_digest_is_e24_before_e25(tmp_path: Path) -> None:
     rule, baseline, candidate = campaign(tmp_path, tolerance=0)
-    candidate.write_text("task_id,outcome\n")
+    candidate.write_text("task_id,outcome\na,pass\n")
     original = decide_outcomes(rule, [baseline], [candidate])
     assert original.verdict is Verdict.ERROR
     previous = save(tmp_path, reseal(original, round_digests=()))

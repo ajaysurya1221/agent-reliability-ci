@@ -184,17 +184,35 @@ def test_junit_fixed_errors(source: str, expected: str) -> None:
     assert error.value.reason == expected
 
 
-def test_junit_utf8_bom_and_empty_round() -> None:
+def test_junit_utf8_bom() -> None:
     actual = read_junit(
-        '\ufeff<?xml version="1.0" encoding="UTF-8"?><testsuite/>',
+        '\ufeff<?xml version="1.0" encoding="UTF-8"?>'
+        '<testsuite><testcase classname="c" name="a"/></testsuite>',
         path="a.xml",
         arm="baseline",
         position=4,
         tasks=None,
         seen=set(),
     )
-    assert actual.rows == ()
+    assert [(row.task_id, row.outcome) for row in actual.rows] == [("c::a", "pass")]
     assert tuple(actual.rounds) == (4,)
+
+
+def test_junit_without_test_cases_is_e6() -> None:
+    with pytest.raises(OutcomeError, match=r"unreadable or unsupported input: a\.xml"):
+        read_junit(
+            "<testsuites><testsuite/></testsuites>",
+            path="a.xml",
+            arm="baseline",
+            position=1,
+            tasks=None,
+            seen=set(),
+        )
+
+
+def test_inspect_without_samples_is_e6() -> None:
+    with pytest.raises(OutcomeError, match=r"unreadable or unsupported input: log\.json"):
+        parse_inspect(inspect_log(samples=[]))
 
 
 @pytest.mark.parametrize(
@@ -315,8 +333,8 @@ def test_inspect_error_precedes_score_and_missing_stays_missing() -> None:
 
 
 def test_inspect_absent_epoch_keeps_registered_round() -> None:
-    actual = parse_inspect(inspect_log(samples=[], epochs=3))
-    assert actual.rows == ()
+    actual = parse_inspect(inspect_log(epochs=3))
+    assert [(row.task_id, row.round, row.outcome) for row in actual.rows] == [("a", 1, "pass")]
     assert tuple(actual.rounds) == (1, 2, 3)
 
 

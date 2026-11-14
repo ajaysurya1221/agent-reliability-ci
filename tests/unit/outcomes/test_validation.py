@@ -231,6 +231,64 @@ def test_neutral_malformed_records_are_e6(tmp_path: Path, suffix: str, source: s
     assert actual.reasons == (f"unreadable or unsupported input: {a}",)
 
 
+@pytest.mark.parametrize("suffix", ["csv", "jsonl", "xml", "json"])
+@pytest.mark.parametrize("source", ["", " \t\n\r\n"])
+def test_empty_or_whitespace_input_is_e6(tmp_path: Path, suffix: str, source: str) -> None:
+    path = write(tmp_path, f"empty.{suffix}", source)
+    actual = decide_outcomes(rule_file(tmp_path), [path], [good_csv(tmp_path)])
+    assert actual.reasons == (f"unreadable or unsupported input: {path}",)
+    assert actual.verdict is Verdict.ERROR and actual.validate_seal()
+
+
+@pytest.mark.parametrize(
+    "suffix,source",
+    [
+        ("csv", "task_id,outcome\n"),
+        ("csv", "task_id,outcome,round\n"),
+        ("jsonl", "\n\n"),
+        ("xml", "<testsuites><testsuite/></testsuites>"),
+        (
+            "json",
+            json.dumps(
+                {
+                    "eval": {
+                        "config": {"epochs": 1},
+                        "dataset": {"sample_ids": ["a", "b"]},
+                        "scorers": [{"name": "match"}],
+                    },
+                    "samples": [],
+                }
+            ),
+        ),
+    ],
+)
+def test_input_without_records_is_e6(tmp_path: Path, suffix: str, source: str) -> None:
+    path = write(tmp_path, f"no-records.{suffix}", source)
+    actual = decide_outcomes(rule_file(tmp_path), [good_csv(tmp_path)], [path])
+    assert actual.reasons == (f"unreadable or unsupported input: {path}",)
+    assert actual.verdict is Verdict.ERROR and actual.validate_seal()
+
+
+@pytest.mark.parametrize("fixed", [False, True])
+def test_previous_comparison_error_has_only_f2_after_reading_inputs(
+    tmp_path: Path, fixed: bool
+) -> None:
+    rule = rule_file(tmp_path, fixed_before_runs=fixed)
+    baseline, candidate = good_csv(tmp_path), good_csv(tmp_path, "candidate.csv")
+    earlier = decide_outcomes(rule, [baseline], [candidate])
+    previous = write(tmp_path, "previous.json", earlier.model_dump_json())
+    candidate.write_text("task_id,outcome\na,fail\nb,pass\n", encoding="utf-8")
+    actual = decide_outcomes(rule, [baseline], [candidate], previous=previous)
+    assert actual.reasons == ("round 1 differs from the previous decision",)
+    assert actual.statements == (
+        "Imported outcomes: ARCI did not run these trials. No fault injection, "
+        "fault accounting, tool outcomes or replay.",
+    )
+    assert actual.rounds_registered == 0
+    assert actual.history == actual.inputs == actual.tasks == ()
+    assert actual.verdict is Verdict.ERROR and actual.validate_seal()
+
+
 @pytest.mark.parametrize(
     "field",
     [

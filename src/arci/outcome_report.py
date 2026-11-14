@@ -6,6 +6,10 @@ import re
 
 from arci.outcome_schema import OutcomeDecision
 
+# Terminal layout, separate from the statistical statements and notices.
+TERMINAL_TASK_HEADING = "Tasks where the candidate did worse or a pair errored, through round {k}"
+TERMINAL_TASK_OVERFLOW = "{n} more such tasks are in the Markdown and JSON outputs"
+
 # Single source for ADR 0015 fixed text, including all validation reasons.
 FIXED_TEXT: dict[str, str] = {
     "F1": (
@@ -135,6 +139,9 @@ def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
     lines.append(f"VERDICT: {decision.verdict.value} (exit {decision.exit_code})")
     lines.append("")
     lines.extend(_reason(reason, descriptive) for reason in decision.reasons)
+    if not markdown:
+        for notice in decision.notices:
+            lines.extend(("", notice))
     if decision.rule_sha256 is not None:
         lines.extend(("", f"Rule SHA-256: {decision.rule_sha256}"))
     if decision.history:
@@ -161,15 +168,32 @@ def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
                 f"{decision.history[-1].counts.errored}",
             )
         )
-    if decision.tasks:
-        lines.extend(("", "Task counts through round " + str(decision.last_round_evaluated)))
-        lines.append(
-            "Task | Pairs | Baseline successes | Candidate successes | "
-            "Minus | Zero | Plus | Errored"
+    tasks = decision.tasks
+    omitted = 0
+    if not markdown:
+        qualifying = sorted(
+            (task for task in tasks if task.counts.minus > 0 or task.counts.errored > 0),
+            key=lambda task: (-task.counts.minus, -task.counts.errored, task.task_id),
         )
-        if markdown:
-            lines.append(" | ".join(["---"] * 8))
-        for task in decision.tasks:
+        tasks = tuple(qualifying[:10])
+        omitted = len(qualifying) - len(tasks)
+    if tasks or not markdown:
+        heading = (
+            "Task counts through round " + str(decision.last_round_evaluated)
+            if markdown
+            else TERMINAL_TASK_HEADING.format(k=decision.last_round_evaluated)
+        )
+        lines.extend(("", heading))
+        if tasks:
+            lines.append(
+                "Task | Pairs | Baseline successes | Candidate successes | "
+                "Minus | Zero | Plus | Errored"
+            )
+            if markdown:
+                lines.append(" | ".join(["---"] * 8))
+        else:
+            lines.append("none")
+        for task in tasks:
             counts = task.counts
             task_id = task.task_id.replace("|", "\\|") if markdown else task.task_id
             # Escape line breaks so task identifiers cannot splice report lines.
@@ -179,12 +203,15 @@ def _lines(decision: OutcomeDecision, *, markdown: bool) -> list[str]:
                 f"{task.candidate_successes} | {counts.minus} | {counts.zero} | "
                 f"{counts.plus} | {counts.errored}"
             )
+        if omitted:
+            lines.append(TERMINAL_TASK_OVERFLOW.format(n=omitted))
     for statement in decision.statements:
         if descriptive and statement == text("F1"):
             continue
         lines.extend(("", statement))
-    for notice in decision.notices:
-        lines.extend(("", notice))
+    if markdown:
+        for notice in decision.notices:
+            lines.extend(("", notice))
     return lines
 
 
