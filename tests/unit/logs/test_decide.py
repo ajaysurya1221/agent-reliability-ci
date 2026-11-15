@@ -154,7 +154,7 @@ def test_digest_payload_is_exact_and_medians_use_day_values() -> None:
     assert decision.measures[0].median_before == "11/2"
     assert actual.before is not None and actual.after is not None
     expected = {
-        "method": "arci-logs/1",
+        "method": "arci-logs/2",
         "tool": "claude-code",
         "model": "gpt-5.3",
         "effort": "high",

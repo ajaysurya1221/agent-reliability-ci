@@ -82,7 +82,7 @@ def test_model_rejects_free_strings(raw: str) -> None:
     assert render_model(raw) is None
 
 
-@pytest.mark.parametrize("value", [None, "", "HIGH", "none", "other", "CANARY-1", 1, True, [], {}])
+@pytest.mark.parametrize("value", [None, "", "HIGH", "other", "CANARY-1", 1, True, [], {}])
 def test_unknown_effort(value: object) -> None:
     assert effort_of(value) is None
 
@@ -93,7 +93,12 @@ def test_effort(value: str) -> None:
 
 
 def test_effort_vocabulary_is_closed() -> None:
-    assert frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}) == EFFORTS
+    assert (
+        frozenset(
+            {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "persistent"}
+        )
+        == EFFORTS
+    )
 
 
 @pytest.mark.parametrize("tool", ["claude-code", "codex"])
@@ -207,6 +212,7 @@ def test_contract_fields() -> None:
         "model_order",
         "effort_order",
         "counters",
+        "versions",
     ]
     assert [f.name for f in fields(ReaderCounters)] == [
         "files_read",
@@ -298,7 +304,12 @@ def test_readers_stream_and_close_inputs(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_closed_lists_match_record() -> None:
-    assert frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}) == EFFORTS
+    assert (
+        frozenset(
+            {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "persistent"}
+        )
+        == EFFORTS
+    )
     assert (
         frozenset(
             [
@@ -344,6 +355,7 @@ def test_closed_lists_match_record() -> None:
                 "grok",
                 "code",
                 "mlx",
+                "sol",
             ]
         )
         == MODEL_WORDS

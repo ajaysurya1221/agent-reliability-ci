@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 from arci.logs.cli import run
 from tests.unit.logs.privacy.test_canary import arguments
 from tests.unit.logs.synth_logs import generate
@@ -21,13 +23,18 @@ def _audit(event: str, args: tuple[object, ...]) -> None:
 sys.addaudithook(_audit)
 
 
-def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path) -> None:
+@pytest.mark.parametrize("keep", [False, True])
+def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, keep: bool) -> None:
     global _active
     logs = generate(tmp_path / "input", compressed=False)
     targets = [tmp_path / "result.json", tmp_path / "result.md", tmp_path / "result.html"]
     argv = arguments(logs, "both")
     for flag, target in zip(("--json", "--markdown", "--html"), targets, strict=True):
         argv.extend([flag, str(target)])
+    table_dir = tmp_path / ".realornoise"
+    if keep:
+        argv.append("--keep")
+        targets.append(table_dir / "days-1.json")
     output, error = io.StringIO(), io.StringIO()
     _EVENTS.clear()
     _active = True
@@ -57,10 +64,14 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path) ->
                     assert not flags & (os.O_TRUNC | os.O_APPEND)
                     placeholders.add(path)
                     continue
-                assert path.parent == tmp_path and path.name.startswith(".realornoise-"), path
+                assert path.parent in (
+                    {tmp_path, table_dir} if keep else {tmp_path}
+                ) and path.name.startswith(".realornoise-"), path
                 writes.add(path)
         if event == "os.chmod":
-            assert Path(str(args[0])) in writes
+            assert Path(str(args[0])) in writes | ({table_dir} if keep else set())
+        if event == "os.mkdir":
+            assert keep and Path(str(args[0])) == table_dir
         if event == "os.rename":
             source, target, *_ = args
             assert isinstance(source, str) and isinstance(target, str)

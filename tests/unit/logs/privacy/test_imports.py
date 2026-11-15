@@ -27,6 +27,7 @@ STDLIB = frozenset(
         "tempfile",
         "textwrap",
         "typing",
+        "unicodedata",
         "compression",
     }
 )

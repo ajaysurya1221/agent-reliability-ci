@@ -10,7 +10,7 @@ split 2026-05-01 · client versions 2 before, 2 after, 2 in both · working dire
 
 One person's logs. No recorded measure moved toward worse by its margin; this does not say anything improved.
 
-Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one comparison, only under unchecked assumptions (days in the window interchangeable; no date, model, effort or project chosen from these logs; a uniform shift the measure can take; the same days, setting, reference value and earlier-day values in use). Repeated checking until a result appears is not covered. arci-logs/1, digest 6f6889936ee4. Yours: uvx realornoise
+Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one comparison, if the days in the window are interchangeable when nothing changes and the assumptions below hold; with days that resemble their neighbours the self-check measured wrong REAL DROP up to 11.8% (5 days after, 10 before) and 3.55% (7 after, 21 before) in its tested cases. Assumptions, unchecked: no date, model, effort or project chosen from these logs; a uniform shift the measure can take; the same days, setting, reference value and earlier-day values in use. Repeated checking until a result appears is not covered. arci-logs/2, digest ce5d85f16e01. Yours: uvx --python 3.14 realornoise
 
 Codex
 ERROR

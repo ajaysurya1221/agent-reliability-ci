@@ -220,3 +220,38 @@ def test_records_drop_superseded_sentences(document: str) -> None:
         "and the production decision rule.",
     ):
         assert old not in text
+
+
+def test_logs2_printed_rates_match_selfcheck() -> None:
+    from arci.logs import report
+
+    lines = section(
+        read("docs/results/logs-selfcheck.md"), "Days that come in streaks (report only)"
+    ).splitlines()
+    header = next(line for line in lines if line.startswith("| after/before"))
+    columns = [cell.strip() for cell in header.strip("|").split("|")]
+    rates: dict[str, list[Decimal]] = {"5/10": [], "7/21": []}
+    for line in lines:
+        if not line.startswith("|") or line == header:
+            continue
+        cells = dict(
+            zip(columns, (cell.strip() for cell in line.strip("|").split("|")), strict=True)
+        )
+        design = cells["after/before"]
+        if (
+            design not in rates
+            or cells["drop"] != "0"
+            or cells["metric"] != "wrong REAL DROP"
+            or Decimal(cells["rho"]) <= 0
+        ):
+            continue
+        match = re.search(r"= ([0-9.]+) ", cells["as built (95% CI)"])
+        assert match is not None
+        rates[design].append(Decimal(match.group(1)))
+    for design, constant in (("5/10", report.RATE_5_10), ("7/21", report.RATE_7_21)):
+        expected = format(max(rates[design]) * 100, "f").rstrip("0").rstrip(".")
+        assert constant == expected
+        assert expected + "%" in report.limits_text()
+        assert expected + "%" in report.MD_LIMITS.format(
+            digest="0" * 12, rate_5_10=report.RATE_5_10, rate_7_21=report.RATE_7_21
+        )

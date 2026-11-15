@@ -22,6 +22,7 @@ from .records import (
     render_model,
     string_of,
     time_of,
+    version_name,
     without_timezone,
 )
 
@@ -29,17 +30,26 @@ _USED = frozenset({"assistant", "user"})
 _EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 
 
-def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadResult:
+def read(
+    paths: Sequence[Path],
+    *,
+    project: Path | None,
+    now: datetime,
+    model_names: Sequence[str] = (),
+    effort_names: Sequence[str] = (),
+) -> ReadResult:
     counts = ReaderCounters()
-    models: dict[str, int] = {}
-    efforts: dict[str, int] = {}
+    models: dict[str, int] = {name: i for i, name in enumerate(sorted(set(model_names)))}
+    efforts: dict[str, int] = {name: i for i, name in enumerate(sorted(set(effort_names)))}
     versions: dict[str | None, int] = {}
     workdirs: dict[str | None, int] = {}
     responses: list[Response] = []
+    unconfigured: list[Response] = []
     edits: list[EditResult] = []
     seen: set[str] = set()
     latest_main_response: datetime | None = None
     for path in paths:
+        file_unconfigured: list[Response] = []
         saved_counts = counts
         counts = replace(counts)
         saved_models, saved_efforts = models.copy(), efforts.copy()
@@ -99,6 +109,21 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                                 latest_main_response = when
                             if not model or not effort:
                                 counts.responses_without_setting += 1
+                                cwd = string_of(data.get("cwd"))
+                                version = string_of(data.get("version"))
+                                file_unconfigured.append(
+                                    Response(
+                                        "claude-code",
+                                        when,
+                                        -1,
+                                        -1,
+                                        data.get("isSidechain") is not True,
+                                        None,
+                                        versions.setdefault(version, len(versions)),
+                                        workdirs.setdefault(cwd, len(workdirs)),
+                                        in_project(cwd, project),
+                                    )
+                                )
                                 continue
                         elif identity not in pending:
                             # A later content block cannot supply a missing first setting.
@@ -182,6 +207,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
             versions, workdirs = saved_versions, saved_workdirs
             latest_main_response = saved_latest
             continue
+        unconfigured.extend(file_unconfigured)
         edits.extend(file_edits)
         seen.update(file_seen)
         for response in pending.values():
@@ -201,4 +227,6 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         tuple(efforts[effort] for effort in sorted(efforts)),
         counts,
         latest_main_response,
+        versions=tuple(version_name(version) for version in versions),
+        unconfigured_responses=tuple(unconfigured),
     )

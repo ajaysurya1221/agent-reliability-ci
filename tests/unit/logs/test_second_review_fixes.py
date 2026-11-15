@@ -21,13 +21,20 @@ from tests.unit.logs.test_schema import decision
 @pytest.mark.parametrize(
     "names", [("out.txt", "OUT.txt"), ("café.txt", unicodedata.normalize("NFD", "café.txt"))]
 )
-def test_new_output_aliases_leave_nothing(tmp_path: Path, names: tuple[str, str]) -> None:
+def test_new_output_aliases_leave_nothing(
+    tmp_path: Path, names: tuple[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     first, second = (tmp_path / name for name in names)
     first.touch()
     folds = second.exists() and first.samefile(second)
     first.unlink()
     if not folds:
         pytest.skip("This volume keeps the tested spellings apart.")
+
+    def no_read(*args: object, **kwargs: object) -> None:
+        pytest.fail("output aliases must be checked before logs")
+
+    monkeypatch.setattr(cli.claude_code, "read", no_read)
     out, err = StringIO(), StringIO()
     assert (
         cli.run(["--example", "--json", str(first), "--markdown", str(second)], out=out, err=err)

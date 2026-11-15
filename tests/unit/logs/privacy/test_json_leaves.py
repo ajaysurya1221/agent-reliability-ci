@@ -19,7 +19,13 @@ from tests.unit.logs.synth_logs import generate
 
 CLOSED = frozenset(
     {
-        "arci-logs/1",
+        "arci-logs/2",
+        "logs",
+        "kept",
+        "absent",
+        "not_read",
+        "read",
+        "unreadable",
         "lower",
         "higher",
         *EFFORTS,
@@ -51,7 +57,11 @@ def model_name(value: str) -> bool:
     )
 
 
-def allowed(value: str) -> bool:
+def allowed(value: str, field: str = "") -> bool:
+    if field == "client_versions_after_shown" and re.fullmatch(
+        r"[0-9]{1,5}(\.[0-9]{1,5}){1,3}", value
+    ):
+        return True
     if value in CLOSED or value == __version__ or model_name(value):
         return True
     if re.fullmatch(r"(?:model|effort)-[1-9][0-9]*|[0-9a-f]{64}", value):
@@ -64,13 +74,13 @@ def allowed(value: str) -> bool:
     return False
 
 
-def walk(value: object) -> list[str]:
+def walk(value: object, field: str = "") -> list[tuple[str, str]]:
     if isinstance(value, str):
-        return [value]
+        return [(field, value)]
     if isinstance(value, dict):
-        return [leaf for item in value.values() for leaf in walk(item)]
+        return [leaf for key, item in value.items() for leaf in walk(item, key)]
     if isinstance(value, list):
-        return [leaf for item in value for leaf in walk(item)]
+        return [leaf for item in value for leaf in walk(item, field)]
     assert value is None or isinstance(value, bool | int | float)
     return []
 
@@ -87,5 +97,5 @@ def test_every_json_string_leaf(tmp_path: Path, model: str | None) -> None:
     assert not err.getvalue()
     leaves = walk(json.loads(target.read_text()))
     assert leaves
-    for leaf in leaves:
-        assert allowed(leaf), leaf
+    for field, leaf in leaves:
+        assert allowed(leaf, field), leaf

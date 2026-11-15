@@ -5,13 +5,15 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, NoReturn, cast
 
 Tool = Literal["claude-code", "codex"]
-EFFORTS: frozenset[str] = frozenset({"minimal", "low", "medium", "high", "xhigh", "max"})
+EFFORTS: frozenset[str] = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "persistent"}
+)
 MODEL_WORDS: frozenset[str] = frozenset(
     [
         "claude",
@@ -56,6 +58,7 @@ MODEL_WORDS: frozenset[str] = frozenset(
         "grok",
         "code",
         "mlx",
+        "sol",
     ]
 )
 _MODEL = re.compile(r"[a-z0-9][a-z0-9._-]{0,47}\Z")
@@ -137,6 +140,7 @@ class ReadResult:
     model_order: tuple[int, ...]
     effort_order: tuple[int, ...]
     counters: ReaderCounters
+    versions: tuple[str | None, ...] = field(default=(), kw_only=True)
 
 
 def object_of(value: object) -> dict[str, object]:
@@ -249,3 +253,14 @@ def without_timezone(value: object) -> bool:
         return parsed.tzinfo is None and datetime(2000, 1, 1) <= parsed <= datetime(2200, 1, 1)
     except (ValueError, OverflowError):
         return False
+
+
+VERSION_PATTERN = re.compile(r"[0-9]{1,5}(\.[0-9]{1,5}){1,3}\Z")
+
+
+def version_name(raw: str | None) -> str | None:
+    return raw if raw is not None and VERSION_PATTERN.fullmatch(raw) else None
+
+
+def version_key(name: str) -> tuple[tuple[int, ...], str]:
+    return tuple(int(part) for part in name.split(".")), name

@@ -220,7 +220,14 @@ def test_markdown_has_no_wrapping() -> None:
 
     decision = example_record()
     output = report.render_markdown(decision)
-    assert report.MD_LIMITS.format(digest=(decision.tools[0].day_table_sha256 or "")[:12]) in output
+    assert (
+        report.MD_LIMITS.format(
+            digest=(decision.tools[0].day_table_sha256 or "")[:12],
+            rate_5_10=report.RATE_5_10,
+            rate_7_21=report.RATE_7_21,
+        )
+        in output
+    )
     assert report.context_text(decision.tools[0]) in output
 
 
@@ -374,4 +381,6 @@ def test_markdown_without_setting_does_not_wrap_limits() -> None:
     from arci.logs import report
     from tests.unit.logs.test_report import cases
 
-    assert " ".join(report.F10.splitlines()) in report.render_markdown(cases()["no_usable_setting"])
+    assert " ".join(report.limits_text().splitlines()) in report.render_markdown(
+        cases()["no_usable_setting"]
+    )

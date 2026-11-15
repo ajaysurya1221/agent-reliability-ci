@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from fractions import Fraction
 from typing import Literal
 
-from .records import ReadResult, Response, Tool
+from . import kept
+from .records import ReadResult, Response, Tool, version_key
 from .schema import ContextCounts, DayValue, MeasureId, Period, validate_rational
 
 
@@ -35,6 +36,7 @@ class WindowReadResult(ReadResult):
     """
 
     latest_main_response: datetime | None = None
+    unconfigured_responses: tuple[Response, ...] = field(default=(), kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +58,16 @@ class ToolTable:
     measures: tuple[MeasureTable, ...]
     context: ContextCounts | None
     reference_value: int | None = None
+    first_response_day: str | None = None
+    response_days_before: int = 0
+    response_days_after: int = 0
+    kept_days_before: int = 0
+    kept_days_after: int = 0
+    kept_rows_other_offset: int = 0
+    settings_not_kept: int = 0
+    days_not_kept: int = 0
+    newest: date | None = None
+    write_rows: tuple[kept.KeptRow, ...] = ()
 
 
 def _names(values: tuple[str | None, ...], order: tuple[int, ...], prefix: str) -> dict[int, str]:
@@ -70,9 +82,17 @@ def _names(values: tuple[str | None, ...], order: tuple[int, ...], prefix: str) 
     return names
 
 
-def _context(before: list[Response], after: list[Response]) -> ContextCounts:
+def _context(
+    before: list[Response], after: list[Response], versions: tuple[str | None, ...]
+) -> ContextCounts:
     vb, va = {r.version for r in before}, {r.version for r in after}
+    names = [versions[i] for i in va if 0 <= i < len(versions) and versions[i] is not None]
+    shown = tuple(
+        sorted((name for name in names if name is not None), key=version_key, reverse=True)[:3]
+    )
     return ContextCounts(
+        client_versions_after_shown=shown,
+        client_versions_after_more=len(va) - len(shown),
         client_versions_before=len(vb),
         client_versions_after=len(va),
         client_versions_both=len(vb & va),
@@ -99,6 +119,8 @@ def build(
     since: date | None = None,
     model: str | None = None,
     effort: str | None = None,
+    kept_rows: tuple[kept.KeptRow, ...] = (),
+    keep: bool = False,
 ) -> ToolTable:
     from .decide import BEFORE_DAYS, DEFAULT_AFTER_DAYS
 
@@ -131,10 +153,33 @@ def build(
     )
     if newest is None or split is None or first is None or last is None:
         return empty
-    # If the split is in the future, before still ends at split - 1; no after period exists.
-    window_end = max(last, newest)
-    window = [(d, r) for d, r in responses if first <= d <= window_end]
-    counts = Counter((r.model, r.effort) for _, r in window if r.main_thread)
+    try:
+        logs = kept.from_logs(result, utc_offset=utc_offset, now=now)
+        minutes = utc_offset // timedelta(minutes=1)
+        rows = kept.use(
+            logs,
+            kept_rows,
+            result=result,
+            offset=minutes,
+            first=first,
+            newest=newest,
+            window_end=max(last, newest),
+        )
+        written, settings_not_kept, days_not_kept = (
+            kept.for_write(logs, result, offset=minutes, newest=newest) if keep else ((), 0, 0)
+        )
+    except (OverflowError, ValueError):
+        raise UsageError("calendar_range") from None
+    other_offset = sum(
+        row.tool == result.tool and row.utc_offset_minutes != minutes for row in kept_rows
+    )
+    counts: Counter[tuple[int, int]] = Counter()
+    after_counts: Counter[tuple[int, int]] = Counter()
+    for (m, e, day), row in rows.items():
+        if row.responses:
+            counts[m, e] += row.responses
+            if day >= split:
+                after_counts[m, e] += row.responses
     models = _names(result.models, result.model_order, "model")
     efforts = _names(result.efforts, result.effort_order, "effort")
     eligible = [
@@ -144,77 +189,90 @@ def build(
         and (effort is None or efforts[setting[1]] == effort)
     ]
     if not eligible:
-        return empty
+        return ToolTable(
+            result.tool,
+            None,
+            None,
+            len(counts),
+            split.isoformat(),
+            None,
+            None,
+            (),
+            None,
+            newest=newest,
+            write_rows=written,
+            kept_rows_other_offset=other_offset,
+            settings_not_kept=settings_not_kept,
+            days_not_kept=days_not_kept,
+        )
     model_ranks = {value: i for i, value in enumerate(result.model_order)}
     effort_ranks = {value: i for i, value in enumerate(result.effort_order)}
+    scores = after_counts if any(after_counts[setting] for setting in eligible) else counts
     chosen = min(
         eligible,
-        key=lambda setting: (-counts[setting], model_ranks[setting[0]], effort_ranks[setting[1]]),
+        key=lambda setting: (-scores[setting], model_ranks[setting[0]], effort_ranks[setting[1]]),
     )
-    selected = [(d, r) for d, r in window if r.main_thread and (r.model, r.effort) == chosen]
-    positive = Counter(
-        r.reasoning for _, r in selected if r.reasoning is not None and r.reasoning > 0
-    )
+    selected = {day: row for (m, e, day), row in rows.items() if (m, e) == chosen}
+    positive: Counter[int] = Counter()
+    for row in selected.values():
+        positive.update(
+            {value: frequency for value, frequency in row.reasoning.items() if value > 0}
+        )
     reference = min(positive, key=lambda count: (-positive[count], count)) if positive else None
-    known: dict[date, list[int]] = defaultdict(list)
-    for day, response in selected:
-        if response.reasoning is not None:
-            known[day].append(response.reasoning)
-    edit_counts: dict[date, list[bool]] = defaultdict(list)
-    try:
-        for edit in result.edits:
-            if (
-                edit.in_project
-                and edit.main_thread
-                and (edit.model, edit.effort) == chosen
-                and edit.when.tzinfo is not None
-                and edit.when <= now
-            ):
-                day = edit.when.astimezone(zone).date()
-                if first <= day <= window_end:
-                    edit_counts[day].append(edit.failed)
-    except (OverflowError, ValueError):
-        raise UsageError("calendar_range") from None
     values: dict[MeasureId, list[DayValue]] = {
         "reasoning_tokens": [],
         "no_reasoning_share": [],
         "edit_failure_share" if result.tool == "claude-code" else "repeated_value_share": [],
     }
-    for day, numbers in sorted(known.items()):
-        positives = sorted(number for number in numbers if number > 0)
-        n = len(positives)
-        if len(numbers) >= 20:
-            values["no_reasoning_share"].append(
+    for day, row in sorted(selected.items()):
+        known = sum(row.reasoning.values())
+        n = known - row.reasoning[0]
+
+        def add(
+            key: MeasureId,
+            count: int,
+            value: Fraction,
+            *,
+            day: date = day,
+            row: kept.DailyRow = row,
+        ) -> None:
+            values[key].append(
                 DayValue(
-                    day=day.isoformat(),
-                    count=len(numbers),
-                    value=fraction_str(Fraction(numbers.count(0), len(numbers))),
+                    day=day.isoformat(), count=count, value=fraction_str(value), source=row.source
                 )
             )
+
+        if known >= 20:
+            add("no_reasoning_share", known, Fraction(row.reasoning[0], known))
             if n >= 10:
-                value = Fraction(positives[(n - 1) // 2] + positives[n // 2], 2)
-                values["reasoning_tokens"].append(
-                    DayValue(day=day.isoformat(), count=n, value=fraction_str(value))
-                )
+                middle: list[int] = []
+                cumulative = 0
+                for number, frequency in sorted(row.reasoning.items()):
+                    if number <= 0:
+                        continue
+                    for index in ((n - 1) // 2, n // 2):
+                        if cumulative <= index < cumulative + frequency:
+                            middle.append(number)
+                    cumulative += frequency
+                add("reasoning_tokens", n, Fraction(sum(middle), 2))
                 if result.tool == "codex":
-                    values["repeated_value_share"].append(
-                        DayValue(
-                            day=day.isoformat(),
-                            count=n,
-                            value=fraction_str(Fraction(sum(v == reference for v in positives), n)),
-                        )
+                    add(
+                        "repeated_value_share",
+                        n,
+                        Fraction(row.reasoning[reference] if reference is not None else 0, n),
                     )
-    if result.tool == "claude-code":
-        for day, failures in sorted(edit_counts.items()):
-            if len(failures) >= 10:
-                values["edit_failure_share"].append(
-                    DayValue(
-                        day=day.isoformat(),
-                        count=len(failures),
-                        value=fraction_str(Fraction(sum(failures), len(failures))),
-                    )
-                )
+        if result.tool == "claude-code" and row.edits >= 10:
+            add("edit_failure_share", row.edits, Fraction(row.edits_failed, row.edits))
     split_text = split.isoformat()
+    context_responses = list(responses)
+    if isinstance(result, WindowReadResult):
+        context_responses.extend(
+            (r.when.astimezone(zone).date(), r)
+            for r in result.unconfigured_responses
+            if r.in_project and r.when.tzinfo is not None and r.when <= now
+        )
+    window = [(d, r) for d, r in context_responses if first <= d <= max(last, newest)]
+    response_days = [day for day, row in selected.items() if row.responses]
     return ToolTable(
         result.tool,
         models[chosen[0]],
@@ -231,6 +289,20 @@ def build(
             )
             for key, days in values.items()
         ),
-        _context([r for d, r in window if d < split], [r for d, r in window if d >= split]),
+        _context(
+            [r for d, r in window if d < split],
+            [r for d, r in window if d >= split],
+            result.versions,
+        ),
         reference,
+        first_response_day=min(response_days).isoformat(),
+        response_days_before=sum(day < split for day in response_days),
+        response_days_after=sum(day >= split for day in response_days),
+        kept_days_before=sum(day < split and row.source == "kept" for day, row in selected.items()),
+        kept_days_after=sum(day >= split and row.source == "kept" for day, row in selected.items()),
+        newest=newest,
+        write_rows=written,
+        kept_rows_other_offset=other_offset,
+        settings_not_kept=settings_not_kept,
+        days_not_kept=days_not_kept,
     )
