@@ -1,0 +1,66 @@
+name: Client versions
+
+# Daily: ask npm for the latest published Claude Code and Codex CLI versions and compare
+# them with the versions docs/LOG_FORMATS.md says the session-log readers were checked
+# against (the sentence near the top of that file). When either client has a newer
+# version, this keeps one open issue up to date asking for the format tests to be run
+# against a session of the new client. It never opens a second issue and closes none.
+
+on:
+  schedule:
+    - cron: "11 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: client-versions / compare with docs/LOG_FORMATS.md
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Latest published client versions
+        id: latest
+        run: |
+          set -euo pipefail
+          echo "claude_code=$(npm view @anthropic-ai/claude-code version)" >> "$GITHUB_OUTPUT"
+          echo "codex=$(npm view @openai/codex version)" >> "$GITHUB_OUTPUT"
+      - name: Compare against the checked versions
+        id: compare
+        env:
+          CLAUDE_CODE_LATEST: ${{ steps.latest.outputs.claude_code }}
+          CODEX_LATEST: ${{ steps.latest.outputs.codex }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/client_versions.py "$CLAUDE_CODE_LATEST" "$CODEX_LATEST" \
+            > body.txt
+          if [ -s body.txt ]; then
+            echo "newer=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "newer=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Keep one open issue up to date
+        if: steps.compare.outputs.newer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: "Newer client versions than the checked ones"
+        run: |
+          set -euo pipefail
+          number=$(gh issue list --repo "$GH_REPO" --state open \
+            --search "in:title \"$TITLE\"" --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" | head -n1)
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GH_REPO" --body-file body.txt
+          else
+            gh issue create --repo "$GH_REPO" --title "$TITLE" \
+              --body-file body.txt
+          fi
