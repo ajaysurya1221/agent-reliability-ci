@@ -305,41 +305,46 @@ F4 = {
     "CANNOT_TELL": "RESULT: CANNOT TELL",
     "ERROR": "RESULT: ERROR",
 }
-# F10, changed in 0017 and changed again after the self-check ran: it no longer holds two
-# figures but one figure with its design, `{rate_max}` with `{worst_after}` and
-# `{worst_before}`, filled at build time from the self-check file.
-#
-# The record's own "Fixed texts" section, which gave F10 as thirteen lines and the footer as one
-# span, is not in the record this file was written against: that section and the heading
-# "Coverage of the bound" were dropped when the figures changed, so the new line breaks of F10
-# and the new wording of the footer sentence cannot be read anywhere. The sentences below are
-# the ones the change did not touch, as the record gave them, plus the figure sentence as the
-# task states it; a test holds them against the output with whitespace collapsed, holds every
-# printed F10 line to 100 characters, and does not guess where the new text breaks. Restoring
-# the section would let the line-for-line comparison come back.
+# F10, changed in 0017 and changed again after the self-check ran: it carries one figure with
+# its design, `{rate_max}` with `{worst_after}` and `{worst_before}`, filled at build time from
+# the self-check file. The record gives F10 as thirteen lines of at most 100 characters that
+# print as given, and says that with their values filled they stay within 100 characters.
+F10_LINES = (
+    "This shows what your logs recorded. It does not establish answer quality, a cause, or a"
+    " change",
+    "to the model: your tasks, prompts, projects or client version may have changed.",
+    "For each tool above and one comparison, if (1) the days in this window are interchangeable"
+    " when",
+    "nothing changes, whatever their number of responses, and (2) to (4) below hold, then REAL"
+    " DROP",
+    "appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of the time"
+    " if a",
+    "measure moved toward worse by its margin or more. When days resemble their neighbours or"
+    " work comes",
+    "in phases, (1) fails: in the cases it tested, the self-check measured wrong REAL DROP up to",
+    "{rate_max}%, with {worst_after} days after the split and {worst_before} before; other"
+    " patterns can",
+    "give more. The conditions (2) to (4) are: (2) any date, model, effort or project you gave"
+    " was not",
+    "chosen from these logs; (3) a change moves every day alike, by an amount the measure can"
+    " take; (4) a",
+    "change leaves the same days, setting, reference value and earlier-day values in use. None"
+    " of these",
+    "is checked, and the streak check does not prove them. Running this again and again until a"
+    " result",
+    "appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the repository.",
+)
+# The same text where no line limit applies, as the Markdown file and the HTML page carry it.
+F10_TEXT = " ".join(F10_LINES)
 F10_FIRST_SENTENCE = "This shows what your logs recorded."
 # Record 0017, "Text output, in this order", item 3: "Its third sentence begins ...".
 F10_THIRD_SENTENCE = "For each tool above and one comparison, if (1)"
-F10_SENTENCES = (
-    "This shows what your logs recorded. It does not establish answer quality, a cause, or a"
-    " change to the model: your tasks, prompts, projects or client version may have changed.",
-    "For each tool above and one comparison, if (1) the days in this window are interchangeable"
-    " when nothing changes, whatever their number of responses, and (2) to (4) below hold, then"
-    " REAL DROP appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of"
-    " the time if a measure moved toward worse by its margin or more.",
-    "The conditions (2) to (4) are: (2) any date, model, effort or project you gave was not"
-    " chosen from these logs; (3) a change moves every day alike, by an amount the measure can"
-    " take; (4) a change leaves the same days, setting, reference value and earlier-day values"
-    " in use.",
-    "None of these is checked, and the streak check does not prove them.",
-    "Running this again and again until a result appears is not covered.",
-    "Exact statement: docs/STATISTICS_LOGS.md in the repository.",
+# The one sentence of F10 that carries the figure and its design, across the record's breaks.
+FIGURE_SENTENCE = (
+    "When days resemble their neighbours or work comes in phases, (1) fails: in the cases it"
+    " tested, the self-check measured wrong REAL DROP up to {rate_max}%, with {worst_after}"
+    " days after the split and {worst_before} before; other patterns can give more."
 )
-F10_LAST_SENTENCE = F10_SENTENCES[-1]
-# The one sentence that carries the figure and its design. The words the task gives are fixed;
-# what stands between the colon and "up to" is not stated, so the pattern leaves it open.
-FIGURE_HEAD = "When days resemble their neighbours or work comes in phases, (1) fails:"
-FIGURE_TAIL = "other patterns can give more."
 F12 = (
     "Share: --markdown FILE · --html FILE · --json FILE      "
     "Stronger evidence: arci verdict, arci run"
@@ -356,15 +361,18 @@ MARKDOWN_CLOSE = {
     ),
     "CANNOT_TELL": "One person's logs. Not enough to tell a shift from noise.",
 }
-# The footer, changed in 0017 and changed again with the figures. Its first clause and its last
-# line are the ones the record still fixes; the sentence that carried the two figures now
-# carries the one figure with its design, in wording the record no longer holds, so a test
-# pins the three values and their order inside the footer and not the words between them.
+# The footer, changed in 0017 and changed again with the figures: one span, so whitespace is
+# compared after collapsing runs, and its last line follows the sentence below.
 FOOTER_FIRST_WORDS = "Wrong REAL DROP and wrong NO DROP are each at most 2.5%"
-FOOTER_ASSUMPTIONS = (
-    "Assumptions, unchecked: no date, model, effort or project chosen from these logs; a uniform"
-    " shift the measure can take; the same days, setting, reference value and earlier-day values"
-    " in use. Repeated checking until a result appears is not covered."
+FOOTER_BOUND = (
+    "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one comparison,"
+    " if the days in the window are interchangeable when nothing changes and the assumptions"
+    " below hold; when days resemble their neighbours or work comes in phases the self-check"
+    " measured wrong REAL DROP up to {rate_max}% ({worst_after} days after, {worst_before}"
+    " before) in its tested cases. Assumptions, unchecked: no date, model, effort or project"
+    " chosen from these logs; a uniform shift the measure can take; the same days, setting,"
+    " reference value and earlier-day values in use. Repeated checking until a result appears is"
+    " not covered."
 )
 FOOTER_METHOD = "arci-logs/2, digest {digest}. Yours: uvx --python 3.14 realornoise"
 ROW_NAMES = {
@@ -1671,90 +1679,84 @@ def _listing(folder: Path) -> set[str]:
     return {str(path.relative_to(folder)) for path in folder.rglob("*")}
 
 
-# The shape of the printed rate ("Coverage of the bound"): the proportion times 100, in
-# decimal, without trailing zeros and without a trailing point. The two day counts are whole
-# numbers of days, so they are positive integers with no leading zero.
+# The shapes of the three values ("Coverage of the bound"): the rate is the proportion times
+# 100, in decimal, without trailing zeros and without a trailing point (a proportion of 0
+# prints as `0`); the two day counts are plain whole numbers with no leading zero.
 RATE_SHAPE = r"((?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?)"
 DAYS_SHAPE = r"([1-9][0-9]*)"
+FIGURE_SHAPES = {
+    "rate_max": RATE_SHAPE,
+    "worst_after": DAYS_SHAPE,
+    "worst_before": DAYS_SHAPE,
+}
 Figures = tuple[str, int, int]
+
+
+def _pattern(template: str, shapes: Mapping[str, str]) -> str:
+    """A regex that matches `template` exactly, each `{field}` replaced by its shape."""
+    out = ""
+    rest = template
+    while True:
+        found = re.search(r"\{([a-z_0-9]+)\}", rest)
+        if found is None:
+            return out + re.escape(rest)
+        out += re.escape(rest[: found.start()]) + shapes[found.group(1)]
+        rest = rest[found.end() :]
+
+
+def _filled(template: str, figures: Figures) -> str:
+    return template.format(rate_max=figures[0], worst_after=figures[1], worst_before=figures[2])
 
 
 def _figures(text: str) -> Figures:
     """The one self-check figure and its design, read out of F10's own sentence.
 
     The record fills `{rate_max}`, `{worst_after}` and `{worst_before}` at build time from the
-    self-check file, so this file cannot hold the numbers; it holds the words around them, the
-    shape of the rate and that the two day counts are whole numbers of days. That the three
-    equal what the rule of "Coverage of the bound" reads from the self-check file is item 40,
-    covered elsewhere; here the same three must appear in F10, in the footer and on the page.
-    What stands between "(1) fails:" and "up to" is not stated in the passage this file was
-    given, so the pattern leaves that span open and pins everything else.
+    self-check file, so this file cannot hold the numbers; it holds every word around them, the
+    shape of the rate and the shape of the two day counts. That the three equal what the rule
+    of "Coverage of the bound" reads from the self-check file is item 40, covered elsewhere;
+    here the same three must appear in F10, in the footer and on the page.
     """
-    pattern = (
-        re.escape(FIGURE_HEAD)
-        + r".{0,200}?up to "
-        + RATE_SHAPE
-        + re.escape("%, with ")
-        + DAYS_SHAPE
-        + re.escape(" days after the split and ")
-        + DAYS_SHAPE
-        + re.escape(" before; ")
-        + re.escape(FIGURE_TAIL)
-    )
-    found = re.search(pattern, _flat(text))
+    found = re.search(_pattern(FIGURE_SENTENCE, FIGURE_SHAPES), _flat(text))
     assert found is not None, "F10 does not hold its figure sentence with the three values"
     return found.group(1), int(found.group(2)), int(found.group(3))
 
 
 def _f10_block(outcome: Outcome) -> Figures:
-    """F10 as the text output prints it: one run of lines, each at most 100 characters.
+    """F10 as the text output prints it: the record's thirteen lines, line for line.
 
-    The record gives F10 as lines that print as given, but its line breaks moved with the
-    figures and the passage that held them is not in the record any more, so this holds the run
-    of consecutive lines from its first sentence to its last, every line to 100 characters, the
-    sentences the change did not touch, and the figure sentence with its three values.
+    The three values are read from the printed sentence first, since the record fills them at
+    build time; every line is then rebuilt from them and compared, each line is held to 100
+    characters, and the block is one run of consecutive non-blank lines.
     """
     lines = outcome.lines
     starts = [index for index, line in enumerate(lines) if line.startswith(F10_FIRST_SENTENCE)]
     assert len(starts) == 1, "F10 prints once, when a tool has a result other than ERROR"
     start = starts[0]
-    stop = next(
-        index for index in range(start, len(lines)) if lines[index].endswith(F10_LAST_SENTENCE)
-    )
-    block = lines[start : stop + 1]
+    block = lines[start : start + len(F10_LINES)]
     assert all(line.strip() for line in block), "F10 prints as one run of lines"
     for line in block:
         assert len(line) <= 100, line
-    flat = _flat("\n".join(block))
-    for sentence in F10_SENTENCES:
-        _says(flat, sentence)
-    return _figures(flat)
+    figures = _figures("\n".join(block))
+    assert block == _f10_lines(figures)
+    return figures
+
+
+def _f10_lines(figures: Figures) -> list[str]:
+    return [_filled(line, figures) for line in F10_LINES]
 
 
 def _footer_figures(text: str) -> Figures:
-    """The three values the Markdown footer carries, in the record's order.
+    """The three values the Markdown footer carries, with the footer held word for word.
 
-    The footer is one span and its figure sentence changed with F10; the wording is not in the
-    record this file was given, so the pattern pins the three values and their order between
-    the footer's first clause and its assumptions sentence, and not the words between them.
+    The footer is one span, so whitespace is compared after collapsing runs; its last line
+    carries the method name and the digest and is checked where the digest is known.
     """
-    flat = _flat(text)
-    _says(flat, FOOTER_FIRST_WORDS)
-    _says(flat, FOOTER_ASSUMPTIONS)
-    pattern = (
-        re.escape(FOOTER_FIRST_WORDS)
-        + r".{0,500}?up to "
-        + RATE_SHAPE
-        + r"%[^0-9]{1,60}"
-        + DAYS_SHAPE
-        + r"[^0-9]{1,60}"
-        + DAYS_SHAPE
-        + r"[^0-9]{0,120}?"
-        + re.escape(FOOTER_ASSUMPTIONS)
-    )
-    found = re.search(pattern, flat)
+    found = re.search(_pattern(FOOTER_BOUND, FIGURE_SHAPES), _flat(text))
     assert found is not None, "the footer does not hold its figure and its design"
-    return found.group(1), int(found.group(2)), int(found.group(3))
+    figures = (found.group(1), int(found.group(2)), int(found.group(3)))
+    _says(text, _filled(FOOTER_BOUND, figures))
+    return figures
 
 
 def _reason_block(outcome: Outcome, reason: str, *, tool: str = "claude-code") -> None:
@@ -4036,6 +4038,8 @@ def test_the_closing_paragraph_and_the_footer_carry_the_same_figure(
     assert figures == _figures(outcome.out)
     assert figures == _figures(outcome.page())
     assert figures == _footer_figures(outcome.text("markdown"))
+    # The page holds the same paragraph, where no line limit applies.
+    _says(outcome.page(), _filled(F10_TEXT, figures))
     digest = outcome.tool()["day_table_sha256"][:12]
     _says(outcome.text("markdown"), FOOTER_METHOD.format(digest=digest))
     # The two figures of the first form of this record, and the 0016 wording, are gone.
@@ -4282,7 +4286,8 @@ def test_a_tool_without_a_setting_has_no_method_line_and_no_footer(tmp_path: Pat
     assert _flat(block).count("arci-logs/2, digest") == 1
     assert _flat(outcome.out).count("method arci-logs/2") == 1
     _says(block, REASONS["no_usable_setting"])
-    _says(block, F10_FIRST_SENTENCE)
+    # The blank tool's block ends with the F10 text, word for word, and no footer.
+    _says(block, _filled(F10_TEXT, _f10_block(outcome)))
     # The blank tool keeps no scope, no period line, no table, no context and no digest.
     first = _flat(block).index(_flat(REASONS["no_usable_setting"]))
     second = _flat(block).index(_flat(FOOTER_FIRST_WORDS))
