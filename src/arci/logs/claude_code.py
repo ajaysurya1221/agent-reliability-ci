@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
+from .measures import WindowReadResult
 from .records import (
     EditResult,
     ReaderCounters,
@@ -37,6 +38,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
     responses: list[Response] = []
     edits: list[EditResult] = []
     seen: set[str] = set()
+    latest_main_response: datetime | None = None
     for path in paths:
         file_seen: set[str] = set()
         duplicates: set[str] = set()
@@ -44,14 +46,16 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         calls: dict[str, tuple[bool, Response]] = {}
         try:
             with path.open("rb") as stream:
+                counts.files_read += 1
                 for raw in stream:
                     data = parse_line(raw.decode("utf-8"), _USED, counts)
                     if data is None:
                         continue
+                    if "isApiErrorMessage" in data:
+                        counts.lines_unknown_type += 1
+                        continue
                     message = object_of(data.get("message"))
                     if data["type"] == "assistant":
-                        if data.get("isApiErrorMessage") is True:
-                            continue
                         identity = string_of(message.get("id"))
                         model = string_of(message.get("model"))
                         effort = string_of(data.get("effort", data.get("perTurnEffort")))
@@ -72,6 +76,13 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                             continue
                         if identity not in file_seen:
                             file_seen.add(identity)
+                            if (
+                                when <= now
+                                and data.get("isSidechain") is not True
+                                and in_project(string_of(data.get("cwd")), project)
+                                and (latest_main_response is None or when > latest_main_response)
+                            ):
+                                latest_main_response = when
                             if not model or not effort:
                                 counts.responses_without_setting += 1
                                 continue
@@ -147,8 +158,11 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                                     )
                                 )
                         counts.lines_lacking_field += lacking_time
-            counts.files_read += 1
-        except (OSError, UnicodeError, ValueError):
+        except UnicodeError:
+            # The physical line was read even though it could not be decoded.
+            counts.lines += 1
+            counts.files_unreadable += 1
+        except (OSError, ValueError):
             counts.files_unreadable += 1
         seen.update(file_seen)
         for response in pending.values():
@@ -158,7 +172,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                 responses.append(response)
                 counts.responses += 1
                 counts.responses_without_reasoning += response.reasoning is None
-    return ReadResult(
+    return WindowReadResult(
         "claude-code",
         tuple(responses),
         tuple(edits),
@@ -167,4 +181,5 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         tuple(models[model] for model in sorted(models)),
         tuple(efforts[effort] for effort in sorted(efforts)),
         counts,
+        latest_main_response,
     )

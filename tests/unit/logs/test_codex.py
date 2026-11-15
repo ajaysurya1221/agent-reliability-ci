@@ -121,8 +121,8 @@ def test_bad_first_line_skips_file(tmp_path: Path, first: str) -> None:
     path = tmp_path / "rollout.jsonl"
     write_rows(path, [first, meta(), context(), token()])
     actual = read([path], project=None, now=NOW)
-    assert actual.counters.files_unreadable == 1
-    assert actual.counters.files_read == 0
+    assert actual.counters.files_unreadable == 0
+    assert actual.counters.files_read == 1
     assert actual.counters.lines == 1 and actual.responses == ()
 
 
@@ -131,7 +131,9 @@ def test_empty_missing_and_non_utf8(tmp_path: Path, capsys: pytest.CaptureFixtur
     empty.touch()
     bad.write_bytes(b"\xff\xfe\n")
     actual = read([empty, bad, tmp_path / "CANARY-absent"], project=None, now=NOW)
-    assert actual.counters.files_unreadable == 3 and actual.responses == ()
+    assert actual.counters.files_unreadable == 2 and actual.responses == ()
+    assert actual.counters.files_read == 2
+    assert actual.counters.lines == 1
     assert capsys.readouterr() == ("", "")
 
 

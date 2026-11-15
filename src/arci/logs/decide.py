@@ -44,11 +44,13 @@ DEFAULT_AFTER_DAYS = 14
 def ladder(findings: Sequence[Finding]) -> tuple[Result, ReasonCode]:
     if all(f == "too_few_days" for f in findings):
         return "CANNOT_TELL", "too_few_days"
+    if "streaky" in findings:
+        return "CANNOT_TELL", "streaky_days"
     if "real_drop" in findings:
         return "REAL_DROP", "real_drop"
     if all(f == "no_drop" for f in findings):
         return "NO_DROP", "no_drop"
-    return "CANNOT_TELL", "streaky_days" if "streaky" in findings else "not_enough_evidence"
+    return "CANNOT_TELL", "not_enough_evidence"
 
 
 def move_before(measure: MeasureId, value: Fraction) -> Fraction:

@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, cast
 
+from .measures import WindowReadResult
 from .records import (
     ReaderCounters,
     ReadResult,
@@ -35,6 +36,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
     workdirs: dict[str | None, int] = {}
     responses: list[Response] = []
     seen: set[tuple[str, datetime, str]] = set()
+    latest_main_response: datetime | None = None
     for path in paths:
         compressed = path.name.endswith(".zst")
         zstd = None
@@ -47,16 +49,17 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         try:
             stream = cast(BinaryIO, zstd.open(path, "rb")) if zstd is not None else path.open("rb")
             with stream:
+                counts.files_read += 1
                 first = stream.readline()
                 meta = parse_line(first.decode("utf-8"), _USED, counts) if first else None
                 if meta is None or meta["type"] != "session_meta":
-                    counts.files_unreadable += 1
+                    # A readable file with no session header has an unrecognised
+                    # format, not an I/O or decoding fault.
                     continue
                 payload = object_of(meta.get("payload"))
                 cwd, version = string_of(payload.get("cwd")), string_of(payload.get("cli_version"))
                 inside = in_project(cwd, project)
                 if not inside:
-                    counts.files_read += 1
                     counts.files_outside_project += 1
                     continue
                 session = string_of(payload.get("id"))
@@ -99,6 +102,8 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     if when > now:
                         counts.records_in_future += 1
                         continue
+                    if main and (latest_main_response is None or when > latest_main_response):
+                        latest_main_response = when
                     model = string_of(context.get("model")) if context is not None else None
                     effort = string_of(context.get("effort")) if context is not None else None
                     if not model or not effort:
@@ -122,12 +127,14 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     )
                     counts.responses += 1
                     counts.responses_without_reasoning += reasoning is None
-            counts.files_read += 1
+        except UnicodeError:
+            counts.lines += 1
+            counts.files_unreadable += 1
         except Exception:
             # Decompression errors have interpreter-specific classes. No exception
             # (including its private input/path) is rendered or retained.
             counts.files_unreadable += 1
-    return ReadResult(
+    return WindowReadResult(
         "codex",
         tuple(responses),
         (),
@@ -136,4 +143,5 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         tuple(models[model] for model in sorted(models)),
         tuple(efforts[effort] for effort in sorted(efforts)),
         counts,
+        latest_main_response,
     )

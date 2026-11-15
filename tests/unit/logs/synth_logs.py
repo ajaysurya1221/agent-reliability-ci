@@ -287,7 +287,7 @@ def generate(
                 )
                 expected.counters.records_in_future += 1
                 expected.counters.lines_lacking_field += 1
-                expected.counters.lines_unknown_type += 1
+                expected.counters.lines_unknown_type += 2 if tool == "claude-code" else 1
                 expected.counters.lines_not_json += 2
                 expected.counters.files_read += 1
                 expected.counters.lines += len(rows)

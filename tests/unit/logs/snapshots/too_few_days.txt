@@ -15,7 +15,6 @@ file edits that failed        - (0)         - (0)        -      too few days
 Context counts; differences between the periods are not tested:
 client versions 2 before, 0 after, 0 in both · working directories 3 before, 0 after · sub-agent
 share 0.0% -> -
-Streak check: 0 of 0 tested measures were not flagged.
 method arci-logs/1 · exact rank tests · no random numbers · day-table digest 63a09a6a71d1
 
 This shows what your logs recorded. It does not establish answer quality, a cause, or a change

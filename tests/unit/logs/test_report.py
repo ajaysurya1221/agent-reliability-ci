@@ -13,6 +13,7 @@ from arci.logs.codex import read as read_codex
 from arci.logs.decide import decide_tool, error_tool, exit_code
 from arci.logs.discover import claude_files, codex_files
 from arci.logs.example import load
+from arci.logs.html import render_html
 from arci.logs.measures import build
 from arci.logs.records import ReaderCounters
 from arci.logs.schema import LogsDecision, ToolDecision, seal
@@ -114,10 +115,12 @@ def test_every_fixed_text_matches_record() -> None:
         *report.F6_HEADERS,
         *report.F6_NAMES.values(),
         *report.F6_FINDINGS.values(),
+        report.F6_NOT_USED,
         report.F7_HEADER,
         report.F7,
         report.F8,
         report.F9,
+        report.F9_NEXT,
         *report.F10.splitlines(),
         report.F11.replace("{digest}", "{12 hex}"),
         report.F12,
@@ -153,6 +156,11 @@ def test_every_fixed_text_matches_record() -> None:
         "format_not_recognised",
         "{default}",
         "{flag}",
+        "{k}",
+        "files_read",
+        "files_outside_project",
+        "responses",
+        "--since",
     }
     for value in fixed:
         assert value in ignored or normal(value) in [normal(text) for text in constants], value
@@ -180,3 +188,57 @@ def test_renderers_use_record_only() -> None:
     restored = LogsDecision.model_validate_json(decision.model_dump_json())
     assert report.render_text(restored) == report.render_text(decision)
     assert report.render_markdown(restored) == report.render_markdown(decision)
+
+
+def test_streak_notice_requires_tested_measure() -> None:
+    assert "Streak check:" not in report.render_text(cases()["too_few_days"])
+
+
+def test_fixed_sentence_wraps_at_last_space() -> None:
+    sentence = report.F5["real_drop"]
+    text = report.render_text(example_record())
+    lines = text.splitlines()
+    start = lines.index("RESULT: REAL DROP") + 1
+    first, rest = lines[start : start + 2]
+    assert first == sentence[: sentence.rfind(" ", 0, 101)]
+    assert first + " " + rest == sentence
+
+
+@pytest.mark.parametrize("finding", ["real_drop", "no_drop", "cannot_tell", "too_few_days"])
+def test_streak_veto_rows_keep_stored_findings(finding: str) -> None:
+    data = sample()
+    rows = tuple(
+        replace(r, reasoning=10 if r.when.month == 4 and r.when.day < 26 else 20)
+        for r in data.responses
+    )
+    source = table(replace(data, responses=rows))
+    share = source.measures[1]
+    before_days = tuple(
+        d.model_copy(update={"value": f"{i % 2 if finding == 'cannot_tell' else 0}/1"})
+        for i, d in enumerate(share.before_days)
+    )
+    after_days = tuple(
+        d.model_copy(
+            update={
+                "value": f"{i % 2 if finding == 'cannot_tell' else int(finding == 'real_drop')}/1"
+            }
+        )
+        for i, d in enumerate(share.after_days)
+    )
+    share = replace(
+        share,
+        before_days=before_days,
+        after_days=after_days[:4] if finding == "too_few_days" else after_days,
+    )
+    source = replace(source, measures=(source.measures[0], share, source.measures[2]))
+    tool = decide_tool(source, data.counters)
+    assert tool.measures[1].finding == finding
+    decision = record((tool,))
+    before = decision.model_dump_json()
+    for render in (report.render_text, report.render_markdown, render_html):
+        output = render(decision)
+        assert output.count("not used") == (1 if finding == "too_few_days" else 2)
+        assert "days come in streaks" in output
+        if finding == "too_few_days":
+            assert "too few days" in output
+    assert decision.model_dump_json() == before

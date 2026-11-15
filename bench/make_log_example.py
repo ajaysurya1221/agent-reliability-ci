@@ -1,7 +1,9 @@
 """Generate small synthetic histories; seed 7 was chosen for REAL DROP / NO DROP.
 
 Claude Code has a planted 45% reasoning-count drop in the final 14 of 56 days;
-Codex is unchanged. There are 21 main-thread replies per day (about 24),
+Codex is unchanged. Each day has three zero counts, two Codex counts at
+500, and ten Claude Code edit results, one failed, in both periods.
+There are 20 main-thread replies per day,
 keeping the uncompressed files below 400 KB. This illustrative seed was selected
 for those two results, not as statistical calibration evidence. No private session data are used.
 """
@@ -24,13 +26,13 @@ def generate() -> dict[str, bytes]:
         {
             "type": "session_meta",
             "payload": {
-                "id": "example",
+                "id": "x",
                 "cwd": "/example",
                 "cli_version": "1",
                 "filler": "synthetic",
             },
         },
-        {"type": "turn_context", "payload": {"model": "codex-example-1", "effort": "high"}},
+        {"type": "turn_context", "payload": {"model": "x", "effort": "high"}},
     ]
     sub: list[dict[str, object]] = [
         {"type": "session_meta", "payload": {"id": "sub", "thread_source": "subagent"}},
@@ -39,32 +41,43 @@ def generate() -> dict[str, bytes]:
     start = datetime(2026, 9, 20, 12, tzinfo=UTC)
     for day in range(56):
         base = rng.randrange(900, 1101)
-        for response in range(21):
-            stamp = (
-                (start + timedelta(days=day, minutes=response)).isoformat().replace("+00:00", "Z")
-            )
+        for response in range(20):
+            stamp = (start + timedelta(days=day, minutes=response)).strftime("%Y%m%dT%H%MZ")
             count = base + rng.randrange(-40, 41)
-            identity = str(day * 21 + response)
+            if response < 3:
+                count = 0
+            identity = str(day * 20 + response)
             message: dict[str, object] = {
                 "id": identity,
-                "model": "claude-example-1",
+                "model": "x",
                 "usage": {
                     "output_tokens_details": {
                         "thinking_tokens": count * 55 // 100 if day >= 42 else count
                     }
                 },
             }
-            if response == 0 and day % 7 == 0:
-                message["content"] = [{"type": "tool_use", "id": identity, "name": "Edit"}]
+            if response == 0:
+                message["content"] = [
+                    {"type": "tool_use", "id": str(i), "name": "Edit"} for i in range(10)
+                ]
             claude.append(
                 {"type": "assistant", "timestamp": stamp, "effort": "high", "message": message}
             )
-            if response == 0 and day % 7 == 0:
+            if response == 0:
                 claude.append(
                     {
                         "type": "user",
                         "timestamp": stamp,
-                        "message": {"content": [{"type": "tool_result", "tool_use_id": identity}]},
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": str(i),
+                                    **({"is_error": True} if i == 0 else {}),
+                                }
+                                for i in range(10)
+                            ]
+                        },
                     }
                 )
             event: dict[str, object] = {
@@ -72,7 +85,11 @@ def generate() -> dict[str, bytes]:
                 "timestamp": stamp,
                 "payload": {
                     "type": "token_count",
-                    "info": {"last_token_usage": {"reasoning_output_tokens": count}},
+                    "info": {
+                        "last_token_usage": {
+                            "reasoning_output_tokens": 500 if response in (3, 4) else count
+                        }
+                    },
                 },
             }
             codex.append(event)
@@ -88,7 +105,7 @@ def generate() -> dict[str, bytes]:
                     "filler": "synthetic",
                     "message": {
                         "id": f"sub-{day}",
-                        "model": "claude-example-1",
+                        "model": "x",
                         "usage": {"output_tokens_details": {"thinking_tokens": 100}},
                     },
                 }

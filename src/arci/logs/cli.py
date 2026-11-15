@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import os
 import re
@@ -18,6 +17,7 @@ from arci import __version__
 
 from . import claude_code, codex, discover, measures, report
 from .decide import decide_tool, error_tool, exit_code
+from .html import render_html
 from .records import Tool
 from .schema import LogsDecision, ToolDecision, seal
 
@@ -73,14 +73,6 @@ def _execute(
             since = date.fromisoformat(args.since)
         except ValueError:
             raise _UsageError(report.SINCE_DATE) from None
-    html_renderer = None
-    if args.html is not None:
-        try:
-            html_renderer = importlib.import_module("arci.logs.html").render_html
-        except ModuleNotFoundError as error:
-            if error.name != "arci.logs.html":
-                raise
-            raise _UsageError(report.HTML_UNAVAILABLE) from None
     instant = datetime.now().astimezone() if now is None else now
     if args.example:
         from .example import load
@@ -131,6 +123,7 @@ def _execute(
             if not paths
             else "read_error"
             if not counts.files_read
+            or counts.files_unreadable == len(paths) - counts.files_unread_compressed
             else "format_not_recognised"
             if not result.responses
             and not (counts.responses_without_setting or counts.files_outside_project)
@@ -169,8 +162,7 @@ def _execute(
     if args.markdown is not None:
         outputs.append((args.markdown, report.render_markdown(decision)))
     if args.html is not None:
-        assert html_renderer is not None
-        outputs.append((args.html, cast(str, html_renderer(decision))))
+        outputs.append((args.html, render_html(decision)))
     text = report.render_text(decision)
     for path, content in outputs:
         try:

@@ -1,11 +1,9 @@
 """CLI integration on generated logs only; every error stays private."""
 
-import importlib
 import io
 import json
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
@@ -98,46 +96,20 @@ def test_outputs_and_override_dirs(tmp_path: Path) -> None:
     assert "CANARY" not in out + err + json_path.read_text() + md.read_text()
 
 
-@pytest.mark.parametrize("option", ["--json", "--markdown"])
+@pytest.mark.parametrize("option", ["--json", "--markdown", "--html"])
 def test_unwritable_output(tmp_path: Path, option: str) -> None:
     code, out, err = invoke(tmp_path, ["--example", option, str(tmp_path / "CANARY" / "a")])
     assert (code, out, err) == (3, "", report.WRITE_ERROR + "\n")
 
 
-def test_missing_html(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    original = importlib.import_module
+def test_html_output(tmp_path: Path) -> None:
+    from arci.logs.html import render_html
 
-    def missing(name: str) -> ModuleType:
-        if name == "arci.logs.html":
-            raise ModuleNotFoundError("CANARY", name=name)
-        return original(name)
-
-    monkeypatch.setattr(cli.importlib, "import_module", missing)
-    assert invoke(tmp_path, ["--example", "--html", str(tmp_path / "CANARY")]) == (
-        3,
-        "",
-        report.HTML_UNAVAILABLE + "\n",
-    )
-
-
-def test_html_callback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    module = ModuleType("arci.logs.html")
-    seen: list[LogsDecision] = []
-
-    def render_html(decision: LogsDecision) -> str:
-        seen.append(decision)
-        return "<html>Example data, generated.</html>\n"
-
-    monkeypatch.setattr(module, "render_html", render_html, raising=False)
-
-    def module_for(name: str) -> ModuleType:
-        return module
-
-    monkeypatch.setattr(cli.importlib, "import_module", module_for)
-    target = tmp_path / "page.html"
-    code, _, err = invoke(tmp_path, ["--example", "--html", str(target)])
-    assert code == 1 and not err and len(seen) == 1 and verify_seal(seen[0])
-    assert target.read_text() == render_html(seen[0])
+    target, record = tmp_path / "page.html", tmp_path / "record.json"
+    code, _, err = invoke(tmp_path, ["--example", "--html", str(target), "--json", str(record)])
+    decision = LogsDecision.model_validate_json(record.read_text())
+    assert code == 1 and not err and verify_seal(decision)
+    assert target.read_text() == render_html(decision)
 
 
 def test_synthetic_canaries_project_and_auto(tmp_path: Path) -> None:
@@ -259,3 +231,14 @@ def test_missing_context_is_a_dash(tmp_path: Path) -> None:
     code, out, err = invoke(tmp_path, ["--example", "--since", "2026-11-15"])
     assert code == 2 and not err
     assert "-> -" in out and "-%" not in out
+
+
+@pytest.mark.parametrize("args", [["--unknown"], ["--tool", "invalid"], ["--model"]])
+def test_usage_error_is_one_fixed_line_and_writes_nothing(tmp_path: Path, args: list[str]) -> None:
+    target = tmp_path / "record.json"
+    assert invoke(tmp_path, ["--example", "--json", str(target), *args]) == (
+        3,
+        "",
+        "Usage error. Run: realornoise --help\n",
+    )
+    assert not target.exists()

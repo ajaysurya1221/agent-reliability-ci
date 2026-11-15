@@ -4,9 +4,9 @@ Example data, generated. Not anyone's logs.
 
 measure, median day           | before (days) | after (days) | change  | finding
 ----------------------------- | ------------- | ------------ | ------- | -----------------------
-reasoning tokens per response | 973 (42)      | 553 (14)     | -43%    | real drop
-responses with no reasoning   | 0.0% (42)     | 0.0% (14)    | 0.0 pts | no drop (margin 10 pts)
-file edits that failed        | - (0)         | - (0)        | -       | too few days
+reasoning tokens per response | 986 (42)      | 529 (14)     | -46%    | real drop
+responses with no reasoning   | 15.0% (42)    | 15.0% (14)   | 0.0 pts | no drop (margin 10 pts)
+file edits that failed        | 10.0% (42)    | 10.0% (14)   | 0.0 pts | no drop (margin 3 pts)
 
 split 2026-11-01 · client versions 1 before, 1 after, 1 in both · working directories 1 before, 1
 after · sub-agent share 0.7% -> 0.7%
@@ -18,15 +18,15 @@ Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one co
 unchecked assumptions (days in the window interchangeable; no date, model, effort or project chosen
 from these logs; a uniform shift the measure can take; the same days, setting, reference value and
 earlier-day values in use). Repeated checking until a result appears is not covered. arci-logs/1,
-digest 8cd5138e436d. Yours: uvx realornoise
+digest 5737f3d6ed96. Yours: uvx realornoise
 
 **Codex · model-1 · effort high · main thread · days at UTC+00:00 · NO DROP**
 
 measure, median day             | before (days) | after (days) | change  | finding
 ------------------------------- | ------------- | ------------ | ------- | -----------------------
-reasoning tokens per response   | 973 (42)      | 1005 (14)    | +3%     | no drop (margin 25%)
-responses with no reasoning     | 0.0% (42)     | 0.0% (14)    | 0.0 pts | no drop (margin 10 pts)
-reasoning at one repeated value | 0.0% (42)     | 0.0% (14)    | 0.0 pts | no drop (margin 10 pts)
+reasoning tokens per response   | 984 (42)      | 962 (14)     | -2%     | no drop (margin 25%)
+responses with no reasoning     | 15.0% (42)    | 15.0% (14)   | 0.0 pts | no drop (margin 10 pts)
+reasoning at one repeated value | 11.8% (42)    | 11.8% (14)   | 0.0 pts | no drop (margin 10 pts)
 
 split 2026-11-01 · client versions 2 before, 2 after, 2 in both · working directories 2 before, 2
 after · sub-agent share 0.7% -> 0.7%
@@ -38,4 +38,4 @@ Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one co
 unchecked assumptions (days in the window interchangeable; no date, model, effort or project chosen
 from these logs; a uniform shift the measure can take; the same days, setting, reference value and
 earlier-day values in use). Repeated checking until a result appears is not covered. arci-logs/1,
-digest 0050fa25659c. Yours: uvx realornoise
+digest c0b6d7c8c0d6. Yours: uvx realornoise

@@ -137,8 +137,9 @@ def test_bad_lines_missing_fields_future_and_files(tmp_path: Path) -> None:
     invalid.write_bytes(b"\xff\xfe\n")
     actual = read([path, invalid, tmp_path / "CANARY-missing"], project=None, now=NOW)
     assert len(actual.responses) == 1
-    assert actual.counters.files_read == 1
+    assert actual.counters.files_read == 2
     assert actual.counters.files_unreadable == 2
+    assert actual.counters.lines == 15
     assert actual.counters.lines_not_json == 5
     assert actual.counters.lines_unknown_type == 2
     assert actual.counters.lines_lacking_field == 2

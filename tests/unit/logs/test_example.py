@@ -22,7 +22,17 @@ def test_generated_bytes_and_result() -> None:
     for tool in decision.tools:
         assert len(tool.measures[0].before_days) == 42
         assert len(tool.measures[0].after_days) == 14
-        assert all(day.count == 21 for day in tool.measures[0].before_days)
+        assert all(day.count == 17 for day in tool.measures[0].before_days)
+        for measure in tool.measures:
+            assert len(measure.before_days) == 42
+            assert len(measure.after_days) == 14
+            assert measure.finding != "too_few_days"
+        assert tool.measures[1].median_before == tool.measures[1].median_after == "3/20"
+        if tool.tool == "claude-code":
+            assert tool.measures[2].median_before == tool.measures[2].median_after == "1/10"
+            assert all(day.count >= 10 for day in tool.measures[2].before_days)
+        else:
+            assert tool.measures[2].median_before == tool.measures[2].median_after == "2/17"
     assert render_model("claude-example-1") is None
     assert render_model("codex-example-1") is None
     a, b, instant = load()

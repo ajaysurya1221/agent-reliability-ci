@@ -9,6 +9,18 @@ from arci.outcome_report import escape_terminal
 
 from .schema import LogsDecision, MeasureDecision, ToolDecision
 
+__all__ = [
+    "context_text",
+    "format_number",
+    "format_scope",
+    "measure_row",
+    "notices",
+    "reason_text",
+    "render_markdown",
+    "render_text",
+    "wrap_text",
+]
+
 F1 = (
     "realornoise {version} · reads local session logs · sends nothing · writes nothing unless asked"
 )
@@ -52,9 +64,8 @@ SINCE_DATE = "--since needs a date as YYYY-MM-DD."
 SINCE_EARLY = "--since can be at most 83 days before the newest day in the logs."
 WRITE_ERROR = "Requested output could not be written."
 CALENDAR_RANGE = "Comparison dates are outside the supported calendar range."
-USAGE_ERROR = "Invalid command line."
+USAGE_ERROR = "Usage error. Run: realornoise --help"
 INTERNAL_ERROR = "Internal error."
-HTML_UNAVAILABLE = "--html is not available in this build."
 F6_HEADERS = ("measure, median day", "before (days)", "after (days)", "change", "finding")
 F6_NAMES = {
     "reasoning_tokens": "reasoning tokens per response",
@@ -75,7 +86,8 @@ F7 = (
     "{d} before, {e} after · sub-agent share {f}% -> {g}%"
 )
 F8 = "Streak check: {k} of {K} tested measures were not flagged."
-F9 = "{k} compressed Codex files were not read (Python 3.14 is needed); the result uses the rest."
+F9 = "Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest."
+F9_NEXT = "To read them: uvx --python 3.14 realornoise"
 F10 = (
     "This shows what your logs recorded. It does not establish answer quality, "
     "a cause, or a change\n"
@@ -100,10 +112,10 @@ F12 = (
     "arci verdict, arci run"
 )
 F13 = "Example data, generated. Not anyone's logs."
-F14 = "Not compared: {k} other model or effort settings."
-F15 = "{k} lines lacked a needed field and were left out."
-F16 = "{k} records stamped later than now were left out."
-F17 = "{k} files could not be read; the result uses the rest."
+F14 = "Other model or effort settings, not compared: {k}."
+F15 = "Lines that lacked a needed field, left out: {k}."
+F16 = "Records stamped later than now, left out: {k}."
+F17 = "Files that could not be read: {k}. The result uses the rest."
 MD_CLOSING = {
     "REAL_DROP": (
         "One person's logs. Evidence of movement toward worse in a recorded "
@@ -133,7 +145,7 @@ FLAGS = {"claude-code": "--claude-dir", "codex": "--codex-dir"}
 MARGINS = {"1/4": "25%", "1/10": "10 pts", "3/100": "3 pts"}
 
 
-def _wrap(value: str) -> str:
+def wrap_text(value: str) -> str:
     return "\n".join(
         textwrap.fill(line, width=100, break_long_words=True, break_on_hyphens=False)
         if len(line) > 100
@@ -142,7 +154,7 @@ def _wrap(value: str) -> str:
     )
 
 
-def _number(value: Fraction, decimals: int = 0, *, signed: bool = False) -> str:
+def format_number(value: Fraction, decimals: int = 0, *, signed: bool = False) -> str:
     scale = 10**decimals
     number = (abs(value).numerator * scale * 2 + abs(value).denominator) // (
         2 * abs(value).denominator
@@ -153,10 +165,10 @@ def _number(value: Fraction, decimals: int = 0, *, signed: bool = False) -> str:
 
 
 def _percent(value: str | None) -> str:
-    return "-" if value is None else _number(Fraction(value) * 100, 1)
+    return "-" if value is None else format_number(Fraction(value) * 100, 1)
 
 
-def _scope(tool: ToolDecision, decision: LogsDecision) -> str:
+def format_scope(tool: ToolDecision, decision: LogsDecision) -> str:
     minutes = decision.utc_offset_minutes
     offset = f"{'+' if minutes >= 0 else '-'}{abs(minutes) // 60:02}:{abs(minutes) % 60:02}"
     return F2.format(
@@ -167,13 +179,16 @@ def _scope(tool: ToolDecision, decision: LogsDecision) -> str:
     )
 
 
-def _reason(tool: ToolDecision) -> str:
+def reason_text(tool: ToolDecision) -> str:
     return F5[tool.reason].format(
         Tool=TOOL_NAMES[tool.tool], default=DEFAULTS[tool.tool], flag=FLAGS[tool.tool]
     )
 
 
-def _row(measure: MeasureDecision) -> tuple[str, ...]:
+F6_NOT_USED = "not used"
+
+
+def measure_row(measure: MeasureDecision, *, streaky_days: bool = False) -> tuple[str, ...]:
     tokens = measure.id == "reasoning_tokens"
     cells: list[str] = [F6_NAMES[measure.id]]
     for value, days in (
@@ -183,22 +198,33 @@ def _row(measure: MeasureDecision) -> tuple[str, ...]:
         rendered = (
             "-"
             if value is None
-            else (_number(Fraction(value)) if tokens else _percent(value) + "%")
+            else (format_number(Fraction(value)) if tokens else _percent(value) + "%")
         )
         cells.append(f"{rendered} ({len(days)})")
     change = "-"
     if measure.median_before is not None and measure.median_after is not None:
         before, after = Fraction(measure.median_before), Fraction(measure.median_after)
         if tokens and before:
-            change = _number((after - before) * 100 / before, signed=True) + "%"
+            change = format_number((after - before) * 100 / before, signed=True) + "%"
         elif not tokens:
-            change = _number((after - before) * 100, 1, signed=True) + " pts"
-    cells.extend((change, F6_FINDINGS[measure.finding].format(margin=MARGINS[measure.margin])))
+            change = format_number((after - before) * 100, 1, signed=True) + " pts"
+    finding = (
+        F6_NOT_USED
+        if streaky_days and measure.finding not in {"streaky", "too_few_days"}
+        else F6_FINDINGS[measure.finding].format(margin=MARGINS[measure.margin])
+    )
+    cells.extend((change, finding))
     return tuple(cells)
 
 
 def _table(tool: ToolDecision, *, markdown: bool = False) -> str:
-    rows = [F6_HEADERS, *(_row(measure) for measure in tool.measures)]
+    rows = [
+        F6_HEADERS,
+        *(
+            measure_row(measure, streaky_days=tool.reason == "streaky_days")
+            for measure in tool.measures
+        ),
+    ]
     widths = [max(len(row[i]) for row in rows) for i in range(5)]
     if markdown:
         # Omit optional edge pipes; ordinary rows fit with aligned columns.
@@ -232,7 +258,7 @@ def _table(tool: ToolDecision, *, markdown: bool = False) -> str:
     return "\n".join(lines)
 
 
-def _context(tool: ToolDecision) -> str:
+def context_text(tool: ToolDecision) -> str:
     c = tool.context
     assert c is not None
     return F7.format(
@@ -246,13 +272,14 @@ def _context(tool: ToolDecision) -> str:
     ).replace("-%", "-")
 
 
-def _notices(tool: ToolDecision) -> list[str]:
+def notices(tool: ToolDecision) -> list[str]:
     c = tool.counters
     return [
         template.format(k=count)
         for template, count in (
             (F14, tool.other_settings),
             (F9, c.files_unread_compressed),
+            (F9_NEXT, c.files_unread_compressed),
             (F15, c.lines_lacking_field),
             (F16, c.records_in_future),
             (F17, c.files_unreadable),
@@ -265,14 +292,14 @@ def render_text(decision: LogsDecision) -> str:
     header = F1.format(version=escape_terminal(decision.arci_version))
     groups = [header + ("\n" + F13 if decision.example else "")]
     for tool in decision.tools:
-        result = F4[tool.result] + "\n" + _reason(tool)
+        result = F4[tool.result] + "\n" + reason_text(tool)
         if tool.model is None:
             groups.append(
                 "\n".join(
                     [
                         TOOL_NAMES[tool.tool],
                         result,
-                        *(_notices(tool) if tool.result != "ERROR" else []),
+                        *(notices(tool) if tool.result != "ERROR" else []),
                     ]
                 )
             )
@@ -284,18 +311,26 @@ def render_text(decision: LogsDecision) -> str:
             if tool.after
             else F3_EMPTY.format(s=tool.split_date)
         )
-        groups.extend(["\n".join([_scope(tool, decision), *periods]), result, _table(tool)])
+        groups.extend(["\n".join([format_scope(tool, decision), *periods]), result, _table(tool)])
         tested = [m for m in tool.measures if m.p_streak is not None]
         groups.append(
             "\n".join(
                 [
                     F7_HEADER,
-                    _context(tool),
-                    F8.format(
-                        k=sum(Fraction(m.p_streak or "0") > Fraction(1, 10) for m in tested),
-                        K=len(tested),
+                    context_text(tool),
+                    *(
+                        [
+                            F8.format(
+                                k=sum(
+                                    Fraction(m.p_streak or "0") > Fraction(1, 10) for m in tested
+                                ),
+                                K=len(tested),
+                            )
+                        ]
+                        if tested
+                        else []
                     ),
-                    *_notices(tool),
+                    *notices(tool),
                     F11.format(digest=(tool.day_table_sha256 or "")[:12]),
                 ]
             )
@@ -303,23 +338,25 @@ def render_text(decision: LogsDecision) -> str:
     if any(tool.result != "ERROR" for tool in decision.tools):
         groups.append(F10)
     groups.append(F12 + "\n" + EXIT.format(code=decision.exit_code))
-    return _wrap("\n\n".join(groups)) + "\n"
+    return wrap_text("\n\n".join(groups)) + "\n"
 
 
 def render_markdown(decision: LogsDecision) -> str:
     blocks: list[str] = [F13] if decision.example else []
     for tool in decision.tools:
         if tool.model is None:
-            block = "\n".join([TOOL_NAMES[tool.tool], tool.result.replace("_", " "), _reason(tool)])
+            block = "\n".join(
+                [TOOL_NAMES[tool.tool], tool.result.replace("_", " "), reason_text(tool)]
+            )
             if tool.result != "ERROR":
-                block += "\n" + "\n".join([*_notices(tool), F10])
+                block += "\n" + "\n".join([*notices(tool), F10])
         else:
             block = "\n\n".join(
                 [
-                    f"**{_scope(tool, decision)} · {tool.result.replace('_', ' ')}**",
+                    f"**{format_scope(tool, decision)} · {tool.result.replace('_', ' ')}**",
                     _table(tool, markdown=True),
-                    f"split {tool.split_date} · {_context(tool)}",
-                    *(_notices(tool)),
+                    f"split {tool.split_date} · {context_text(tool)}",
+                    *(notices(tool)),
                     MD_CLOSING[tool.result],
                     MD_LIMITS.format(digest=(tool.day_table_sha256 or "")[:12]),
                 ]
@@ -327,4 +364,4 @@ def render_markdown(decision: LogsDecision) -> str:
         blocks.append(block)
     # Markdown table rows must stay intact. Their compact representation fits normal
     # counts; prose uses ordinary soft line breaks.
-    return "\n\n".join(_wrap(block) for block in blocks) + "\n"
+    return "\n\n".join(wrap_text(block) for block in blocks) + "\n"

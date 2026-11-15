@@ -52,7 +52,7 @@ def test_errors_and_exit_mapping(reason: str) -> None:
         assert exit_code([decide_tool(table(data), data.counters), err]) == expected
 
 
-def test_streak_does_not_veto_another_real_drop() -> None:
+def test_streak_vetoes_another_real_drop() -> None:
     data = sample()
     # Tokens have two long runs before the split. Zeros have constant before-days.
     rows = tuple(
@@ -74,7 +74,8 @@ def test_streak_does_not_veto_another_real_drop() -> None:
     decision = decide_tool(table(replace(data, responses=rows)), data.counters)
     assert decision.measures[0].finding == "streaky"
     assert decision.measures[1].finding == "real_drop"
-    assert decision.result == "REAL_DROP"
+    assert (decision.result, decision.reason) == ("CANNOT_TELL", "streaky_days")
+    assert exit_code([decision]) == 2
     # Same streak, zero share unchanged: prevents NO DROP.
     rows = tuple(
         replace(r, reasoning=10 if r.when.month == 4 and r.when.day < 26 else 20)

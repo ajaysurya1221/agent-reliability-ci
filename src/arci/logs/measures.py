@@ -27,6 +27,17 @@ class UsageError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class WindowReadResult(ReadResult):
+    """Retain the window anchor even when a response has no usable setting.
+
+    Readers keep only an in-project, non-future main-thread timestamp here;
+    unconfigured responses stay out of the response count and selected day values.
+    """
+
+    latest_main_response: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class MeasureTable:
     id: MeasureId
     before_days: tuple[DayValue, ...]
@@ -98,7 +109,10 @@ def build(
             for r in result.responses
             if r.in_project and r.when.tzinfo is not None and r.when <= now
         ]
-        newest = max((day for day, r in responses if r.main_thread), default=None)
+        main_days = [day for day, r in responses if r.main_thread]
+        if isinstance(result, WindowReadResult) and result.latest_main_response is not None:
+            main_days.append(result.latest_main_response.astimezone(zone).date())
+        newest = max(main_days, default=None)
         split = (
             since
             if since is not None

@@ -1,10 +1,11 @@
 Claude Code
 CANNOT TELL
 No model and effort setting has a response in the window.
-2 compressed Codex files were not read (Python 3.14 is needed); the result uses the rest.
-3 lines lacked a needed field and were left out.
-4 records stamped later than now were left out.
-1 files could not be read; the result uses the rest.
+Compressed Codex files not read (Python 3.14 is needed): 2. The result uses the rest.
+To read them: uvx --python 3.14 realornoise
+Lines that lacked a needed field, left out: 3.
+Records stamped later than now, left out: 4.
+Files that could not be read: 1. The result uses the rest.
 This shows what your logs recorded. It does not establish answer quality, a cause, or a change
 to the model: your tasks, prompts, projects or client version may have changed.
 For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the
