@@ -133,9 +133,13 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    else from the logs.
 
 8. **The second distribution.** `packages/realornoise/` builds a wheel that depends on
-   `agent-reliability-ci==<same version>`, declares `requires-python >=3.14`, and provides
-   the console script `realornoise = "arci.logs.cli:main"`. It carries no code of its own. The
-   release workflow builds, smoke-tests and publishes both, the main package first.
+   `agent-reliability-ci==<same version>`, declares the same `requires-python` as the main
+   package (3.11 onward), and provides the console script
+   `realornoise = "arci.logs.cli:main"`. It carries no code of its own. The release workflow
+   builds, smoke-tests and publishes both, the main package first. It does not require
+   Python 3.14: `uvx` does not choose an interpreter from a tool's `requires-python`
+   (measured: with a default of 3.13 it stops with an unsatisfiable-requirements error), and
+   a first run that fails is worse than a first run that reports unread compressed files.
 
 9. **Plugin and skill.** `plugins/realornoise/` (Claude Code) and
    `integrations/codex/skills/realornoise/` (Codex) each run the command and show its output
@@ -237,6 +241,7 @@ a value that is not available as `-`. Rendered numbers decide nothing.
 - **F8 streak check:** `Streak check: {k} of {K} tested measures were not flagged.` (`K` measures with
   enough days, `k` of them with `p_streak > 1/10`); left out when `K` is 0
 - **F9 unread:** `Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest.`
+  then, on its own line, `To read them: uvx --python 3.14 realornoise`
 - **F10 limits (every tool with REAL DROP, NO DROP or CANNOT TELL):**
   `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`
   `to the model: your tasks, prompts, projects or client version may have changed.`

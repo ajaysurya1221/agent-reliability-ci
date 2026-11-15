@@ -940,16 +940,20 @@ def _expect_measures(
 
 
 def _expect_result(measures: Sequence[Mapping[str, Any]]) -> tuple[str, str]:
-    """Contract, "Result for a tool, in this order", steps 3 to 7."""
+    """Contract, "Result for a tool, in this order", steps 3 to 8.
+
+    One streaky measure stops the whole comparison: `streaky_days` is decided before REAL DROP
+    and NO DROP, and the other measures keep the findings their own tests gave.
+    """
     findings = [measure["finding"] for measure in measures]
     if all(finding == "too_few_days" for finding in findings):
         return "CANNOT_TELL", "too_few_days"
+    if "streaky" in findings:
+        return "CANNOT_TELL", "streaky_days"
     if "real_drop" in findings:
         return "REAL_DROP", "real_drop"
     if all(finding == "no_drop" for finding in findings):
         return "NO_DROP", "no_drop"
-    if "streaky" in findings:
-        return "CANNOT_TELL", "streaky_days"
     return "CANNOT_TELL", "not_enough_evidence"
 
 
@@ -1003,19 +1007,18 @@ def _says(text: str, sentence: str) -> None:
     assert _flat(sentence) in _flat(text), sentence
 
 
-def _wrapped(sentence: str, bound: int) -> list[str]:
-    """The sentence broken at the last space at or before `bound`.
+def _wrapped(sentence: str) -> list[str]:
+    """The sentence broken as the text output breaks it.
 
-    Record 0016, "Fixed texts": "A fixed sentence longer than 100 characters is broken at the
-    last space at or before column 100, and so on for the rest." Column 100 is index 99, so a
-    break there leaves a line of 99 characters; `bound` 101 is the reading that allows a full
-    100-character line. The two differ only when a space sits at exactly index 100, so `_block`
-    accepts either.
+    Record 0016, "Fixed texts": "a fixed sentence longer than 100 characters is broken at the
+    last space that leaves the line at most 100 characters long, and so on for the rest (a line
+    of exactly 100 characters is allowed)". The Markdown and HTML outputs have no line limit,
+    so this applies to the terminal text only.
     """
     lines: list[str] = []
     rest = sentence
     while len(rest) > 100:
-        cut = rest.rfind(" ", 0, bound)
+        cut = rest.rfind(" ", 0, 101)
         lines.append(rest[:cut])
         rest = rest[cut + 1 :]
     lines.append(rest)
@@ -1024,15 +1027,8 @@ def _wrapped(sentence: str, bound: int) -> list[str]:
 
 def _block(outcome: Outcome, *sentences: str) -> None:
     """Each sentence appears as its own run of consecutive output lines, broken by the rule."""
-    lines = outcome.lines
     for sentence in sentences:
-        wanted = [_wrapped(sentence, 100), _wrapped(sentence, 101)]
-        found = any(
-            lines[start : start + len(want)] == want
-            for want in wanted
-            for start in range(len(lines) + 1 - len(want))
-        )
-        assert found, wanted[0]
+        _run_of(outcome, _wrapped(sentence))
 
 
 def _run_of(outcome: Outcome, wanted: Sequence[str]) -> None:

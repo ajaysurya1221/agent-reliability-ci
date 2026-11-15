@@ -210,3 +210,14 @@ comparison in five is stopped at 42 before-days. The self-check prints all three
 (no check, per measure, as built) so the choice can be judged from the numbers, and the
 measured rates are published with their conditions. They are not expected to reach 2.5% at
 the smallest sizes; the contract says so.
+
+## D-16: `realornoise` runs on Python 3.11 onward (2026-11-15)
+
+The plan gave the second distribution `requires-python >=3.14` so that `uvx realornoise`
+would run on a Python that reads compressed Codex logs. Measured with the built wheels and
+uv 0.12.5: `uvx` uses its default interpreter and does not look at the tool's
+`requires-python`; with a default of 3.13 the command fails before it starts. The second
+distribution therefore takes the main package's range. On Python older than 3.14 the tool
+counts the compressed Codex files it could not read and prints the command that reads them
+(`uvx --python 3.14 realornoise`). No dependency is added for decompression (rule 4 of
+`AGENTS.md`).
