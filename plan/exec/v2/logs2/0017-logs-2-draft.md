@@ -796,7 +796,8 @@ conditional on passing the check); the proportion is the decimal after `= ` in t
 `{worst_before}` are the two numbers of that row's `after/before` cell; if several rows share
 the largest proportion, the first in file order gives them. The value printed for `{rate_max}`
 is the proportion times 100, in decimal, without trailing zeros and without a trailing point
-(a proportion of `0.181000` prints as `18.1`, of `0.035500` as `3.55`). The `%` sign belongs to
+(a proportion of `0.181000` prints as `18.1`, of `0.035500` as `3.55`, of `0.000000` as `0`).
+The two day counts print as plain whole numbers with no leading zero. The `%` sign belongs to
 the text. A test reads the self-check file, applies this rule, and holds the three values
 equal to the constants `RATE_MAX`, `RATE_MAX_AFTER` and `RATE_MAX_BEFORE` in the code, in F10
 and in the footer.
