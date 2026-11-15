@@ -1,0 +1,14 @@
+{
+  "name": "agent-reliability-ci",
+  "description": "Tools from agent-reliability-ci: did your agent get worse? Real, noise, or cannot tell.",
+  "owner": {
+    "name": "Ajay Surya Senthilrajan"
+  },
+  "plugins": [
+    {
+      "name": "realornoise",
+      "source": "./plugins/realornoise",
+      "description": "Did your coding agent get worse? Runs realornoise on your local session logs and shows its output unchanged."
+    }
+  ]
+}
