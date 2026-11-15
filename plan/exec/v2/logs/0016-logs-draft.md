@@ -227,7 +227,7 @@ a value that is not available as `-`. Rendered numbers decide nothing.
 - **F10 limits (every tool with REAL DROP, NO DROP or CANNOT TELL):**
   `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`
   `to the model: your tasks, prompts, projects or client version may have changed.`
-  `For this tool and this one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the`
+  `For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the`
   `time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5% of the`
   `time. Both hold only if: (1) the days in this window are interchangeable when nothing changes;`
   `(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change`
@@ -261,6 +261,50 @@ With no selected setting (`no_usable_setting`), every output form shows the tool
 result and the fixed reason, then the reader notices that apply and F10. The scope parts that
 are not available, the period lines, the measure table, the context counts and the digest are
 left out; no digest is made up.
+
+## Command line and layout
+
+```
+arci logs [--tool auto|claude-code|codex|both] [--since YYYY-MM-DD] [--model NAME]
+          [--effort NAME] [--project PATH] [--claude-dir DIR] [--codex-dir DIR] [--utc]
+          [--markdown FILE] [--html FILE] [--json FILE] [--example]
+realornoise [the same options]
+```
+
+- `--tool auto` (the default) requests each tool whose log root exists; when neither exists
+  both are requested, so both report `no_logs` and the exit code is 3. `both` requests both.
+- `--model` and `--effort` take rendered names (as the output shows them).
+- `--example` ignores the directory options, reads the packaged synthetic logs with a fixed
+  "now" stored beside them, and prints F13 as the second line of the text output, in the
+  Markdown block and on the HTML page. The packaged example gives REAL DROP for Claude Code
+  and NO DROP for Codex.
+- Unknown options, a malformed value and the usage errors of F5 print one fixed line to
+  standard error and exit 3. Nothing else is written to standard error.
+- `arci.logs.cli.run(argv, *, now=None, env=None, home=None, out=None, err=None) -> int` is
+  the testable entry; `main(argv=None)` calls it with the real clock, environment, home and
+  streams. `arci logs ...` and `realornoise ...` call `main`.
+
+Text output, in this order, with one blank line between groups:
+
+1. F1 (then F13 for `--example`).
+2. For each requested tool, Claude Code first: F2; the two F3 lines; a blank line; F4; the F5
+   reason; a blank line; the F6 table; a blank line; the two F7 lines; F8; then each notice
+   that applies, in the order F14, F9, F15, F16, F17; then F11. For ERROR: the tool name on
+   its own line, F4 and the F5 reason only. For `no_usable_setting`: the tool name, F4, the
+   reason and the notices.
+3. F10, once, when at least one tool has a result other than ERROR. Its third sentence
+   begins `For each tool above and one comparison:`.
+4. F12, then the last line `exit {code}`.
+
+Lines are at most 100 characters. The text is plain ASCII except `·`; no colour, no control
+characters (every rendered name passes through `outcome_report.escape_terminal`).
+
+The Markdown file holds one block per requested tool, separated by a blank line. The JSON
+file holds the sealed `LogsDecision`, UTF-8, keys sorted, two-space indent, a final newline.
+The HTML page holds, per tool, the same information as the text output and one strip chart
+per gating measure (one dot per usable day, a vertical line at the split, the two medians),
+as inline SVG; it has no script, no external reference, and no value that is not in the
+record.
 
 ## Files
 
