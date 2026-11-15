@@ -31,7 +31,7 @@ Inspect. Link the recipe and the statistical contract.
 Before sending: run the recipe's Inspect commands against logs produced by the current
 inspect-ai release, not only the 0.3.289 fixtures.
 
-## 2. Awesome lists (prepared 2026-11-15, not yet opened)
+## 2. Awesome lists (prepared and opened 2026-11-15: pull requests 1191, 319 and 62)
 
 Each is one line on branch `add-arci` of a fork under the maintainer's account, placed in
 alphabetical order, checked with the list's own check where it has one. Not listed in any of
@@ -41,7 +41,7 @@ awesome-mlops 109, awesome-ai-eval 15, so a merge may take weeks or not happen.
 
 ### tensorchord/Awesome-LLMOps
 
-Section `## LLMOps` (table), between App AI Gateway and Arize-Phoenix. Commit `ab2f555`.
+Section `## LLMOps` (table), between App AI Gateway and Arize-Phoenix. Commit `99a71f9` (was `ab2f555`; amended on 15 Nov to add the `Signed-off-by` line the list's DCO check requires).
 
 Title: `Add ARCI to LLMOps`
 
