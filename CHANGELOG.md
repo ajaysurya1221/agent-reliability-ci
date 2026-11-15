@@ -15,6 +15,14 @@
   0.3 s and tool calls of 0.8 s (before: 0.03 s and 0.08 s). On a loaded CI machine the
   gap between one tool call ending and the next starting could pass 0.03 s and fail the
   test with "tool order wait timeout". The released code uses 30 s and was not affected.
+- **Tests:** added `tests/unit/logs/test_format_incidents.py`, guarding the three 2026
+  `ccusage` breakages (a `null` model inside `usage.iterations[]`, a session kept twice
+  once compressed, and a record cut off in the middle of its JSON) against both readers
+  and against an end-to-end `arci logs` run, plus `tests/unit/packaging/test_client_versions.py`.
+- **CI:** a new daily `client-versions` workflow asks npm for the latest Claude Code and
+  Codex CLI versions and compares them with the versions `docs/LOG_FORMATS.md` says the
+  readers were checked against; when either is newer it keeps one open issue up to date
+  asking for the format tests to be run against a session of the new client.
 
 ## v2.3.0 (2026-11-15)
 
