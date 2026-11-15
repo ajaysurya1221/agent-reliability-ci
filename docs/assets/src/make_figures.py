@@ -1,6 +1,6 @@
-"""Generate the README figures: ``docs/assets/{hero,where}-{light,dark}.svg``.
+"""Generate the README figures: ``docs/assets/{hero,where,banner}-{light,dark}.svg``.
 
-Standard library only, deterministic, no network. ``--write`` regenerates the four files;
+Standard library only, deterministic, no network. ``--write`` regenerates the six files;
 ``--check`` regenerates them in memory and exits 1 if a committed file is missing or differs.
 
 The SVGs are plain ``<text>``, ``<rect>`` and ``<path>`` elements: no ``<style>`` blocks, no
@@ -23,11 +23,18 @@ the evidence silently:
 - ``src/arci/schema.py`` (frozen): the four verdicts and their exit codes 0, 1, 2 and 3.
 
 The pipeline figure contains no measured numbers.
+
+The banner figure's 56 dot values are the daily values of the ``reasoning_tokens`` measure for
+the Claude Code tool in the packaged example (what ``arci logs --example --json`` writes under
+``tools[0].measures[0].before_days[*].value`` and ``.after_days[*].value``). They are literal
+tuples below, not read from a file; ``tests/unit/docs/test_figures.py`` checks them against the
+packaged example directly.
 """
 
 from __future__ import annotations
 
 import argparse
+import statistics
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -167,11 +174,42 @@ class Canvas:
         rx: int = 0,
         stroke: str | None = None,
         stroke_width: int = 1,
+        fill_opacity: float | None = None,
     ) -> None:
         extra = f' stroke="{stroke}" stroke-width="{stroke_width}"' if stroke else ""
         radius = f' rx="{rx}"' if rx else ""
+        opacity = f' fill-opacity="{fill_opacity}"' if fill_opacity is not None else ""
         self.body.append(
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}"{radius} fill="{fill}"{extra}/>'
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}"{radius} fill="{fill}"'
+            f"{extra}{opacity}/>"
+        )
+
+    def circle(self, cx: float, cy: float, r: float, fill: str) -> None:
+        self.body.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}"/>')
+
+    def line(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        color: str,
+        *,
+        width: float = 1.5,
+        dasharray: str | None = None,
+        linecap: str | None = None,
+        opacity: float | None = None,
+    ) -> None:
+        extra = ""
+        if dasharray is not None:
+            extra += f' stroke-dasharray="{dasharray}"'
+        if linecap is not None:
+            extra += f' stroke-linecap="{linecap}"'
+        if opacity is not None:
+            extra += f' stroke-opacity="{opacity}"'
+        self.body.append(
+            f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}"'
+            f' stroke-width="{width}"{extra}/>'
         )
 
     def text(
@@ -668,6 +706,197 @@ def _describe(node: Node) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
+# Banner, 1280 x 640
+# ---------------------------------------------------------------------------------------------
+
+BANNER_W, BANNER_H = 1280, 640
+BANNER_TITLE = "Real or noise?"
+BANNER_MARK = "ARCI"
+PILL_TEXT = "$ uvx realornoise"
+
+# The daily values of the `reasoning_tokens` measure for the Claude Code tool in the packaged
+# example: what `arci logs --example --json FILE` writes under
+# `tools[0].measures[0].before_days[*].value` (earlier) and `.after_days[*].value` (recent).
+# `tests/unit/docs/test_figures.py` checks these two tuples against the packaged example.
+BANNER_BEFORE: tuple[int, ...] = (
+    972, 925, 1060, 1047, 1097, 911, 1022, 913, 985, 931,
+    919, 944, 970, 1049, 1054, 987, 905, 980, 1015, 1101,
+    983, 964, 897, 935, 1097, 980, 969, 1060, 1115, 1088,
+    910, 1058, 967, 1054, 1074, 911, 1111, 999, 1006, 1001,
+    993, 914,
+)  # fmt: skip
+BANNER_AFTER: tuple[int, ...] = (
+    535, 500, 491, 543, 518, 552, 497, 595, 534, 530, 527, 521, 559, 495,
+)  # fmt: skip
+BANNER_VALUES: tuple[int, ...] = BANNER_BEFORE + BANNER_AFTER
+BANNER_MEDIAN_BEFORE = statistics.median(BANNER_BEFORE)
+BANNER_MEDIAN_AFTER = statistics.median(BANNER_AFTER)
+
+
+@dataclass(frozen=True)
+class BannerTheme:
+    name: str
+    ground: str
+    band_opacity: float
+    split: str
+    median_before_opacity: float
+    median_after_opacity: float
+    mark: str
+    dot_blue: str
+    dot_orange: str
+    headline_blue: str
+    headline_orange: str
+    headline_muted: str
+    pill_fill: str
+    pill_border: str
+    pill_dollar: str
+    pill_ink: str
+
+
+BANNER_LIGHT = BannerTheme(
+    name="light",
+    ground="#F6F8FA",
+    band_opacity=0.08,
+    split="#8C959F",
+    median_before_opacity=0.5,
+    median_after_opacity=0.55,
+    mark="#57606A",
+    dot_blue="#1F6FEB",
+    dot_orange="#E8590C",
+    headline_blue="#1F6FEB",
+    headline_orange="#D14E0A",
+    headline_muted="#7A838D",
+    pill_fill="#FFFFFF",
+    pill_border="#D0D7DE",
+    pill_dollar="#636C76",
+    pill_ink="#10161D",
+)
+
+BANNER_DARK = BannerTheme(
+    name="dark",
+    ground="#0D1117",
+    band_opacity=0.10,
+    split="#5B6878",
+    median_before_opacity=0.55,
+    median_after_opacity=0.6,
+    mark="#9BA7B4",
+    dot_blue="#6CB6FF",
+    dot_orange="#FF9F45",
+    headline_blue="#6CB6FF",
+    headline_orange="#FF9F45",
+    headline_muted="#8B98A7",
+    pill_fill="#151C26",
+    pill_border="#2A3646",
+    pill_dollar="#8B98A7",
+    pill_ink="#F2F6FA",
+)
+
+
+def _banner_dot_x(index: int) -> float:
+    return round(80 + index * 1120 / 55, 1)
+
+
+def _banner_dot_y(value: float) -> float:
+    return round(122 + (1115 - value) * 0.44, 1)
+
+
+def banner(theme: BannerTheme) -> str:
+    desc = (
+        "Forty-two dots for the earlier days scatter inside one band; after a dashed line,"
+        " fourteen dots for the recent days sit well below the band. The dots are the daily"
+        " values of the packaged example (realornoise --example), which is generated data;"
+        " the command is uvx realornoise."
+    )
+    canvas = Canvas(BANNER_W, BANNER_H, BANNER_TITLE, desc)
+    canvas.rect(0, 0, BANNER_W, BANNER_H, theme.ground)
+
+    before_ys = [_banner_dot_y(value) for value in BANNER_BEFORE]
+    band_y = round(min(before_ys) - 16)
+    band_bottom = round(max(before_ys) + 16)
+    canvas.rect(
+        0, band_y, BANNER_W, band_bottom - band_y, theme.dot_blue, fill_opacity=theme.band_opacity
+    )
+
+    split_x = round((_banner_dot_x(41) + _banner_dot_x(42)) / 2, 1)
+    canvas.line(
+        split_x,
+        56,
+        split_x,
+        430,
+        theme.split,
+        dasharray="3 7",
+        linecap="round",
+    )
+
+    canvas.line(
+        _banner_dot_x(0),
+        _banner_dot_y(BANNER_MEDIAN_BEFORE),
+        _banner_dot_x(41),
+        _banner_dot_y(BANNER_MEDIAN_BEFORE),
+        theme.dot_blue,
+        opacity=theme.median_before_opacity,
+    )
+    canvas.line(
+        _banner_dot_x(42),
+        _banner_dot_y(BANNER_MEDIAN_AFTER),
+        _banner_dot_x(55),
+        _banner_dot_y(BANNER_MEDIAN_AFTER),
+        theme.dot_orange,
+        opacity=theme.median_after_opacity,
+    )
+
+    canvas.text(
+        80,
+        64,
+        BANNER_MARK,
+        size=14,
+        family=MONO,
+        fill=theme.mark,
+        weight=500,
+        spacing="2.4",
+    )
+
+    for index, value in enumerate(BANNER_VALUES):
+        color = theme.dot_blue if index < len(BANNER_BEFORE) else theme.dot_orange
+        canvas.circle(_banner_dot_x(index), _banner_dot_y(value), 7, color)
+
+    canvas.text(
+        80,
+        560,
+        [
+            Span("Real ", fill=theme.headline_orange),
+            Span("or ", fill=theme.headline_muted),
+            Span("noise?", fill=theme.headline_blue),
+        ],
+        size=92,
+        family=SANS,
+        fill=theme.headline_blue,
+        weight=700,
+        spacing="-3.2",
+    )
+
+    pad = 22
+    pill_h = 58
+    pill_w = round(len(PILL_TEXT) * 22 * MONO_ADVANCE) + 2 * pad
+    pill_x = 1200 - pill_w
+    pill_y = 574 - pill_h
+    canvas.rect(pill_x, pill_y, pill_w, pill_h, theme.pill_fill, rx=10, stroke=theme.pill_border)
+    canvas.text(
+        pill_x + pad,
+        baseline(pill_y, pill_h, 22),
+        [
+            Span("$", fill=theme.pill_dollar),
+            Span(PILL_TEXT[1:], fill=theme.pill_ink),
+        ],
+        size=22,
+        family=MONO,
+        fill=theme.pill_ink,
+        weight=500,
+    )
+    return canvas.render()
+
+
+# ---------------------------------------------------------------------------------------------
 # Command line
 # ---------------------------------------------------------------------------------------------
 
@@ -678,6 +907,8 @@ def figures() -> dict[str, str]:
         "hero-dark.svg": hero(DARK),
         "where-light.svg": where(LIGHT),
         "where-dark.svg": where(DARK),
+        "banner-light.svg": banner(BANNER_LIGHT),
+        "banner-dark.svg": banner(BANNER_DARK),
     }
 
 
