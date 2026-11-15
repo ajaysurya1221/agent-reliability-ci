@@ -848,6 +848,7 @@ def _cmd_minimize(run_dir: str, trial_id: str, out_path: str) -> int:
 def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
     parser = _Parser(prog="arci")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("logs", help="compare recorded measures in local session logs")
 
     # --- descriptor ---
     run = commands.add_parser(
@@ -1549,6 +1550,10 @@ def main(argv: list[str] | None = None) -> int:
     """Run the CLI and translate user-facing errors to exit code 3."""
     try:
         arguments = sys.argv[1:] if argv is None else argv
+        if arguments and arguments[0] == "logs":
+            from arci.logs.cli import main as logs_main
+
+            return logs_main(arguments[1:])
         if arguments and arguments[0] in ("verdict", "verdict-rule"):
             return _outcomes_main(arguments)
         v1_plan = False

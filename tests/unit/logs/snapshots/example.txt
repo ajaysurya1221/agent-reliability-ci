@@ -1,0 +1,53 @@
+realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked
+Example data, generated. Not anyone's logs.
+
+Claude Code · model-1 · effort high · main thread · days at UTC+00:00
+before  2026-08-09 to 2026-10-31
+after   2026-11-01 to 2026-11-14   split 2026-11-01
+
+RESULT: REAL DROP
+In at least one recorded measure, the days after the split moved toward worse by more than a chance
+ordering of your days explains.
+
+measure, median day           before (days) after (days) change  finding
+reasoning tokens per response 973 (42)      553 (14)     -43%    real drop
+responses with no reasoning   0.0% (42)     0.0% (14)    0.0 pts no drop (margin 10 pts)
+file edits that failed        - (0)         - (0)        -       too few days
+
+Context counts; differences between the periods are not tested:
+client versions 1 before, 1 after, 1 in both · working directories 1 before, 1 after · sub-agent
+share 0.7% -> 0.7%
+Streak check: 2 of 2 tested measures were not flagged.
+method arci-logs/1 · exact rank tests · no random numbers · day-table digest 8cd5138e436d
+
+Codex · model-1 · effort high · main thread · days at UTC+00:00
+before  2026-08-09 to 2026-10-31
+after   2026-11-01 to 2026-11-14   split 2026-11-01
+
+RESULT: NO DROP
+No recorded measure moved toward worse by its margin or more. This does not say anything improved.
+
+measure, median day             before (days) after (days) change  finding
+reasoning tokens per response   973 (42)      1005 (14)    +3%     no drop (margin 25%)
+responses with no reasoning     0.0% (42)     0.0% (14)    0.0 pts no drop (margin 10 pts)
+reasoning at one repeated value 0.0% (42)     0.0% (14)    0.0 pts no drop (margin 10 pts)
+
+Context counts; differences between the periods are not tested:
+client versions 2 before, 2 after, 2 in both · working directories 2 before, 2 after · sub-agent
+share 0.7% -> 0.7%
+Streak check: 3 of 3 tested measures were not flagged.
+method arci-logs/1 · exact rank tests · no random numbers · day-table digest 0050fa25659c
+
+This shows what your logs recorded. It does not establish answer quality, a cause, or a change
+to the model: your tasks, prompts, projects or client version may have changed.
+For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the
+time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5% of the
+time. Both hold only if: (1) the days in this window are interchangeable when nothing changes;
+(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change
+moves every day alike, by an amount the measure can take; (4) a change leaves the same days,
+setting, reference value and earlier-day values in use. None of these is checked, and the streak
+check does not prove them. Running this again and again until a result appears is not covered.
+Exact statement: docs/STATISTICS_LOGS.md in the repository.
+
+Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run
+exit 1

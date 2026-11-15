@@ -1,0 +1,210 @@
+"""Read local session logs without exposing private input in errors or reports."""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import json
+import os
+import re
+import sys
+from collections.abc import Mapping, Sequence
+from contextlib import suppress
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from typing import NoReturn, TextIO, cast
+
+from arci import __version__
+
+from . import claude_code, codex, discover, measures, report
+from .decide import decide_tool, error_tool, exit_code
+from .records import Tool
+from .schema import LogsDecision, ToolDecision, seal
+
+
+class _UsageError(Exception):
+    pass
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise _UsageError(report.USAGE_ERROR)
+
+
+def _parser() -> _Parser:
+    parser = _Parser(prog="realornoise", add_help=False, allow_abbrev=False)
+    parser.add_argument("--help", "-h", action="store_true")
+    parser.add_argument("--tool", choices=("auto", "claude-code", "codex", "both"), default="auto")
+    for name in (
+        "since",
+        "model",
+        "effort",
+        "project",
+        "claude-dir",
+        "codex-dir",
+        "markdown",
+        "html",
+        "json",
+    ):
+        parser.add_argument(f"--{name}")
+    parser.add_argument("--utc", action="store_true")
+    parser.add_argument("--example", action="store_true")
+    return parser
+
+
+def _execute(
+    argv: Sequence[str],
+    *,
+    now: datetime | None,
+    env: Mapping[str, str] | None,
+    home: Path | None,
+    out: TextIO,
+) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.help:
+        out.write(parser.format_help())
+        return 0
+    since: date | None = None
+    if args.since is not None:
+        try:
+            if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", args.since) is None:
+                raise ValueError
+            since = date.fromisoformat(args.since)
+        except ValueError:
+            raise _UsageError(report.SINCE_DATE) from None
+    html_renderer = None
+    if args.html is not None:
+        try:
+            html_renderer = importlib.import_module("arci.logs.html").render_html
+        except ModuleNotFoundError as error:
+            if error.name != "arci.logs.html":
+                raise
+            raise _UsageError(report.HTML_UNAVAILABLE) from None
+    instant = datetime.now().astimezone() if now is None else now
+    if args.example:
+        from .example import load
+
+        claude_root, codex_root, instant = load()
+    else:
+        environment = os.environ if env is None else env
+        # Avoid resolving HOME or an unused root when explicit directories were supplied.
+        root_home = Path.home() if home is None else home
+        claude_root = (
+            Path(args.claude_dir)
+            if args.claude_dir is not None
+            else discover.claude_root(environment, root_home)
+        )
+        codex_root = (
+            Path(args.codex_dir)
+            if args.codex_dir is not None
+            else discover.codex_root(environment, root_home)
+        )
+    if instant.utcoffset() is None:
+        raise _UsageError(report.CALENDAR_RANGE)
+    offset = timedelta() if args.utc else instant.utcoffset()
+    assert offset is not None
+    # The record stores whole offset minutes; the same offset defines all days.
+    minutes = offset // timedelta(minutes=1)
+    offset = timedelta(minutes=minutes)
+    instant = instant.astimezone(UTC)
+    roots: dict[Tool, Path] = {"claude-code": claude_root, "codex": codex_root}
+    requested: list[Tool]
+    if args.tool == "auto":
+        requested = [tool for tool, root in roots.items() if root.exists()] or list(roots)
+    elif args.tool == "both":
+        requested = list(roots)
+    else:
+        requested = [cast(Tool, args.tool)]
+    project = Path(args.project) if args.project is not None else None
+    decisions: list[ToolDecision] = []
+    for tool in requested:
+        paths = (discover.claude_files if tool == "claude-code" else discover.codex_files)(
+            roots[tool]
+        )
+        result = (claude_code.read if tool == "claude-code" else codex.read)(
+            paths, project=project, now=instant
+        )
+        counts = result.counters
+        reason = (
+            "no_logs"
+            if not paths
+            else "read_error"
+            if not counts.files_read
+            else "format_not_recognised"
+            if not result.responses
+            and not (counts.responses_without_setting or counts.files_outside_project)
+            else None
+        )
+        if reason is not None:
+            decisions.append(error_tool(tool, reason, counts))
+        else:
+            table = measures.build(
+                result,
+                utc_offset=offset,
+                now=instant,
+                since=since,
+                model=args.model,
+                effort=args.effort,
+            )
+            decisions.append(decide_tool(table, counts))
+    decision = seal(
+        LogsDecision(
+            arci_version=__version__,
+            example=args.example,
+            utc_offset_minutes=minutes,
+            project_filtered=project is not None,
+            tools=tuple(decisions),
+            exit_code=exit_code(decisions),
+        )
+    )
+    outputs: list[tuple[str, str]] = []
+    if args.json is not None:
+        outputs.append(
+            (
+                args.json,
+                json.dumps(decision.model_dump(mode="json"), sort_keys=True, indent=2) + "\n",
+            )
+        )
+    if args.markdown is not None:
+        outputs.append((args.markdown, report.render_markdown(decision)))
+    if args.html is not None:
+        assert html_renderer is not None
+        outputs.append((args.html, cast(str, html_renderer(decision))))
+    text = report.render_text(decision)
+    for path, content in outputs:
+        try:
+            Path(path).write_text(content, encoding="utf-8")
+        except (OSError, ValueError):
+            raise _UsageError(report.WRITE_ERROR) from None
+    out.write(text)
+    return decision.exit_code
+
+
+def run(
+    argv: Sequence[str],
+    *,
+    now: datetime | None = None,
+    env: Mapping[str, str] | None = None,
+    home: Path | None = None,
+    out: TextIO | None = None,
+    err: TextIO | None = None,
+) -> int:
+    """Return a result code; exceptions and offending values never reach the user."""
+    output = sys.stdout if out is None else out
+    errors = sys.stderr if err is None else err
+    try:
+        return _execute(argv, now=now, env=env, home=home, out=output)
+    except _UsageError as error:
+        message = str(error)  # Only our fixed constants enter this private exception.
+    except measures.UsageError as error:
+        message = report.SINCE_EARLY if error.code == "since_too_early" else report.CALENDAR_RANGE
+    except BaseException:
+        message = report.INTERNAL_ERROR
+    with suppress(BaseException):
+        errors.write(message + "\n")
+    return 3
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    return run(sys.argv[1:] if argv is None else argv)
