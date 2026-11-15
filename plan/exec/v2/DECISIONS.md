@@ -249,3 +249,41 @@ code defect and six document slips, corrected by the orchestrator. Decisions tak
 
 Not verified on this machine: a file system that keeps letter case apart (the branch where
 `out.txt` and `OUT.txt` are two files); Windows; hosted CI until the branch is pushed.
+
+## D-18: 2.4.0 approved: method `arci-logs/2`, a kept day table, plainer bounds (2026-11-16)
+
+The maintainer approved the plan for 2.4.0 on 16 Nov 2026. It follows three things found
+after 2.3.0: two runs on a real machine with a long history, an in-house research round
+whose cited claims were re-opened one by one, and a count-only check of the reasoning field.
+
+- **Kept:** the direction (a per-person result from local Claude Code and Codex logs).
+- **Found in 2.3.0:** the rule compares the setting with the most responses over the whole
+  window; on a real machine that was a setting with no response in the last 14 days, in
+  both tools, so the result was CANNOT TELL for a reason the output did not name. Claude
+  Code deletes session files after 30 days by default, so a default user has about 16
+  earlier days. The 2.5% wording is too strong for such short histories when days resemble
+  their neighbours. The tool prints six effort names; Codex accepts nine.
+- **Approved scope:** (1) compare the setting in use in the after period; (2) an opt-in
+  kept day table, counts only, outside the vendors' folders, and `uvx --python 3.14
+  realornoise` as the documented command; (3) the bound stated with its measured failures;
+  (4) on CANNOT TELL, the days so far and the first date a test becomes possible;
+  (5) small repairs (effort names, related tools); (6) a guard against log-format changes;
+  (7) trust items (dependency and workflow checks, a threat model, a contributing guide,
+  an outside check of the rank test); (8) reach only after 1 to 5 are released.
+- **This reverses** one "not doing" of the 2.3.0 plan: a day table that outlives log
+  retention.
+- **Re-freeze approved under design record 0017.** Pinned files released for change:
+  `docs/STATISTICS_LOGS.md`, `src/arci/logs/schema.py`, `tests/acceptance/test_logs.py`,
+  `pyproject.toml`, `uv.lock`. Newly pinned: `docs/design/0017-logs-2.md`.
+  `docs/design/0016-logs.md` stays pinned and unchanged as the record of `arci-logs/1`.
+  Every other hash must stay as it is.
+- **Approved with it:** the tag `v2.4.0` after the maintainer says "Merged". Not covered,
+  as before: commands on the deny list, merging to `main`, the release page, every post.
+- **Gate before product code:** spike S0 (`spikes/S0-logs2/`). The new setting rule must
+  keep wrong REAL DROP and wrong NO DROP at or under 2.83% in 20,000 simulated histories
+  per design with setting changes and independent days. If it fails, the rule is revised
+  before anything is built.
+- The stop rule of 14 Dec 2026 stands.
+- Also on this branch: the wider timing window for one adapter test (`bc29799`).
+
+Design decisions for the build: `logs2/DESIGN-MEMO.md`.
