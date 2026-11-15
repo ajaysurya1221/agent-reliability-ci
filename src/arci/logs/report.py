@@ -99,26 +99,37 @@ F8 = "Streak check: {k} of {K} tested measures were not flagged."
 F9 = "Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest."
 F9_ERROR = "Compressed Codex files not read (Python 3.14 is needed): {k}."
 F9_NEXT = "To read them: uvx --python 3.14 realornoise"
-RATE_5_10 = "10.75"
-RATE_7_21 = "4.3"
+# Maximum as-built null rate across both dependence sections of the self-check.
+# Regime switching, 14/16 days, seed 18112185: 362/2000 = 0.181000.
+RATE_MAX = "18.1"
+RATE_MAX_AFTER = 14
+RATE_MAX_BEFORE = 16
 F10 = (
     "This shows what your logs recorded. It does not establish answer quality, a "
-    "cause, or a change\nto the model: your tasks, prompts, projects or client ver"
-    "sion may have changed.\nFor each tool above and one comparison, if (1) the da"
-    "ys in this window are interchangeable when\nnothing changes, whatever their n"
-    "umber of responses, and (2) to (4) below hold, then REAL DROP\nappears at mos"
-    "t 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of the time "
-    "if a\nmeasure moved toward worse by its margin or more. When days resemble th"
-    "eir neighbours, (1) fails: in\nthe cases it tested, the self-check measured w"
-    "rong REAL DROP up to {rate_5_10}% with 5 days after\nthe split and 10 before,"
-    " and up to {rate_7_21}% with 7 after and 21 before; stronger streaks can\ngiv"
-    "e more. The conditions (2) to (4) are: (2) any date, model, effort or projec"
-    "t you gave was not\nchosen from these logs; (3) a change moves every day alik"
-    "e, by an amount the measure can take; (4) a\nchange leaves the same days, set"
-    "ting, reference value and earlier-day values in use. None of these\nis checke"
-    "d, and the streak check does not prove them. Running this again and again un"
-    "til a result\nappears is not covered. Exact statement: docs/STATISTICS_LOGS.m"
-    "d in the repository."
+    "cause, or a change\n"
+    "to the model: your tasks, prompts, projects or client version may have changed.\n"
+    "For each tool above and one comparison, if (1) the days in this window are "
+    "interchangeable when\n"
+    "nothing changes, whatever their number of responses, and (2) to (4) below hold, "
+    "then REAL DROP\n"
+    "appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% "
+    "of the time if a\n"
+    "measure moved toward worse by its margin or more. When days resemble their "
+    "neighbours or work comes\n"
+    "in phases, (1) fails: in the cases it tested, the self-check measured wrong "
+    "REAL DROP up to\n"
+    "{rate_max}%, with {worst_after} days after the split and {worst_before} before; "
+    "other patterns can\n"
+    "give more. The conditions (2) to (4) are: (2) any date, model, effort or "
+    "project you gave was not\n"
+    "chosen from these logs; (3) a change moves every day alike, by an amount the "
+    "measure can take; (4) a\n"
+    "change leaves the same days, setting, reference value and earlier-day values in "
+    "use. None of these\n"
+    "is checked, and the streak check does not prove them. Running this again and "
+    "again until a result\n"
+    "appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the "
+    "repository."
 )
 F11 = "method arci-logs/2 · exact rank tests · no random numbers · day-table digest {digest}"
 F12 = (
@@ -164,16 +175,16 @@ MD_CLOSING = {
     "CANNOT_TELL": "One person's logs. Not enough to tell a shift from noise.",
 }
 MD_LIMITS = (
-    "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and on"
-    "e comparison, if the days in the window are interchangeable when nothing cha"
-    "nges and the assumptions below hold; with days that resemble their neighbour"
-    "s the self-check measured wrong REAL DROP up to {rate_5_10}% (5 days after, "
-    "10 before) and {rate_7_21}% (7 after, 21 before) in its tested cases. Assump"
-    "tions, unchecked: no date, model, effort or project chosen from these logs; "
-    "a uniform shift the measure can take; the same days, setting, reference valu"
-    "e and earlier-day values in use. Repeated checking until a result appears is"
-    " not covered. arci-logs/2, digest {digest}. Yours: uvx --python 3.14 realorn"
-    "oise"
+    "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one "
+    "comparison, if the days in the window are interchangeable when nothing changes "
+    "and the assumptions below hold; when days resemble their neighbours or work "
+    "comes in phases the self-check measured wrong REAL DROP up to {rate_max}% "
+    "({worst_after} days after, {worst_before} before) in its tested cases. "
+    "Assumptions, unchecked: no date, model, effort or project chosen from these "
+    "logs; a uniform shift the measure can take; the same days, setting, reference "
+    "value and earlier-day values in use. Repeated checking until a result appears "
+    "is not covered. arci-logs/2, digest {digest}. Yours: uvx --python 3.14 "
+    "realornoise"
 )
 TOOL_NAMES = {"claude-code": "Claude Code", "codex": "Codex"}
 DEFAULTS = {
@@ -342,7 +353,7 @@ def notices(tool: ToolDecision) -> list[str]:
 
 
 def limits_text() -> str:
-    return F10.format(rate_5_10=RATE_5_10, rate_7_21=RATE_7_21)
+    return F10.format(rate_max=RATE_MAX, worst_after=RATE_MAX_AFTER, worst_before=RATE_MAX_BEFORE)
 
 
 def short_history(tool: ToolDecision) -> list[str]:
@@ -472,8 +483,9 @@ def render_markdown(decision: LogsDecision, *, directory_tools: Collection[Tool]
                     MD_CLOSING[tool.result],
                     MD_LIMITS.format(
                         digest=(tool.day_table_sha256 or "")[:12],
-                        rate_5_10=RATE_5_10,
-                        rate_7_21=RATE_7_21,
+                        rate_max=RATE_MAX,
+                        worst_after=RATE_MAX_AFTER,
+                        worst_before=RATE_MAX_BEFORE,
                     ),
                 ]
             )

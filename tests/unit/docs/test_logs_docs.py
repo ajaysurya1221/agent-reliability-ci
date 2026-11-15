@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import io
 import re
 import subprocess
@@ -22,9 +23,10 @@ NEW_DOCS = (
     "docs/design/0016-logs.md",
     "docs/LOG_FORMATS.md",
     "docs/recipes/logs.md",
+    "docs/THREAT_MODEL_LOGS.md",
 )
 README_SECTIONS = (
-    "New in 2.3: a result from logs you already have",
+    "New in 2.4: compare the setting you use now",
     "Controlled trials: arci run",
     "Related tools",
 )
@@ -205,8 +207,7 @@ def test_example_output_is_real_and_labelled(tmp_path: Path) -> None:
     recipe = read("docs/recipes/logs.md")
     captured = re.search(r"```text\n(realornoise .*?)```", recipe, re.DOTALL)
     assert captured is not None
-    # A release bump changes only the banner; the captured pre-release banner is labelled.
-    assert captured.group(1).splitlines()[1:] == output.splitlines()[1:]
+    assert captured.group(1) == output
     assert "Example data, generated. Not anyone's logs." in captured.group(1)
     row = next(line for line in output.splitlines() if line.startswith("reasoning tokens"))
     readme = read("README.md")
@@ -281,36 +282,81 @@ def test_records_drop_superseded_sentences(document: str) -> None:
         assert old not in text
 
 
+def worst_measured_row(text: str) -> dict[str, str]:
+    candidates: list[tuple[Decimal, dict[str, str]]] = []
+    headings = (
+        "Days that come in streaks (report only)",
+        "Weekly cycles and regime switches (report only)",
+    )
+    for heading in sorted(headings, key=lambda name: text.index("## " + name + "\n")):
+        for row in measured_rows(text, heading):
+            if row["drop"] != "0" or row["metric"] != "wrong REAL DROP":
+                continue
+            if heading == headings[0] and Decimal(row["rho"]) <= 0:
+                continue
+            match = re.search(r"= ([0-9.]+) ", row["as built (95% CI)"])
+            assert match is not None
+            candidates.append((Decimal(match.group(1)), row))
+    # max retains the first matching row in file order on a tie.
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
 def test_logs2_printed_rates_match_selfcheck() -> None:
     from arci.logs import report
 
-    lines = section(
-        read("docs/results/logs-selfcheck.md"), "Days that come in streaks (report only)"
-    ).splitlines()
-    header = next(line for line in lines if line.startswith("| after/before"))
-    columns = [cell.strip() for cell in header.strip("|").split("|")]
-    rates: dict[str, list[Decimal]] = {"5/10": [], "7/21": []}
-    for line in lines:
-        if not line.startswith("|") or line == header:
-            continue
-        cells = dict(
-            zip(columns, (cell.strip() for cell in line.strip("|").split("|")), strict=True)
+    row = worst_measured_row(read("docs/results/logs-selfcheck.md"))
+    proportion = Decimal(row["as built (95% CI)"].split("= ")[1].split()[0])
+    expected = format(proportion * 100, "f").rstrip("0").rstrip(".")
+    after, before = map(int, row["after/before"].split("/"))
+    assert (
+        expected,
+        after,
+        before,
+    ) == (report.RATE_MAX, report.RATE_MAX_AFTER, report.RATE_MAX_BEFORE)
+    limits = " ".join(report.limits_text().split())
+    assert f"up to {expected}%, with {after} days after the split and {before} before" in limits
+    footer = report.MD_LIMITS.format(
+        digest="0" * 12,
+        rate_max=report.RATE_MAX,
+        worst_after=report.RATE_MAX_AFTER,
+        worst_before=report.RATE_MAX_BEFORE,
+    )
+    assert f"up to {expected}% ({after} days after, {before} before)" in footer
+
+
+@pytest.mark.parametrize("weekly_first", [False, True])
+def test_bound_source_filters_columns_and_keeps_first_tie(weekly_first: bool) -> None:
+    header = (
+        "| after/before | rho | drop | metric | as built (95% CI) | "
+        "as-built conditional (95% CI) |\n|---|---|---|---|---|---|\n"
+    )
+    streaks = (
+        "## Days that come in streaks (report only)\n"
+        + header
+        + (
+            "| 1/1 | 0 | 0 | wrong REAL DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 2/2 | 0.5 | 1/4 | wrong REAL DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 3/3 | 0.5 | 0 | wrong NO DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 5/10 | 0.5 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n"
+            "| 7/21 | 0.7 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n"
         )
-        design = cells["after/before"]
-        if (
-            design not in rates
-            or cells["drop"] != "0"
-            or cells["metric"] != "wrong REAL DROP"
-            or Decimal(cells["rho"]) <= 0
-        ):
-            continue
-        match = re.search(r"= ([0-9.]+) ", cells["as built (95% CI)"])
-        assert match is not None
-        rates[design].append(Decimal(match.group(1)))
-    for design, constant in (("5/10", report.RATE_5_10), ("7/21", report.RATE_7_21)):
-        expected = format(max(rates[design]) * 100, "f").rstrip("0").rstrip(".")
-        assert constant == expected
-        assert expected + "%" in report.limits_text()
-        assert expected + "%" in report.MD_LIMITS.format(
-            digest="0" * 12, rate_5_10=report.RATE_5_10, rate_7_21=report.RATE_7_21
+    )
+    weekly = (
+        "## Weekly cycles and regime switches (report only)\n"
+        + header
+        + ("| 14/16 | 0 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n")
+    )
+    text = weekly + "\n" + streaks if weekly_first else streaks + "\n" + weekly
+    assert worst_measured_row(text)["after/before"] == ("14/16" if weekly_first else "5/10")
+
+
+def test_logs_threat_model_link_and_named_tests_exist() -> None:
+    assert "[realornoise threat model](docs/THREAT_MODEL_LOGS.md)" in read("SECURITY.md")
+    text = read("docs/THREAT_MODEL_LOGS.md")
+    references = re.findall(r"`(tests/[^`\s]+\.py)::(test_\w+)`", text)
+    assert references
+    for path, name in references:
+        tree = ast.parse(read(path))
+        assert any(isinstance(node, ast.FunctionDef) and node.name == name for node in tree.body), (
+            f"missing threat-model check: {path}::{name}"
         )

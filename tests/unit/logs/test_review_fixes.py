@@ -223,8 +223,9 @@ def test_markdown_has_no_wrapping() -> None:
     assert (
         report.MD_LIMITS.format(
             digest=(decision.tools[0].day_table_sha256 or "")[:12],
-            rate_5_10=report.RATE_5_10,
-            rate_7_21=report.RATE_7_21,
+            rate_max=report.RATE_MAX,
+            worst_after=report.RATE_MAX_AFTER,
+            worst_before=report.RATE_MAX_BEFORE,
         )
         in output
     )

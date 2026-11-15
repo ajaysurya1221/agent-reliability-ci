@@ -22,9 +22,10 @@ Acceptance items covered elsewhere, with the reason:
 
 - 39 (every fixed text equals a constant in the code, and every backtick span between the two
   headings is a fixed text): a source comparison, `tests/unit/logs/test_report.py`.
-- 40 (the two printed figures equal what the rule of "Coverage of the bound" reads from
-  `docs/results/logs-selfcheck.md`): a document test. This file holds everything around the two
-  numbers, their shape, and that F10, the footer and the HTML page carry the same two.
+- 40 (`{rate_max}`, `{worst_after}` and `{worst_before}` equal what the rule of "Coverage of the
+  bound" reads from `docs/results/logs-selfcheck.md`): a document test. This file holds the
+  words around the three values, the shape of the rate, that the two day counts are whole
+  numbers of days, and that F10, the footer and the unescaped HTML page carry the same three.
 - 72 (the self-check file's cells): `bench/selfcheck_logs.py` and its own test.
 - 73 (the documented command, the pinned version, both distributions): the packaging and
   document tests.
@@ -304,8 +305,10 @@ F4 = {
     "CANNOT_TELL": "RESULT: CANNOT TELL",
     "ERROR": "RESULT: ERROR",
 }
-# F10, changed in 0017. The record gives it as lines of at most 100 characters that print as
-# given, with `{rate_5_10}` and `{rate_7_21}` filled from the self-check file at build time.
+# F10, changed in 0017 and changed again after the self-check ran: it carries one figure with
+# its design, `{rate_max}` with `{worst_after}` and `{worst_before}`, filled at build time from
+# the self-check file. The record gives F10 as thirteen lines of at most 100 characters that
+# print as given, and says that with their values filled they stay within 100 characters.
 F10_LINES = (
     "This shows what your logs recorded. It does not establish answer quality, a cause, or a"
     " change",
@@ -316,12 +319,11 @@ F10_LINES = (
     " DROP",
     "appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of the time"
     " if a",
-    "measure moved toward worse by its margin or more. When days resemble their neighbours, (1)"
-    " fails: in",
-    "the cases it tested, the self-check measured wrong REAL DROP up to {rate_5_10}% with 5 days"
-    " after",
-    "the split and 10 before, and up to {rate_7_21}% with 7 after and 21 before; stronger"
-    " streaks can",
+    "measure moved toward worse by its margin or more. When days resemble their neighbours or"
+    " work comes",
+    "in phases, (1) fails: in the cases it tested, the self-check measured wrong REAL DROP up to",
+    "{rate_max}%, with {worst_after} days after the split and {worst_before} before; other"
+    " patterns can",
     "give more. The conditions (2) to (4) are: (2) any date, model, effort or project you gave"
     " was not",
     "chosen from these logs; (3) a change moves every day alike, by an amount the measure can"
@@ -332,8 +334,17 @@ F10_LINES = (
     " result",
     "appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the repository.",
 )
+# The same text where no line limit applies, as the Markdown file and the HTML page carry it.
+F10_TEXT = " ".join(F10_LINES)
 F10_FIRST_SENTENCE = "This shows what your logs recorded."
+# Record 0017, "Text output, in this order", item 3: "Its third sentence begins ...".
 F10_THIRD_SENTENCE = "For each tool above and one comparison, if (1)"
+# The one sentence of F10 that carries the figure and its design, across the record's breaks.
+FIGURE_SENTENCE = (
+    "When days resemble their neighbours or work comes in phases, (1) fails: in the cases it"
+    " tested, the self-check measured wrong REAL DROP up to {rate_max}%, with {worst_after}"
+    " days after the split and {worst_before} before; other patterns can give more."
+)
 F12 = (
     "Share: --markdown FILE · --html FILE · --json FILE      "
     "Stronger evidence: arci verdict, arci run"
@@ -350,18 +361,20 @@ MARKDOWN_CLOSE = {
     ),
     "CANNOT_TELL": "One person's logs. Not enough to tell a shift from noise.",
 }
-# The footer, changed in 0017: one span, so whitespace is compared after collapsing runs.
+# The footer, changed in 0017 and changed again with the figures: one span, so whitespace is
+# compared after collapsing runs, and its last line follows the sentence below.
+FOOTER_FIRST_WORDS = "Wrong REAL DROP and wrong NO DROP are each at most 2.5%"
 FOOTER_BOUND = (
     "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one comparison,"
     " if the days in the window are interchangeable when nothing changes and the assumptions"
-    " below hold; with days that resemble their neighbours the self-check measured wrong REAL"
-    " DROP up to {rate_5_10}% (5 days after, 10 before) and {rate_7_21}% (7 after, 21 before)"
-    " in its tested cases. Assumptions, unchecked: no date, model, effort or project chosen from"
-    " these logs; a uniform shift the measure can take; the same days, setting, reference value"
-    " and earlier-day values in use. Repeated checking until a result appears is not covered."
+    " below hold; when days resemble their neighbours or work comes in phases the self-check"
+    " measured wrong REAL DROP up to {rate_max}% ({worst_after} days after, {worst_before}"
+    " before) in its tested cases. Assumptions, unchecked: no date, model, effort or project"
+    " chosen from these logs; a uniform shift the measure can take; the same days, setting,"
+    " reference value and earlier-day values in use. Repeated checking until a result appears is"
+    " not covered."
 )
 FOOTER_METHOD = "arci-logs/2, digest {digest}. Yours: uvx --python 3.14 realornoise"
-FOOTER_FIRST_WORDS = "Wrong REAL DROP and wrong NO DROP are each at most 2.5%"
 ROW_NAMES = {
     "reasoning_tokens": "reasoning tokens per response",
     "no_reasoning_share": "responses with no reasoning",
@@ -1666,45 +1679,84 @@ def _listing(folder: Path) -> set[str]:
     return {str(path.relative_to(folder)) for path in folder.rglob("*")}
 
 
+# The shapes of the three values ("Coverage of the bound"): the rate is the proportion times
+# 100, in decimal, without trailing zeros and without a trailing point (a proportion of 0
+# prints as `0`); the two day counts are plain whole numbers with no leading zero.
 RATE_SHAPE = r"((?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?)"
+DAYS_SHAPE = r"([1-9][0-9]*)"
+FIGURE_SHAPES = {
+    "rate_max": RATE_SHAPE,
+    "worst_after": DAYS_SHAPE,
+    "worst_before": DAYS_SHAPE,
+}
+Figures = tuple[str, int, int]
 
 
-def _rates(text: str) -> tuple[str, str]:
-    """The two self-check figures the output prints, read out of F10's own sentence.
+def _pattern(template: str, shapes: Mapping[str, str]) -> str:
+    """A regex that matches `template` exactly, each `{field}` replaced by its shape."""
+    out = ""
+    rest = template
+    while True:
+        found = re.search(r"\{([a-z_0-9]+)\}", rest)
+        if found is None:
+            return out + re.escape(rest)
+        out += re.escape(rest[: found.start()]) + shapes[found.group(1)]
+        rest = rest[found.end() :]
 
-    The record fills `{rate_5_10}` and `{rate_7_21}` at build time from the self-check file, so
-    this file cannot hold the numbers; it holds every word around them and the shape the record
-    gives them (a decimal without trailing zeros and without a trailing point). That the two
-    equal what the rule of "Coverage of the bound" reads from the self-check file is item 40,
-    covered elsewhere; here the same two must appear in F10, in the footer and on the page.
+
+def _filled(template: str, figures: Figures) -> str:
+    return template.format(rate_max=figures[0], worst_after=figures[1], worst_before=figures[2])
+
+
+def _figures(text: str) -> Figures:
+    """The one self-check figure and its design, read out of F10's own sentence.
+
+    The record fills `{rate_max}`, `{worst_after}` and `{worst_before}` at build time from the
+    self-check file, so this file cannot hold the numbers; it holds every word around them, the
+    shape of the rate and the shape of the two day counts. That the three equal what the rule
+    of "Coverage of the bound" reads from the self-check file is item 40, covered elsewhere;
+    here the same three must appear in F10, in the footer and on the page.
     """
-    pattern = (
-        re.escape("the cases it tested, the self-check measured wrong REAL DROP up to ")
-        + RATE_SHAPE
-        + re.escape("% with 5 days after the split and 10 before, and up to ")
-        + RATE_SHAPE
-        + re.escape("% with 7 after and 21 before; stronger streaks can give more.")
-    )
-    found = re.search(pattern, _flat(text))
-    assert found is not None, "F10 does not hold its own sentence with two decimal figures"
-    return found.group(1), found.group(2)
+    found = re.search(_pattern(FIGURE_SENTENCE, FIGURE_SHAPES), _flat(text))
+    assert found is not None, "F10 does not hold its figure sentence with the three values"
+    return found.group(1), int(found.group(2)), int(found.group(3))
 
 
-def _f10_lines(rates: tuple[str, str]) -> list[str]:
-    return [line.format(rate_5_10=rates[0], rate_7_21=rates[1]) for line in F10_LINES]
+def _f10_block(outcome: Outcome) -> Figures:
+    """F10 as the text output prints it: the record's thirteen lines, line for line.
+
+    The three values are read from the printed sentence first, since the record fills them at
+    build time; every line is then rebuilt from them and compared, each line is held to 100
+    characters, and the block is one run of consecutive non-blank lines.
+    """
+    lines = outcome.lines
+    starts = [index for index, line in enumerate(lines) if line.startswith(F10_FIRST_SENTENCE)]
+    assert len(starts) == 1, "F10 prints once, when a tool has a result other than ERROR"
+    start = starts[0]
+    block = lines[start : start + len(F10_LINES)]
+    assert all(line.strip() for line in block), "F10 prints as one run of lines"
+    for line in block:
+        assert len(line) <= 100, line
+    figures = _figures("\n".join(block))
+    assert block == _f10_lines(figures)
+    return figures
 
 
-def _footer_rates(text: str) -> tuple[str, str]:
-    pattern = (
-        re.escape("the self-check measured wrong REAL DROP up to ")
-        + RATE_SHAPE
-        + re.escape("% (5 days after, 10 before) and ")
-        + RATE_SHAPE
-        + re.escape("% (7 after, 21 before) in its tested cases.")
-    )
-    found = re.search(pattern, _flat(text))
-    assert found is not None, "the footer does not hold its two decimal figures"
-    return found.group(1), found.group(2)
+def _f10_lines(figures: Figures) -> list[str]:
+    return [_filled(line, figures) for line in F10_LINES]
+
+
+def _footer_figures(text: str) -> Figures:
+    """The three values the Markdown footer carries, with the footer held word for word.
+
+    The footer is one span, so whitespace is compared after collapsing runs; its last line
+    carries the method name and the digest and is checked where the digest is known.
+    """
+    found = re.search(_pattern(FOOTER_BOUND, FIGURE_SHAPES), _flat(text))
+    assert found is not None, "the footer does not hold its figure and its design"
+    figures = (found.group(1), int(found.group(2)), int(found.group(3)))
+    _says(text, _filled(FOOTER_BOUND, figures))
+    return figures
 
 
 def _reason_block(outcome: Outcome, reason: str, *, tool: str = "claude-code") -> None:
@@ -1907,7 +1959,7 @@ def test_an_error_beside_a_result_leaves_the_exit_code_to_the_result(tmp_path: P
     # has a result (record 0017, text layout items 2 and 3).
     assert TOOL_NAMES["claude-code"] in outcome.lines
     _block(outcome, NO_LOGS_GIVEN["claude-code"])
-    _run_of(outcome, _f10_lines(_rates(outcome.out)))
+    _f10_block(outcome)
 
 
 def test_with_no_log_root_at_all_both_tools_are_requested_and_error(tmp_path: Path) -> None:
@@ -3948,7 +4000,7 @@ def test_the_fixed_lines_of_a_run_with_a_result(tmp_path: Path) -> None:
         "method arci-logs/2 · exact rank tests · no random numbers · day-table digest "
         f"{digest[:12]}" in lines
     )
-    _run_of(outcome, _f10_lines(_rates(outcome.out)))
+    _f10_block(outcome)
     _says(outcome.out, F10_FIRST_SENTENCE)
     _says(outcome.out, F10_THIRD_SENTENCE)
     assert F12 in lines
@@ -3970,27 +4022,32 @@ def test_the_fixed_lines_of_a_run_with_a_result(tmp_path: Path) -> None:
     assert "not used" not in outcome.out
 
 
-def test_the_closing_paragraph_and_the_footer_carry_the_same_two_figures(
+def test_the_closing_paragraph_and_the_footer_carry_the_same_figure(
     tmp_path: Path,
 ) -> None:
     """Item 5 of the decision list and item 40 in part: the closing paragraph states the
-    assumption first and then two measured figures, and the footer carries a short form of the
-    same two. The numbers themselves come from the self-check file at build time; this holds
-    every word around them, their shape, and that all three forms agree."""
+    assumption first and then one measured figure with its design, and the footer carries a
+    short form of the same three values. The numbers come from the self-check file at build
+    time; this holds the words around them, the shape of the rate, that the two day counts are
+    whole numbers of days, and that all three forms agree."""
     plans = _uniform(ALTERNATING, DROPPED)
     root = tmp_path / "claude"
     write_claude(root, plans)
     outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown", "html"))
-    rates = _rates(outcome.out)
-    assert rates == _footer_rates(outcome.text("markdown"))
-    assert rates == _rates(outcome.page())
-    _run_of(outcome, _f10_lines(rates))
-    _says(outcome.text("markdown"), FOOTER_BOUND.format(rate_5_10=rates[0], rate_7_21=rates[1]))
+    figures = _f10_block(outcome)
+    assert figures == _figures(outcome.out)
+    assert figures == _figures(outcome.page())
+    assert figures == _footer_figures(outcome.text("markdown"))
+    # The page holds the same paragraph, where no line limit applies.
+    _says(outcome.page(), _filled(F10_TEXT, figures))
     digest = outcome.tool()["day_table_sha256"][:12]
     _says(outcome.text("markdown"), FOOTER_METHOD.format(digest=digest))
-    # The 0016 wording of the closing paragraph and of the footer is gone.
+    # The two figures of the first form of this record, and the 0016 wording, are gone.
     _absent(outcome.out, "For each tool above and one comparison: if nothing shifted")
+    _absent(outcome.out, "with 5 days after the split and 10 before")
+    _absent(outcome.out, "stronger streaks can give more")
     _absent(outcome.text("markdown"), "only under unchecked assumptions")
+    _absent(outcome.text("markdown"), "(5 days after, 10 before)")
     _absent(outcome.text("markdown"), "arci-logs/1")
     _absent(outcome.text("markdown"), "Yours: uvx realornoise")
 
@@ -4229,7 +4286,8 @@ def test_a_tool_without_a_setting_has_no_method_line_and_no_footer(tmp_path: Pat
     assert _flat(block).count("arci-logs/2, digest") == 1
     assert _flat(outcome.out).count("method arci-logs/2") == 1
     _says(block, REASONS["no_usable_setting"])
-    _says(block, F10_FIRST_SENTENCE)
+    # The blank tool's block ends with the F10 text, word for word, and no footer.
+    _says(block, _filled(F10_TEXT, _f10_block(outcome)))
     # The blank tool keeps no scope, no period line, no table, no context and no digest.
     first = _flat(block).index(_flat(REASONS["no_usable_setting"]))
     second = _flat(block).index(_flat(FOOTER_FIRST_WORDS))
@@ -4293,8 +4351,8 @@ def test_the_markdown_block_closes_with_the_line_for_the_result(
     assert outcome.tool()["result"] == result
     block = outcome.text("markdown")
     _says(block, MARKDOWN_CLOSE[result])
-    rates = _footer_rates(block)
-    _says(block, FOOTER_BOUND.format(rate_5_10=rates[0], rate_7_21=rates[1]))
+    # The footer carries the same figure and design as the closing paragraph above it.
+    assert _footer_figures(block) == _f10_block(outcome)
     _says(block, "arci-logs/2, digest")
     _says(block, "Yours: uvx --python 3.14 realornoise")
     _says(block, outcome.tool()["day_table_sha256"][:12])

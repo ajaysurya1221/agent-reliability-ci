@@ -110,6 +110,13 @@ example, Markdown/JSON/HTML output, a Claude Code plugin and a Codex skill.
 [record 0016](design/0016-logs.md) and [self-check](results/logs-selfcheck.md) give the
 assumptions and measured limits under correlated days.
 
+## Done in v2.4.0
+
+`arci-logs/2` compares the setting used most after the split, can keep daily counts beyond
+vendor retention, gives a best-case test date for short histories, lists bounded client
+versions and prints the worst wrong-REAL-DROP rate measured in the self-check
+([record 0017](design/0017-logs-2.md), [recipe](recipes/logs.md)).
+
 ## Next
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
@@ -124,9 +131,12 @@ suites beyond what the schema already allows, which are untested end to end). Th
 framework adapter, for LangChain. Design record 0015 defers, for imported outcomes: reading an
 Inspect `.eval` file directly, promptfoo, the GitHub Action's verdict mode, and HTML output.
 
-Record 0016 defers scans over split dates, comparisons of two models, a stored day table
-beyond log retention, a range for the change, other coding agents, real-machine Windows
-checks, older log formats, usage-limit and cost measures, and sending data anywhere.
+Record 0017 leaves open one pre-stated streak check in place of the three variants reported
+by the self-check, an unknown split date and repeated daily looks with a stated error rate.
+It also leaves out scans over split dates, comparisons of two models, a range for the change,
+other coding agents, OpenTelemetry input, a public tracker, real-machine Windows checks,
+older log formats, usage-limit and cost measures, and sending data anywhere. Keeping days
+is now built; the streak check itself is unchanged.
 
 On compound fault conditions: a condition can already list several faults (`faults:` in
 `arci.yaml`, applied together in order), in v1 and in suites. What 2.1.0 does not have is a

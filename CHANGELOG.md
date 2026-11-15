@@ -1,7 +1,33 @@
 # Changelog
 
-## Unreleased
+## v2.4.0 (2026-11-16)
 
+- **Added:** `arci-logs/2` records, a best-case earliest test date when usable days are
+  too few, and bounded client-version names after the split. `--keep` saves daily counts,
+  dates and accepted settings to `realornoise-days/1`; `--keep-dir` chooses its directory
+  and `--ignore-kept` skips reading it. Kept days are counted and marked in HTML.
+- **Changed:** the default model and effort now come from the most responses after the
+  split, falling back to the whole window only when no candidate has an after-response.
+  Both skills run `uvx --python 3.14 realornoise==2.4.0` without keeping days. Version 1
+  log records remain readable. The printed limits now state the worst measured rate
+  across both dependence sections of the [self-check](docs/results/logs-selfcheck.md):
+  wrong REAL DROP 362/2000 = 0.181000 [0.164743, 0.198480] (18.1%, Wilson 95% interval),
+  seed 18112185, regime-switching days with log SD 0.45, 14 days after and 16 before.
+  Work in phases can break the bound; other patterns can give more.
+- **Fixed:** equal numeric client-version tuples now use ascending text order in both
+  the displayed list and record validation. With four equivalent spellings, the wrong
+  three had been shown. A kept-table path below a regular file is now absent rather
+  than unreadable: `--keep` reports a write error instead of success without a write,
+  and a read-only run no longer reports an unreadable table that never existed.
+  Both defects were found by the blind acceptance tests.
+- **Not in this release:** an unknown split date, repeated daily looks with a stated
+  error rate, a replacement streak check, two-model comparisons, a range for the change,
+  other coding agents, OpenTelemetry input, a public tracker, real-machine Windows
+  checks, older log formats, usage-limit or cost measures, or sending data anywhere.
+- **Docs:** record 0017, the logs/2 statistics and self-check, the live example transcript,
+  kept-table format and retention limits, the realornoise threat model, skill pins,
+  release checks, compatibility and roadmap. The documented command requests Python
+  3.14 for compressed Codex logs. Related tools are described without comparison claims.
 - **CI:** CodeQL (Python and Actions) and zizmor now scan every push to `main` and
   `sprint/**` and every pull request, Dependabot opens one monthly grouped pull request for
   GitHub Actions versions, uv is installed from a hash-pinned requirements file in every

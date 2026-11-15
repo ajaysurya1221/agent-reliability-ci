@@ -3,13 +3,13 @@
 `arci logs` reads local Claude Code and Codex session logs and compares recent days with
 earlier days for one model and effort setting per tool. It runs no model and no trial.
 The [statistics contract](../STATISTICS_LOGS.md) states the assumptions and limits;
-[record 0016](../design/0016-logs.md) defines the output;
+[record 0017](../design/0017-logs-2.md) defines the output;
 [log formats](../LOG_FORMATS.md) describes the readers.
 
 ## Try it in one command
 
 ```sh
-uvx realornoise
+uvx --python 3.14 realornoise
 ```
 
 Or install the main package:
@@ -20,9 +20,10 @@ arci logs
 ```
 
 Installation needs network access. Reading the logs sends nothing and writes nothing
-unless an output path is given. Model and effort names that pass a bounded grammar are
-printed in full; other names become distinct opaque labels. Raw text, client versions and
-working-directory names do not appear in the output.
+unless an output path or `--keep` is given. Model and effort names that pass the accepted
+lists are printed in full; other names become distinct opaque labels. Up to three bounded
+client-version names after the split are printed too. Raw text and working-directory names
+never appear. Python 3.14 reads compressed Codex logs; uv fetches that Python.
 
 ## Try the packaged example
 
@@ -31,10 +32,10 @@ arci logs --example
 ```
 
 Example data, generated, not anyone's logs. This is the complete output captured in the
-checkout on 2026-11-15.
+2.4.0 checkout on 2026-11-16.
 
 ```text
-realornoise 2.3.0 · reads local session logs · sends nothing · writes nothing unless asked
+realornoise 2.4.0 · reads local session logs · sends nothing · writes nothing unless asked
 Example data, generated. Not anyone's logs.
 
 Claude Code · model-1 · effort high · main thread · days at UTC+00:00
@@ -54,7 +55,7 @@ Context counts; differences between the periods are not tested:
 client versions 1 before, 1 after, 1 in both · working directories 1 before, 1 after · sub-agent
 share 0.7% -> 0.7%
 Streak check: 3 of 3 tested measures were not flagged.
-method arci-logs/1 · exact rank tests · no random numbers · day-table digest 5737f3d6ed96
+method arci-logs/2 · exact rank tests · no random numbers · day-table digest bc3c83e31e99
 
 Codex · model-1 · effort high · main thread · days at UTC+00:00
 before  2026-08-09 to 2026-10-31
@@ -72,25 +73,28 @@ Context counts; differences between the periods are not tested:
 client versions 2 before, 2 after, 2 in both · working directories 2 before, 2 after · sub-agent
 share 0.7% -> 0.7%
 Streak check: 3 of 3 tested measures were not flagged.
-method arci-logs/1 · exact rank tests · no random numbers · day-table digest c0b6d7c8c0d6
+method arci-logs/2 · exact rank tests · no random numbers · day-table digest b267f6b674a9
 
 This shows what your logs recorded. It does not establish answer quality, a cause, or a change
 to the model: your tasks, prompts, projects or client version may have changed.
-For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the
-time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5% of the
-time. Both hold only if: (1) the days in this window are interchangeable when nothing changes;
-(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change
-moves every day alike, by an amount the measure can take; (4) a change leaves the same days,
-setting, reference value and earlier-day values in use. None of these is checked, and the streak
-check does not prove them. Running this again and again until a result appears is not covered.
-Exact statement: docs/STATISTICS_LOGS.md in the repository.
+For each tool above and one comparison, if (1) the days in this window are interchangeable when
+nothing changes, whatever their number of responses, and (2) to (4) below hold, then REAL DROP
+appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of the time if a
+measure moved toward worse by its margin or more. When days resemble their neighbours or work comes
+in phases, (1) fails: in the cases it tested, the self-check measured wrong REAL DROP up to
+18.1%, with 14 days after the split and 16 before; other patterns can
+give more. The conditions (2) to (4) are: (2) any date, model, effort or project you gave was not
+chosen from these logs; (3) a change moves every day alike, by an amount the measure can take; (4) a
+change leaves the same days, setting, reference value and earlier-day values in use. None of these
+is checked, and the streak check does not prove them. Running this again and again until a result
+appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the repository.
 
 Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run
 exit 1
 ```
 
 Exit 1 is expected here because Claude Code has REAL DROP, even though Codex has NO DROP.
-`uvx realornoise --example` reads the same packaged data with a fixed clock.
+`uvx --python 3.14 realornoise --example` reads the same packaged data with a fixed clock.
 
 ## Read the output
 
@@ -107,8 +111,9 @@ Exit 1 is expected here because Claude Code has REAL DROP, even though Codex has
    share changes are percentage points. A dash means unavailable. The finding is each
    measure's test result; `not used` means another measure's streak stopped the comparison.
 4. Context counts show distinct client versions and directories and the sub-agent share,
-   not tests of those differences. The streak line counts measures not flagged; it does
-   not prove independence. Notices count other settings, unread compressed files, lines
+   not tests of those differences. A separate line lists up to three accepted client
+   versions after the split, highest first, with a count of those not shown. The streak line
+   counts measures not flagged; it does not prove independence. Notices count other settings, unread compressed files, lines
    lacking fields, future records and unreadable files. The method and digest identify the
    rule and day table, not who produced the logs.
 5. The limits state what this cannot show and the assumptions for the error bounds.
@@ -145,8 +150,13 @@ A measure needs 5 usable after-days and 10 usable before-days. A reasoning-token
 repeated-value day needs 20 known counts, including 10 positive counts; a no-reasoning
 share needs 20 known counts; a file-edit share needs 10 results. Unknown counts are not
 zeros. Sub-agents and other settings do not fill gaps for the chosen setting.
-Claude Code's retention can remove the older files before enough usable days accumulate.
-No day table is stored automatically to outlive that retention.
+When the reason is `too_few_days`, text, Markdown and HTML show the setting's first response date
+in the window and its response-day counts before and after the split. With no `--since`,
+text, Markdown and HTML also give the earliest test date, a best case if this setting is
+used every day after the last log day, each new day is usable, and earlier days remain on
+disk or kept. This is not a promise of a decisive result. It counts from the last log day,
+so the date can already be in the past. Claude Code also prints its retention notice.
+Other CANNOT TELL reasons do not print this date.
 
 Even enough days can be too variable. If any eligible measure's earlier days come in
 streaks, the whole tool comparison is CANNOT TELL. Passing this check does not establish
@@ -159,17 +169,68 @@ a desired result appears. Use controlled runs when the question needs stronger e
 |---|---|
 | `--tool auto\|claude-code\|codex\|both` | Default `auto` requests tools whose roots exist; under `auto`, a tool whose directory option is given is always requested, also when the directory does not exist. If neither root exists and no directory option was given, both report no logs. |
 | `--since YYYY-MM-DD` | Set the split, at most 83 days before the newest day; a later-than-newest split gives no after-days. |
-| `--model NAME`, `--effort NAME` | Select names as printed, including opaque labels. Default is the most frequent setting over both periods, ties by raw text order. |
+| `--model NAME`, `--effort NAME` | Select names as printed, including opaque labels. Default is the setting with the most main-thread responses after the split, among candidates matching these filters. If none has an after-response, use counts over the whole window. Ties use raw model, then raw effort, in code-point order. Kept rows participate in these counts. |
 | `--project PATH` | Keep sessions whose working directory is that path or below it. |
 | `--claude-dir DIR` | Replace the Claude Code projects directory. |
 | `--codex-dir DIR` | Replace the Codex home containing `sessions` and `archived_sessions`. |
 | `--utc` | Use UTC calendar days instead of the start instant's local offset. |
-| `--example` | Read packaged synthetic logs with a fixed clock; directory options are ignored. |
+| `--example` | Read packaged synthetic logs with a fixed clock; directory and keep options are ignored after usage checks. No kept table is read or written. |
 | `--markdown FILE`, `--html FILE`, `--json FILE` | Write the chosen report files. |
-| `--help` | Show the command's options without reading logs. |
+| `--keep` | Read the kept table and save daily counts after the run. |
+| `--keep-dir DIR` | Choose the table directory; implies `--keep`. |
+| `--ignore-kept` | Do not read or use the kept table. Cannot be combined with either keep option. |
+| `--help`, `-h` | Show the command's options without reading logs. |
+
+The two keep-option conflicts exit 3 before reading logs or writing files:
+`--keep cannot be used with --project.` and `--ignore-kept cannot be used with --keep.`
+Both also apply when `--keep-dir` implied `--keep`, including with `--example`.
 
 Choose filters and dates without looking at the compared records if you intend to invoke
 the bounds. The calendar uses one UTC offset, not historical daylight-saving offsets.
+
+## Keeping days beyond the vendor's retention
+
+```sh
+uvx --python 3.14 realornoise --keep
+```
+
+Claude Code deletes session files after 30 days by default. Its setting is
+`cleanupPeriodDays` ([settings reference](https://code.claude.com/docs/en/settings-reference),
+read 15 Nov 2026). `--keep` saves main-thread daily counts, dates, UTC offsets and accepted
+model and effort names. It saves no prompts, answers, paths or client versions.
+Settings shown by aliases are not kept. Days with more than 5,000 distinct reasoning
+counts are not kept; the output counts these omissions.
+
+The file is `days-1.json` under `--keep-dir DIR`, else `$REALORNOISE_HOME` when non-empty,
+else `~/.realornoise`. The directory is created with mode 0700 and the file with mode 0600.
+An existing directory keeps its mode. The table is read on later runs even without `--keep`;
+`--ignore-kept`, `--project` and `--example` skip it. `--keep` writes every accepted setting
+from the newest log day back through 180 days, independent of model, effort or date filters.
+Older rows of that requested, readable tool are pruned. The table is not a permanent archive.
+
+For a day present in both sources, the row with more responses wins; on equal responses,
+more file-edit results wins; on an exact tie, logs win. The whole row is used, never a mix.
+Kept days are counted in the output and drawn as open circles in HTML. Context and reader
+counts still come from logs alone. The table cannot advance the newest day or turn missing
+logs into a result. Invalid tables are not used; a `--keep` run does not overwrite one.
+
+The retention promise assumes immutable records, no late backdated arrivals and whole-file
+deletion strictly after 720 hours. Each deleted day must have been captured whole before deletion, with successful captures
+at most 29 days apart. For admitted rows, retained and undeleted histories then give the
+same day values and results at the same instant, options, UTC offset and window, as checked
+on synthetic histories. A day never captured whole cannot be recovered. Days with only
+file-edit results are outside the tested promise. Changing the offset, rejected names,
+rows above the count limit, edited logs or a longer gap also fall outside it. Partial days
+or a changed reader can affect one period differently and break the statistical assumptions.
+
+To delete kept history, delete `days-1.json` from the directory you chose. For the default:
+
+```sh
+rm ~/.realornoise/days-1.json
+```
+
+Omit `--keep` on later runs to leave it absent. The file format and validation limits are in
+[LOG_FORMATS.md](../LOG_FORMATS.md#kept-day-table-realornoise-days1).
 
 ## Compressed Codex logs
 
@@ -191,11 +252,11 @@ arci logs --markdown comparison.md --html comparison.html --json comparison.json
 
 Markdown is a block for an issue thread: scope, result, table, context counts and limits.
 HTML is a self-contained page with the same information and daily strip charts. It has
-no script or external reference. JSON is the sealed `arci-logs/1` record: day tables,
+no script or external reference. JSON is the sealed `arci-logs/2` record: day tables,
 exact rational test values, reader counters, context counts and rendered model and effort
-names. It contains enough to recompute the result, not the original log text. The seal
+names, plus bounded client versions, kept-day sources and short-history fields. It contains enough to recompute the result, not the original log text. The seal
 checks consistency; it does not authenticate execution. Review the dates and accepted
-model and effort names before sharing them.
+model, effort and client-version names before sharing them.
 
 ## Inside Claude Code or Codex
 
@@ -207,7 +268,8 @@ In Claude Code:
 /realornoise:realornoise
 ```
 
-The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) runs the command and shows its output.
+The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) runs `uvx --python 3.14 realornoise==2.4.0` and shows its output. Neither skill passes
+`--keep`; run that option yourself in a terminal when you want to store counts.
 The printed numbers then enter that assistant's conversation.
 
 For Codex, copy [integrations/codex/skills/realornoise](../../integrations/codex/skills/realornoise/SKILL.md)
@@ -221,3 +283,7 @@ Use [`arci verdict`](verdict.md) when you have repeated pass/fail results for a 
 and candidate. Use [`arci run`](../../README.md#controlled-trials-arci-run) to run both on
 the same predeclared tasks and faults with an independent checker. These answer controlled
 comparison questions that observational session logs cannot answer.
+
+The self-check measured wrong REAL DROP up to 18.1% (362/2000, Wilson 95% interval
+[0.164743, 0.198480], seed 18112185), with 14 days after and 16 before in regimes:
+work that comes in phases can break the stated bound, and other patterns can give more.

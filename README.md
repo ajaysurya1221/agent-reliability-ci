@@ -1,32 +1,34 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/banner-dark.svg">
-  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/banner-light.svg" alt="Real or noise? Dots for 42 earlier days scatter inside one band; dots for 14 recent days sit well below it. Generated example data. Command: uvx realornoise." width="100%">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/banner-light.svg" alt="Real or noise? Dots for 42 earlier days scatter inside one band; dots for 14 recent days sit well below it. Generated example data. Command: uvx --python 3.14 realornoise." width="100%">
 </picture>
 
 # Did your agent get worse? Real, noise, or cannot tell.
 
 [![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
 
-ARCI (agent-reliability-ci) answers that question in three ways, from the least effort and the
-weakest evidence to the most. Each one prints the assumptions it cannot check.
+ARCI (agent-reliability-ci) offers three comparisons with increasing effort and evidence.
+Each prints the assumptions it cannot check.
 
 **1. Logs you already have.** If you use Claude Code or Codex, the session logs on your disk
 record how the model behaved each day. One command compares recent days with earlier ones:
 
 ```bash
-uvx realornoise
+uvx --python 3.14 realornoise
 ```
 
-On the packaged example data (`uvx realornoise --example`):
+Python 3.14 reads compressed Codex logs; uv fetches that Python.
+
+On the packaged example data (`uvx --python 3.14 realornoise --example`):
 
 ```text
 RESULT: REAL DROP
 reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-Nothing leaves your machine, and the output holds counts, rates, dates and the names of the model
-and effort compared. It shows what your logs recorded, not why: your tasks, prompts and client
-changed too. With a short history the usual answer is `CANNOT TELL`.
+Nothing leaves your machine. The output holds counts, rates, dates and bounded model, effort
+and client-version names. It shows what your logs recorded, not why: your tasks, prompts and client
+may have changed too. With a short history the usual answer is `CANNOT TELL`.
 [How to read it](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md) ·
 [the method and its limits](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS_LOGS.md)
 
@@ -40,9 +42,11 @@ tasks, injects tool timeouts, errors and empty results, and returns `PASS`, `BLO
 defaults and under assumptions ARCI states and does not check.
 [Start here](#controlled-trials-arci-run) · no install: `uvx --from agent-reliability-ci arci demo`
 
-## New in 2.3: a result from logs you already have
+## New in 2.4: compare the setting you use now
 
-`arci logs` reads local Claude Code and Codex session logs, runs no model, and compares usable days for one model and effort setting per tool.
+`arci logs` compares the model and effort used most after the split, instead of the most used over the whole window.
+`--keep` saves daily counts beyond vendor retention. Claude Code deletes session files after 30 days by default (`cleanupPeriodDays`; [settings reference](https://code.claude.com/docs/en/settings-reference), read 15 Nov 2026).
+With a short history the usual answer is CANNOT TELL. When days are too few, the output names the earliest possible test date, conditional on daily usable counts and retained earlier days.
 Packaged example data (`arci logs --example`), Claude Code:
 
 ```text
@@ -50,16 +54,12 @@ RESULT: REAL DROP
 reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-REAL DROP means a recorded measure moved toward worse beyond a chance ordering of days.
-NO DROP rules out each measure's margin under the stated assumptions; it does not mean improvement.
-CANNOT TELL means the history is too short, variable or streaky to decide.
-This cannot show cause, answer quality or a change to a model; tasks, prompts and clients can change too.
-In the final AR(1) self-check at correlation 0.5 and log SD 0.45, the rule as built gave wrong REAL DROP rates of 0.080500, 0.035500 and 0.002500 and wrong NO DROP rates of 0.005000, 0.005000 and 0.000500 at 5/10, 7/21 and 14/42 after/before days (2000 histories each); the first two wrong REAL DROP rates exceed the nominal bound of 0.025, and [the method](docs/STATISTICS_LOGS.md#what-the-method-cannot-see) gives all variants, wrong-NO-DROP rates and intervals.
-
+The output now states the worst wrong-REAL-DROP rate measured in the [self-check](docs/results/logs-selfcheck.md): 18.1%, at 14/16 after/before days in regimes (362/2000 = 0.181000 [0.164743, 0.198480], Wilson 95% interval, seed 18112185).
+For AR(1) correlation 0.5 and log SD 0.45, the rule as built measured wrong REAL DROP at 0.092500, 0.036000 and 0.005000 for 5/10, 7/21 and 14/42 days (2000 histories each).
+Work in phases can break the bound; other patterns can give more. These logs cannot establish cause, answer quality or a model change.
 Claude Code: `/plugin marketplace add ajaysurya1221/agent-reliability-ci`, `/plugin install realornoise@agent-reliability-ci`, then `/realornoise:realornoise`.
-Codex: copy [`integrations/codex/skills/realornoise`](integrations/codex/skills/realornoise/SKILL.md) into `~/.agents/skills/`.
-Both put the printed numbers into that assistant's conversation.
-[Recipe](docs/recipes/logs.md) · [Statistics and limits](docs/STATISTICS_LOGS.md) · [Design record](docs/design/0016-logs.md).
+Codex: copy [`integrations/codex/skills/realornoise`](integrations/codex/skills/realornoise/SKILL.md) into `~/.agents/skills/`. Both skills put the printed numbers into the conversation.
+[Recipe](docs/recipes/logs.md) · [Statistics and limits](docs/STATISTICS_LOGS.md) · [Design record](docs/design/0017-logs-2.md).
 
 ## New in 2.2: a verdict from results another tool produced
 
@@ -173,6 +173,13 @@ compares two different models with everything else equal
 As each project describes itself; read in November 2026, not tested here. Corrections are
 welcome as issues.
 
+- Tools about "did the model get worse", as they describe themselves, read 16 Nov 2026,
+  not tested here: [is-it-nerfed](https://github.com/resitaydin/is-it-nerfed),
+  "A Claude Code plugin that checks your own logs for proof". It asks Sonnet subagents
+  whether you had to correct the model, for a sample of your prompts, and compares the
+  last two weeks with an earlier window. [livenerf](https://github.com/ninjahawk/livenerf),
+  "A long-running, deterministic-as-possible benchmark for detecting whether a frontier
+  model gets quietly worse after launch".
 - Fault injection for agent tool calls:
   [agentchaos-sdk](https://pypi.org/project/agentchaos-sdk/),
   [probe-ai](https://pypi.org/project/probe-ai/),

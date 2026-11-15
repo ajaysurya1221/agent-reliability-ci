@@ -6,7 +6,12 @@ and Codex CLI versions 0.154.0 and 0.167.0 on one machine.
 `arci logs` is untested on Windows; Windows case rules are unchanged.
 This describes the readers in [the repository](../src/arci/logs/), not a vendor contract.
 The [statistics](STATISTICS_LOGS.md) define the day table and comparison;
-[record 0016](design/0016-logs.md) defines the output record and fixed texts.
+[record 0017](design/0017-logs-2.md) defines the output record and fixed texts.
+
+In 2.4.0 the only reader change is client-version names. Each reader still returns a version
+identity per response. It now also returns the matching version string, or null for a name
+outside `^[0-9]{1,5}(\.[0-9]{1,5}){1,3}$`. Response assembly, duplicate handling, filtering,
+counts and unreadable-file rules are unchanged.
 
 ## Files and order
 
@@ -20,6 +25,9 @@ Codex's root is `$CODEX_HOME`, or `~/.codex` when the variable is absent or empt
 `--codex-dir DIR` replaces that home directory. The reader walks `sessions` and
 `archived_sessions` recursively for names starting with `rollout-` and ending in
 `.jsonl` or `.jsonl.zst`. Session paths normally include `sessions/YYYY/MM/DD/`.
+Codex compresses sessions idle for 7 days to `.jsonl.zst`
+([Codex compression source](https://github.com/openai/codex/blob/main/codex-rs/rollout/src/compression.rs),
+read 16 Nov 2026), which is why `uvx --python 3.14 realornoise` is the documented command.
 Compressed files use Python 3.14's `compression.zstd`. Earlier Pythons count them as
 unread compressed files, report the count (and, when other files give a result, that the
 result uses the rest), and print `uvx --python 3.14 realornoise`. No decompression dependency is installed.
@@ -56,7 +64,7 @@ An assistant line uses:
 | `message.model` | Model setting from the first line. |
 | `effort`, else `perTurnEffort` | Effort setting from the first line; the first non-empty string is used. An empty or non-string `effort` falls back to `perTurnEffort`. |
 | `cwd` | Working directory on the first line, used for the project filter and context counts. |
-| `version` | Client version on the first line, reduced to distinct-value counts. |
+| `version` | Client version on the first line, retained as an identity and a bounded name or null. |
 | `isSidechain` | Exactly `true` means a sub-agent response. |
 | `message.usage.output_tokens_details.thinking_tokens` | Non-negative integer reasoning count, excluding booleans; missing, null or invalid means unknown, never zero. |
 | `message.content[]` | `tool_use` blocks supply `id` and `name` for matching results. Other blocks do not supply a measure. |
@@ -101,7 +109,7 @@ the setting comparisons and increments its counter.
 
 No answer-text assembly is needed: the token-count event supplies the response measure.
 There is no Codex file-edit measure, since edits can go through shell commands. Client
-versions and working directories become counts, never printed strings.
+versions supply identities and bounded names; working directories become counts, never printed strings.
 
 ## Counters and records left out
 
@@ -140,6 +148,48 @@ the calendar, or offset zero with `--utc`; this does not reconstruct historical 
 saving offsets. The main thread of one selected model and effort setting supplies the
 day table. See [the recipe](recipes/logs.md) for usable days, results and notices.
 
-Model and effort names pass the bounded rendering rules in [record 0016](design/0016-logs.md).
+Model and effort names pass the bounded rendering rules in [record 0017](design/0017-logs-2.md).
 Accepted names are disclosed in full; other names become distinct `model-1`, `effort-1`
-style labels. No log text, raw directory, client version or exception text is printed.
+style labels. No log text, raw directory, rejected client version or exception text is printed.
+After-period client versions use all in-project responses, including other settings and
+sub-agents. Up to three matching names are listed in descending numeric-tuple order;
+equal tuples use ascending text order (`1.01` before `1.1`). The `+k more` count includes
+all other distinct versions, matching or not. With no matching name, the line is omitted.
+
+## Kept day table: `realornoise-days/1`
+
+`days-1.json` lives in `--keep-dir DIR`, else non-empty `$REALORNOISE_HOME`, else
+`~/.realornoise`. It is UTF-8 JSON, sorted keys, no indent, with a final newline.
+Its top-level object has exactly two fields:
+
+| Field | Meaning |
+|---|---|
+| `schema` | Exactly `realornoise-days/1`. |
+| `rows` | Row objects sorted by `(tool, utc_offset_minutes, model, effort, day)`, with no duplicate key tuple. |
+
+Each row has exactly these fields:
+
+| Field | Meaning |
+|---|---|
+| `tool` | `claude-code` or `codex`. |
+| `utc_offset_minutes` | Integer strictly between -1440 and 1440; the writing run's fixed offset. |
+| `model` | Model id passing the bounded model grammar; aliases are never kept. |
+| `effort` | One of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`, `persistent`. |
+| `day` | Calendar date as `YYYY-MM-DD` at this offset. |
+| `responses` | Non-negative count of this setting's main-thread responses, including unknown reasoning counts. |
+| `reasoning` | At most 5,000 `[count, frequency]` pairs. Counts are non-negative integers in strictly ascending order, including zero; frequencies are positive integers. |
+| `reasoning_unknown` | Non-negative number of responses without a known reasoning count. |
+| `edits` | Claude Code: non-negative file-edit result count, excluding denials and unmatched results. Codex: null. |
+| `edits_failed` | Claude Code: integer from zero through `edits`. Codex: null. |
+
+`responses` must equal `reasoning_unknown` plus all histogram frequencies. A row needs
+at least one response or edit. Integer fields reject booleans and decimal numbers.
+Extra fields, duplicate JSON keys, invalid names, malformed dates, unsorted or duplicate
+rows or counts, invalid totals, non-regular files and files over 33,554,432 bytes are rejected.
+The whole invalid table is left unused; `--keep` does not replace it. The writer shares the
+32 MiB limit. Writes are staged with requested reports and rolled back together on failure.
+The file has mode 0600; newly created directories have mode 0700.
+
+The table stores counts and settings, not prompts, answers, paths, version strings or
+response ids. It has no integrity seal or authentication. For merging, pruning, retention
+limits and deletion, see [Keeping days](recipes/logs.md#keeping-days-beyond-the-vendors-retention).
