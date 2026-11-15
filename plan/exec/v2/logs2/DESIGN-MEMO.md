@@ -125,3 +125,30 @@ wrong REAL DROP and wrong NO DROP are each at or under 2.83% in 20,000 simulated
 per design, where histories hold two or three settings and a change of setting inside the
 window; and the kept-table rules of M4 give the same day table after old logs are deleted
 as before.
+
+## Addenda after spike S0 (16 Nov 2026; S0 passed, decision D-19)
+
+- **A2 changes too.** The 2.3.0 statistics document forbids choosing the setting from
+  after-period counts. The new document restates A1 and A2 and their proofs: with the log
+  structure fixed, the choice is fixed under every permutation of day values over fixed
+  usable slots; conditional exchangeability then gives the reference distribution.
+- **`--since` later than `N`:** the after period has no response. The setting is then
+  chosen by the same count rule over the before period, so the output still names a
+  setting, and the result is CANNOT TELL (`too_few_days`).
+- **One of `--model` and `--effort` given:** among the settings that match the given
+  one, the other is chosen by the count rule of M2.
+- **Rows under another UTC offset** are counted as rows (one row is one setting on one day).
+- **The kept table's promise** is limited to rows admitted to the table and inside the
+  active window: with no gap between `--keep` runs longer than 29 days, the days used
+  equal those of a history with nothing deleted (S0, G4: 0 of 500 histories differed;
+  with gaps of 31 to 45 days every history lost data). The docs say that a day never
+  captured whole cannot be recovered.
+- **Stated limit with a number:** when the first five days of a newly adopted setting
+  run 15% higher than its later days, wrong REAL DROP was 535 of 20,000 at 14 days after
+  against 16 before (S0, G2b). The self-check keeps this cell.
+- **The self-check adds a competitive choice:** histories in which two settings have
+  close after-period counts, so that the choice is exercised and not fixed by construction.
+- **Process:** every Codex invocation line now carries the sentence "Never open anything
+  under ~/.claude or ~/.codex" itself, because in S0 Codex ran one search of its own
+  memory registry under `~/.codex` before it had read the brief. It reported that the
+  search returned nothing and that no session log was read.

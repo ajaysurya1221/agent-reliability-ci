@@ -287,3 +287,28 @@ whose cited claims were re-opened one by one, and a count-only check of the reas
 - Also on this branch: the wider timing window for one adapter test (`bc29799`).
 
 Design decisions for the build: `logs2/DESIGN-MEMO.md`.
+
+## D-19: spike S0 passed; go for `arci-logs/2` (2026-11-16)
+
+Report and scripts: `spikes/S0-logs2/` (seed base 17112026; every cell re-runs by id).
+
+- **G1 (gate), setting changes, independent days, 20,000 histories per cell:** wrong REAL
+  DROP 287, 320, 358 and 380 of 20,000 at 5/10, 7/21, 14/16 and 14/42 (limit 566). Wrong
+  NO DROP at a margin: at most 29 of 20,000. In 6,000 histories run through response
+  records, the new rule chose the current setting every time and day table and result
+  agreed. The 2.3.0 rule would have chosen the old setting in every history of the three
+  shorter designs and in 28% of the 14/42 ones.
+- **G4 (gate), kept day table:** with no gap between runs longer than 29 days, 0 of 500
+  histories differed from the undeleted history; with gaps of 31 to 45 days all 500 lost
+  data. Rows under another UTC offset were never mixed in (1,000 checks).
+- **G2 (report):** a "new model" effect (first five days 15% higher) gave wrong REAL DROP
+  535 of 20,000 at 14/16 and 415 at 7/21. This is outside the assumption and goes into the
+  docs as a stated limit.
+- **G3 (report), power with the rule as built:** at 14 days after against 16 before, a
+  45% drop in reasoning tokens was found in 1,694 of 2,208 generated histories at spread
+  0.45; a 33% drop in 879 of 2,261. At 5 against 10: 705 of 2,199 and 280 of 2,191.
+- Corrections to the design memo from the spike are in its addenda (assumption A2,
+  `--since` later than the newest day, a partial override, what the kept table promises).
+- One process fault: Codex ran one search of its own memory registry under `~/.codex`
+  before reading the brief. It reported no match and no session log read. The invocation
+  line now carries the prohibition itself.
