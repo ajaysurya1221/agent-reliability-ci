@@ -182,7 +182,15 @@ NO_LOGS_REASON = {
 USAGE_ERRORS = {
     "malformed": "--since needs a date as YYYY-MM-DD.",
     "early": "--since can be at most 83 days before the newest day in the logs.",
+    "usage": "Usage error. Run: realornoise --help",
 }
+# The notices, which print only when their count is at least 1.
+F9 = "Compressed Codex files not read (Python 3.14 is needed): {}. The result uses the rest."
+F14 = "Other model or effort settings, not compared: {}."
+F15 = "Lines that lacked a needed field, left out: {}."
+F16 = "Records stamped later than now, left out: {}."
+F17 = "Files that could not be read: {}. The result uses the rest."
+NOTICES = (F9, F14, F15, F16, F17)
 F4 = {
     "REAL_DROP": "RESULT: REAL DROP",
     "NO_DROP": "RESULT: NO DROP",
@@ -206,6 +214,26 @@ F10_FIRST_SENTENCE = "This shows what your logs recorded."
 F10_THIRD_SENTENCE = (
     "For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5%"
     " of the time"
+)
+# F10 is the one fixed text the record gives already broken into lines: its breaks are not the
+# ones the wrapping rule would choose, so the lines below are the record's own.
+F10_LINES = (
+    "This shows what your logs recorded. It does not establish answer quality, a cause,"
+    " or a change",
+    "to the model: your tasks, prompts, projects or client version may have changed.",
+    "For each tool above and one comparison: if nothing shifted, REAL DROP appears at most 2.5%"
+    " of the",
+    "time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5%"
+    " of the",
+    "time. Both hold only if: (1) the days in this window are interchangeable when nothing"
+    " changes;",
+    "(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change",
+    "moves every day alike, by an amount the measure can take; (4) a change leaves the same days,",
+    "setting, reference value and earlier-day values in use. None of these is checked, and the"
+    " streak",
+    "check does not prove them. Running this again and again until a result appears is not"
+    " covered.",
+    "Exact statement: docs/STATISTICS_LOGS.md in the repository.",
 )
 F12 = (
     "Share: --markdown FILE · --html FILE · --json FILE      "
@@ -274,6 +302,13 @@ CANARY_LOWER = "canary-lower-model-x"
 CANARY_VERSION = "9.8.7654321"
 CANARY_MODEL_A = "acme-payroll-secret"
 CANARY_MODEL_B = "gpt-12345678-87654321"
+# Nine parts and eight plain numbers: over the grammar's limits of six and three.
+CANARY_MODEL_C = "gpt-12-34-56-78-87-65-43-21"
+CANARY_EFFORT_1 = "canary-effort-aggressive"
+CANARY_EFFORT_2 = "canary-effort-zealous"
+# An accepted id that sorts before every rejected one, so that numbering the rejected names
+# among themselves is visible: "4o" is a letter-and-digits token and "mini" is a listed word.
+SMALL_MODEL = "4o-mini"
 CANARY_DIR = "/canary-home/canary-work"
 CANARY_PROMPT = "canary prompt text"
 CANARY_INPUT = "canary tool input"
@@ -284,12 +319,15 @@ CANARIES = (
     CANARY_VERSION,
     CANARY_MODEL_A,
     CANARY_MODEL_B,
+    CANARY_MODEL_C,
+    CANARY_EFFORT_1,
+    CANARY_EFFORT_2,
     CANARY_DIR,
     CANARY_PROMPT,
     CANARY_INPUT,
     CANARY_OUTPUT,
 )
-CANARY_PARTS = ("acme", "payroll", "87654321", "canary", "CANARY")
+CANARY_PARTS = ("acme", "payroll", "87654321", "12-34-56", "canary", "CANARY")
 
 
 @dataclass(frozen=True)
@@ -965,6 +1003,47 @@ def _says(text: str, sentence: str) -> None:
     assert _flat(sentence) in _flat(text), sentence
 
 
+def _wrapped(sentence: str, bound: int) -> list[str]:
+    """The sentence broken at the last space at or before `bound`.
+
+    Record 0016, "Fixed texts": "A fixed sentence longer than 100 characters is broken at the
+    last space at or before column 100, and so on for the rest." Column 100 is index 99, so a
+    break there leaves a line of 99 characters; `bound` 101 is the reading that allows a full
+    100-character line. The two differ only when a space sits at exactly index 100, so `_block`
+    accepts either.
+    """
+    lines: list[str] = []
+    rest = sentence
+    while len(rest) > 100:
+        cut = rest.rfind(" ", 0, bound)
+        lines.append(rest[:cut])
+        rest = rest[cut + 1 :]
+    lines.append(rest)
+    return lines
+
+
+def _block(outcome: Outcome, *sentences: str) -> None:
+    """Each sentence appears as its own run of consecutive output lines, broken by the rule."""
+    lines = outcome.lines
+    for sentence in sentences:
+        wanted = [_wrapped(sentence, 100), _wrapped(sentence, 101)]
+        found = any(
+            lines[start : start + len(want)] == want
+            for want in wanted
+            for start in range(len(lines) + 1 - len(want))
+        )
+        assert found, wanted[0]
+
+
+def _run_of(outcome: Outcome, wanted: Sequence[str]) -> None:
+    """`wanted` appears as a run of consecutive output lines."""
+    lines = outcome.lines
+    rows = list(wanted)
+    assert any(
+        lines[start : start + len(rows)] == rows for start in range(len(lines) + 1 - len(rows))
+    ), rows[0]
+
+
 def _args(
     tool: str,
     *,
@@ -981,6 +1060,25 @@ def _args(
     if utc:
         argv.append("--utc")
     return [*argv, *extra]
+
+
+def _day_table(tool: Mapping[str, Any]) -> dict[str, Any]:
+    """The structure `day_table_sha256` hashes (record 0016, "Record model", last bullet)."""
+    return {
+        "method": "arci-logs/1",
+        "tool": tool["tool"],
+        "model": tool["model"],
+        "effort": tool["effort"],
+        "split_date": tool["split_date"],
+        "before": tool["before"],
+        "after": tool["after"],
+        "alpha_real": "1/120",
+        "alpha_none": "1/40",
+        "measures": [
+            {name: measure[name] for name in ("id", "margin", "before_days", "after_days")}
+            for measure in tool["measures"]
+        ],
+    }
 
 
 def _audit(body: Mapping[str, Any], code: int) -> None:
@@ -1012,6 +1110,7 @@ def _audit(body: Mapping[str, Any], code: int) -> None:
             assert set(tool["before"]) == PERIOD_FIELDS
             assert set(tool["context"]) == CONTEXT_FIELDS
             assert re.fullmatch(r"[0-9a-f]{64}", tool["day_table_sha256"])
+            assert tool["day_table_sha256"] == hash_record(_day_table(tool))
             if tool["after"] is None:
                 assert all(not measure["after_days"] for measure in tool["measures"])
             else:
@@ -1155,8 +1254,11 @@ def test_each_result_and_reason_of_the_ladder(tmp_path: Path, name: str) -> None
     assert (tool["result"], tool["reason"]) == (result, reason)
     assert outcome.code == EXIT[result]
     assert F4[result] in outcome.lines
-    _says(outcome.out, REASONS.get(reason, NO_LOGS_REASON["claude-code"]))
+    _block(outcome, REASONS.get(reason, NO_LOGS_REASON["claude-code"]))
     assert outcome.err == ""
+    # F8 is left out when no measure was tested, and printed otherwise.
+    tested = [measure for measure in tool["measures"] if measure["finding"] != "too_few_days"]
+    assert ("Streak check:" in outcome.out) is bool(tested)
     if plans is not None:
         _check(outcome, "claude-code", plans)
 
@@ -1203,8 +1305,8 @@ def test_an_error_beside_a_result_leaves_the_exit_code_to_the_result(tmp_path: P
     # An ERROR block is the tool name, F4 and the reason; F10 prints once, for the tool that
     # has a result (record 0016, text layout items 2 and 3).
     assert TOOL_NAMES["claude-code"] in outcome.lines
-    _says(outcome.out, NO_LOGS_REASON["claude-code"])
-    _says(outcome.out, F10)
+    _block(outcome, NO_LOGS_REASON["claude-code"])
+    _run_of(outcome, F10_LINES)
 
 
 def test_with_no_log_root_at_all_both_tools_are_requested_and_error(tmp_path: Path) -> None:
@@ -1213,8 +1315,8 @@ def test_with_no_log_root_at_all_both_tools_are_requested_and_error(tmp_path: Pa
     assert [tool["result"] for tool in outcome.tools()] == ["ERROR", "ERROR"]
     assert [tool["reason"] for tool in outcome.tools()] == ["no_logs", "no_logs"]
     assert outcome.code == 3
-    _says(outcome.out, NO_LOGS_REASON["claude-code"])
-    _says(outcome.out, NO_LOGS_REASON["codex"])
+    _block(outcome, NO_LOGS_REASON["claude-code"], NO_LOGS_REASON["codex"])
+    assert [tool["split_date"] for tool in outcome.tools()] == [None, None]
     # F10 belongs to tools that have a result, and there is none.
     assert F10_FIRST_SENTENCE not in _flat(outcome.out)
 
@@ -1437,6 +1539,56 @@ def test_sub_agent_responses_are_left_out_and_only_counted_as_context(tmp_path: 
     assert all(row["count"] == 20 and row["value"] == "100/1" for row in tokens["before_days"])
     assert tool["context"]["subagent_share_before"] == _rational(Fraction(1, 5))
     assert tool["context"]["subagent_share_after"] == _rational(Fraction(1, 5))
+    # `responses` counts responses kept: a sub-agent response has a setting and is not a copy.
+    assert tool["counters"]["responses"] == 25 * 15
+
+
+def test_the_working_directory_counts_are_per_period(tmp_path: Path) -> None:
+    """Record 0016 item 6: a Claude Code line's working directory is its top-level `cwd`."""
+    plans = _uniform(ALTERNATING, DROPPED)
+    root = tmp_path / "claude"
+    kept = {day: plans[day] for day in (*BEFORE_DAYS, *AFTER_DAYS[:3])}
+    write_claude(root, kept, session="01")
+    write_claude(
+        root,
+        {day: plans[day] for day in AFTER_DAYS[3:]},
+        session="02",
+        prefix="w",
+        cwd="/work/second",
+    )
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    context = _check(outcome, "claude-code", plans)["context"]
+    assert context["workdirs_before"] == 1
+    assert context["workdirs_after"] == 2
+
+
+def test_project_keeps_only_the_claude_code_responses_inside_it(tmp_path: Path) -> None:
+    plans = _uniform(ALTERNATING, DROPPED)
+    root = tmp_path / "claude"
+    write_claude(root, {day: plans[day] for day in BEFORE_DAYS}, session="01")
+    # A directory below the project is kept as well.
+    write_claude(
+        root,
+        {day: plans[day] for day in AFTER_DAYS},
+        session="02",
+        prefix="b",
+        cwd=f"{WORKDIR}/below",
+    )
+    write_claude(
+        root,
+        {day: Day(counts=(1,) * 20) for day in (*BEFORE_DAYS, *AFTER_DAYS)},
+        session="03",
+        prefix="z",
+        cwd="/elsewhere/other",
+    )
+    outcome = _run(tmp_path, _args("claude-code", claude=root, extra=("--project", WORKDIR)))
+    assert outcome.body is not None
+    assert outcome.body["project_filtered"] is True
+    tool = _check(outcome, "claude-code", plans)
+    # Without the filter every day would hold 40 counts and a median of 91/2.
+    assert all(row["count"] == 20 for row in tool["measures"][0]["before_days"])
+    assert tool["context"]["workdirs_before"] == 1
+    assert tool["context"]["workdirs_after"] == 1
 
 
 def test_the_client_version_counts_are_per_period(tmp_path: Path) -> None:
@@ -1480,6 +1632,59 @@ def test_a_tie_between_settings_goes_to_the_first_pair_as_text(tmp_path: Path) -
     assert tool["result"] == "REAL_DROP"
 
 
+def test_a_tie_goes_by_the_raw_pair_even_when_the_rendered_names_reorder(tmp_path: Path) -> None:
+    """The tie is broken on the raw ids: `acme-...` wins, though `model-1` sorts after `gpt-5`."""
+    base = _codex_no_drop()
+    plans = {day: Day(counts=base[day].counts, other=(1,) * 20) for day in base}
+    outcome = _codex_run(
+        tmp_path,
+        plans,
+        setting=Setting(CANARY_MODEL_A, "high"),
+        other=Setting(CODEX_MODEL, "high"),
+    )
+    tool = _check(outcome, "codex", plans)
+    assert tool["model"] == "model-1"
+    assert tool["other_settings"] == 1
+    assert tool["measures"][0]["before_days"][0]["value"] == "5/1"
+    for canary in CANARIES:
+        assert canary not in outcome.out
+
+
+def test_unknown_efforts_are_numbered_among_themselves_and_never_merged(tmp_path: Path) -> None:
+    """Record 0016 item 6: rejected names are numbered in raw text order, unknown ones only."""
+    root = tmp_path / "claude"
+    plans = {
+        day: Day(counts=(value,) * 20, other=(1000,) * 10)
+        for day, value in zip((*BEFORE_DAYS, *AFTER_DAYS), (*ALTERNATING, *DROPPED), strict=True)
+    }
+    write_claude(
+        root,
+        plans,
+        session="01",
+        setting=Setting(CLAUDE_MODEL, CANARY_EFFORT_1),
+        other=Setting(CLAUDE_MODEL, CANARY_EFFORT_2),
+    )
+    # A third setting whose effort the grammar accepts, which must take no number.
+    write_claude(
+        root,
+        {day: Day(counts=(1,) * 5) for day in (*BEFORE_DAYS, *AFTER_DAYS)},
+        session="02",
+        prefix="h",
+        setting=Setting(CLAUDE_MODEL, "high"),
+    )
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["model"] == CLAUDE_MODEL
+    assert tool["effort"] == "effort-1"
+    assert tool["other_settings"] == 2
+    # Merged with the other unknown effort, the days would mix in the 1000-token responses.
+    assert all(row["count"] == 20 for row in tool["measures"][0]["before_days"])
+    assert tool["result"] == "REAL_DROP"
+    for canary in CANARIES:
+        assert canary not in outcome.out
+    assert F14.format(2) in outcome.lines
+
+
 def test_model_and_effort_select_a_setting_by_rendered_name(tmp_path: Path) -> None:
     """The second setting carries its effort on `perTurnEffort`; `--effort` still reaches it."""
     plans = {
@@ -1518,7 +1723,7 @@ def test_a_named_model_that_does_not_exist_gives_no_usable_setting(tmp_path: Pat
     tool = outcome.tool()
     assert (tool["result"], tool["reason"]) == ("CANNOT_TELL", "no_usable_setting")
     assert outcome.code == 2
-    _says(outcome.out, REASONS["no_usable_setting"])
+    _block(outcome, REASONS["no_usable_setting"])
 
 
 def test_since_replaces_the_split_date(tmp_path: Path) -> None:
@@ -1532,17 +1737,31 @@ def test_since_replaces_the_split_date(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("value", "message"),
-    [("2026-11-32", "malformed"), ("yesterday", "malformed"), ("2026-08-18", "early")],
+    ("flags", "message"),
+    [
+        (("--since", "2026-11-32"), "malformed"),
+        (("--since", "yesterday"), "malformed"),
+        (("--since", "2026-08-18"), "early"),
+        (("--bogus",), "usage"),
+        (("--tool", "bogus"), "usage"),
+    ],
 )
-def test_a_bad_since_is_a_usage_error(tmp_path: Path, value: str, message: str) -> None:
+def test_a_usage_error_prints_one_sentence_and_writes_nothing(
+    tmp_path: Path, flags: tuple[str, ...], message: str
+) -> None:
     root = tmp_path / "claude"
     write_claude(root, _uniform(ALTERNATING, DROPPED))
-    outcome = _run(tmp_path, _args("claude-code", claude=root, extra=("--since", value)))
+    outcome = _run(
+        tmp_path,
+        _args("claude-code", claude=root, extra=flags),
+        outputs=("markdown", "html"),
+    )
     assert outcome.code == 3
     assert outcome.out == ""
-    assert len(outcome.err.splitlines()) == 1
-    _says(outcome.err, USAGE_ERRORS[message])
+    # The sentence alone, with no prefix, and nothing else on standard error.
+    assert outcome.err.splitlines() == [USAGE_ERRORS[message]]
+    assert not outcome.json_path.exists()
+    assert not any(path.exists() for path in outcome.extra.values())
 
 
 def test_a_since_83_days_before_the_newest_day_is_accepted(tmp_path: Path) -> None:
@@ -1581,6 +1800,10 @@ def test_project_keeps_only_the_sessions_inside_it(tmp_path: Path) -> None:
     assert outcome.body["project_filtered"] is True
     tool = _check(outcome, "codex", plans)
     assert tool["counters"]["files_outside_project"] == 15
+    # `lines` counts every line read, and for a file outside the project its first line only:
+    # fifteen kept files of 22 lines each, plus one line from each of the fifteen others.
+    assert tool["counters"]["lines"] == 15 * 22 + 15
+    assert tool["counters"]["responses"] == 300
     assert tool["result"] == "NO_DROP"
 
 
@@ -1611,6 +1834,7 @@ def test_utc_and_the_local_offset_of_now_pick_different_days(tmp_path: Path) -> 
 
 
 def test_a_response_found_in_two_files_is_counted_once(tmp_path: Path) -> None:
+    """The identity is the message id for Claude Code; the first assembled copy is kept."""
     root = tmp_path / "claude"
     plans = _uniform(ALTERNATING, DROPPED)
     write_claude(root, plans, session="01")
@@ -1619,6 +1843,20 @@ def test_a_response_found_in_two_files_is_counted_once(tmp_path: Path) -> None:
     tool = _check(outcome, "claude-code", plans)
     assert tool["counters"]["files_read"] == 2
     assert tool["counters"]["responses_duplicate"] == 20
+    assert tool["counters"]["responses"] == 300
+
+
+def test_a_codex_response_found_in_two_files_is_counted_once(tmp_path: Path) -> None:
+    """For Codex the identity is the session id, the event time and the cumulative usage."""
+    root = tmp_path / "codex"
+    plans = _codex_no_drop()
+    write_codex(root, plans)
+    write_codex(root, {NEWEST: plans[NEWEST]}, name="rollout-copy")
+    outcome = _run(tmp_path, _args("codex", codex=root))
+    tool = _check(outcome, "codex", plans)
+    assert tool["counters"]["files_read"] == 16
+    assert tool["counters"]["responses_duplicate"] == 20
+    assert tool["counters"]["responses"] == 300
 
 
 def test_future_and_zoneless_records_are_left_out_and_counted(tmp_path: Path) -> None:
@@ -1640,10 +1878,13 @@ def test_future_and_zoneless_records_are_left_out_and_counted(tmp_path: Path) ->
     tool = _check(outcome, "claude-code", plans)
     assert tool["counters"]["records_in_future"] == 1
     assert tool["counters"]["records_without_timezone"] == 1
+    # A line carrying `isApiErrorMessage` counts as a line of an unused type.
+    assert tool["counters"]["lines_unknown_type"] == 1
+    assert tool["counters"]["lines"] == 300 + 3
     # None of the three reaches a day: the newest day, the split and every day count stand.
     assert tool["split_date"] == SPLIT.isoformat()
     assert all(row["count"] == 20 for row in tool["measures"][0]["after_days"])
-    assert "1 records stamped later than now were left out." in outcome.lines
+    assert F16.format(1) in outcome.lines
 
 
 # --- 5. privacy ------------------------------------------------------------------------------
@@ -1699,8 +1940,23 @@ def _canary_outcome(tmp_path: Path) -> Outcome:
     write_claude(
         root,
         _canary_plans(),
+        session="01",
         setting=Setting(CANARY_MODEL_A, "high"),
         other=Setting(CANARY_MODEL_B, "high"),
+        project=f"-canary-{CANARY_UPPER}",
+        cwd=CANARY_DIR,
+        text=CANARY_INPUT,
+        output=CANARY_OUTPUT,
+    )
+    # A third rejected id (nine parts) and one the grammar accepts, which sorts before every
+    # rejected one: the rejected names must still be numbered 1 and 2.
+    write_claude(
+        root,
+        {day: Day(counts=(1,) * 3, other=(1,) * 2) for day in (*BEFORE_DAYS, *AFTER_DAYS)},
+        session="02",
+        prefix="t",
+        setting=Setting(CANARY_MODEL_C, "high"),
+        other=Setting(SMALL_MODEL, "high"),
         project=f"-canary-{CANARY_UPPER}",
         cwd=CANARY_DIR,
         text=CANARY_INPUT,
@@ -1725,17 +1981,21 @@ def test_no_canary_token_reaches_any_output(tmp_path: Path) -> None:
             assert part not in text, (where, part)
 
 
-def test_two_unknown_model_ids_are_numbered_and_never_merged(tmp_path: Path) -> None:
+def test_unknown_model_ids_are_numbered_among_themselves_and_never_merged(
+    tmp_path: Path,
+) -> None:
     outcome = _canary_outcome(tmp_path)
     tool = outcome.tool()
-    # Numbered in the text order of the raw values: "acme-..." before "gpt-...".
+    # Numbered in the text order of the raw rejected values, "acme-..." first; the accepted
+    # "4o-mini" sorts before all of them and takes no number.
     assert tool["model"] == "model-1"
     assert tool["effort"] == "high"
-    assert tool["other_settings"] == 1
-    # Still compared, and not merged with the other unknown id: the day values are the majority
-    # setting's alone, not a mix with the other setting's 1000-token responses.
+    assert tool["other_settings"] == 3
+    # Still compared, and not merged with the other unknown ids: the day values are the majority
+    # setting's alone, not a mix with the other settings' responses.
     assert tool["measures"] == _expect_measures("claude-code", _canary_plans())
     assert tool["result"] == "REAL_DROP"
+    assert F14.format(3) in outcome.lines
 
 
 def _string_leaves(node: Any, key: str = "") -> list[tuple[str, str]]:
@@ -1800,7 +2060,7 @@ def test_broken_lines_are_counted_and_never_raise(tmp_path: Path) -> None:
     assert counters["lines_unknown_type"] == 1
     assert counters["lines_lacking_field"] == 2
     assert counters["responses"] == 2
-    assert "2 lines lacked a needed field and were left out." in outcome.lines
+    assert F15.format(2) in outcome.lines
     assert outcome.code == 2
 
 
@@ -1821,7 +2081,7 @@ def test_an_unreadable_file_beside_a_readable_one(tmp_path: Path) -> None:
     tool = _check(outcome, "claude-code", plans)
     assert tool["counters"]["files_unreadable"] == 1
     assert tool["counters"]["files_read"] == 1
-    assert "1 files could not be read; the result uses the rest." in outcome.lines
+    assert F17.format(1) in outcome.lines
 
 
 def test_a_response_spread_over_several_lines_is_one_response(tmp_path: Path) -> None:
@@ -1886,7 +2146,12 @@ def test_an_error_or_a_missing_setting_nulls_the_same_fields(tmp_path: Path, nam
     for name_of in ("model", "effort", "before", "after", "context", "day_table_sha256"):
         assert tool[name_of] is None, name_of
     if name == "no_usable_setting":
+        # The split is kept whenever the tool has a main-thread response.
+        assert tool["split_date"] == SPLIT.isoformat()
         assert tool["counters"]["responses_without_setting"] == 300
+        assert tool["counters"]["responses"] == 0
+    else:
+        assert tool["split_date"] is None
     # No digest is made up when there is no day table.
     assert "method arci-logs/1" not in outcome.out
 
@@ -1934,20 +2199,27 @@ def test_the_fixed_lines_of_a_run_with_a_result(tmp_path: Path) -> None:
     assert "before  2026-08-05 to 2026-10-27" in lines
     assert "after   2026-10-28 to 2026-11-10   split 2026-10-28" in lines
     assert "RESULT: NO DROP" in lines
-    _says(outcome.out, REASONS["no_drop"])
+    _block(outcome, REASONS["no_drop"])
     assert "Context counts; differences between the periods are not tested:" in lines
-    _says(outcome.out, "client versions 1 before, 1 after, 1 in both")
+    _block(
+        outcome,
+        "client versions 1 before, 1 after, 1 in both · working directories 1 before, 1 after"
+        " · sub-agent share 0.0% -> 0.0%",
+    )
     assert "Streak check: 3 of 3 tested measures were not flagged." in lines
     assert (
         "method arci-logs/1 · exact rank tests · no random numbers · day-table digest "
         f"{digest[:12]}" in lines
     )
-    _says(outcome.out, F10)
+    _run_of(outcome, F10_LINES)
     _says(outcome.out, F10_FIRST_SENTENCE)
     _says(outcome.out, F10_THIRD_SENTENCE)
     assert F12 in lines
     assert lines[-1] == "exit 0"
     assert outcome.err == ""
+    # Every notice count is zero here, so no notice prints.
+    for notice in NOTICES:
+        assert notice.split("{")[0] not in outcome.out
     # The table names every gating measure of this tool and no other.
     for measure in TOOL_MEASURES["claude-code"]:
         _says(outcome.out, ROW_NAMES[measure])
@@ -1975,7 +2247,7 @@ def test_the_notice_about_other_settings(tmp_path: Path) -> None:
     }
     outcome = _claude_run(tmp_path, plans)
     assert outcome.tool()["other_settings"] == 1
-    assert "Not compared: 1 other model or effort settings." in outcome.lines
+    assert F14.format(1) in outcome.lines
 
 
 def test_the_word_improved_appears_only_in_the_sentence_that_denies_it(tmp_path: Path) -> None:
@@ -1984,7 +2256,7 @@ def test_the_word_improved_appears_only_in_the_sentence_that_denies_it(tmp_path:
     none = _claude_run(tmp_path / "b", _uniform(ALTERNATING, HELD, edits=(False,) * 10))
     assert none.tool()["result"] == "NO_DROP"
     assert _flat(none.out).count("improved") == 1
-    _says(none.out, REASONS["no_drop"])
+    _block(none, REASONS["no_drop"])
 
 
 @pytest.mark.parametrize(
@@ -2046,9 +2318,9 @@ def test_the_html_page_has_no_script_and_no_external_reference(tmp_path: Path) -
 def test_two_runs_on_the_same_logs_are_byte_identical(tmp_path: Path) -> None:
     root = tmp_path / "claude"
     write_claude(root, _uniform(SPREAD, MIDDLE, edits=(False,) * 5 + (True,) * 5))
-    options = {"outputs": ("markdown", "html")}
-    first = _run(tmp_path, _args("claude-code", claude=root), stem="one", **options)
-    second = _run(tmp_path, _args("claude-code", claude=root), stem="two", **options)
+    outputs = ("markdown", "html")
+    first = _run(tmp_path, _args("claude-code", claude=root), stem="one", outputs=outputs)
+    second = _run(tmp_path, _args("claude-code", claude=root), stem="two", outputs=outputs)
     assert first.out == second.out
     assert first.err == second.err == ""
     assert first.code == second.code

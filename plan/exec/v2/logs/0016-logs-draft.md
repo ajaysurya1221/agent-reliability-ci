@@ -254,8 +254,13 @@ a value that is not available as `-`. Rendered numbers decide nothing.
 - **F16 future records:** `Records stamped later than now, left out: {k}.`
 - **F17 unreadable files:** `Files that could not be read: {k}. The result uses the rest.`
 
-A notice prints only when its `{k}` is at least 1. A fixed sentence longer than 100 characters
-is broken at the last space at or before column 100, and so on for the rest.
+A notice prints only when its `{k}` is at least 1. In the text output a fixed sentence longer
+than 100 characters is broken at the last space that leaves the line at most 100 characters
+long, and so on for the rest (a line of exactly 100 characters is allowed). The Markdown and
+HTML outputs have no line limit. A malformed `--since` prints its own sentence; an unknown
+option and any other malformed value print the general usage line. `files_read` counts every
+file opened, including a Codex file left after its first line; `files_outside_project` is
+used for Codex only and is 0 for Claude Code; `responses` includes sub-agent responses.
 
 The Markdown block carries F2 in bold with the result, the F6 table, one line with the split
 date and F7's counts, and one closing line that depends on the result:
