@@ -193,3 +193,28 @@ These replace the memo's wording where they differ.
   A1) are reported, and each names the assumption it breaks.
 - **A streak flag withholds a result; it does not establish that days depend on each
   other.** The statistics document and the `streaky_days` text say that.
+
+## Rulings on the confirmation pass (16 Nov 2026; `reviews/R2-logs2-codex-confirm.md`)
+
+Nine of Codex's eleven findings were resolved and two partly. All remaining findings of
+the confirmation pass are accepted with their corrected wording. Rulings on the points
+that needed one:
+
+- **F24** reads `The kept day table could not be read or is not valid. It was not used.`
+  (a report may be written onto the table's path when `--keep` is not given).
+- **Order of errors:** option-only errors are checked before any log or table is read;
+  data-dependent errors only after option validation succeeds; within each phase the
+  first applicable error in the F5 order prints.
+- **A day over the histogram cap** is left out of the write merge and counted; a valid
+  stored row for that key stays; the use rule still considers the uncapped row from the
+  logs.
+- **Rollback** removes every directory the run created, deepest first, if any write fails.
+- **With no selected setting** the Markdown block prints the F10 text and omits the
+  digest-bearing footer.
+- **What the kept table promises** uses Codex's wording: immutable records with no late
+  backdated arrivals; only batches strictly older than 30 times 24 hours are deleted; the
+  retained and the undeleted history are compared at the same instant with the same
+  options, offset and window; each deleted day was captured whole before deletion, with
+  successful captures at most 29 days apart; within the admitted rows and the active
+  window the day lists agree apart from `source`, and the results agree; days that hold
+  only file-edit results are outside the promise.
