@@ -58,9 +58,10 @@ round whose cited claims were checked one by one, and a count-only check of the 
 
 5. **The bound is stated as it is.** The closing paragraph first says that the 2.5% bounds need
    the days to be interchangeable when nothing changes, together with the other assumptions,
-   then gives two measured figures from the 2.4.0 self-check: the largest wrong REAL DROP rate
-   of the rule as built, over the tested positive correlations, at 5 days after against 10
-   before and at 7 against 21. A test holds the printed figures equal to the self-check file.
+   then gives one measured figure from the 2.4.0 self-check with its design: the largest wrong
+   REAL DROP rate of the rule as built over every no-change row of the correlation table and of
+   the weekly-cycle and regime table ("Coverage of the bound"). A test holds the printed values
+   equal to the self-check file.
    The Markdown footer carries a short form. The 2.4.0 self-check adds: (i) a gate with setting
    changes under decision 2, from a generator that keeps A1 (day values drawn independently of
    the number of responses), with a null cell and one exact-margin cell per measure, 20,000
@@ -647,7 +648,142 @@ value that is not available as `-`. Rendered numbers decide nothing.
 ## How a test reads this record
 
 A test that compares fixed texts with the code takes every span in backticks between the headings
-`## Fixed texts` and `## Coverage of the bound
+`## Fixed texts` and `## Coverage of the bound` (changed in 0017: the 0016 test ended at
+`## Command line`, which now precedes this section; `tests/unit/logs/test_report.py` changes
+with it). In the code, F10 and the footer keep `{rate_max}`, `{worst_after}` and `{worst_before}`
+as format fields, filled from the module constants `RATE_MAX`, `RATE_MAX_AFTER` and
+`RATE_MAX_BEFORE`; the comparison uses the
+unfilled constants, as for `{12 hex}`. Each span is a fixed text, or one
+of these spans that are not texts: one of the nine reason codes, `{}`, `ERROR`, `K`, `k`,
+`p_streak > 1/10`, `{default}`, `{flag}`, `{k}`. A multi-line text is given one line
+per span, as in 0016; the footer is one span. Whitespace is compared after collapsing runs to one
+space. Markers "(new in 0017)" and "(changed in 0017)" stand outside the spans.
+
+## Fixed texts
+
+`{}` marks a value. Numbers are rendered from the record; nothing else varies.
+
+- **F1 header:** `realornoise {version} · reads local session logs · sends nothing · writes nothing unless asked`
+- **F2 scope:** `{Tool} · {model} · effort {effort} · main thread · days at UTC{+hh:mm}`
+- **F3 periods:** `before  {first} to {last}` and `after   {first} to {last}   split {s}`; with no
+  after-days the second line is `after   no days   split {s}`
+- **F4 result (per tool):** `RESULT: REAL DROP` / `RESULT: NO DROP` / `RESULT: CANNOT TELL` /
+  `RESULT: ERROR`. The process exit code prints once, on the last line: `exit {code}`.
+- **F5 reasons:**
+  - `real_drop`: `In at least one recorded measure, the days after the split moved toward worse by more than a chance ordering of your days explains.`
+  - `no_drop`: `No recorded measure moved toward worse by its margin or more. This does not say anything improved.`
+  - `not_enough_evidence`: `The days are too few or too variable to tell a shift from noise.`
+  - `too_few_days`: `Too few usable days for every measure (5 needed after the split, 10 before).`
+  - `streaky_days` (changed in 0017; two lines):
+    `The streak check flagged a recorded measure: its earlier days crossed their middle few times.`
+    `No result is given here. A flag does not establish that your days depend on each other.`
+  - `no_usable_setting`: `No model and effort setting has a response in the window.`
+  - `no_logs`: `No session logs found for {Tool}. Looked under {default}. Use {flag} DIR, or try: realornoise --example`
+    where `{default}` and `{flag}` are `~/.claude/projects (or CLAUDE_CONFIG_DIR)` and
+    `--claude-dir`, or `~/.codex (or CODEX_HOME)` and `--codex-dir`
+    When the tool's directory option was given, use instead:
+    `No session logs found for {Tool} under the directory given with {flag}. Or try: realornoise --example`
+    The directory itself is never printed.
+  - `read_error`: `Session log files could not be read.`
+  - `format_not_recognised`: `Log files were found, but this version could not recover a response from them.`
+  - usage errors (exit 3): `--since needs a date as YYYY-MM-DD.` · `--since can be at most 83 days before the newest day in the logs.` · `Requested output could not be written.` · `Comparison dates are outside the supported calendar range.` · `Two output options name the same file.` · `--keep cannot be used with --project.` (new in 0017) · `--ignore-kept cannot be used with --keep.` (new in 0017)
+  - `Internal error.`: printed alone on the error stream when the program fails in a
+    way no other text covers; exit 3
+  - an unknown option or malformed value: `Usage error. Run: realornoise --help`
+- **F6 table:** header `measure, median day` / `before (days)` / `after (days)` / `change` /
+  `finding`; each period cell is the median followed by the number of usable days in
+  brackets; row names `reasoning tokens per response`, `responses with no reasoning`,
+  `file edits that failed`, `reasoning at one repeated value`; findings `real drop`,
+  `no drop (margin {margin})`, `cannot tell`, `too few days`, `days come in streaks`; when the
+  tool's reason is `streaky_days`, every row that is not `days come in streaks` or
+  `too few days` shows `not used` instead of its own finding (the record keeps the finding).
+- **F7 context:** `Context counts; differences between the periods are not tested:` then
+  `client versions {a} before, {b} after, {c} in both · working directories {d} before, {e} after · sub-agent share {f}% -> {g}%`
+- **F8 streak check:** `Streak check: {k} of {K} tested measures were not flagged.` (`K` measures
+  with enough days, `k` of them with `p_streak > 1/10`); left out when `K` is 0
+- **F9 unread:** `Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest.`
+  then, on its own line, `To read them: uvx --python 3.14 realornoise`
+  Under ERROR: `Compressed Codex files not read (Python 3.14 is needed): {k}.` then, on its own
+  line, the same "To read them" line as above.
+- **F10 limits (changed in 0017; every run with a tool whose result is not ERROR):**
+  `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`
+  `to the model: your tasks, prompts, projects or client version may have changed.`
+  `For each tool above and one comparison, if (1) the days in this window are interchangeable when`
+  `nothing changes, whatever their number of responses, and (2) to (4) below hold, then REAL DROP`
+  `appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% of the time if a`
+  `measure moved toward worse by its margin or more. When days resemble their neighbours or work comes`
+  `in phases, (1) fails: in the cases it tested, the self-check measured wrong REAL DROP up to`
+  `{rate_max}%, with {worst_after} days after the split and {worst_before} before; other patterns can`
+  `give more. The conditions (2) to (4) are: (2) any date, model, effort or project you gave was not`
+  `chosen from these logs; (3) a change moves every day alike, by an amount the measure can take; (4) a`
+  `change leaves the same days, setting, reference value and earlier-day values in use. None of these`
+  `is checked, and the streak check does not prove them. Running this again and again until a result`
+  `appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the repository.`
+- **F11 method (changed in 0017):** `method arci-logs/2 · exact rank tests · no random numbers · day-table digest {12 hex}`
+- **F12 next:** `Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run`
+- **F13 example label:** `Example data, generated. Not anyone's logs.`
+- **F14 other settings:** `Other model or effort settings, not compared: {k}.`
+- **F15 skipped lines:** `Lines that lacked a needed field, left out: {k}.`
+- **F16 future records:** `Records stamped later than now, left out: {k}.`
+- **F17 unreadable files:** `Files that could not be read: {k}. The result uses the rest.`
+  Under ERROR: `Files that could not be read: {k}.`
+- **F18 compared setting (new in 0017; reason too_few_days only):**
+  `This setting: first response in the window {first} · days with a response {b} before, {a} after`
+  where first is the record's first response day, and b and a are its counts of days with a
+  response before and after the split.
+- **F19 earliest date (new in 0017; reason too_few_days, no --since given):**
+  `Earliest test date if this setting is used every day after {last}: {date} (best case).`
+  `It also needs each such day usable for a measure and the earlier days still on disk or kept.`
+  where date is the record's earliest test date and last is the last day of the after period.
+- **F20 Claude Code retention (new in 0017; Claude Code with reason too_few_days only):**
+  `Claude Code deletes session files after 30 days by default (setting cleanupPeriodDays).`
+  `With --keep, each day's counts are kept for later runs, for settings shown by name.`
+- **F21 kept days (new in 0017; every tool with a selected setting when the table was read, 0 included):**
+  `Days from the kept table: {b} before, {a} after.`
+  where b and a are the record's counts of kept days before and after the split.
+- **F22 settings not kept (new in 0017):**
+  `Settings not kept, since a name is outside the accepted lists: {k}.`
+- **F23 days not kept (new in 0017):**
+  `Days not kept, since they hold more than 5,000 distinct reasoning counts: {k}.`
+- **F24 table not read (new in 0017; once per run):**
+  `The kept day table could not be read or is not valid. It was not used.`
+  It says nothing about the file afterwards, because a report may be written onto that path
+  when --keep is not given.
+- **F25 other offset (new in 0017):**
+  `Kept rows stored under another UTC offset, not used: {k}.`
+- **F26 client versions (new in 0017; when at least one after-period version matches):**
+  `Client versions after the split: {versions}`
+  where versions is the listed versions joined by a comma and a space, followed by a space,
+  a plus sign, k and the word "more" when k is at least 1 (as in "2.1.325, 2.1.321 +2 more").
+
+A notice prints only when its `{k}` is at least 1 (F14 to F17, F22, F23, F25). F21 prints with
+zeros. In the text output, F18 to F21 follow the 100-column rule above. A malformed --since
+prints its own sentence; an unknown option and any other malformed value print the general
+usage line. The counter files_read counts every file opened, including a Codex file left after
+its first line and a file that then fails while being read (that file is also counted as
+unreadable); a Codex file is taken as compressed by its name, ending in .jsonl.zst, without
+opening it; files_outside_project is used for Codex only and is 0 for Claude Code; responses
+includes sub-agent responses.
+
+The Markdown block's closing line depends on the result, unchanged:
+- REAL DROP: `One person's logs. Evidence of movement toward worse in a recorded measure; this establishes no cause and says nothing about answer quality.`
+- NO DROP: `One person's logs. No recorded measure moved toward worse by its margin; this does not say anything improved.`
+- CANNOT TELL: `One person's logs. Not enough to tell a shift from noise.`
+- ERROR: the tool name, `ERROR` and the F5 text, then F9 (with its next line) and F17 in
+  their ERROR wording when they apply, and nothing else.
+
+followed by the footer (changed in 0017), except for ERROR and for a tool with no selected
+setting, which end with the F10 text and no footer: `Wrong REAL DROP and wrong NO
+DROP are each at most 2.5% for this tool and one comparison, if the days in the window are
+interchangeable when nothing changes and the assumptions below hold; when days resemble their
+neighbours or work comes in phases the self-check measured wrong REAL DROP up to {rate_max}%
+({worst_after} days after, {worst_before} before) in its tested cases. Assumptions, unchecked: no
+date, model, effort or project chosen from these logs; a uniform shift the measure can take;
+the same days, setting, reference value and earlier-day values in use. Repeated checking until
+a result appears is not covered.
+arci-logs/2, digest {12 hex}. Yours: uvx --python 3.14 realornoise`
+
+## Coverage of the bound
 
 `{rate_max}`, `{worst_after}` and `{worst_before}` are filled at build time from the 2.4.0
 self-check file (`docs/results/logs-selfcheck.md`). The rows that count are those of the two
