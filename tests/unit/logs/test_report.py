@@ -20,7 +20,7 @@ from arci.logs.schema import LogsDecision, ToolDecision, seal
 from tests.unit.logs.test_measures import sample, table
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
-RECORD = Path("/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/logs/0016-logs-draft.md")
+RECORD = Path(__file__).resolve().parents[3] / "docs/design/0016-logs.md"
 
 
 def record(
@@ -92,8 +92,6 @@ def test_snapshot(name: str, extension: str) -> None:
 
 
 def test_every_fixed_text_matches_record() -> None:
-    if not RECORD.exists():
-        pytest.skip("orchestrator's design record is absent")
     source = RECORD.read_text(encoding="utf-8")
     section = source.split("## Fixed texts\n", 1)[1].split("## Command line", 1)[0]
     fixed = re.findall(r"`([^`]+)`", section)
