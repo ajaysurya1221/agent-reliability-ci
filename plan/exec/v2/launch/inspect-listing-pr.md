@@ -18,6 +18,7 @@ No migration required. One entry is appended to `docs/extensions/extensions.yml`
 ### Validation
 - The YAML file loads and the new entry has the same four keys as its neighbours.
 - The tool's Inspect reader was tested against logs written by inspect-ai 0.3.289 (JSON form, 9 samples, 3 epochs, two scorers, one errored sample, an integer sample id); those logs and the generator script are in the tool's repository under `tests/unit/outcomes/real/inspect/`.
+- The same generator was re-run on 15 Nov 2026 with inspect-ai 0.3.290 and the released 2.2.0 from PyPI: a JSON-format log and the output of `inspect log dump` on a `.eval` log both gave the verdict the recipe shows.
 - Limits a reader should know: `.eval` files are not read directly (the JSON form is), and one log per arm is supported.
 
 ### Agent review
