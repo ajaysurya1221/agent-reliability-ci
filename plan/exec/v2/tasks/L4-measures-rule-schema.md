@@ -78,3 +78,20 @@ edit them. `records.py` gives `ReadResult` with `responses`, `edits`, `models`, 
 
 `.venv/bin/pytest tests/unit/logs -q` passes; ruff format, ruff check and basedpyright are
 clean on your files; `shasum -a 256 -c FROZEN.sha256` still passes.
+
+## First, three small reader changes (decision D-14)
+
+For these only you also own `src/arci/logs/records.py`, `discover.py`, `claude_code.py`,
+`codex.py` and their tests. Do them before the L4 work and keep the existing tests passing.
+
+1. `render_model`: in addition to the current rules, the id has at most six parts, and at
+   most three of them are plain numbers (one or two digits). The full grammar is in record
+   0016, decision 6. `gpt-12-34-56-78-87-65-43-21` and `gpt-1-2-3-4` return `None`;
+   `claude-opus-5-5`, `gpt-5.3-codex-spark`, `claude-sonnet-4-5-20250929` pass.
+   `MODEL_WORDS` and `EFFORTS` must equal the lists in the record exactly.
+2. A response or edit-result record whose timestamp has no zone is counted in a new counter
+   `records_without_timezone` (not in `lines_lacking_field`) and left out. `ReaderCounters`
+   has exactly the fields of the record model, in that order.
+3. `discover.claude_files` and `discover.codex_files` return paths sorted by the text of
+   their path relative to the root written with `/` (`relative_to(root).as_posix()`), not by
+   `Path` ordering. Add a test where the two orders differ (`a-b/x.jsonl` and `a/x.jsonl`).
