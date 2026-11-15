@@ -2,12 +2,13 @@
 name: realornoise
 description: Run realornoise on the Claude Code and Codex session logs on this machine and show its result (real drop, no drop or cannot tell) unchanged. Runs only when the user types the command.
 disable-model-invocation: true
-allowed-tools: Bash(uvx realornoise), Bash(uvx realornoise *)
+allowed-tools: Bash(uvx realornoise)
 ---
 
 The command below has already run on this machine. It read local session logs and printed
-numbers only; it sent nothing anywhere. Its output is now part of this conversation, so the
-numbers it printed are visible to this assistant.
+counts, rates and the names of the model and effort setting it compared. The command itself
+sent nothing anywhere. Its output is now part of this conversation, so what it printed is
+visible to this assistant and goes wherever this conversation goes.
 
 !`uvx realornoise 2>&1 || true`
 

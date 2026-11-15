@@ -45,12 +45,15 @@ def test_claude_skill_runs_only_the_fixed_command() -> None:
     meta = _frontmatter(CLAUDE_SKILL)
     assert meta["name"] == "realornoise"
     assert meta["disable-model-invocation"] == "true"
-    assert meta["allowed-tools"] == "Bash(uvx realornoise), Bash(uvx realornoise *)"
+    # The fixed command only: a wildcard would pre-approve any option, such as writing a file.
+    assert meta["allowed-tools"] == "Bash(uvx realornoise)"
+    assert "*" not in meta["allowed-tools"]
     body = CLAUDE_SKILL.read_text(encoding="utf-8")
     commands = [line for line in body.splitlines() if line.startswith("!`")]
     assert commands == ["!`uvx realornoise 2>&1 || true`"]
     assert "$ARGUMENTS" not in body
     assert "visible to this assistant" in body
+    assert "numbers only" not in body
 
 
 def test_codex_skill_names_the_same_command() -> None:
