@@ -124,8 +124,18 @@ raised, and nothing in this record departs from it.
 - In the HTML strip charts a kept day is an open circle.
 - F21 prints with zeros whenever the table was read.
 - F20's second line names only settings shown by name.
-- Stored rows dated after `N` are not used.
-- On write, stored rows of the tool dated before `N-180` are dropped under every offset.
+- Stored rows dated after `N` are not used. They are not dropped either: a write prunes only
+  rows dated before `N-180`.
+- On write, stored rows of the tool dated before `N-180` are dropped under every offset, and
+  only for a requested tool that is not ERROR.
+- Which errors are checked in which phase: the option-only phase holds an unknown option, a
+  malformed value, a malformed `--since` date, two output options naming the same file and the
+  two conflicts of `--keep`; the rest need the logs. The ruling fixes the two phases; this list
+  assigns the errors to them.
+- Rollback stops at the first directory it did not create or that is not empty, so a directory
+  that already existed is never removed.
+- F24 says only that the table was not used, and the record says why: without `--keep` an output
+  option may name the table's path, and the report is then written over it.
 - The rows written, and the counts `settings_not_kept` and `days_not_kept`, cover every kept
   setting and day from `N-180` to `N`, whatever `--model`, `--effort` and `--since` say.
 - The table's path joins the same-file check only when `--keep` or `--keep-dir` is given. A
@@ -166,6 +176,12 @@ notices, the client-version line, the new record fields below, and two usage err
 - **Efforts printed as written:** `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`,
   `ultra`, `persistent` (the Codex client's own list on 16 Nov 2026). Any other effort is shown
   as `effort-1`, `effort-2`, ... as in 0016.
+- **How aliases are numbered (0016's rule, stated here).** Per tool and per kind, the raw names
+  that the lists reject are put in code-point order of the raw string and numbered from 1 in that
+  order: the first rejected effort is `effort-1`, the second `effort-2`, and likewise `model-1`,
+  `model-2`, ... for rejected model ids. Models and efforts are numbered independently, accepted
+  names take no number, and one raw name always gets the same alias within a run. A setting shown
+  by alias is never kept in the day table.
 - **Model ids** pass the closed grammar of 0016 (`records.render_model`): at most 48 characters;
   lower-case ASCII; split at `-`, `.` and `_` into at most six parts; every part is a word of
   `MODEL_WORDS`, or a number of one or two digits, or a token of two or three characters made
@@ -276,9 +292,13 @@ Rules for the new options:
 - **`--keep` or `--keep-dir` with `--project`** is a usage error with fixed text
   `--keep cannot be used with --project.` and exit 3. Kept rows hold no project, so rows of a
   project-filtered run would later be used as whole-tool rows.
-- Both usage errors are checked on the options alone, before any log or table is read, so
-  `--example` does not excuse them. Where more than one applies, the one printed is the first in
-  the order of the F5 list.
+- **Order of errors.** Checking has two phases. The errors that read the options alone are
+  checked first, before any log or table is opened: an unknown option, a malformed value, a
+  malformed `--since` date, two output options naming the same file, and the two conflicts above.
+  `--example` does not excuse them. The errors that need the logs are checked only after the
+  first phase found none: a `--since` more than 83 days before the newest day, dates outside the
+  calendar range, and output that could not be written. Within one phase, where more than one
+  error applies, the one printed is the first in the order of the F5 list.
 - **`--example`** ignores `--keep`, `--keep-dir` and `--ignore-kept`: it reads no table and
   writes none, as it ignores the directory options.
 - An option given more than once takes its last value, as in 0016.
@@ -289,7 +309,8 @@ Text output, in this order, with one blank line between groups:
 2. For each requested tool, Claude Code first: F2; the two F3 lines; a blank line; F4; the F5
    reason; for `too_few_days` only, F18, then F19 (its two lines), then for Claude Code F20 (its
    two lines) (new in 0017); a blank line; the F6 table; a blank line; the two F7 lines; F26 when
-   it applies (new); F8; F21 when the kept table was read (new); then each notice that applies,
+   it applies (new); F8; F21 when the kept table was read (new; in this block only, so a tool
+   with no selected setting and an ERROR tool print no F21); then each notice that applies,
    in the order F14, F9, F15, F16, F17, F22, F23, F25 (the last three new); then F11. For ERROR:
    the tool name on its own line, F4 and the F5 reason, then F9 and F17 when they apply in their
    ERROR wording (so a Codex history that is entirely compressed, read on an older Python, still
@@ -303,7 +324,8 @@ Lines are at most 100 characters. A fixed sentence longer than 100 characters is
 last space that leaves the line at most 100 characters long, and so on for the rest, as in 0016.
 F10, F19, F20 and the `streaky_days` reason are given below as lines of at most 100 characters
 and print as given; with their values filled they stay within 100 characters. F26 can pass 100
-characters with three long versions and is then broken by the rule. A line of exactly 100 characters is allowed. The text
+characters with three long versions and is then broken by the rule. A line of exactly 100
+characters is allowed. The text
 is plain ASCII except `·`; no colour, no control characters (every rendered name passes through
 `outcome_report.escape_terminal`).
 
@@ -320,7 +342,9 @@ F24 when it applies (new). An ERROR block holds the tool name, `ERROR` and the F
 With no selected setting (`no_usable_setting`), every output form shows the tool name, the
 result and the fixed reason, then the notices that apply, in the text order, and F10. The scope
 parts that are not available, the period lines, the measure table, the context counts and the
-digest are left out; no digest is made up.
+digest are left out; no digest is made up. In the Markdown file such a block ends with the F10
+text and no footer, since the footer carries a digest; the footer appears only for a tool with a
+selected setting and a result other than ERROR.
 
 The HTML page holds, per tool, the same information as the text output, F18 to F26 included,
 and one strip chart per gating measure (one dot per usable day, a vertical line at the split,
@@ -401,8 +425,17 @@ reasoning counts is not kept and is counted (`days_not_kept`, notice F23). So th
 log string outside the two bounded name exceptions. `settings_not_kept` is the number of
 distinct raw settings with a main-thread response or file-edit result from `N-180` to `N` that
 are not kept; `days_not_kept` is the number of (setting, day) rows of kept settings in that
-range left out for more than 5,000 distinct counts. Both are counted whenever `keep` is true and
-the tool is not ERROR, also when the table is not written.
+range left out for more than 5,000 distinct counts. Both count settings and rows, never
+responses: a setting with a thousand responses on ten days counts once in `settings_not_kept`,
+and a day over the cap counts once in `days_not_kept`. Both are counted whenever `keep` is true
+and the tool is not ERROR, also when the table is not written.
+
+**A day over the histogram cap.** A day of a kept setting with more than 5,000 distinct
+reasoning counts is left out of the write merge and counted in `days_not_kept`. A valid stored
+row for that (tool, offset, setting, day) stays as stored; it is neither replaced nor dropped.
+The use rule is not affected: the row from the logs is used for that day under the ordinary rule,
+with all its counts, since the cap bounds only what the file may hold. A row with exactly 5,000
+distinct counts is kept.
 
 **Write rule.** With `--keep`, after the run, for each requested tool that has a newest day `N`
 (a tool whose result is ERROR writes nothing): the rows from the logs are every (setting, day)
@@ -412,9 +445,12 @@ whatever `--model`, `--effort` and `--since` say. For each (tool, offset, settin
 rows are compared by the pair (number of responses, number of file-edit results), in that order;
 the row from the logs replaces the stored row when its pair is at least as large, and otherwise
 the stored row stays. A Codex row has no file-edit count and counts as 0 there. A row is written
-whole: no field of one row is merged into the other. Stored
-rows of that tool dated before `N-180` are dropped, under every offset. Rows of a tool that was
-not requested, or that is ERROR, stay as stored.
+whole: no field of one row is merged into the other. Pruning belongs to the same step and runs
+only for a requested tool that is not ERROR and has a newest day `N`: it drops that tool's stored
+rows dated before `N-180`, under every offset, and touches nothing else. Stored rows dated after
+`N` stay as stored, although no run uses them. Rows of a tool that was not requested, or that is
+ERROR, stay as stored, pruning included. When every requested tool is ERROR, nothing is written
+at all and the stored file keeps its bytes.
 
 **Use rule.** Unless the table is not read, for each (tool, setting, day) in the window at the
 run's offset: the two rows are compared by the pair (number of responses, number of file-edit
@@ -439,9 +475,12 @@ parents; the mode of an existing directory is not changed. The file is written t
 name in the directory and moved into place; its mode is 0600, also when it replaces a file with
 other bits. Keys sorted, no indent, UTF-8, a final newline. The write joins the all-or-none rule
 of 0016: it is staged with the other requested files; if any write fails, none of them is left
-changed, a table directory the run created is removed again, and the run exits 3 with
+changed and the run exits 3 with
 `Requested output could not be written.` as the only line on standard error and nothing on
-standard output. The
+standard output. **Rollback** then removes every directory this run created, the missing parents
+included, deepest first, and stops at the first directory that is not empty or that the run did
+not create. A directory that already existed is never removed and keeps its mode. A failure
+while a staged file is being moved into place rolls back the same way. The
 table's path joins the same-file check only when `--keep` or `--keep-dir` is given: an output
 option that names the table is then `Two output options name the same file.` `kept_table` is
 `absent` only when the path does not exist; any other failure to open it is `unreadable`.
@@ -457,20 +496,29 @@ The run therefore never leaves behind a table its own reader would refuse.
 
 **Faults.** The table is not used, with notice F24, when the file cannot be opened or read, is
 not a regular file, is larger than the size limit above, is not UTF-8 JSON, holds an object key
-twice, or fails any rule above. The run goes on without it. With `--keep`, a table that could not
-be read is not replaced and not changed; the run goes on, F24 says so, and the exit code is the
-one of the result. The path, the file's text and any error text are never printed. A staged table
-over the size limit is not a fault of this kind but a write error, as above.
+twice, or fails any rule above. One bad row makes the whole table unused: there is no partial
+use, and F24 prints once for the run. The run goes on without it. With `--keep`, a table that
+could not be read is not replaced and not changed; the run goes on, F24 says so, and the exit
+code is the one of the result. Without `--keep` the file may still be replaced, but only because
+an output option named its path (see the same-file rule above); F24 therefore says only that the
+table was not used. The path, the file's text and any error text are never printed. A staged
+table over the size limit is not a fault of this kind but a write error, as above.
 
-**What the table promises, and where it stops.** The promise is stated only for the case the S0
-spike tested: rows admitted to the table (a kept setting, at most 5,000 distinct counts), one UTC
-offset, a window inside the 180 days the table holds, deletion of whole days or of parts of days
-by age, and no gap longer than 29 days between `--keep` runs. Under those conditions the days
-used equal the days a history with nothing deleted would give (S0, G4: 0 of 500 histories
-differed; with gaps of 31 to 45 days every history lost data). Outside them nothing is promised.
-A day never captured whole cannot be recovered: `--keep` keeps what a run could read, so a day
-whose files were already partly deleted before the first `--keep` run stays partial, and a longer
-gap loses days outright. A row is used whole, so a day whose responses grew while its file-edit
+**What the table promises, and where it stops.** The promise holds for the case the S0 spike
+tested, and for no other. Its conditions, all of them needed: records are immutable and no
+response arrives late with an earlier timestamp; only batches strictly older than 30 times 24
+hours are deleted; the retained history and the undeleted history are compared at the same
+instant, with the same options, the same UTC offset and the same window; each deleted day was
+captured whole by a `--keep` run before it was deleted, and successful captures are at most 29
+days apart; and the rows are rows the table admits (a kept setting, at most 5,000 distinct
+counts) inside that window. Then, for each measure, the day lists of the two runs agree after
+`source` is removed from them, and the two results agree. (S0, G4: 0 of 500 histories differed;
+with gaps of 31 to 45 days every history lost data.) Outside these conditions nothing is
+promised, and the `source` fields differ by construction, since the point of the table is that a
+day came from it. A day never captured whole cannot be recovered: `--keep` keeps what a run could
+read, so a day whose files were already partly deleted when the first `--keep` run saw it stays
+partial for good. Days that hold only file-edit results are outside the promise: their retention
+was not tested, and a row is used whole, so a day whose responses grew while its file-edit
 results were deleted keeps the logs row and its smaller file-edit count.
 
 **Limits.** Kept rows are not checked against logs again. An edited table gives an edited result.
@@ -576,7 +624,9 @@ strings `"p/q"` in lowest terms with a positive denominator (`"0/1"` for zero); 
   likewise after, and at most the number of days in the period; `earliest_test_date` is null or
   equal to its recomputation; a `kept` source with `kept_table` other than `read` is rejected;
   `kept_table` is `not_read` only when `keep` is false, since a run that writes the table also
-  reads it.
+  reads it; `client_versions_after_shown` holds at most three strings, each matching the version
+  pattern, in the order of the Names section, and its length plus `client_versions_after_more`
+  equals `client_versions_after`. A record that breaks any of these is rejected.
 - **One day, one source (new).** One row of the day table supplies every measure of that day, so
   a day that appears in the day lists of more than one measure carries the same `source` in each.
   A record in which two measures give one day different sources is rejected, with reason
@@ -690,7 +740,9 @@ space. Markers "(new in 0017)" and "(changed in 0017)" stand outside the spans.
 - **F23 days not kept (new in 0017):**
   `Days not kept, since they hold more than 5,000 distinct reasoning counts: {k}.`
 - **F24 table not read (new in 0017; once per run):**
-  `The kept day table could not be read or is not valid. It was not used and was not changed.`
+  `The kept day table could not be read or is not valid. It was not used.`
+  It says nothing about the file afterwards, because a report may be written onto that path
+  when --keep is not given.
 - **F25 other offset (new in 0017):**
   `Kept rows stored under another UTC offset, not used: {k}.`
 - **F26 client versions (new in 0017; when at least one after-period version matches):**
@@ -714,7 +766,8 @@ The Markdown block's closing line depends on the result, unchanged:
 - ERROR: the tool name, `ERROR` and the F5 text, then F9 (with its next line) and F17 in
   their ERROR wording when they apply, and nothing else.
 
-followed, except for ERROR, by the footer (changed in 0017): `Wrong REAL DROP and wrong NO
+followed by the footer (changed in 0017), except for ERROR and for a tool with no selected
+setting, which end with the F10 text and no footer: `Wrong REAL DROP and wrong NO
 DROP are each at most 2.5% for this tool and one comparison, if the days in the window are
 interchangeable when nothing changes and the assumptions below hold; with days that resemble
 their neighbours the self-check measured wrong REAL DROP up to {rate_5_10}% (5 days after, 10
@@ -771,6 +824,10 @@ Each item can be checked from outside: by running `arci.logs.cli.run` on synthet
 fixed `now`, `env` and `home`, and reading standard output, standard error, the exit code, the
 written files and the JSON record.
 
+Unless an item supplies a kept-table fixture of its own, the run uses an isolated `home` with no
+table file and an `env` without `REALORNOISE_HOME`, so no stored row can reach the result. The
+items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
+
 1. A run writes a JSON record with `schema_version` `arci-logs/2`, and the fields of the record
    model above, no more and no fewer, at every level.
 2. A record of `arci-logs/1` written by 2.3.0 still validates, under
@@ -790,8 +847,10 @@ written files and the JSON record.
 8. When every response in the window lacks a model or an effort, the result is CANNOT TELL with
    `no_usable_setting` and its unchanged text. `--model` naming no candidate also gives
    `no_usable_setting`.
-9. `--model` and `--effort` keep their 0016 effect: the named candidate is compared even when
-   another has more after-period responses.
+9. `--model` and `--effort` keep their 0016 effect. With one of them, the count rule chooses
+   among the candidates that match it, so the named candidate is compared even when another has
+   more after-period responses. With both, the one candidate that matches the pair is compared.
+   With no match, the result is CANNOT TELL with `no_usable_setting`.
 10. Under `too_few_days`, text output holds F18 with the first response day and the counts of
     days with a response before and after; Markdown and HTML hold the same values; the JSON
     holds them in `first_response_day`, `response_days_before`, `response_days_after`.
@@ -807,17 +866,21 @@ written files and the JSON record.
     setting whose model id fails the grammar, F20 prints the same two lines, and with `--keep`
     the table holds no row for that setting and F22 counts it.
 14. The efforts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`,
-    `persistent` print as written; any other effort prints as `effort-1`.
-15. A model id `gpt-5-sol` prints as written; an id with a word outside `MODEL_WORDS` prints as
-    `model-1`.
+    `persistent` print as written. With exactly one rejected effort in the tool's logs, it prints
+    as `effort-1`; with several, each gets its own number, from 1 up, in code-point order of the
+    raw strings, as "How aliases are numbered" says.
+15. A model id `gpt-5-sol` prints as written; with exactly one id outside the grammar it prints
+    as `model-1`, and with several each gets its own number by the same rule, numbered apart from
+    the efforts.
 16. Client versions `2.1.309`, `2.1.321`, `2.1.325`, `2.1.40` after the split print F26 as
     `Client versions after the split: 2.1.325, 2.1.321, 2.1.309 +1 more`; a version that does
     not match the pattern, such as a canary string, is never printed and counts in `+k more`;
-    when no version matches, F26 is absent. Before-period versions are never listed. Each
+    when no version matches, F26 is absent. A version that occurs only before the split is never
+    listed, while one that occurs in both periods is. Each
     reader's result holds a version name only for a string that matches the pattern, so a
     non-matching string is in no reader result and in no output.
-17. Without `--keep`, `--keep-dir` and an existing table, no file is created anywhere, and the
-    table directory does not come into being.
+17. Without `--keep`, `--keep-dir`, an existing table and any report-output option, no file is
+    created anywhere, and the table directory does not come into being.
 18. `--keep` with `REALORNOISE_HOME` set writes `days-1.json` under it; with it unset or empty,
     under `home/.realornoise`; `--keep-dir DIR` writes under `DIR` and needs no `--keep`.
 19. The written table validates against the schema above: exactly the listed keys, rows sorted,
@@ -833,25 +896,30 @@ written files and the JSON record.
 25. Write rule: the pair decides. A stored row whose pair (responses, file-edit results) is
     larger stays; a row from the logs whose pair is at least as large replaces it, a tie
     included; a stored row with equal responses and more file-edit results stays.
-26. Use rule in the deletion model S0 tested: rows admitted to the table, one UTC offset, a
-    window inside the 180 days the table holds, deletion of whole days or of parts of days by
-    age only, and a `--keep` run after each deleted day ended, never more than 29 days apart.
-    Then a later run with the table uses the same days, gives the same day lists per measure and
-    the same result as the run before the deletion, with `source: "kept"` on the days that came
-    from the table. A further case has a session file that spans the deletion boundary (its
-    responses on days on both sides of it), and checks the day lists the use rule gives for
-    those days.
-27. Outside that model nothing is promised, and these cases fix the behaviour instead of
-    promising equality: (a) with 31 days between `--keep` runs, a day is lost or stays partial
-    and the day lists differ from those of the undeleted history; (b) a day whose logs row has
+26. The promise of "What the table promises, and where it stops", under every one of its
+    conditions: the fixture holds immutable records with no late arrival carrying an earlier
+    timestamp, deletes only batches strictly older than 30 times 24 hours, and runs `--keep` so
+    that each deleted day was captured whole beforehand, with successful captures at most 29 days
+    apart. The retained history and the undeleted history are then run at the same instant, with
+    the same options, offset and window. For each measure the two day lists agree after `source`
+    is removed from both, and the two results agree; the days that came from the table carry
+    `source: "kept"`, so the lists are not equal with `source` kept. A further case has a session
+    file that spans the deletion boundary (its responses on days on both sides of it), and checks
+    the day lists the use rule gives for those days.
+27. Outside those conditions nothing is promised, and these cases fix the behaviour instead:
+    (a) a constructed history in which a day is never captured whole, because the first `--keep`
+    run comes 31 days after that day ended and its earlier batches are already deleted: that day
+    is missing or partial in the later run, and the day lists differ from the undeleted history's
+    even after `source` is removed; (b) a day whose logs row has
     more responses and fewer file-edit results than the stored row is used whole from the logs,
     so the day's `edit_failure_share` value comes from that row and the stored file-edit count is
     not recovered; (c) an edit-only day, with file-edit results and no response, takes the row
     with more file-edit results, so a complete stored row beats a partial logs row; S0 did not
     cover retention of file-edit results on their own, so (b) and (c) are the rule, not a
     promise.
-28. F21 prints the counts of kept days per period whenever the table was read, `0 before, 0
-    after` included; it is absent when no table exists or under `--ignore-kept`.
+28. F21 prints the counts of kept days per period for each tool with a selected setting when the
+    table was read, `0 before, 0 after` included; it is absent for a tool whose result is ERROR or
+    `no_usable_setting`, and for every tool when no table exists or under `--ignore-kept`.
 29. `--ignore-kept` reads no table and writes none: the result equals the result of the same run
     with no table present, `kept_table` is `not_read`, and a stored table is left byte for byte.
 30. Rows stored under another offset are not used; F25 counts all of them, whatever their day; a
@@ -869,11 +937,16 @@ written files and the JSON record.
     were; a table directory the run created is removed. With `--keep --json FILE` and a JSON
     target that cannot be written, the table is unchanged and no table directory is left
     behind.
-34. With `--keep` or `--keep-dir`, a `--json` or `--markdown` path that names the table file is
-    `Two output options name the same file.`; without either flag the same path is not an error
-    and the report file is written there.
-35. `--example` with `--keep` writes no table and reads none; its output equals the output
-    without `--keep`.
+34. With `--keep` or `--keep-dir`, a `--json`, `--markdown` or `--html` path that names the table
+    file is `Two output options name the same file.`; without any of those three flags the same
+    path is not an error and the report file is written there. One case has no `--keep`, an
+    invalid table at the resolved path and `--json` naming that path: F24 prints once, the result
+    is the result with no table, the report is written over the file, and no output claims that
+    the file was left alone.
+35. With otherwise valid options and report paths that collide with nothing, adding `--keep` to
+    `--example` leaves the output unchanged and writes no table, and no table is read. The option
+    errors still apply: `--example --keep --project PATH` prints
+    `--keep cannot be used with --project.` and exits 3.
 36. Every `DayValue` carries `source`; the day-table digest changes when one day's source
     changes and nothing else does. The `kept_days_*` counts include a day whose kept row is
     usable for no measure, so a case with such a day has a count larger than the kept days in
@@ -886,16 +959,20 @@ written files and the JSON record.
 38. Every text output line is at most 100 characters, also with F18, F19, F20, F26 at their
     longest values and with the two lines of the `streaky_days` reason; the text is plain ASCII
     except `·`.
-39. Every fixed text in this record equals a constant in the code, and every prose span in the
-    section "Fixed texts" is a fixed text or one of the listed spans that are not texts.
+39. Every fixed text in this record equals a constant in the code, and every backtick-delimited
+    span between the headings "Fixed texts" and "Coverage of the bound" is a fixed text or one of
+    the listed spans that are not texts. The prose around the spans is not compared.
 40. F10 and the footer hold `{rate_5_10}` and `{rate_7_21}` filled with the values that the
     rule in "Coverage of the bound" reads from the self-check file.
-41. F11 and the footer say `arci-logs/2`.
+41. Where they are present, F11 and the footer name `arci-logs/2`. A tool with no selected
+    setting has no digest, so it carries neither F11 nor the footer, and a test checks that too.
 42. The mapping from each result to its exit code, the result names, and the reason texts other
-    than those marked changed in this record are those of 0016. On synthetic logs where the 0016
-    setting rule and the rule of decision 2 choose the same setting, the results and the exit
-    codes equal 0016's; where the two rules choose different settings, the result may differ and
-    only the mapping is held.
+    than those marked changed in this record are those of 0016. Result equality with 2.3.0 is
+    held only for runs in which nothing differs in the effective inputs: no kept row contributed
+    (`kept_days_before` and `kept_days_after` are 0 and `kept_table` is not `read`), the 0016
+    setting rule and the rule of decision 2 choose the same setting, and the window, options and
+    day values are the same. Where the two rules choose different settings, or a kept row
+    contributed, the result may differ and only the mapping is held.
 43. The run opens no socket, starts no process, and writes only the requested report files and
     their temporary files and, with `--keep`, the table, its temporary file and its directory.
 44. Use rule tie: a stored row and a logs row with equal responses and equal file-edit results:
@@ -903,7 +980,9 @@ written files and the JSON record.
 45. A stored row dated after `N` is not used and does not count in `kept_days_*`; a stored row
     under another offset counts in `kept_rows_other_offset` whatever its day, a day after `N`
     included.
-46. `--keep --tool codex` leaves stored Claude Code rows byte for byte.
+46. `--keep --tool codex` leaves every stored Claude Code row unchanged as a parsed row object,
+    field for field, pruning included. The file's bytes may differ, since the writer always
+    writes the canonical form.
 47. `kept_table` is `absent` with no file, `read` with a valid one, `unreadable` with F24,
     `not_read` under `--ignore-kept`, `--project` or `--example`; `since_given` and `keep`
     follow their options.
@@ -917,13 +996,125 @@ written files and the JSON record.
 52. `--keep --ignore-kept`, and `--keep-dir DIR --ignore-kept`, each print
     `--ignore-kept cannot be used with --keep.` on standard error, nothing on standard output,
     read no table, write nothing, and exit 3; the same holds with `--example` given as well.
-53. One size limit, both ways. Reader: a table file of 33,554,432 bytes is read and used; one of
-    33,554,433 bytes prints F24, is not used, and with `--keep` is left byte for byte. Writer: a
-    run whose staged table would pass 33,554,432 bytes prints
+53. One size limit, both ways, with files that are otherwise valid. Reader: a table of 33,554,431
+    bytes and one of exactly 33,554,432 bytes are read and used; one of 33,554,433 bytes prints
+    F24, is not used, and with `--keep` is left byte for byte. Writer: a staged table of
+    33,554,431 bytes and one of exactly 33,554,432 bytes are written and are read by the next
+    run; a staged table of 33,554,433 bytes prints
     `Requested output could not be written.` as the only line on standard error, writes nothing,
-    leaves the stored table and every requested output file as they were, removes a table
-    directory it created, and exits 3; a staged table just inside the limit is written, and the
-    next run reads it.
-54. The JSON walk accepts a version string only under `client_versions_after_shown`; the canary
-    `9.8.7654321`, and a version used only before the split, appear in no output.
+    leaves the stored table and every requested output file as they were, removes every directory
+    the run created, and exits 3.
+54. The new client-version exception holds only under `client_versions_after_shown`: the JSON
+    walk accepts a version-shaped string there and nowhere else, so the canary `9.8.7654321`, and
+    a version that occurs only before the split, appear in no output. The categories 0016 already
+    allows stay allowed, `arci_version` with the value `2.4.0` among them.
 55. `--help` reads no logs and its text names every option of the synopsis.
+
+**Selection, reduction and context.**
+
+56. The before-period fallback, in two shapes: (a) the after period holds responses but every
+    one of them lacks a model or an effort, and (b) `--model` or `--effort` removes every
+    after-period candidate while a matching candidate has before-period responses. In both the
+    count rule runs over the before period, the record names that setting, and the result is
+    CANNOT TELL.
+57. A valid stored table changes a run without `--keep`: with `--keep` absent and the table in
+    the resolved directory, kept days enter the day lists and F21 prints. The table cannot set
+    the window: `N` stays the newest day with a main-thread response in the logs even when the
+    table holds later days, and a tool with no log file is still ERROR (`no_logs`) with stored
+    rows present.
+58. The merged days drive everything that reads days: `v*`, each day's value and usable flag,
+    `first_response_day`, `response_days_before`, `response_days_after` and `other_settings` all
+    change when a kept row supplies a day, while `context` and `counters` keep the values the
+    logs alone give. One fixture changes `v*` by a kept row and checks
+    `repeated_value_share` with it.
+59. Names at their boundaries: each of the nine efforts is admitted; a model id of 48 characters
+    passes and one of 49 does not; six parts pass and seven do not; three numeric parts pass and
+    four do not; one date part passes and two do not; `4o`, `o3` and `r1` pass. Client versions
+    are ordered as tuples of integers: `2.1.325` before `2.1.40`; `1.01` and `1.1` are equal
+    tuples and go in text order; two, three and four numbers all match, one and five do not; a
+    number of five digits matches and one of six does not; two non-matching strings count as two
+    in `k`.
+60. The version population is every response of the tool in the after period after the
+    `--project` filter: responses of other settings and sub-agent responses are included, a
+    response outside the project is not, and a version seen only before the split is not listed.
+    In the JSON, the length of `client_versions_after_shown` plus `client_versions_after_more`
+    equals `client_versions_after`.
+
+**Table persistence and faults.**
+
+61. The written rows and the two omission counts cover every eligible setting and day from
+    `N-180` to `N`, whatever `--model`, `--effort` and `--since` say: a fixture with a selector
+    that hides most settings still writes them all. `settings_not_kept` counts distinct settings
+    and `days_not_kept` distinct (setting, day) rows, not responses. A day with exactly 5,000
+    distinct reasoning counts is written; one with 5,001 is left out and counted, a valid stored
+    row for that key stays as stored, and the run's own day value for that day still comes from
+    the uncapped row from the logs.
+62. Pruning runs under every offset for a requested tool that is not ERROR, and only for it: an
+    ERROR tool keeps every stored row, including rows before `N-180`; a run in which every
+    requested tool is ERROR writes nothing and leaves the file's bytes; stored rows dated after
+    `N` survive a write and are not used.
+63. Every one of these makes the whole table unused with one F24 and the result of a run with no
+    table: a file that cannot be opened, a directory or other file that is not regular, bytes
+    that are not UTF-8, a duplicate JSON object key, a missing key, a `schema` other than
+    `realornoise-days/1`, a malformed day or an offset outside the range, frequencies plus
+    `reasoning_unknown` that do not equal `responses`, `edits_failed` greater than `edits`, and
+    rows out of order. One bad row is enough; no other row is used.
+64. The written file is the canonical form (keys sorted, no indent, UTF-8, one final newline) and
+    is byte for byte equal for two runs on the same logs. A directory that already existed keeps
+    its mode; a table that replaces a file with other bits has mode 0600; an existing report file
+    keeps its permission bits.
+65. Paths and the points at which a write can fail: a relative `--keep-dir` is resolved against
+    the current directory and a `~` path against the injected `home`; `--keep-dir` implies
+    `--keep`, so `--keep-dir DIR --project PATH` and `--keep-dir DIR --ignore-kept` print their
+    own fixed lines; with two errors at once the first in the F5 order prints, and an option-only
+    error prints even when a log-dependent error would also apply; `--html` naming the table
+    file is the same-file error, as is another spelling of that path; and a failure while a
+    staged file is moved into place, not only at directory creation, leaves every output and the
+    table as they were and removes every directory the run created.
+
+**Record validation and rendering.**
+
+66. The record's `seal` is `hash_record` of the record without `seal`, and `day_table_sha256` is
+    `hash_record` of exactly the payload of "Record model", in its order: a test builds the
+    payload itself and compares. Changing any one field of the payload changes the digest.
+67. The validators reject, one case each: a `first_response_day` outside the window or later than
+    a stored usable day; a `response_days_before` below the distinct before-days of one of the
+    three response measures; a `kept_days_after` above the number of days in the after period; a
+    non-null `model`, `before`, `context` or `day_table_sha256` with ERROR or
+    `no_usable_setting`; a `client_versions_after_shown` out of the required order; and a shown
+    list plus `client_versions_after_more` that does not equal `client_versions_after`.
+68. An ERROR record and a `no_usable_setting` record carry the fields "Record model" requires:
+    `model`, `effort`, `before`, `after`, `context`, `day_table_sha256`, `first_response_day` and
+    `earliest_test_date` null, `measures` empty, `response_days_*` and `kept_days_*` 0, and with
+    ERROR also `kept_rows_other_offset`, `settings_not_kept` and `days_not_kept` 0; the notices
+    that still apply (F9, F17 in their ERROR wording; F14, F22, F23, F25 for
+    `no_usable_setting`) print in the text order.
+69. Every new state round-trips: the record is written, validated again from its JSON, and the
+    text, Markdown and HTML rendered from the restored record equal those of the first run. The
+    states covered are `kept_table` `not_read`, `absent`, `read` and `unreadable`, `since_given`
+    both ways, `keep` both ways, a day of each `source`, and a `no_usable_setting` tool beside a
+    tool with a result.
+70. F18 to F26 in all three formats: each prints where "Text output, in this order" and the
+    Markdown and HTML rules put it, is absent when its condition does not hold, and F21 prints
+    its zeros. The HTML page draws a kept day as an open circle and a logs day as a filled one,
+    has no script and no external reference, and holds no value that is not in the record.
+71. With no selected setting, the Markdown block ends with the F10 text and no footer, and a
+    snapshot holds that block; a tool with a selected setting and a result other than ERROR keeps
+    the footer with its digest.
+
+**Self-check and distribution.**
+
+72. The self-check file holds the new cells: the A1-preserving null cell and one exact-margin
+    cell per measure, the competitive-choice null and margin cells, each on 20,000 histories,
+    with wrong REAL DROP at most 0.0283 in a null cell and wrong NO DROP at most 0.0283 in a
+    margin cell; the script fails when a gated cell would run on fewer histories. It also holds
+    the report-only cells (many more after-period responses; the newly adopted setting at 1.15,
+    with 535 of 20,000 at 14 after against 16 before and 415 of 20,000 at 7 against 21), each
+    naming the assumption it breaks, the streak-check rates conditional on passing the check, the
+    power cells with their generated, tested and stopped counts, the design 14 after against 16
+    before in the null, correlation and power tables, the weekly-cycle and regime-switching
+    generators, and the counterexample label `Demonstration outside A1 (arci-logs/2): `.
+73. The documented command `uvx --python 3.14 realornoise` appears in the README first screen,
+    the recipe, the package README and both skills; the plugin and the Codex skill pin
+    `uvx --python 3.14 realornoise==2.4.0`; both distributions report version 2.4.0 and keep
+    `requires-python` at `>=3.11`.

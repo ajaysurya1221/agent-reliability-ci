@@ -339,3 +339,21 @@ Codex confirmed that all 94 copied self-check rows match the checked-in file and
 path by which a log string outside the three bounded exceptions reaches an output.
 The amendments are in `logs2/DESIGN-MEMO.md`. The drafts are revised from them and get
 one confirmation pass before the blind acceptance tests are written.
+
+## D-21: records for `arci-logs/2` closed for implementation (2026-11-16)
+
+After three review rounds (29, 11 and 5 findings; all dispositioned in D-20 and in the
+rulings at the end of `logs2/DESIGN-MEMO.md`), the drafts `logs2/0017-logs-2-draft.md`
+(73 acceptance items) and `logs2/STATISTICS_LOGS-2-draft.md` are closed for
+implementation. They are copied to the code branch `v2/logs2` as
+`docs/design/0017-logs-2.md` and `docs/STATISTICS_LOGS.md`; from here those two files are
+the records, and the drafts are history. Changes to them during the build are made on the
+code branch and listed in the release record. The statistics document still carries the
+2.3.0 self-check tables; task B2 replaces them with the 2.4.0 run.
+
+Open in the record and left for later, by decision: the row label `days come in streaks`
+(kept as it is in this version); one pre-stated streak check instead of three; an
+unknown split date; repeated daily looks.
+
+Next: task B1 (the build, Codex) and task A1 (blind acceptance tests from the records
+alone, a separate agent) run at the same time on different files.

@@ -100,11 +100,16 @@ the proof below covers the days as used without change. What the table changes i
 exist to be compared: it can supply before-days whose session files are gone. It also adds ways
 for A1 to fail, listed below.
 
-What it promises is limited to the case the spike behind this version tested: rows admitted to
-the table, one UTC offset, a window inside the 180 days the table holds, deletion of whole days
-or of parts of days by age, and no gap longer than 29 days between `--keep` runs. Under those
-conditions the days used equal the days an undeleted history would give. A day never captured
-whole cannot be recovered, and a longer gap loses days outright.
+What it promises is limited to the case the spike behind this version tested, with all of its
+conditions: records are immutable and no response arrives late with an earlier timestamp; only
+batches strictly older than 30 times 24 hours are deleted; the retained history and the
+undeleted history are compared at the same instant, with the same options, the same UTC offset
+and the same window; each deleted day was captured whole by a `--keep` run before it was deleted,
+and successful captures are at most 29 days apart; and the rows are rows the table admits, inside
+the active window. Then, for each measure, the day lists of the two runs agree once `source` is
+removed from them, and the results agree. Outside this case nothing is promised. A day never
+captured whole cannot be recovered. Days that hold only file-edit results are outside the
+promise.
 
 Its limits: kept rows are not checked against logs again; they hold the counts as the readers
 of the version that wrote them saw them; an edited table gives an edited result, and the seal
@@ -529,12 +534,13 @@ The 2.4.0 self-check adds:
     check, a per-measure check and the rule as built.
 14. The two figures printed in every output (section "How far the bound can fail"), read from
     the correlation table; a test holds the printed figures equal to this file.
-15. The kept-table rules, inside the deletion model of the section "Days from the kept table":
-    admitted rows, one offset, a window inside the stored 180 days, deletion of whole days or of
-    parts of days by age, and a `--keep` run after each deleted day ended, never more than 29
-    days apart. Then a run with the kept table gives the same day table as the run before the
-    deletion. One further case has a session file that spans the deletion boundary, and one has a
-    gap longer than 29 days, which loses days and is recorded as the stated limit.
+15. The kept-table rules under every condition of the promise in the section "Days from the kept
+    table": immutable records, no late arrival with an earlier timestamp, deletion only of
+    batches strictly older than 30 times 24 hours, the same instant, options, offset and window
+    for both runs, each deleted day captured whole beforehand, and successful captures at most 29
+    days apart. Then the day lists of the two runs agree once `source` is removed, and the
+    results agree. One further case has a session file that spans the deletion boundary; one has
+    a day that was never captured whole, which stays lost and is recorded as the stated limit.
 16. The first counterexample of item 6 prints as `Demonstration outside A1 (arci-logs/2): ...`.
 
 The streak check itself is unchanged in this version. Open: one pre-stated check instead of the
