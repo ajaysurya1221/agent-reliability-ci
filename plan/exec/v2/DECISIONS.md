@@ -114,3 +114,31 @@ Baseline `gemma4:12b-mlx`, candidate `qwen3.5:4b-mlx`, the order-desk suite, def
 temperature 0.7, per-round seeds: `study/PREREGISTRATION.md`, pushed before any trial. The
 pilot showed the retry setting barely matters with real models, so the arms differ in the
 model alone. Run from a checkout pinned at `804157a` so later edits cannot touch it.
+
+## D-11: 2.3.0 adds a result from session logs; spike first (2026-11-15)
+
+Maintainer decisions of 2026-11-15, then the plan approved the same day.
+
+1. **Direction.** A first step with no set-up: `arci logs`, also installed as `realornoise`,
+   reads the Claude Code and Codex session logs already on a user's disk and answers REAL
+   DROP, NO DROP or CANNOT TELL for recorded measures, with each wrong answer bounded under
+   printed assumptions. `arci verdict` and `arci run` stay as the stronger steps. Evidence
+   read from open issues and new repositories on GitHub that day is summarised in the draft
+   record `logs/0016-logs-draft.md`.
+2. **Real logs.** Agents read only this project's own session logs on the maintainer's
+   machine, and keep counts and rates only. Codex never opens a real log: it writes code
+   against the documented structure and synthetic logs, and the orchestrator runs that code
+   on the permitted logs and reads count-only output.
+3. **Name.** The repository and `agent-reliability-ci` stay; a second distribution
+   `realornoise` is added.
+4. **Order of work.** L0 is a feasibility spike with a go or no-go test
+   (`tasks/L0-logs-spike.md`). If the test's power fails, the feature stops and only the
+   repository clean-up is released.
+5. **Tie rule chosen by the orchestrator while drafting the contract.** The spike brief asks
+   for midranks with the conditional distribution; the draft contract counts strict wins only
+   and uses the no-ties reference distribution, because its bound then follows from
+   exchangeability in three lines and needs no monotonicity lemma for tied data. The spike's
+   power figures use continuous values, so they carry over. The read-only review decides.
+6. **Stop rule.** 14 Dec 2026 stays. Its third criterion becomes "one result block from the
+   tool posted publicly by someone else", since a tool that runs on a private machine leaves
+   no public repository.
