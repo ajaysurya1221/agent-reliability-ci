@@ -4,6 +4,7 @@ import importlib
 from collections import Counter
 from dataclasses import asdict
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import cast
 
@@ -22,12 +23,12 @@ def test_synthetic_every_record_and_counter(tmp_path: Path, seed: int) -> None:
     expected = fixture.expected["codex"]
     assert asdict(actual.counters) == asdict(expected.counters)
     assert Counter(
-        (r.when, actual.models[r.model], r.effort, r.main_thread, r.reasoning)
+        (r.when, actual.models[r.model], actual.efforts[r.effort], r.main_thread, r.reasoning)
         for r in actual.responses
     ) == Counter(expected.responses)
     assert (
         Counter(
-            (r.when.date(), actual.models[r.model], r.effort, r.main_thread)
+            (r.when.date(), actual.models[r.model], actual.efforts[r.effort], r.main_thread)
             for r in actual.responses
         )
         == expected.per_day_setting
@@ -61,10 +62,11 @@ def test_latest_context_and_full_total_deduplication(tmp_path: Path) -> None:
         "gpt-5.6",
         "gpt-5.6",
     ]
-    assert [r.effort for r in actual.responses] == ["high", "max", "max"]
+    assert [actual.efforts[r.effort] for r in actual.responses] == ["high", "max", "max"]
     assert all(not r.main_thread and r.in_project for r in actual.responses)
     assert actual.responses[-1].when == datetime(2025, 12, 31, 23, 30, tzinfo=UTC)
     assert actual.counters.lines_unknown_type == 1
+    assert actual.counters.responses_duplicate == 2
 
 
 @pytest.mark.parametrize("raw", [None, -1, 1.5, True, "123", {}, []])
@@ -102,8 +104,9 @@ def test_missing_fields_and_unknown_lines(tmp_path: Path) -> None:
     ]
     write_rows(path, rows)
     actual = read([path], project=None, now=NOW)
-    assert len(actual.responses) == 2 and actual.responses[-1].effort == "other"
-    assert actual.counters.lines_lacking_field == 5
+    assert len(actual.responses) == 1
+    assert actual.counters.responses_without_setting == 3
+    assert actual.counters.lines_lacking_field == 3
     assert actual.counters.lines_not_json == 5
     assert actual.counters.lines_unknown_type == 2
     assert actual.counters.records_in_future == 1
@@ -131,14 +134,76 @@ def test_empty_missing_and_non_utf8(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert capsys.readouterr() == ("", "")
 
 
-def test_context_and_total_do_not_cross_files(tmp_path: Path) -> None:
+def test_context_is_local_but_response_identity_crosses_files(tmp_path: Path) -> None:
     a, b, c = (tmp_path / name for name in ("a.jsonl", "b.jsonl", "c.jsonl"))
     write_rows(a, [meta(), context(), token()])
     write_rows(b, [meta(), token(), context(), token(2)])
     write_rows(c, [meta(), context(), token()])
     actual = read([a, b, c], project=None, now=NOW)
-    assert len(actual.responses) == 3
-    assert actual.counters.lines_lacking_field == 1
+    assert len(actual.responses) == 2
+    assert actual.counters.responses_duplicate == 2
+    assert actual.counters.lines_lacking_field == 0
+
+
+def test_copied_session_counts_each_response_once(tmp_path: Path) -> None:
+    first, copied = tmp_path / "z.jsonl", tmp_path / "a.jsonl"
+    encoded = write_rows(first, [meta(), context(), token(), token(2), token()])
+    copied.write_bytes(encoded)
+    actual = read([first, copied], project=None, now=NOW)
+    assert len(actual.responses) == actual.counters.responses == 2
+    assert actual.counters.responses_duplicate == 4
+    assert actual.counters.files_read == 2 and actual.counters.lines == 10
+
+
+def test_duplicate_key_uses_session_time_and_complete_unordered_usage(tmp_path: Path) -> None:
+    first, second = tmp_path / "first.jsonl", tmp_path / "second.jsonl"
+    event = token({"input": 1, "output": 2})
+    reordered = token({"output": 2, "input": 1})
+    write_rows(
+        first,
+        [
+            meta(id="one"),
+            context(),
+            event,
+            token(2),
+            reordered,
+            token({"input": 1, "output": 3}),
+            token({"input": 1, "output": 2}, stamp="2026-01-01T12:01:00Z"),
+        ],
+    )
+    write_rows(second, [meta(id="two"), context(), event])
+    actual = read([first, second], project=None, now=NOW)
+    assert len(actual.responses) == 5
+    assert actual.counters.responses_duplicate == 1
+
+
+def test_outside_project_never_reads_second_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "rollout.jsonl"
+    encoded = write_rows(path, [meta(cwd="/elsewhere"), "not JSON", context(), token()])
+
+    class HeaderOnly(BytesIO):
+        def __next__(self) -> bytes:
+            pytest.fail("out-of-project body was read")
+
+        def readline(self, size: int | None = -1) -> bytes:
+            if self.tell():
+                pytest.fail("out-of-project body was read")
+            return super().readline(size)
+
+    stream = HeaderOnly(encoded)
+
+    def open_input(*args: object, **kwargs: object) -> BytesIO:
+        return stream
+
+    monkeypatch.setattr(Path, "open", open_input)
+    actual = read([path], project=Path("/project"), now=NOW)
+    assert stream.closed
+    assert actual.responses == ()
+    assert actual.counters.files_outside_project == actual.counters.files_read == 1
+    assert actual.counters.lines == 1
+    assert actual.counters.lines_not_json == actual.counters.files_unreadable == 0
 
 
 def test_absent_total_does_not_deduplicate(tmp_path: Path) -> None:
@@ -169,7 +234,9 @@ def test_version_and_workdir_identity_across_files(tmp_path: Path) -> None:
         [("98234567.1", "/CANARY-1"), ("98234567.1", "/CANARY-2"), ("98234567.2", "/CANARY-1")]
     ):
         path = tmp_path / f"rollout-{i}.jsonl"
-        write_rows(path, [meta(cli_version=version, cwd=cwd), context(), token()])
+        write_rows(
+            path, [meta(id=f"CANARY-session-{i}", cli_version=version, cwd=cwd), context(), token()]
+        )
         paths.append(path)
     a, b, c = read(paths, project=None, now=NOW).responses
     assert a.version == b.version != c.version
@@ -199,7 +266,10 @@ def test_project_lexical_parts(
     monkeypatch.setattr(Path, "resolve", forbidden)
     monkeypatch.setattr(Path, "stat", forbidden)
     actual = read([path], project=Path("/project"), now=NOW)
-    assert actual.responses[0].in_project is inside
+    assert len(actual.responses) == int(inside)
+    assert all(r.in_project for r in actual.responses)
+    assert actual.counters.files_outside_project == int(not inside)
+    assert actual.counters.lines == (3 if inside else 1)
 
 
 def test_unavailable_compression_is_counted_without_opening(

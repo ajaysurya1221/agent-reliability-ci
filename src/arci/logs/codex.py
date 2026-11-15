@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -28,9 +29,11 @@ _USED = frozenset({"session_meta", "turn_context", "event_msg"})
 def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadResult:
     counts = ReaderCounters()
     models: dict[str, int] = {}
+    efforts: dict[str, int] = {}
     versions: dict[str | None, int] = {}
     workdirs: dict[str | None, int] = {}
     responses: list[Response] = []
+    seen: set[tuple[str, datetime, str]] = set()
     for path in paths:
         compressed = path.name.endswith(".zst")
         zstd = None
@@ -50,13 +53,16 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     continue
                 payload = object_of(meta.get("payload"))
                 cwd, version = string_of(payload.get("cwd")), string_of(payload.get("cli_version"))
+                inside = in_project(cwd, project)
+                if not inside:
+                    counts.files_read += 1
+                    counts.files_outside_project += 1
+                    continue
+                session = string_of(payload.get("id"))
                 workdir_id = workdirs.setdefault(cwd, len(workdirs))
                 version_id = versions.setdefault(version, len(versions))
                 main = payload.get("thread_source") != "subagent"
-                inside = in_project(cwd, project)
                 context: dict[str, object] | None = None
-                previous: object = None
-                have_previous = False
                 for raw in stream:
                     data = parse_line(raw.decode("utf-8"), _USED, counts)
                     if data is None:
@@ -71,31 +77,28 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     if payload.get("info") is None:
                         continue
                     info = object_of(payload.get("info"))
-                    total = info.get("total_token_usage")
-                    if isinstance(total, dict):
-                        if have_previous:
-                            try:
-                                if total == previous:
-                                    continue
-                            except RecursionError:
-                                counts.lines_lacking_field += 1
-                                previous, have_previous = None, False
-                                continue
-                        previous, have_previous = total, True
-                    else:
-                        previous, have_previous = None, False
-                    model = string_of(context.get("model")) if context is not None else None
                     when = time_of(data.get("timestamp"))
-                    if (
-                        context is None
-                        or not model
-                        or when is None
-                        or not isinstance(payload.get("info"), dict)
-                    ):
+                    if when is None or not isinstance(payload.get("info"), dict):
                         counts.lines_lacking_field += 1
                         continue
+                    total = info.get("total_token_usage")
+                    if session and isinstance(total, dict):
+                        try:
+                            key = (session, when, json.dumps(total, sort_keys=True))
+                        except (ValueError, RecursionError):
+                            counts.lines_lacking_field += 1
+                            continue
+                        if key in seen:
+                            counts.responses_duplicate += 1
+                            continue
+                        seen.add(key)
                     if when > now:
                         counts.records_in_future += 1
+                        continue
+                    model = string_of(context.get("model")) if context is not None else None
+                    effort = string_of(context.get("effort")) if context is not None else None
+                    if not model or not effort:
+                        counts.responses_without_setting += 1
                         continue
                     reasoning = reasoning_of(
                         object_of(info.get("last_token_usage")).get("reasoning_output_tokens")
@@ -105,7 +108,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                             "codex",
                             when,
                             models.setdefault(model, len(models)),
-                            effort_of(context.get("effort")),
+                            efforts.setdefault(effort, len(efforts)),
                             main,
                             reasoning,
                             version_id,
@@ -120,4 +123,13 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
             # Decompression errors have interpreter-specific classes. No exception
             # (including its private input/path) is rendered or retained.
             counts.files_unreadable += 1
-    return ReadResult("codex", tuple(responses), (), tuple(render_model(m) for m in models), counts)
+    return ReadResult(
+        "codex",
+        tuple(responses),
+        (),
+        tuple(render_model(model) for model in models),
+        tuple(effort_of(effort) for effort in efforts),
+        tuple(models[model] for model in sorted(models)),
+        tuple(efforts[effort] for effort in sorted(efforts)),
+        counts,
+    )

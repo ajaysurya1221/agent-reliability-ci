@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal, NoReturn, cast
 
 Tool = Literal["claude-code", "codex"]
-Effort = Literal["minimal", "low", "medium", "high", "xhigh", "max", "other"]
+EFFORTS: frozenset[str] = frozenset({"minimal", "low", "medium", "high", "xhigh", "max"})
 MODEL_WORDS: frozenset[str] = frozenset(
     [
         "claude",
@@ -87,35 +87,26 @@ MODEL_WORDS: frozenset[str] = frozenset(
         "z",
     ]
 )
-_MODEL = re.compile(r"[a-z0-9][a-z0-9._-]{0,48}\Z")
-_NUMBER_PART = re.compile(r"(?:[0-9]{1,8}|[0-9]{1,8}[a-z]|[a-z][0-9]{1,8})\Z")
+_MODEL = re.compile(r"[a-z0-9][a-z0-9._-]{0,47}\Z")
+_NUMBER_PART = re.compile(r"(?:[0-9]{1,2}|[0-9]{1,2}[a-z]|[a-z][0-9]{1,2})\Z")
+_DATE_PART = re.compile(r"20[0-9]{6}\Z")
 
 
 def render_model(raw: str) -> str | None:
     """Return only ids composed entirely of approved words and bounded numbers."""
     if not _MODEL.fullmatch(raw):
         return None
-    return (
-        raw
-        if all(
-            part in MODEL_WORDS or _NUMBER_PART.fullmatch(part) for part in re.split(r"[-._]", raw)
-        )
-        else None
-    )
+    dates = 0
+    for part in re.split(r"[-._]", raw):
+        if _DATE_PART.fullmatch(part):
+            dates += 1
+        elif part not in MODEL_WORDS and not _NUMBER_PART.fullmatch(part):
+            return None
+    return raw if dates <= 1 else None
 
 
-def effort_of(raw: object) -> Effort:
-    if isinstance(raw, str) and raw in (
-        "minimal",
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "other",
-    ):
-        return raw
-    return "other"
+def effort_of(raw: object) -> str | None:
+    return raw if isinstance(raw, str) and raw in EFFORTS else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +114,7 @@ class Response:
     tool: Tool
     when: datetime
     model: int
-    effort: Effort
+    effort: int
     main_thread: bool
     reasoning: int | None
     version: int
@@ -136,7 +127,7 @@ class EditResult:
     tool: Tool
     when: datetime
     model: int
-    effort: Effort
+    effort: int
     main_thread: bool
     failed: bool
     in_project: bool
@@ -147,13 +138,16 @@ class ReaderCounters:
     files_read: int = 0
     files_unread_compressed: int = 0
     files_unreadable: int = 0
+    files_outside_project: int = 0
     lines: int = 0
     lines_not_json: int = 0
     lines_unknown_type: int = 0
     lines_lacking_field: int = 0
     records_in_future: int = 0
     responses: int = 0
+    responses_duplicate: int = 0
     responses_without_reasoning: int = 0
+    responses_without_setting: int = 0
     edits_denied: int = 0
     edits_unmatched: int = 0
 
@@ -164,6 +158,9 @@ class ReadResult:
     responses: tuple[Response, ...]
     edits: tuple[EditResult, ...]
     models: tuple[str | None, ...]
+    efforts: tuple[str | None, ...]
+    model_order: tuple[int, ...]
+    effort_order: tuple[int, ...]
     counters: ReaderCounters
 
 

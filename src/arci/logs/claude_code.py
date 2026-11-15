@@ -30,11 +30,15 @@ _EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadResult:
     counts = ReaderCounters()
     models: dict[str, int] = {}
+    efforts: dict[str, int] = {}
     versions: dict[str | None, int] = {}
     workdirs: dict[str | None, int] = {}
     responses: list[Response] = []
     edits: list[EditResult] = []
+    seen: set[str] = set()
     for path in paths:
+        file_seen: set[str] = set()
+        duplicates: set[str] = set()
         pending: dict[str, Response] = {}
         calls: dict[str, tuple[bool, Response]] = {}
         try:
@@ -49,15 +53,30 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                             continue
                         identity = string_of(message.get("id"))
                         model = string_of(message.get("model"))
+                        effort = string_of(data.get("effort", data.get("perTurnEffort")))
                         when = time_of(data.get("timestamp"))
-                        if not identity or not model or when is None:
+                        if not identity or when is None:
                             counts.lines_lacking_field += 1
+                            continue
+                        if identity in seen:
+                            if identity not in duplicates:
+                                counts.responses_duplicate += 1
+                                duplicates.add(identity)
+                            continue
+                        if identity not in file_seen:
+                            file_seen.add(identity)
+                            if not model or not effort:
+                                counts.responses_without_setting += 1
+                                continue
+                        elif identity not in pending:
+                            # A later content block cannot supply a missing first setting.
                             continue
                         usage = object_of(
                             object_of(message.get("usage")).get("output_tokens_details")
                         )
                         reasoning = reasoning_of(usage.get("thinking_tokens"))
                         if identity not in pending:
+                            assert model and effort
                             version, cwd = (
                                 string_of(data.get("version")),
                                 string_of(data.get("cwd")),
@@ -66,7 +85,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                                 "claude-code",
                                 when,
                                 models.setdefault(model, len(models)),
-                                effort_of(data.get("effort", data.get("perTurnEffort"))),
+                                efforts.setdefault(effort, len(efforts)),
                                 data.get("isSidechain") is not True,
                                 reasoning,
                                 versions.setdefault(version, len(versions)),
@@ -122,6 +141,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
             counts.files_read += 1
         except (OSError, UnicodeError, ValueError):
             counts.files_unreadable += 1
+        seen.update(file_seen)
         for response in pending.values():
             if response.when > now:
                 counts.records_in_future += 1
@@ -134,5 +154,8 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         tuple(responses),
         tuple(edits),
         tuple(render_model(model) for model in models),
+        tuple(effort_of(effort) for effort in efforts),
+        tuple(models[model] for model in sorted(models)),
+        tuple(efforts[effort] for effort in sorted(efforts)),
         counts,
     )

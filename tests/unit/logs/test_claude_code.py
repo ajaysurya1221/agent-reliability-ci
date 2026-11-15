@@ -21,15 +21,16 @@ def test_synthetic_every_record_and_counter(tmp_path: Path, seed: int) -> None:
     expected = fixture.expected["claude-code"]
     assert asdict(actual.counters) == asdict(expected.counters)
     assert Counter(
-        (r.when, actual.models[r.model], r.effort, r.main_thread, r.reasoning)
+        (r.when, actual.models[r.model], actual.efforts[r.effort], r.main_thread, r.reasoning)
         for r in actual.responses
     ) == Counter(expected.responses)
     assert Counter(
-        (r.when, actual.models[r.model], r.effort, r.main_thread, r.failed) for r in actual.edits
+        (r.when, actual.models[r.model], actual.efforts[r.effort], r.main_thread, r.failed)
+        for r in actual.edits
     ) == Counter(expected.edits)
     assert (
         Counter(
-            (r.when.date(), actual.models[r.model], r.effort, r.main_thread)
+            (r.when.date(), actual.models[r.model], actual.efforts[r.effort], r.main_thread)
             for r in actual.responses
         )
         == expected.per_day_setting
@@ -69,11 +70,14 @@ def test_first_metadata_last_usage_and_union_of_calls(tmp_path: Path) -> None:
     assert len(actual.responses) == 1
     response = actual.responses[0]
     assert response.when == datetime(2025, 12, 31, 23, 30, tzinfo=UTC)
-    assert response.effort == "medium" and response.reasoning == 25
+    assert actual.efforts[response.effort] == "medium" and response.reasoning == 25
     assert actual.models[response.model] == "claude-opus-5-5"
     assert response.main_thread and response.in_project
     assert len(actual.edits) == 2  # One per result block, even for the same id.
-    assert all(e.effort == "medium" and e.main_thread and e.in_project for e in actual.edits)
+    assert all(
+        actual.efforts[e.effort] == "medium" and e.main_thread and e.in_project
+        for e in actual.edits
+    )
     assert actual.edits[0].when == datetime(2026, 1, 1, 12, 1, tzinfo=UTC)
 
 
@@ -94,12 +98,12 @@ def test_optional_fields_and_identity_indices(tmp_path: Path) -> None:
     third = assistant("CANARY-third", cwd="/CANARY-other", model="acme-payroll-secret")
     fourth = assistant("CANARY-fourth", model="acme-another-secret")
     fifth = assistant("CANARY-fifth")
-    for key in ("version", "cwd", "effort"):
+    for key in ("version", "cwd"):
         fifth.pop(key)
     write_rows(path, [first, second, third, fourth, fifth])
     actual = read([path], project=None, now=NOW)
     a, b, c, d, e = actual.responses
-    assert a.effort == "xhigh" and e.effort == "other"
+    assert actual.efforts[a.effort] == "xhigh" and actual.efforts[e.effort] == "high"
     assert a.version == c.version == d.version != b.version
     assert a.workdir == b.workdir == d.workdir != c.workdir
     assert c.model != d.model and actual.models[c.model] is actual.models[d.model] is None
@@ -137,7 +141,8 @@ def test_bad_lines_missing_fields_future_and_files(tmp_path: Path) -> None:
     assert actual.counters.files_unreadable == 2
     assert actual.counters.lines_not_json == 5
     assert actual.counters.lines_unknown_type == 2
-    assert actual.counters.lines_lacking_field == 4
+    assert actual.counters.lines_lacking_field == 3
+    assert actual.counters.responses_without_setting == 1
     assert actual.counters.records_in_future == 1
 
 
@@ -223,13 +228,44 @@ def test_duplicate_type_and_escaped_keys_are_decoded(tmp_path: Path) -> None:
     assert actual.counters.lines_unknown_type == 1
 
 
-def test_ids_are_local_to_each_file(tmp_path: Path) -> None:
+def test_response_ids_cross_files_but_call_ids_are_local(tmp_path: Path) -> None:
     a, b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
     write_rows(a, [assistant(content=[{"type": "tool_use", "id": "CANARY-call", "name": "Edit"}])])
     write_rows(b, [assistant(), result("CANARY-call")])
     actual = read([a, b], project=None, now=NOW)
-    assert len(actual.responses) == 2
+    assert len(actual.responses) == 1
+    assert actual.counters.responses_duplicate == 1
     assert actual.edits == () and actual.counters.edits_unmatched == 1
+
+
+def test_copied_session_counts_each_response_once_in_path_order(tmp_path: Path) -> None:
+    first, copied = tmp_path / "z.jsonl", tmp_path / "a.jsonl"
+    rows: list[Row] = [assistant(reasoning=1), assistant(reasoning=2), assistant("second")]
+    encoded = write_rows(first, rows)
+    copied.write_bytes(encoded)
+    actual = read([first, copied], project=None, now=NOW)
+    assert [r.reasoning for r in actual.responses] == [2, 10]
+    assert actual.counters.responses == actual.counters.responses_duplicate == 2
+    assert actual.counters.files_read == 2 and actual.counters.lines == 6
+    write_rows(copied, [assistant(reasoning=50)])
+    assert read([first, copied], project=None, now=NOW).responses[0].reasoning == 2
+    assert read([copied, first], project=None, now=NOW).responses[0].reasoning == 50
+
+
+def test_missing_first_setting_is_not_replaced_by_later_content(tmp_path: Path) -> None:
+    path = tmp_path / "session.jsonl"
+    write_rows(path, [assistant(effort=None, perTurnEffort="max"), assistant(effort="high")])
+    actual = read([path], project=None, now=NOW)
+    assert actual.responses == ()
+    assert actual.counters.responses_without_setting == 1
+
+
+def test_project_filter_keeps_reading_claude_lines(tmp_path: Path) -> None:
+    path = tmp_path / "session.jsonl"
+    write_rows(path, [assistant("outside", cwd="/elsewhere"), assistant("inside", cwd="/project")])
+    actual = read([path], project=Path("/project"), now=NOW)
+    assert [r.in_project for r in actual.responses] == [False, True]
+    assert actual.counters.files_outside_project == 0 and actual.counters.lines == 2
 
 
 def test_invalid_json_fast_path_does_not_hide_faults(tmp_path: Path) -> None:

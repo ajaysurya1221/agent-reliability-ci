@@ -6,17 +6,17 @@ import importlib
 import json
 import random
 from collections import Counter
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
-from arci.logs.records import Effort, ReaderCounters, Tool
+from arci.logs.records import ReaderCounters, Tool
 
 Row = dict[str, object] | str
-Sample = tuple[datetime, str | None, Effort, bool, int | None]
-Edit = tuple[datetime, str | None, Effort, bool, bool]
-DaySetting = tuple[date, str | None, Effort, bool]
+Sample = tuple[datetime, str | None, str | None, bool, int | None]
+Edit = tuple[datetime, str | None, str | None, bool, bool]
+DaySetting = tuple[date, str | None, str | None, bool]
 
 
 @dataclass
@@ -107,6 +107,7 @@ def meta(**extra: object) -> dict[str, object]:
     return {
         "type": "session_meta",
         "payload": {
+            "id": "CANARY-session",
             "cwd": "/CANARY-1/canary-payroll-1",
             "cli_version": "98234567.76543210",
             **extra,
@@ -152,14 +153,14 @@ def generate(
         for session in range(sessions_per_day):
             main = session % 3 != 2
             private = session % 3 == 1
-            effort: Effort = "other" if private else "high"
+            effort = None if private else "high"
             cwd = str(project / f"CANARY-{session}")
             when = datetime(2026, 1, 1, 12, tzinfo=UTC) + timedelta(days=day, hours=session)
             stamp = when.isoformat()
             future = (now + timedelta(days=1)).isoformat()
             for tool in ("claude-code", "codex"):
                 model = (
-                    "acme-payroll-secret"
+                    ("acme-payroll-secret" if day % 2 else "gpt-12345678-87654321")
                     if private
                     else ("claude-fable-5-2" if tool == "claude-code" else "gpt-6-astra")
                 )
@@ -169,7 +170,11 @@ def generate(
                 if tool == "codex":
                     rows.extend(
                         [
-                            meta(cwd=cwd, thread_source="user" if main else "subagent"),
+                            meta(
+                                id=f"CANARY-session-{day}-{session}",
+                                cwd=cwd,
+                                thread_source="user" if main else "subagent",
+                            ),
                             context(model, "canary-payroll-9" if private else "high"),
                         ]
                     )
@@ -192,7 +197,7 @@ def generate(
                             isSidechain=not main,
                         )
                         if private:
-                            base.pop("effort")
+                            base["effort"] = "canary-payroll-9"
                         rows.append(base)
                         content = [
                             {
@@ -239,10 +244,11 @@ def generate(
                     else:
                         event = token(number + 1, raw_count, stamp=stamp)
                         rows.extend([event, event])
+                        expected.counters.responses_duplicate += 1
                 if tool == "claude-code":
                     rows.extend(
                         [
-                            assistant("CANARY-future", stamp=future, model=model),
+                            assistant(f"CANARY-future-{day}-{session}", stamp=future, model=model),
                             result("CANARY-unmatched", stamp=stamp),
                             assistant(isApiErrorMessage=True),
                             {"type": "assistant", "message": {"id": "CANARY-bad"}},
@@ -297,7 +303,16 @@ def generate(
                         generated.expected[tool].counters.files_unread_compressed += 1
                     else:
                         copy.write_bytes(cast(bytes, zstd.compress(encoded)))
-                        generated.expected[tool].add(expected)
+                        copied = Expected(
+                            counters=replace(
+                                expected.counters,
+                                responses=0,
+                                responses_without_reasoning=0,
+                                records_in_future=0,
+                                responses_duplicate=11,
+                            )
+                        )
+                        generated.expected[tool].add(copied)
                     generated.paths[tool].append(copy)
     journal = generated.claude_root / "journal.jsonl"
     journal.parent.mkdir(parents=True, exist_ok=True)
