@@ -1,0 +1,1473 @@
+{
+  "record_sha256": "850a6eaf745002fccfb9c95aad028be40501333d18e434f38ac322d8915a4886",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb",
+  "manifest_sha256": "a4c3ff43dc8e71952dd5c028e01b45f6052257ecccc7a37a2152c3b44a3f0eb4",
+  "trials_sha256": "83b32441fea6ec16a04299a94d33b158f5bf7c62ad9830395246238d0f75cbe0",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 96,
+  "max_rounds": 5,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 5,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 96,
+      "trials_sha256": "dee6a1448feaf71ae81b2a41404b5e2af3cc7970b18b0c698bf51f77d5c5bc4b",
+      "counts": {
+        "minus": 11,
+        "zero": 85,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.40993e-01",
+      "block_wealth": "9.65619e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 192,
+      "trials_sha256": "d180d845ab6facf0c000b629c7aceb7ce60eafe60ac6fe0251da04e9e4fce628",
+      "counts": {
+        "minus": 21,
+        "zero": 171,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.31301e-01",
+      "block_wealth": "7.24058e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 288,
+      "trials_sha256": "d2c343e7ab4716f5af081d0e33bee3c82b840f4258aec98f7a5ab3fc1398f82c",
+      "counts": {
+        "minus": 31,
+        "zero": 257,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "7.68064e-02",
+      "block_wealth": "5.68042e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 384,
+      "trials_sha256": "acedf1ed950db8f09692394981f14335e30e42667f647b1b620dd38bd8b3503b",
+      "counts": {
+        "minus": 44,
+        "zero": 340,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.76794e-02",
+      "block_wealth": "9.66984e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 480,
+      "trials_sha256": "4ad8615f892350b5b3833ea496fb196c2158926013e21bff0ed6520003643423",
+      "counts": {
+        "minus": 52,
+        "zero": 428,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.97265e-02",
+      "block_wealth": "4.87762e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    }
+  ],
+  "stopped_at_round": 5,
+  "cells": [
+    {
+      "task_id": "desk-01",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-01",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-01",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-01",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-02",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-02",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-02",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-02",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-03",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-03",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 4,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-03",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 3,
+      "counts": {
+        "minus": 2,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-03",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-04",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-04",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-04",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-04",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-05",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-05",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-05",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-05",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 4,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-07",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-07",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-07",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-07",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-08",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-08",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-08",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-08",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-10",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-10",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-10",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-10",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-11",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-11",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-11",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-11",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 5,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-13",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-13",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-13",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-13",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-14",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-14",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-14",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-14",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 4,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-16",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-16",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-16",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-16",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-17",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-17",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-17",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-17",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 5,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-19",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-19",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-19",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-19",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-20",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-20",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-20",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-20",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 5,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 3,
+      "counts": {
+        "minus": 2,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-22",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-22",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-22",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-22",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-23",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-23",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-23",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-23",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 5,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "clean",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "empty_result",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 5,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "tool_error_once",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 3,
+      "counts": {
+        "minus": 2,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "tool_timeout",
+      "pairs": 5,
+      "baseline_successes": 5,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 1,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [
+    "no test crossed"
+  ],
+  "prior_runs": []
+}

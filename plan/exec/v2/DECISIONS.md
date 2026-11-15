@@ -183,3 +183,15 @@ response totals across all projects were computed and printed (no content, no pe
 detail). The maintainer's rule was to read only the working-directory field of other
 projects' files. The product reader now stops at that field (`--project` on Codex), and
 real-log runs pre-filter the file list.
+
+## D-14: confirmation pass on the records; drafts closed for implementation (2026-11-15)
+
+`consults/L1c-records-confirm-codex.md`: four of the ten earlier findings resolved, six still
+open, no fault found in the proof. All six are applied: the name grammar is bounded (six
+parts, three numbers, one date), spelled out in full and stated as an exception that
+discloses an accepted name; the limits text names the window, the admissible shift and the
+earlier-day values and points to the exact statement; file order and first-copy-wins are
+fixed; unknown keys are not counted; outputs with no selected setting are defined; a window
+outside the calendar is a usage error; zone-less timestamps have their own counter. No
+further read-only round is run on the drafts: the adversarial review before release reads
+the final text against the code.

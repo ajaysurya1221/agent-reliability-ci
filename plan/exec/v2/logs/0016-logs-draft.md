@@ -58,7 +58,7 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    `--codex-dir` override; `--project PATH` keeps only sessions whose working directory is
    that path or below it; `--tool` limits to one tool. Formats are specified in
    `docs/LOG_FORMATS.md`, which lists the client versions the readers were checked against.
-   Unknown line types and keys are skipped and counted. Compressed Codex files need Python
+   Unknown line types are skipped and counted; unknown keys are ignored and not counted. Compressed Codex files need Python
    3.14; on older Pythons they are counted and reported as not read, and the result is
    computed from the rest with notice F9.
 
@@ -66,17 +66,25 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    - The command opens no socket, starts no process, and writes only the files named by
      `--markdown`, `--html` and `--json`.
    - Readers return records made of numbers, timestamps and names from closed lists.
-   - **Model and effort names are rendered by rule, never copied through.** A model id is
-     shown as written only when it passes a closed grammar in `records.py`: lower-case parts
-     separated by `-`, `.` or `_`, each part a word from a fixed list (`claude`, `opus`,
-     `sonnet`, `haiku`, `fable`, `gpt`, `codex`, `astra`, `mini`, ...), a number of at most two
-     digits, or a short letter-digit token such as `4o`, with at most one eight-digit date
-     part that starts with `20`. An effort is shown as written only when it is in the fixed
-     list. Anything else is shown as `model-1`, `model-2`, ... or `effort-1`, ..., numbered in
-     the text order of the raw values, and is still compared: two different unknown names are
-     never merged. The review asked for a table of complete names instead; the grammar is
-     kept because a table would print every new model as `model-1` until the next release,
-     and what the grammar can leak is the choice of a few listed words and small numbers.
+   - **Model and effort names are the one exception to the no-log-string rule.** A model id
+     is shown as written only when it passes this closed grammar (`records.render_model`):
+     at most 48 characters; lower-case ASCII; split at `-`, `.` and `_` into at most six
+     parts; every part is a word of `MODEL_WORDS`, or a number of one or two digits, or a
+     token of two or three characters made of one letter and digits (`4o`, `o3`, `r1`), or
+     one eight-digit number starting with `20`; at most three parts are numbers; at most one
+     is the date. `MODEL_WORDS` is exactly: `claude`, `opus`, `sonnet`, `haiku`, `fable`,
+     `mythos`, `instant`, `gpt`, `codex`, `chatgpt`, `mini`, `nano`, `micro`, `max`, `pro`,
+     `turbo`, `spark`, `astra`, `omni`, `preview`, `latest`, `thinking`, `fast`, `high`,
+     `low`, `medium`, `xhigh`, `gemini`, `flash`, `ultra`, `lite`, `exp`, `deepseek`, `chat`,
+     `reasoner`, `coder`, `qwen`, `glm`, `kimi`, `grok`, `code`, `mlx`. An effort is shown as
+     written only when it is one of `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
+     An accepted name is disclosed in full; the grammar bounds what it can carry (listed
+     words, three small numbers, one date) and does not promise that a name is not private.
+     Anything else is shown as `model-1`, `model-2`, ... or `effort-1`, ..., numbered in the
+     text order of the raw values, and is still compared: two different unknown names are
+     never merged. The canary tests apply to rejected names and to every other free string.
+     The review asked for a table of complete names; the grammar is kept because a table
+     would print every new model as `model-1` until the next release.
    - Client versions and working directories are never output: each is reduced to counts of
      distinct values and, for `--project`, to a yes or no.
    - No exception text, warning or output may carry a string read from a log. Per-line faults
@@ -89,13 +97,23 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
      `src/arci/logs/`.
    - **Reading faults.** Lines that are not JSON, lines of a type the reader does not use, and
      lines of a used type that lack a needed field are counted and left out; notice F15
-     prints when any line lacked a needed field. A file that cannot be opened or decoded is
-     counted and left out, with notice F17. Unknown keys are ignored and not counted. The
-     same response found in two files (a resumed or copied session) is counted once: Claude
-     Code by message id, Codex by session id, event time and cumulative usage.
+     prints when any line lacked a needed field. A record whose timestamp has no zone is
+     counted (`records_without_timezone`) and left out. A file that cannot be opened or
+     decoded is counted and left out, with notice F17. Unknown keys are ignored and not
+     counted.
+   - **Order and copies.** Files are visited in the text order of their paths relative to the
+     root, written with `/`, and lines in file order. Each file's responses are assembled
+     first; a response whose identity was already seen in an earlier file (a resumed or
+     copied session) is counted in `responses_duplicate` and the first assembled copy is
+     kept, also when the copies differ. The identity is the message id for Claude Code, and
+     the session id, event time and complete cumulative-usage object for Codex.
+   - **Formats.** Until `docs/LOG_FORMATS.md` is written (task L11, from the same text), the
+     sections "Claude Code" and "Codex" of `plan/exec/v2/tasks/L0-logs-spike.md` define the
+     fields and how a response is assembled, except where this record says otherwise. A
+     missing reasoning count is an unknown count; the response is still a response.
    - **Effort.** Claude Code: the line's `effort`, else its `perTurnEffort` (on this
      project's logs `effort` matched the effort of the recorded request on every one of
-     12,986 lines). Codex: the latest `turn_context`.
+     12,986 lines); each must be a non-empty string. Codex: the latest `turn_context`.
    - **`--project` on Codex** reads the first line of a session file and skips the rest of
      the file when its working directory is outside the project.
 
@@ -159,7 +177,7 @@ denominator (`"0/1"` for zero); dates are `YYYY-MM-DD`.
   null when the period has no response).
 - `ReaderCounters`: `files_read`, `files_unread_compressed`, `files_unreadable`,
   `files_outside_project`, `lines`, `lines_not_json`, `lines_unknown_type`,
-  `lines_lacking_field`, `records_in_future`, `responses`, `responses_duplicate`,
+  `lines_lacking_field`, `records_in_future`, `records_without_timezone`, `responses`, `responses_duplicate`,
   `responses_without_reasoning`, `responses_without_setting`, `edits_denied`,
   `edits_unmatched`.
 - `ReasonCode`: `real_drop`, `no_drop`, `not_enough_evidence`, `too_few_days`,
@@ -195,7 +213,7 @@ a value that is not available as `-`. Rendered numbers decide nothing.
     `--claude-dir`, or `~/.codex (or CODEX_HOME)` and `--codex-dir`
   - `read_error`: `Session log files could not be read.`
   - `format_not_recognised`: `Log files were found, but this version could not recover a response from them.`
-  - usage errors (exit 3): `--since needs a date as YYYY-MM-DD.` · `--since can be at most 83 days before the newest day in the logs.` · `Requested output could not be written.`
+  - usage errors (exit 3): `--since needs a date as YYYY-MM-DD.` · `--since can be at most 83 days before the newest day in the logs.` · `Requested output could not be written.` · `Comparison dates are outside the supported calendar range.`
 - **F6 table:** header `measure, median day` / `before (days)` / `after (days)` / `change` /
   `finding`; each period cell is the median followed by the number of usable days in
   brackets; row names `reasoning tokens per response`, `responses with no reasoning`,
@@ -211,11 +229,12 @@ a value that is not available as `-`. Rendered numbers decide nothing.
   `to the model: your tasks, prompts, projects or client version may have changed.`
   `For this tool and this one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the`
   `time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5% of the`
-  `time. Both hold only if: (1) days are interchangeable when nothing changes; (2) any date, model,`
-  `effort or project you gave was not chosen from these logs; (3) a change moves every day alike;`
-  `(4) a change leaves the same days, setting and reference value in use. None of these is checked,`
-  `and the streak check does not prove them. Running this again and again until a result appears`
-  `is not covered.`
+  `time. Both hold only if: (1) the days in this window are interchangeable when nothing changes;`
+  `(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change`
+  `moves every day alike, by an amount the measure can take; (4) a change leaves the same days,`
+  `setting, reference value and earlier-day values in use. None of these is checked, and the streak`
+  `check does not prove them. Running this again and again until a result appears is not covered.`
+  `Exact statement: docs/STATISTICS_LOGS.md in the repository.`
 - **F11 method:** `method arci-logs/1 · exact rank tests · no random numbers · day-table digest {12 hex}`
 - **F12 next:** `Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run`
 - **F13 example label:** `Example data, generated. Not anyone's logs.`
@@ -232,9 +251,16 @@ date and F7's counts, and one closing line that depends on the result:
 - ERROR: the tool name, `ERROR` and the F5 text, and nothing else.
 
 followed, except for ERROR, by: `Wrong REAL DROP and wrong NO DROP are each at most 2.5% for
-this tool and one comparison, only under unchecked assumptions (interchangeable days; no date,
-model, effort or project chosen from these logs; a uniform shift; the same days, setting and
-reference value in use). arci-logs/1, digest {12 hex}. Yours: uvx realornoise`.
+this tool and one comparison, only under unchecked assumptions (days in the window
+interchangeable; no date, model, effort or project chosen from these logs; a uniform shift the
+measure can take; the same days, setting, reference value and earlier-day values in use).
+Repeated checking until a result appears is not covered. arci-logs/1, digest {12 hex}.
+Yours: uvx realornoise`.
+
+With no selected setting (`no_usable_setting`), every output form shows the tool name, the
+result and the fixed reason, then the reader notices that apply and F10. The scope parts that
+are not available, the period lines, the measure table, the context counts and the digest are
+left out; no digest is made up.
 
 ## Files
 

@@ -25,7 +25,9 @@ effort setting), on the main thread only (sub-agent responses are left out).
   historical local time across a daylight-saving change. A Claude Code response belongs to
   the day of its first line; a Codex response to the day of its token-count event; a
   file-edit result to the day of the result line. Records stamped later than the start
-  instant, and timestamps without a zone, are left out and counted.
+  instant, and timestamps without a zone, are left out and counted
+  (`records_in_future`, `records_without_timezone`). If the window's dates cannot be
+  represented in the calendar, the run is a usage error.
 - **Window.** `N` is the newest day with a main-thread response of the tool, after the
   `--project` filter. The split date `s` is `N − 13` days unless the user gives `--since`. The
   after period is `s` to `N`. The before period is the 84 days ending the day before `s`. A
