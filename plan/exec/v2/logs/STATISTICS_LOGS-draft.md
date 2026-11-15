@@ -1,3 +1,7 @@
+> Superseded on 2026-11-15. The records of authority are `docs/design/0016-logs.md` and
+> `docs/STATISTICS_LOGS.md` on the branch `v2/logs` (pinned in `FROZEN.sha256` at 2.3.0). They
+> carry the changes of two adversarial reviews that this draft does not. Kept as history.
+
 # The session-log contract (arci-logs/1)
 
 Draft 3, 15 Nov 2026 (revised after `consults/L1-records-review-codex.md`, 13 findings, and

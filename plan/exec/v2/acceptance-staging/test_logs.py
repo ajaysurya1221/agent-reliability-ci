@@ -24,6 +24,7 @@ import math
 import os
 import re
 import stat
+import sys
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -169,7 +170,9 @@ REASONS = {
         "Log files were found, but this version could not recover a response from them."
     ),
 }
-NO_LOGS_REASON = {
+# F5 `no_logs` has two texts: the second one when the tool's directory option was given, and
+# the directory itself is never printed.
+NO_LOGS_DEFAULT = {
     "claude-code": (
         "No session logs found for Claude Code. Looked under ~/.claude/projects (or"
         " CLAUDE_CONFIG_DIR). Use --claude-dir DIR, or try: realornoise --example"
@@ -179,18 +182,35 @@ NO_LOGS_REASON = {
         " DIR, or try: realornoise --example"
     ),
 }
+NO_LOGS_GIVEN = {
+    "claude-code": (
+        "No session logs found for Claude Code under the directory given with --claude-dir."
+        " Or try: realornoise --example"
+    ),
+    "codex": (
+        "No session logs found for Codex under the directory given with --codex-dir."
+        " Or try: realornoise --example"
+    ),
+}
 USAGE_ERRORS = {
     "malformed": "--since needs a date as YYYY-MM-DD.",
     "early": "--since can be at most 83 days before the newest day in the logs.",
     "usage": "Usage error. Run: realornoise --help",
+    "same_file": "Two output options name the same file.",
 }
-# The notices, which print only when their count is at least 1.
+INTERNAL_ERROR = "Internal error."
+# The notices, which print only when their count is at least 1. Under ERROR F9 and F17 lose
+# their second sentence, since there is no result; F9 keeps its own next line.
 F9 = "Compressed Codex files not read (Python 3.14 is needed): {}. The result uses the rest."
+F9_ERROR = "Compressed Codex files not read (Python 3.14 is needed): {}."
+F9_NEXT = "To read them: uvx --python 3.14 realornoise"
 F14 = "Other model or effort settings, not compared: {}."
 F15 = "Lines that lacked a needed field, left out: {}."
 F16 = "Records stamped later than now, left out: {}."
 F17 = "Files that could not be read: {}. The result uses the rest."
+F17_ERROR = "Files that could not be read: {}."
 NOTICES = (F9, F14, F15, F16, F17)
+SECOND_SENTENCE = "The result uses the rest."
 F4 = {
     "REAL_DROP": "RESULT: REAL DROP",
     "NO_DROP": "RESULT: NO DROP",
@@ -1150,6 +1170,28 @@ def _audit(body: Mapping[str, Any], code: int) -> None:
     assert body["seal"] == hash_record(draft)
 
 
+def _raw_run(tmp_path: Path, argv: Sequence[str], *, now: datetime = NOW) -> tuple[int, str, str]:
+    """Call `run` with the options exactly as given, and check what holds on every run."""
+    home = tmp_path / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        code = run(list(argv), now=now, env={}, home=home, out=out, err=err)
+    except SystemExit:
+        pytest.fail("`run` exited the process instead of returning an exit code")
+    except Exception as exc:
+        hits = sum(1 for canary in CANARIES if canary in str(exc))
+        pytest.fail(f"`run` raised {type(exc).__name__}; canary strings in its message: {hits}")
+    printed, failed = out.getvalue(), err.getvalue()
+    assert "Traceback" not in printed and "Traceback" not in failed
+    # `Internal error.` is the text for a failure no other text covers; no run here is one.
+    assert INTERNAL_ERROR not in failed
+    # The terminal text keeps to 100 characters; Markdown and HTML have no line limit.
+    for line in [*printed.splitlines(), *failed.splitlines()]:
+        assert len(line) <= 100, line
+    return code, printed, failed
+
+
 def _run(
     tmp_path: Path,
     argv: Sequence[str],
@@ -1158,9 +1200,6 @@ def _run(
     outputs: Sequence[str] = (),
     stem: str = "decision",
 ) -> Outcome:
-    home = tmp_path / "home"
-    home.mkdir(parents=True, exist_ok=True)
-    out, err = io.StringIO(), io.StringIO()
     json_path = tmp_path / f"{stem}.json"
     full = [*argv, "--json", str(json_path)]
     extra: dict[str, Path] = {}
@@ -1168,17 +1207,7 @@ def _run(
         path = tmp_path / f"{stem}.{'md' if name == 'markdown' else name}"
         extra[name] = path
         full += [f"--{name}", str(path)]
-    try:
-        code = run(full, now=now, env={}, home=home, out=out, err=err)
-    except SystemExit:
-        pytest.fail("`run` exited the process instead of returning an exit code")
-    except Exception as exc:
-        hits = sum(1 for canary in CANARIES if canary in str(exc))
-        pytest.fail(f"`run` raised {type(exc).__name__}; canary strings in its message: {hits}")
-    printed, failed = out.getvalue(), err.getvalue()
-    assert "Traceback" not in printed and "Traceback" not in failed
-    for line in [*printed.splitlines(), *failed.splitlines()]:
-        assert len(line) <= 100, line
+    code, printed, failed = _raw_run(tmp_path, full, now=now)
     body = None
     if json_path.exists():
         body = json.loads(json_path.read_text(encoding="utf-8"))
@@ -1271,7 +1300,7 @@ def test_each_result_and_reason_of_the_ladder(tmp_path: Path, name: str) -> None
     assert (tool["result"], tool["reason"]) == (result, reason)
     assert outcome.code == EXIT[result]
     assert F4[result] in outcome.lines
-    _block(outcome, REASONS.get(reason, NO_LOGS_REASON["claude-code"]))
+    _block(outcome, REASONS.get(reason, NO_LOGS_GIVEN["claude-code"]))
     assert outcome.err == ""
     # F8 is left out when no measure was tested, and printed otherwise.
     tested = [measure for measure in tool["measures"] if measure["finding"] != "too_few_days"]
@@ -1391,7 +1420,7 @@ def test_an_error_beside_a_result_leaves_the_exit_code_to_the_result(tmp_path: P
     # An ERROR block is the tool name, F4 and the reason; F10 prints once, for the tool that
     # has a result (record 0016, text layout items 2 and 3).
     assert TOOL_NAMES["claude-code"] in outcome.lines
-    _block(outcome, NO_LOGS_REASON["claude-code"])
+    _block(outcome, NO_LOGS_GIVEN["claude-code"])
     _run_of(outcome, F10_LINES)
 
 
@@ -1401,7 +1430,7 @@ def test_with_no_log_root_at_all_both_tools_are_requested_and_error(tmp_path: Pa
     assert [tool["result"] for tool in outcome.tools()] == ["ERROR", "ERROR"]
     assert [tool["reason"] for tool in outcome.tools()] == ["no_logs", "no_logs"]
     assert outcome.code == 3
-    _block(outcome, NO_LOGS_REASON["claude-code"], NO_LOGS_REASON["codex"])
+    _block(outcome, NO_LOGS_DEFAULT["claude-code"], NO_LOGS_DEFAULT["codex"])
     assert [tool["split_date"] for tool in outcome.tools()] == [None, None]
     # F10 belongs to tools that have a result, and there is none.
     assert F10_FIRST_SENTENCE not in _flat(outcome.out)
@@ -1412,6 +1441,92 @@ def test_auto_requests_only_the_tool_whose_root_exists(tmp_path: Path) -> None:
     write_claude(root, _uniform(ALTERNATING, DROPPED))
     outcome = _run(tmp_path, ["--tool", "auto", "--utc", "--claude-dir", str(root)])
     assert [tool["tool"] for tool in outcome.tools()] == ["claude-code"]
+
+
+def test_a_directory_option_names_the_option_and_never_the_directory(tmp_path: Path) -> None:
+    """F5 `no_logs`, second text; and a tool with a directory option is always requested."""
+    missing = tmp_path / "no-such-canary-directory"
+    outcome = _run(
+        tmp_path,
+        ["--tool", "auto", "--utc", "--codex-dir", str(missing)],
+        outputs=("markdown", "html"),
+    )
+    # Requested although the directory does not exist, so a wrong path reports `no_logs`.
+    assert [tool["tool"] for tool in outcome.tools()] == ["codex"]
+    assert (outcome.tool()["result"], outcome.tool()["reason"]) == ("ERROR", "no_logs")
+    assert outcome.code == 3
+    _block(outcome, NO_LOGS_GIVEN["codex"])
+    # The first text, which names the default place, is not the one used here.
+    assert "Looked under" not in outcome.out
+    for text in (
+        outcome.out,
+        outcome.err,
+        outcome.json_path.read_text(encoding="utf-8"),
+        outcome.text("markdown"),
+        outcome.text("html"),
+    ):
+        assert str(missing) not in text
+        assert "no-such-canary-directory" not in text
+
+
+def test_an_error_tool_prints_its_notices_without_their_second_sentence(tmp_path: Path) -> None:
+    """Record 0016, F17 and the text layout: under ERROR there is no result to speak of."""
+    root = tmp_path / "claude"
+    blocked = root / PROJECT_DIR / "01.jsonl"
+    _write_lines(blocked, [{"type": "mode", "timestamp": _at(NEWEST)}])
+    blocked.chmod(0o000)
+    if os.access(blocked, os.R_OK):
+        blocked.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        pytest.skip("this process can read a file with no read permission")
+    try:
+        outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown", "html"))
+    finally:
+        blocked.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    tool = outcome.tool()
+    assert (tool["result"], tool["reason"]) == ("ERROR", "read_error")
+    assert tool["counters"]["files_unreadable"] == 1
+    assert tool["counters"]["files_read"] == 0
+    _block(outcome, REASONS["read_error"])
+    assert F17_ERROR.format(1) in outcome.lines
+    assert SECOND_SENTENCE not in outcome.out
+    # The Markdown ERROR block holds the tool, ERROR, the reason and the notice, nothing else.
+    block = outcome.text("markdown")
+    _says(block, F17_ERROR.format(1))
+    assert SECOND_SENTENCE not in block
+    assert "2.5%" not in block
+    assert "Yours: uvx realornoise" not in block
+    # The HTML page shows the notices of an ERROR tool.
+    _says(outcome.text("html"), F17_ERROR.format(1))
+    assert SECOND_SENTENCE not in outcome.text("html")
+
+
+def test_an_error_tool_still_names_the_way_to_read_compressed_files(tmp_path: Path) -> None:
+    """A Codex history that is entirely compressed: F9 in its ERROR wording, with its line.
+
+    On Python 3.14 the file is opened and fails while being decompressed, which is F17; below
+    that version a compressed file is counted as not read, which is F9.
+    """
+    root = tmp_path / "codex"
+    path = root / "sessions" / "2026" / "11" / "10" / "rollout-2026-11-10.jsonl.zst"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"\x28\xb5\x2f\xfd" + b"these bytes are not a compressed stream")
+    outcome = _run(tmp_path, _args("codex", codex=root), outputs=("markdown", "html"))
+    tool = outcome.tool()
+    assert (tool["result"], tool["reason"]) == ("ERROR", "read_error")
+    assert outcome.code == 3
+    if sys.version_info >= (3, 14):
+        assert tool["counters"]["files_unreadable"] == 1
+        assert F17_ERROR.format(1) in outcome.lines
+    else:
+        assert tool["counters"]["files_unread_compressed"] == 1
+        assert F9_ERROR.format(1) in outcome.lines
+        assert F9_NEXT in outcome.lines
+        block = outcome.text("markdown")
+        _says(block, F9_ERROR.format(1))
+        _says(block, F9_NEXT)
+        _says(outcome.text("html"), F9_NEXT)
+    assert SECOND_SENTENCE not in outcome.out
+    assert SECOND_SENTENCE not in outcome.text("markdown")
 
 
 # --- 2. the numbers: every rational against brute-force enumeration --------------------------
@@ -2202,6 +2317,107 @@ def test_a_response_spread_over_several_lines_is_one_response(tmp_path: Path) ->
     assert tool["result"] == "REAL_DROP"
 
 
+def test_a_line_marked_as_not_an_api_error_is_kept(tmp_path: Path) -> None:
+    """Decision 6, "Formats": `isApiErrorMessage` set to `true` excludes a line, `false` not."""
+    plans = _uniform(ALTERNATING, DROPPED)
+    lines: list[dict[str, Any]] = []
+    for day, value in zip((*BEFORE_DAYS, *AFTER_DAYS), (*ALTERNATING, *DROPPED), strict=True):
+        for index in range(20):
+            lines.append(
+                _assistant(
+                    mid=f"ok-{day}-{index}",
+                    when=_at(day, 6, index),
+                    setting=Setting(),
+                    reasoning=value,
+                    extra={"isApiErrorMessage": False},
+                )
+            )
+    root = tmp_path / "claude"
+    _write_lines(root / PROJECT_DIR / "01.jsonl", lines)
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["counters"]["lines_unknown_type"] == 0
+    assert tool["counters"]["responses"] == 300
+    assert tool["result"] == "REAL_DROP"
+
+
+def test_a_path_that_is_not_a_regular_file_is_not_discovered(tmp_path: Path) -> None:
+    """Decision 6, "Reading faults": such a path is counted nowhere.
+
+    A directory and a dangling symbolic link stand in for the cases that can be made without
+    risk; a pipe is left out because an implementation that opened one would block instead of
+    failing, and a hanging test says less than a failing one.
+    """
+    root = tmp_path / "claude"
+    plans = _uniform(ALTERNATING, DROPPED)
+    write_claude(root, plans, session="01")
+    (root / PROJECT_DIR / "02.jsonl").mkdir()
+    (root / PROJECT_DIR / "03.jsonl").symlink_to(root / PROJECT_DIR / "missing.jsonl")
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["counters"]["files_read"] == 1
+    assert tool["counters"]["files_unreadable"] == 0
+    assert F17_ERROR.split("{")[0] not in outcome.out
+
+
+def test_a_line_that_is_not_valid_utf8_is_only_a_line_that_is_not_json(tmp_path: Path) -> None:
+    root = tmp_path / "claude"
+    plans = _uniform(ALTERNATING, DROPPED)
+    path = write_claude(root, plans, session="01")
+    path.write_bytes(b"\xff\xfe not valid utf-8 \x80\n" + path.read_bytes())
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["counters"]["files_unreadable"] == 0
+    assert tool["counters"]["files_read"] == 1
+    assert tool["counters"]["lines_not_json"] == 1
+    assert tool["counters"]["lines"] == 301
+
+
+def test_a_byte_order_mark_at_the_start_of_a_file_is_ignored(tmp_path: Path) -> None:
+    root = tmp_path / "claude"
+    plans = _uniform(ALTERNATING, DROPPED)
+    path = write_claude(root, plans, session="01")
+    path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+    outcome = _run(tmp_path, _args("claude-code", claude=root))
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["counters"]["lines_not_json"] == 0
+    assert tool["counters"]["lines"] == 300
+    assert tool["counters"]["responses"] == 300
+
+
+def test_a_timestamp_before_the_year_2000_is_a_missing_field(tmp_path: Path) -> None:
+    """Decision 6: a timestamp before 2000 or after 2200 is treated as a missing field."""
+    base = _uniform(ALTERNATING, DROPPED)
+    stray = _assistant(
+        mid="ancient-1", when=_at(date(1999, 12, 31)), setting=Setting(), reasoning=5
+    )
+    plans = {**base, NEWEST: Day(counts=base[NEWEST].counts, extra=(stray,))}
+    outcome = _claude_run(tmp_path, plans)
+    tool = _check(outcome, "claude-code", plans)
+    assert tool["counters"]["lines_lacking_field"] == 1
+    assert tool["counters"]["records_in_future"] == 0
+    assert F15.format(1) in outcome.lines
+
+
+def test_a_codex_token_count_that_repeats_the_cumulative_usage_is_a_duplicate(
+    tmp_path: Path,
+) -> None:
+    """Decision 6: a repeat within one file is counted and left out, whatever its timestamp."""
+    root = tmp_path / "codex"
+    plans = _codex_no_drop()
+    write_codex(root, plans)
+    path = root / "sessions" / "2026" / "11" / "10" / f"rollout-{NEWEST}.jsonl"
+    rows = path.read_text(encoding="utf-8").splitlines()
+    repeat = {**json.loads(rows[-1]), "timestamp": _at(NEWEST, 9, 0)}
+    path.write_text("\n".join([*rows, json.dumps(repeat)]) + "\n", encoding="utf-8")
+    outcome = _run(tmp_path, _args("codex", codex=root))
+    tool = _check(outcome, "codex", plans)
+    assert tool["counters"]["responses_duplicate"] == 1
+    assert tool["counters"]["responses"] == 300
+    # Kept, the repeat would make the newest day hold 21 positive counts.
+    assert tool["measures"][0]["after_days"][-1]["count"] == 20
+
+
 # --- 7. the record ---------------------------------------------------------------------------
 # Record 0016, "Record model". `_audit` checks the field sets, the null rules, the ascending day
 # lists, the filled test fields and the seal on every run in this file.
@@ -2393,7 +2609,7 @@ def test_an_error_markdown_block_holds_only_the_tool_the_result_and_the_reason(
     root.mkdir()
     outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown",))
     block = outcome.text("markdown")
-    _says(block, NO_LOGS_REASON["claude-code"])
+    _says(block, NO_LOGS_GIVEN["claude-code"])
     assert "2.5%" not in block
     assert "uvx realornoise" not in block
 
@@ -2430,3 +2646,103 @@ def test_two_runs_on_the_same_logs_are_byte_identical(tmp_path: Path) -> None:
     body = first.json_path.read_text(encoding="utf-8")
     assert body.endswith("\n")
     assert body == json.dumps(json.loads(body), indent=2, sort_keys=True) + "\n"
+
+
+# --- 10. the output files --------------------------------------------------------------------
+# Record 0016, "Command line and layout": two output options may not name the same file, where
+# two spellings of one file are the same file; an existing file keeps its permission bits and a
+# new one takes what the umask gives; nothing is left changed or left behind when a run is
+# refused.
+
+
+def _listing(folder: Path) -> set[str]:
+    return {str(path.relative_to(folder)) for path in folder.rglob("*")}
+
+
+@pytest.mark.parametrize("spelling", ["identical", "symlink", "relative"])
+def test_two_output_options_that_name_one_file_are_a_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, spelling: str
+) -> None:
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    target = tmp_path / "out.json"
+    if spelling == "identical":
+        first, second = str(target), str(target)
+    elif spelling == "symlink":
+        target.write_text("keep me", encoding="utf-8")
+        link = tmp_path / "link.json"
+        link.symlink_to(target)
+        first, second = str(target), str(link)
+    else:
+        monkeypatch.chdir(tmp_path)
+        first, second = str(target), target.name
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path, [*_args("claude-code", claude=root), "--json", first, "--markdown", second]
+    )
+    assert code == 3
+    assert printed == ""
+    assert failed.splitlines() == [USAGE_ERRORS["same_file"]]
+    # Nothing written, and no temporary name left beside a target.
+    assert _listing(tmp_path) == before
+    if spelling == "symlink":
+        assert target.read_text(encoding="utf-8") == "keep me"
+    else:
+        assert not target.exists()
+
+
+def test_two_spellings_of_a_new_file_are_one_file_when_the_volume_folds_case(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.txt").write_text("probe", encoding="utf-8")
+    if not (tmp_path / "A.TXT").exists():
+        pytest.skip("this volume keeps a.txt and A.TXT apart, so the two spellings are two files")
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path,
+        [
+            *_args("claude-code", claude=root),
+            "--json",
+            str(tmp_path / "out.json"),
+            "--html",
+            str(tmp_path / "OUT.JSON"),
+        ],
+    )
+    assert code == 3
+    assert printed == ""
+    assert failed.splitlines() == [USAGE_ERRORS["same_file"]]
+    assert _listing(tmp_path) == before
+
+
+def test_three_distinct_output_files_are_all_written(tmp_path: Path) -> None:
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown", "html"))
+    paths = [outcome.json_path, *outcome.extra.values()]
+    assert all(path.is_file() for path in paths)
+    assert len({path.read_bytes() for path in paths}) == 3
+
+
+def test_an_existing_output_file_keeps_its_mode_and_a_new_one_takes_the_umask(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    kept = tmp_path / "decision.json"
+    kept.write_text("old", encoding="utf-8")
+    kept.chmod(0o640)
+    mask = os.umask(0)
+    os.umask(mask)
+
+    outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown",))
+    assert outcome.body is not None
+    assert kept.read_text(encoding="utf-8") != "old"
+    assert stat.S_IMODE(kept.stat().st_mode) == 0o640
+    fresh = outcome.extra["markdown"]
+    assert stat.S_IMODE(fresh.stat().st_mode) == 0o666 & ~mask

@@ -221,3 +221,31 @@ distribution therefore takes the main package's range. On Python older than 3.14
 counts the compressed Codex files it could not read and prints the command that reads them
 (`uvx --python 3.14 realornoise`). No dependency is added for decompression (rule 4 of
 `AGENTS.md`).
+
+## D-17: dispositions of the two adversarial reviews; the records move to `docs/` (2026-11-15)
+
+Two reviews of the finished code ran before the release, each with separate agents that
+tried to refute every finding: L13 (23 findings, 22 confirmed; brief `tasks/L13a-review-fixes.md`,
+16 fixes) and L13b on those fixes (22 findings, 12 confirmed, 10 minor; brief
+`tasks/L13b-second-review-fixes.md`, 17 items). A final check of the output-writing path,
+the record validation and the documents (`reviews/L13c-final-check-workflow.json`) found no
+code defect and six document slips, corrected by the orchestrator. Decisions taken there:
+
+- The gated self-check cells run exactly 20,000 tables. They build day tables directly from
+  the generator; a unit test checks the generator against the path through response and
+  edit records for 10 seeds per design. Setting selection and the usable-day boundaries have
+  their own exact gate. The statistics document says so.
+- Under ERROR the notices F9 and F17 print without "The result uses the rest.", in all three
+  formats. A tool whose directory option was given gets its own `no_logs` text, which names
+  the option and never the directory.
+- Output files are written all or none; two spellings of one file are one file; an existing
+  file keeps its permission bits. An option given twice takes its last value.
+- The record model rejects a record whose stored statistics or day-table digest differ from
+  what its stored fields give.
+- The drafts under `logs/` are history from this point. `docs/design/0016-logs.md` and
+  `docs/STATISTICS_LOGS.md` on `v2/logs` are the records, pinned at 2.3.0.
+- The blind acceptance tests grew from 67 to 82 cases, written from the records alone; all
+  passed on first contact with the fixed code on Python 3.13 and 3.14.
+
+Not verified on this machine: a file system that keeps letter case apart (the branch where
+`out.txt` and `OUT.txt` are two files); Windows; hosted CI until the branch is pushed.

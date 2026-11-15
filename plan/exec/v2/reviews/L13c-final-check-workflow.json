@@ -1,0 +1,84 @@
+{
+ "results": [
+  {
+   "dimension": "output-writing",
+   "verified": [],
+   "low": [
+    {
+     "title": "A repeated output option silently drops the earlier path and reports success",
+     "file": "src/arci/logs/cli.py",
+     "line": 52,
+     "severity": "low",
+     "claim": "The output options are plain argparse options, so the last value wins. `--json A --json B` writes only B, prints the normal report and exits with the result code (1 for the example). A is never written and no line on the error stream says so. Record 0016 does not name this case. It lists only distinct output options naming one file (`Two output options name the same file.`) and malformed values (`Usage error. Run: realornoise --help`). So a requested output can go missing while the run reports success.",
+     "evidence": "run(['--example','--json',d/'a','--json',d/'b']) returned (1, '', 3042 chars on stdout); the directory then held only 'b'. `--json a --json a` writes 'a' once with exit 1. This is the only non-conforming result. Every other probe matched record 0016 and the brief: letter case, NFC/NFD, relative vs absolute, a symlink, a symlinked parent, a hard link and `sub/../a` all gave `Two output options name the same file.` with exit 3 and nothing left behind. An existing directory, a missing directory, a read-only directory, a FIFO, a symlink to a directory, a symlink loop, a file parent, an over-long name and a write-only file all gave `Requested output could not be written.` with exit 3 and the other files kept. A render failure gave `Internal error.` and nothing was written. A symlink target keeps the link and the linked file gets the right content. A dangling link creates the file it points to. Existing 0640 and 0600 files keep their modes; new files get 0644 under umask 022 and 0600 under umask 077. No temporary or placeholder file is left after success or after any failure. With os.replace failing on the n-th call (1 to 6, during install and rollback), every target whose restore succeeded holds its old content and mode. The backup of a target whose restore failed is kept as .realornoise-*, as item 3 says. Not tested: a case-sensitive volume (the scratch volume folds case), so the 'two files, both written' branch is checked by reading the code only.",
+     "suggested_fix": "Treat a repeated output option as a usage error (`Usage error. Run: realornoise --help`, exit 3), for example by using action='append' and rejecting more than one value. Or state in record 0016 that the last value wins."
+    }
+   ]
+  },
+  {
+   "dimension": "record-and-errors",
+   "verified": [],
+   "low": [
+    {
+     "title": "LOG_FORMATS says unread compressed files always report that the result uses the rest",
+     "file": "docs/LOG_FORMATS.md",
+     "line": 23,
+     "severity": "low",
+     "claim": "Under ERROR, docs/LOG_FORMATS.md still says the program reports that the result uses the rest. Item 5 and the record (F9: 'Under ERROR the second sentence is left out, since there is no result') now drop that sentence.",
+     "evidence": "Lines 22-24: 'Earlier Pythons count them as unread compressed files, report that the result uses the rest, and print `uvx --python 3.14 realornoise`.' I built a synthetic Codex directory holding only two rollout-*.jsonl.zst files and ran it on Python 3.13 with --tool codex --codex-dir. The result is ERROR read_error, exit 3. The text, Markdown and HTML all print 'Compressed Codex files not read (Python 3.14 is needed): 2.' and then 'To read them: uvx --python 3.14 realornoise', with no 'The result uses the rest.' This matches the record but contradicts LOG_FORMATS.",
+     "suggested_fix": "Qualify the sentence. For example: 'and, when another file gives a result, report that the result uses the rest'. Or say that under ERROR only the count and the command are printed."
+    }
+   ]
+  },
+  {
+   "dimension": "documents",
+   "verified": [
+    {
+     "title": "Design record 0016 still says a non-regular file is unreadable, contradicting the new sentence beside it",
+     "file": "docs/design/0016-logs.md",
+     "line": 140,
+     "severity": "medium",
+     "claim": "The 'Reading faults' paragraph now holds two statements that cannot both be true. The new sentence from L13b item 10 (line 137) says a path that is not a regular file is not discovered and is counted nowhere. The older L13a sentence kept three lines later (line 140) says 'A file is unreadable only when it cannot be opened, is not a regular file (a pipe or a device is never opened), or fails while being read or decompressed', which makes a pipe or device an unreadable file counted under F17.",
+     "evidence": "src/arci/logs/discover.py claude_files/codex_files keep only names where (Path(directory)/name).is_file(). A FIFO named sessions/.../rollout-x.jsonl is never handed to codex.read, so files_unreadable stays 0 and F17 does not print. docs/LOG_FORMATS.md (lines 132-136) removed the clause under item 14 and now reads 'cannot be opened, or fails while being read or decompressed', plus 'not discovered and are counted nowhere'. The record of authority still holds the old clause.",
+     "suggested_fix": "In 0016 line 140-141, drop 'is not a regular file (a pipe or a device is never opened), ' so the sentence matches LOG_FORMATS.md and the new sentence at line 137. This is a record edit for the orchestrator to approve, because the brief said to keep all other text word for word.",
+     "dimension": "documents",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "The defect is real. I confirmed it in the worktree's uncommitted docs/design/0016-logs.md, in the 'Reading faults' paragraph at lines 132-143. Lines 137-138 are new and say: \"A path that is not a regular file (a pipe, a device, a directory) is not discovered and is counted nowhere.\" Lines 140-141, three lines further on, say: \"A file is unreadable only when it cannot be opened, is not a regular file (a pipe or a device is never opened), or fails while being read or decompressed\". That second sentence makes a pipe or device an unreadable file, so it would be counted in files_unreadable and would print notice F17. Both sentences cannot be true at once.\n\nThe code follows the new sentence. In src/arci/logs/discover.py, claude_files (line 27) and codex_files (line 44) keep a name only when `(Path(directory) / name).is_file()` is true. I ran codex_files on a synthetic root with a FIFO at sessions/2026/rollout-x.jsonl, and the FIFO was not returned. So it never reaches the reader and is counted nowhere. The only file returned was a leftover regular rollout-a.jsonl.zst from earlier scratch work.\n\nBrief L13b item 14 told the implementer to state this rule once and \"Remove the contradiction\" in docs/LOG_FORMATS.md. That was done there: line 132 no longer has the clause. But the same contradiction was then added to the design record, which is the record of authority, and the old \"is not a regular file\" clause was left in. This is a document stating something false that is part of the authority, so medium.",
+      "reproduction": "mkdir -p $S/cx/sessions/2026 && mkfifo $S/cx/sessions/2026/rollout-x.jsonl; .venv/bin/python -c \"from pathlib import Path; from arci.logs.discover import codex_files; print(codex_files(Path('$S/cx')))\" -> FIFO is not listed, so it is never opened or counted. Compare docs/design/0016-logs.md lines 137-138 (\"not discovered and is counted nowhere\") with lines 140-141 (\"A file is unreadable only when it ... is not a regular file (a pipe or a device is never opened)\")."
+     }
+    }
+   ],
+   "low": [
+    {
+     "title": "'Always requested' for a tool given a directory option is false under an explicit --tool",
+     "file": "docs/design/0016-logs.md",
+     "line": 357,
+     "severity": "low",
+     "claim": "The record says 'A tool for which a directory option was given is always requested, also under --tool auto'. The recipe row (docs/recipes/logs.md:161) says the same. Under an explicit --tool claude-code or --tool codex, the other tool is not requested even when its directory option was given.",
+     "evidence": "src/arci/logs/cli.py lines 107-120: only the auto branch looks at args.claude_dir/args.codex_dir; `else: requested = [cast(Tool, args.tool)]`. So `realornoise --tool codex --claude-dir X` requests Codex only and prints nothing for Claude Code.",
+     "suggested_fix": "Say 'Under --tool auto (and both), a tool for which a directory option was given is always requested', or make an explicit --tool together with the other tool's directory option a usage error."
+    },
+    {
+     "title": "'Caps power near 78%' has no source in the final self-check, and a same-condition row there shows 80.0%",
+     "file": "docs/STATISTICS_LOGS.md",
+     "line": 356,
+     "severity": "low",
+     "claim": "Checks item 4 says 'the streak check alone caps power near 78% at 42 before-days'. 78% does not appear in docs/results/logs-selfcheck.md. The power row for the same condition there (14/42, log SD 0.4, drop 9/20, seed 16113102) is 465/581 = 0.800344 [0.765914, 0.830829], above the stated cap. The streak-section row for that condition gives 0.762000 as built and 0.918000 per measure. This sentence was not changed by L13b, but it is a percentage that describes a simulated rate.",
+     "evidence": "logs-selfcheck.md line 94: '| 14/42 | 0.4 | 9/20 | 16113102 | 2000 | 581 | 465/581 = 0.800344 ...'. Line 134: as built 1524/2000 = 0.762000. The 14/42 as-built power cells at drops 1/2 and 11/20 range from 0.715548 to 0.775081.",
+     "suggested_fix": "Cite the self-check rows (for example 465/581 = 0.800344 and 1524/2000 = 0.762000 at 14/42, log SD 0.40, drop 9/20), or state that 78% is an analytic approximation and how it was derived."
+    },
+    {
+     "title": "RELEASING step 1 exempts recipes, but the log recipe shows the current version in a captured banner",
+     "file": "docs/RELEASING.md",
+     "line": 40,
+     "severity": "low",
+     "claim": "I followed step 1 for a bump from 2.2.0 to 2.3.0 and searched the worktree for 2.2.0, leaving out history. Every location that holds the current version is listed, with one exception: docs/recipes/logs.md lines 34 and 38. The step says recipes 'keep their historical versions', so they are left at 2.2.0. The 2.3.0 release would then document its own command with the banner 'realornoise 2.2.0' and the sentence 'The banner still reports 2.2.0 before the release version change'. That is a current-version location, not history. The other hits are history and need no action: README 'Since 2.2.0' (line 668) and 'for 2.2.0' (line 710), docs/COMPATIBILITY.md, docs/ROADMAP.md, docs/recipes/verdict.md 'Not in 2.2.0', tests/acceptance/test_outcomes.py, and test fixtures in tests/unit/packaging/test_review_fixes.py. The listed locations cover pyproject.toml, uv.lock, src/arci/__init__.py, packages/realornoise/pyproject.toml (version and pin), the realornoise __init__.py, plugin.json, CITATION.cff (already 2.3.0), the five goldens and docs/results/sample-suite-report.html. The command `.venv/bin/python -m tests.unit.html_report.generate` exists and writes the goldens and the sample.",
+     "evidence": "git grep -F '2.2.0' outside plan/, CHANGELOG.md and docs/design/. tests/unit/docs/test_logs_docs.py::test_example_output_is_real_and_labelled compares the captured output from line 2 onward only, so nothing fails if the banner stays at 2.2.0.",
+     "suggested_fix": "Add docs/recipes/logs.md (the captured banner and its note) to step 1. Either update the banner at the bump or remove the version-specific note."
+    }
+   ]
+  }
+ ]
+}
