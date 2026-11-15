@@ -272,7 +272,8 @@ New in 0017:
 
 - `--keep` writes the kept day table after the run.
 - `--keep-dir DIR` chooses the table's directory and implies `--keep`. `DIR` is made absolute
-  against the current directory and `~` is expanded, as for `--project`.
+  against the current directory and `~` is expanded, as for `--project`. An empty `DIR` is a malformed
+  value: the general usage line, exit 3, nothing read and nothing written.
 - `--ignore-kept` reads no kept table, so the result uses no kept row. It may not be combined
   with `--keep` or `--keep-dir`.
 
@@ -488,7 +489,22 @@ not create. A directory that already existed is never removed and keeps its mode
 while a staged file is being moved into place rolls back the same way. The
 table's path joins the same-file check only when `--keep` or `--keep-dir` is given: an output
 option that names the table is then `Two output options name the same file.` `kept_table` is
-`absent` only when the path does not exist; any other failure to open it is `unreadable`.
+`absent` only when the path does not exist or the file there holds 0 bytes; any other failure
+to open it is `unreadable`.
+
+**An interrupted write, and two runs at once (added after the adversarial review).** The
+same-file check may create empty files at target paths that do not exist yet; it removes them
+again before anything is staged, so a run that is stopped while it stages or moves files
+leaves no empty file at a target. A table file of 0 bytes is not a table: it is read as
+`absent`, F24 does not print, and a `--keep` run replaces it. With `--keep`, the stored table
+is read again and merged, and the new table is moved into place, while the run holds an
+exclusive lock on the table directory, so two runs that overlap do not lose each other's rows:
+the second writer merges with what the first one wrote. The result of the run still uses the
+table as it was read at the start. Where the platform offers no such lock, the run goes on
+without it. After a successful write, and while the lock is held, temporary files that this
+tool left in the table directory (regular files whose names begin with `.realornoise-`) are
+removed. The run creates no file in the table directory other than the table and its own
+temporary file.
 
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
 more than 33,554,432 bytes. Neither the number of settings nor the number of rows is capped, so
@@ -805,7 +821,11 @@ and in the footer.
 This replaces the two figures of the first form of this record (`{rate_5_10}`, `{rate_7_21}`,
 read from the correlation rows of two designs only). The 2.4.0 self-check measured its
 largest rate in a cell that those two figures left out: days in regimes, at 14 days after
-against 16 before. A printed "up to" must cover every case the self-check tested.
+against 16 before. The printed figure is the largest rate of the rule as built, over all
+generated histories, among the cells of those two sections, which break A1 by dependence
+between days. It is not the largest number in the self-check file: among the histories that
+pass the streak check the rates are higher, and the demonstrations outside the assumptions
+are not rates of this kind. The statistics document gives those figures.
 
 ## Files
 
@@ -1122,8 +1142,11 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
 
 72. The self-check file holds the new cells: the A1-preserving null cell and one exact-margin
     cell per measure, the competitive-choice null and margin cells, each on 20,000 histories,
-    with wrong REAL DROP at most 0.0283 in a null cell and wrong NO DROP at most 0.0283 in a
-    margin cell; the script fails when a gated cell would run on fewer histories. It also holds
+    with wrong REAL DROP at most 0.0283 in a null cell and, in a margin cell, both the tool's
+    wrong NO DROP and the moved measure's own `no drop` finding at most 0.0283 (added after the
+    adversarial review: the tool-level rate alone could not show a wrong margin of one measure);
+    the script fails when a gated cell would run on fewer histories, and its gates are explicit
+    checks, not `assert` statements. It also holds
     the report-only cells (many more after-period responses; the newly adopted setting at 1.15,
     with 535 of 20,000 at 14 after against 16 before and 415 of 20,000 at 7 against 21), each
     naming the assumption it breaks, the streak-check rates conditional on passing the check, the
@@ -1134,3 +1157,17 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
     the recipe, the package README and both skills; the plugin and the Codex skill pin
     `uvx --python 3.14 realornoise==2.4.0`; both distributions report version 2.4.0 and keep
     `requires-python` at `>=3.11`.
+
+**After the adversarial review.**
+
+74. A table file of 0 bytes is `absent`: F24 does not print, `kept_table` is `absent`, and a
+    `--keep` run writes a valid table in its place.
+75. An empty value for `--keep-dir` prints the general usage line, exits 3, and reads and writes
+    nothing; no file appears in the current directory.
+76. After a successful `--keep` run the table directory holds the table and no other file that
+    the run created. A leftover regular file in that directory whose name begins with
+    `.realornoise-` is gone after the run; a file with any other name is left as it was. A run
+    whose write fails leaves no empty file at any target path that did not exist before.
+77. Two `--keep` runs that overlap keep the rows of both: the second writer merges with the
+    table the first one wrote (a unit test with an injected pause between the first read and the
+    write holds this; an acceptance test cannot time two processes).
