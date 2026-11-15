@@ -4,7 +4,8 @@ Read `src/arci/interfaces.py`, `src/arci/schema.py` and `docs/STATISTICS.md` fir
 
 ## Hard rules
 
-1. FROZEN files are listed in `FROZEN.sha256`. Never edit, move or delete them. That covers
+1. FROZEN files are listed in `FROZEN.sha256`; that file is the list of record. Never edit,
+   move or delete them. The list includes
    `src/arci/{schema,interfaces,hashing,fingerprint,schedule,contracts}.py`, everything under `tests/acceptance/`,
    `pyproject.toml`, `uv.lock`, `justfile`, `AGENTS.md`, `docs/AGENT_SEMANTICS.md`,
    `docs/STATISTICS.md`, `docs/TRUST_MODEL.md`, `docs/design/**`. If a frozen file

@@ -1,7 +1,7 @@
 [project]
 name = "agent-reliability-ci"
-version = "2.2.0"
-description = "Regression testing for stochastic AI agents: frozen experiments, fault injection, replayable reduced failures."
+version = "2.3.0"
+description = "Did your AI agent get worse? Real, noise, or cannot tell: from coding-agent session logs, imported results, or controlled trials with fault injection."
 readme = "README.md"
 license = "Apache-2.0"
 authors = [{ name = "Ajay Surya Senthilrajan" }]
@@ -9,7 +9,7 @@ license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 keywords = [
   "ai-agents", "reliability", "fault-injection", "statistics", "evaluation", "reproducibility",
-  "testing", "llm", "regression", "ci", "pytest",
+  "testing", "llm", "regression", "ci", "pytest", "claude-code", "codex", "coding-agents",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
