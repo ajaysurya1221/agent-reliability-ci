@@ -26,7 +26,7 @@ def claude_files(root: Path) -> list[Path]:
             )
     except (OSError, ValueError):
         pass
-    return sorted(found)
+    return sorted(found, key=lambda path: path.relative_to(root).as_posix())
 
 
 def codex_files(root: Path) -> list[Path]:
@@ -41,4 +41,4 @@ def codex_files(root: Path) -> list[Path]:
                 )
         except (OSError, ValueError):
             pass
-    return sorted(found)
+    return sorted(found, key=lambda path: path.relative_to(root).as_posix())

@@ -24,9 +24,6 @@ MODEL_WORDS: frozenset[str] = frozenset(
         "gpt",
         "codex",
         "chatgpt",
-        "o1",
-        "o3",
-        "o4",
         "mini",
         "nano",
         "micro",
@@ -59,32 +56,6 @@ MODEL_WORDS: frozenset[str] = frozenset(
         "grok",
         "code",
         "mlx",
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "j",
-        "k",
-        "l",
-        "m",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-        "t",
-        "u",
-        "v",
-        "w",
-        "x",
-        "y",
-        "z",
     ]
 )
 _MODEL = re.compile(r"[a-z0-9][a-z0-9._-]{0,47}\Z")
@@ -96,8 +67,11 @@ def render_model(raw: str) -> str | None:
     """Return only ids composed entirely of approved words and bounded numbers."""
     if not _MODEL.fullmatch(raw):
         return None
+    parts = re.split(r"[-._]", raw)
+    if len(parts) > 6 or sum(part.isdecimal() and len(part) <= 2 for part in parts) > 3:
+        return None
     dates = 0
-    for part in re.split(r"[-._]", raw):
+    for part in parts:
         if _DATE_PART.fullmatch(part):
             dates += 1
         elif part not in MODEL_WORDS and not _NUMBER_PART.fullmatch(part):
@@ -144,6 +118,7 @@ class ReaderCounters:
     lines_unknown_type: int = 0
     lines_lacking_field: int = 0
     records_in_future: int = 0
+    records_without_timezone: int = 0
     responses: int = 0
     responses_duplicate: int = 0
     responses_without_reasoning: int = 0
@@ -245,3 +220,13 @@ def parse_line(line: str, used: frozenset[str], counts: ReaderCounters) -> dict[
         counts.lines_unknown_type += 1
         return None
     return data
+
+
+def without_timezone(value: object) -> bool:
+    """Distinguish a valid zone-less timestamp from a malformed/missing one."""
+    if not isinstance(value, str):
+        return False
+    try:
+        return datetime.fromisoformat(value).tzinfo is None
+    except (ValueError, OverflowError):
+        return False

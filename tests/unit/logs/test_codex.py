@@ -106,7 +106,8 @@ def test_missing_fields_and_unknown_lines(tmp_path: Path) -> None:
     actual = read([path], project=None, now=NOW)
     assert len(actual.responses) == 1
     assert actual.counters.responses_without_setting == 3
-    assert actual.counters.lines_lacking_field == 3
+    assert actual.counters.lines_lacking_field == 2
+    assert actual.counters.records_without_timezone == 1
     assert actual.counters.lines_not_json == 5
     assert actual.counters.lines_unknown_type == 2
     assert actual.counters.records_in_future == 1

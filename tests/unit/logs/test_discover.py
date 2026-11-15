@@ -51,3 +51,13 @@ def test_discovery_failure_has_no_path(
     monkeypatch.setattr("arci.logs.discover.os.walk", fail)
     assert claude_files(tmp_path) == codex_files(tmp_path) == []
     assert capsys.readouterr() == ("", "")
+
+
+def test_path_text_order(tmp_path: Path) -> None:
+    for part in ("a", "a-b"):
+        folder = tmp_path / "sessions" / part
+        folder.mkdir(parents=True)
+        (folder / "rollout-x.jsonl").touch()
+    expected = [tmp_path / "sessions" / part / "rollout-x.jsonl" for part in ("a-b", "a")]
+    assert claude_files(tmp_path) == expected
+    assert codex_files(tmp_path) == expected

@@ -141,7 +141,8 @@ def test_bad_lines_missing_fields_future_and_files(tmp_path: Path) -> None:
     assert actual.counters.files_unreadable == 2
     assert actual.counters.lines_not_json == 5
     assert actual.counters.lines_unknown_type == 2
-    assert actual.counters.lines_lacking_field == 3
+    assert actual.counters.lines_lacking_field == 2
+    assert actual.counters.records_without_timezone == 1
     assert actual.counters.responses_without_setting == 1
     assert actual.counters.records_in_future == 1
 
@@ -299,3 +300,35 @@ def test_deep_json_fault_is_per_line(tmp_path: Path) -> None:
     assert actual.counters.lines_not_json == 1
     assert actual.counters.files_unreadable == 0
     assert len(actual.responses) == 1
+
+
+def test_edit_without_timezone_counted_separately(tmp_path: Path) -> None:
+    path = tmp_path / "session.jsonl"
+    write_rows(
+        path,
+        [
+            assistant(content=[{"type": "tool_use", "id": "edit", "name": "Edit"}]),
+            result("edit", stamp="2026-01-01T12:00:00"),
+        ],
+    )
+    actual = read([path], project=None, now=NOW)
+    assert actual.edits == ()
+    assert actual.counters.records_without_timezone == 1
+    assert actual.counters.lines_lacking_field == 0
+
+
+def test_zoneless_first_block_cannot_be_recovered_by_later_block(tmp_path: Path) -> None:
+    first = tmp_path / "first.jsonl"
+    copied = tmp_path / "copy.jsonl"
+    write_rows(
+        first,
+        [
+            assistant("same", stamp="2026-01-01T12:00:00"),
+            assistant("same", stamp="2026-01-02T12:00:00Z"),
+        ],
+    )
+    write_rows(copied, [assistant("same", stamp="2026-01-02T12:00:00Z")])
+    actual = read([first, copied], project=None, now=NOW)
+    assert actual.responses == ()
+    assert actual.counters.records_without_timezone == 1
+    assert actual.counters.responses_duplicate == 1

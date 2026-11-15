@@ -21,6 +21,7 @@ from .records import (
     render_model,
     string_of,
     time_of,
+    without_timezone,
 )
 
 _USED = frozenset({"session_meta", "turn_context", "event_msg"})
@@ -78,6 +79,9 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                         continue
                     info = object_of(payload.get("info"))
                     when = time_of(data.get("timestamp"))
+                    if without_timezone(data.get("timestamp")):
+                        counts.records_without_timezone += 1
+                        continue
                     if when is None or not isinstance(payload.get("info"), dict):
                         counts.lines_lacking_field += 1
                         continue

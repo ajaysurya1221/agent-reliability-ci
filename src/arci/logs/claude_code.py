@@ -21,6 +21,7 @@ from .records import (
     render_model,
     string_of,
     time_of,
+    without_timezone,
 )
 
 _USED = frozenset({"assistant", "user"})
@@ -55,6 +56,12 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                         model = string_of(message.get("model"))
                         effort = string_of(data.get("effort", data.get("perTurnEffort")))
                         when = time_of(data.get("timestamp"))
+                        if without_timezone(data.get("timestamp")):
+                            counts.records_without_timezone += 1
+                            if identity:
+                                # Later blocks cannot replace the first response timestamp.
+                                file_seen.add(identity)
+                            continue
                         if not identity or when is None:
                             counts.lines_lacking_field += 1
                             continue
@@ -119,7 +126,9 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                             is_edit, response = call
                             if not is_edit:
                                 continue
-                            if denied:
+                            if without_timezone(data.get("timestamp")):
+                                counts.records_without_timezone += 1
+                            elif denied:
                                 counts.edits_denied += 1
                             elif when is None:
                                 lacking_time = True

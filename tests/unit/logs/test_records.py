@@ -36,7 +36,7 @@ from tests.unit.logs.synth_logs import assistant, context, generate, meta, token
         "qwen-3-a22",
         "claude-opus-20260101",
         "gpt-r1",
-        "gpt-" + "a-" * 21 + "99",
+        "claude-sonnet-4-5-20250929",
         *sorted(MODEL_WORDS),
     ],
 )
@@ -47,6 +47,9 @@ def test_model_vocabulary(raw: str) -> None:
 @pytest.mark.parametrize(
     "raw",
     [
+        "gpt-12-34-56-78-87-65-43-21",
+        "gpt-1-2-3-4",
+        "gpt-a",
         "acme-payroll-secret",
         "claude-acme-payroll",
         "Claude-opus",
@@ -169,7 +172,8 @@ def test_absent_setting_keys_and_naive_timestamp(tmp_path: Path, tool: str) -> N
     actual = reader.read([path], project=None, now=datetime.fromisoformat("2026-02-01T00:00Z"))
     assert actual.responses == ()
     assert actual.counters.responses_without_setting == 1
-    assert actual.counters.lines_lacking_field == 1
+    assert actual.counters.lines_lacking_field == 0
+    assert actual.counters.records_without_timezone == 1
     assert actual.counters.records_in_future == 0
 
 
@@ -214,6 +218,7 @@ def test_contract_fields() -> None:
         "lines_unknown_type",
         "lines_lacking_field",
         "records_in_future",
+        "records_without_timezone",
         "responses",
         "responses_duplicate",
         "responses_without_reasoning",
@@ -290,3 +295,56 @@ def test_readers_stream_and_close_inputs(tmp_path: Path, monkeypatch: pytest.Mon
     assert len(claude_code.read([claude_path], project=None, now=now).responses) == 1
     assert len(codex.read([codex_path], project=None, now=now).responses) == 1
     assert len(streams) == 2 and all(stream.closed for stream in streams)
+
+
+def test_closed_lists_match_record() -> None:
+    assert frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}) == EFFORTS
+    assert (
+        frozenset(
+            [
+                "claude",
+                "opus",
+                "sonnet",
+                "haiku",
+                "fable",
+                "mythos",
+                "instant",
+                "gpt",
+                "codex",
+                "chatgpt",
+                "mini",
+                "nano",
+                "micro",
+                "max",
+                "pro",
+                "turbo",
+                "spark",
+                "astra",
+                "omni",
+                "preview",
+                "latest",
+                "thinking",
+                "fast",
+                "high",
+                "low",
+                "medium",
+                "xhigh",
+                "gemini",
+                "flash",
+                "ultra",
+                "lite",
+                "exp",
+                "deepseek",
+                "chat",
+                "reasoner",
+                "coder",
+                "qwen",
+                "glm",
+                "kimi",
+                "grok",
+                "code",
+                "mlx",
+            ]
+        )
+        == MODEL_WORDS
+    )
