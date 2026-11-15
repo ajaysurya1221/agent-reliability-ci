@@ -312,3 +312,30 @@ Report and scripts: `spikes/S0-logs2/` (seed base 17112026; every cell re-runs b
 - One process fault: Codex ran one search of its own memory registry under `~/.codex`
   before reading the brief. It reported no match and no session log read. The invocation
   line now carries the prohibition itself.
+
+## D-20: dispositions of the reviews of record 0017 (2026-11-16)
+
+Two reviews by Claude agents (a statistician and a completeness check: 29 findings, 2
+blockers; 28 fixed in the drafts, 1 decided here) and one read-only review by Codex
+(`reviews/R1-logs2-codex-review.md`: 11 findings, 3 blockers; all accepted).
+
+- The first draft's assumption was too weak for its proof. A1 now conditions on the log
+  structure, the options of the run and the usable days of the measure; A2 says the
+  options carry no information about the values compared.
+- `--ignore-kept` together with `--keep` is a usage error (Codex 1 and 2: the draft's
+  read-for-the-write state could not be reproduced from the record).
+- No earliest test date under `--since`.
+- Both readers change, to return matching client-version strings (Codex 3).
+- A table over 32 MiB fails the write for the whole run (Codex 4).
+- Rows are compared by responses, then file-edit results; the log structure includes the
+  existence of edit results, not their outcomes (Codex 5).
+- The kept table's promise is narrowed to what S0 tested (Codex 6); the self-check keeps
+  the competitive-choice cell and the newly adopted setting example (Codex 7) and gates
+  only on a generator that satisfies A1 (Codex 8).
+- Three acceptance items corrected; provenance validation made exact (Codex 9, 10).
+- A streak flag withholds a result and does not establish dependence (Codex 11).
+
+Codex confirmed that all 94 copied self-check rows match the checked-in file and found no
+path by which a log string outside the three bounded exceptions reaches an output.
+The amendments are in `logs2/DESIGN-MEMO.md`. The drafts are revised from them and get
+one confirmation pass before the blind acceptance tests are written.

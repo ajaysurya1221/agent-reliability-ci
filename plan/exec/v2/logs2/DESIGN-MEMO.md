@@ -152,3 +152,44 @@ as before.
   under ~/.claude or ~/.codex" itself, because in S0 Codex ran one search of its own
   memory registry under `~/.codex` before it had read the brief. It reported that the
   search returned nothing and that no session log was read.
+
+## Amendments after the reviews of the record (16 Nov 2026; decision D-20)
+
+These replace the memo's wording where they differ.
+
+- **`--ignore-kept` with `--keep` or `--keep-dir` is a usage error** (fixed text
+  `--ignore-kept cannot be used with --keep.`). So a run either reads the table, or
+  ignores it and writes nothing to it. This removes the state in which a table is read
+  only for the write.
+- **No earliest test date is printed when `--since` is given.** The rule's windows assume
+  the default split.
+- **A1 as the statistics document states it**, not as M2 abbreviates it: given the log
+  structure, the options of the run and which days are usable for a measure, the usable
+  day values of the compared setting for that measure are exchangeable when nothing
+  changed. **The log structure includes** which responses and which file-edit results
+  exist, their days, settings and threads; it does not include a reasoning count or
+  whether an edit failed.
+- **Which row wins** (write rule and use rule): rows are compared by the pair (number of
+  responses, number of file-edit results), in that order; the row from the logs wins a
+  tie. This settles days that hold edit results and no response.
+- **A staged table larger than 32 MiB is a write error** for the whole run: nothing is
+  written and existing files stay as they are. The reader's limit and the writer's are
+  the same number.
+- **Client versions** need both readers: each reader returns, for the after period, the
+  distinct version strings that match the pattern and the count of distinct ones that do
+  not. A string that does not match is never returned.
+- **Kept-day counts** in the record count every day whose row came from the kept table,
+  usable or not; one day has one source for all measures, and the record model rejects a
+  record where two measures disagree about a day's source.
+- **What the kept table promises** is stated only for the case S0 tested: rows admitted
+  to the table, one UTC offset, deletion of whole days or parts of days by age, and no
+  gap between `--keep` runs longer than 29 days. A day never captured whole cannot be
+  recovered, and the record says so.
+- **The self-check's new gate** uses a generator that satisfies A1 (day values drawn
+  independently of the number of responses), with separate null and exact-margin cells.
+  Generators that break A1 on purpose (many more responses after the split; a newly
+  adopted setting whose first five days run 15% higher, 535 of 20,000 in S0; a
+  competitive choice between two settings with close counts is a gate, since it keeps
+  A1) are reported, and each names the assumption it breaks.
+- **A streak flag withholds a result; it does not establish that days depend on each
+  other.** The statistics document and the `streaky_days` text say that.
