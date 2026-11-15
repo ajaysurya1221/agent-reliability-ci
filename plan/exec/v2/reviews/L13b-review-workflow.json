@@ -1,0 +1,314 @@
+{
+ "results": [
+  {
+   "dimension": "readers",
+   "verified": [
+    {
+     "title": "Record 0016 still says any line carrying isApiErrorMessage is unused, contradicting fix 10",
+     "file": "docs/design/0016-logs.md",
+     "line": 154,
+     "severity": "medium",
+     "claim": "After fix 10 the Claude Code reader skips a line only when isApiErrorMessage is exactly true, but the normative record's Formats bullet still says 'Lines carrying `isApiErrorMessage` count as unused types.' The document now states something the code does not do, and it contradicts LOG_FORMATS.md line 47.",
+     "evidence": "src/arci/logs/claude_code.py:66 has `if data.get(\"isApiErrorMessage\") is True:`. tests/unit/logs/test_review_fixes.py::test_false_api_error_and_empty_effort_fallback checks that a line with isApiErrorMessage false is kept as a response. docs/LOG_FORMATS.md:46-47 says false does not exclude a line. docs/design/0016-logs.md:154 (decision 6, Formats) still uses the presence wording. The orchestrator's draft plan/exec/v2/logs/0016-logs-draft.md has the same presence wording ('Lines carrying `isApiErrorMessage` count as lines of an unused type'), so copying the draft word for word carried the stale sentence forward.",
+     "suggested_fix": "Change the record and the draft to 'Lines with `isApiErrorMessage: true` count as unused types; false does not exclude a line.'",
+     "dimension": "readers",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "The defect is real. In the working tree, docs/design/0016-logs.md:154 (decision 6, the Formats bullet) still says \"Lines carrying `isApiErrorMessage` count as unused types.\" That sentence describes the field's presence. The code checks its value: src/arci/logs/claude_code.py:66 is `if data.get(\"isApiErrorMessage\") is True:`, so a line where the field is false is kept as a response.\n\nFix 10 of brief L13a says the field \"skips a line only when it is `true`\", and step 16 of the brief tells the implementer to carry the record changes into 0016-logs.md. docs/LOG_FORMATS.md:47 says it the code's way: \"`isApiErrorMessage: true` is unused too; false does not exclude it\". So the two documents disagree, and the normative record states a rule the code does not follow.\n\nI ran tests/unit/logs/test_review_fixes.py -k false_api_error and it passes, which confirms the code keeps a false line. The stale sentence came from the orchestrator's draft (plan/exec/v2/logs/0016-logs-draft.md:123 uses the same presence wording) and was not updated for fix 10. Wrong results are not affected; this is a document that states something false, so severity is medium.",
+      "reproduction": "1. Run `grep -n isApiErrorMessage docs/design/0016-logs.md docs/LOG_FORMATS.md src/arci/logs/claude_code.py` in the worktree. Line 154 of 0016-logs.md uses the presence wording; LOG_FORMATS.md:47 and claude_code.py:66 use the true-only rule.\n2. Run `.venv/bin/python -m pytest tests/unit/logs/test_review_fixes.py -k false_api_error`. It passes, which shows a line with isApiErrorMessage false is kept as a response, against the record's sentence."
+     }
+    }
+   ],
+   "low": [
+    {
+     "title": "Record 0016 still says a file that cannot be 'decoded' is unreadable, next to the new rule that invalid UTF-8 is not",
+     "file": "docs/design/0016-logs.md",
+     "line": 135,
+     "severity": "low",
+     "claim": "Decision 6 ('Reading faults') keeps 'A file that cannot be opened or decoded is counted and left out, with notice F17.' The sentences added right after it say a line that is not valid UTF-8 does not make the file unreadable, and that a file is unreadable only when it cannot be opened, is not a regular file, or fails while being read or decompressed. The two statements conflict, and the record does not say which one 'decoded' means.",
+     "evidence": "src/arci/logs/records.py parse_line now catches the UnicodeError per line and counts it in lines_not_json (lines 210-215). The claude_code.py and codex.py readers no longer have a UnicodeError branch that marks a file unreadable. docs/LOG_FORMATS.md:116 was reworded to 'opened, read or decompressed'. docs/design/0016-logs.md:135-136 still says 'opened or decoded'.",
+     "suggested_fix": "Replace 'cannot be opened or decoded' with 'cannot be opened, is not a regular file, or fails while being read or decompressed', in both the record and its draft."
+    }
+   ]
+  },
+  {
+   "dimension": "cli-output",
+   "verified": [
+    {
+     "title": "Same new file reached by two case or Unicode spellings is not detected; one output silently lost, success reported",
+     "file": "src/arci/logs/cli.py",
+     "line": 172,
+     "severity": "high",
+     "claim": "The duplicate check compares `Path.resolve()` results with case-sensitive equality and only calls `samefile` when both paths already exist. On macOS's default case-insensitive, normalization-insensitive APFS, two spellings of a file that does not exist yet (`out.txt` and `OUT.txt`, or NFC `caf\u00e9` and NFD `caf\u00e9`) pass the check. Both are staged and then moved onto the same file, so the second move overwrites the first. The run exits 1 with full text output and nothing on stderr. Brief item 6 and record 0016 require the usage error `Two output options name the same file.` with exit 3.",
+     "evidence": "`run(['--example','--json',D/'out.txt','--markdown',D/'OUT.txt'])` returned 1 with stderr ''. The directory then held one file, `out.txt`, which contained the Markdown (it starts 'Example data, generated...'), so the JSON was gone. The same happened with `caf\u00e9.txt` written in NFC and in NFD. When `out.txt` already exists, the same call correctly gives exit 3 and the duplicate message.",
+     "suggested_fix": "Before comparing, create or stat each target's parent and compare (parent st_dev, st_ino) plus a case-folded, NFC-normalised name when the volume is case-insensitive. Simpler: after staging, check that the final names give distinct inodes, or reject targets whose `os.path.normcase(unicodedata.normalize('NFC', str(p))).casefold()` values collide.",
+     "dimension": "cli-output",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I reproduced this on the real APFS volume using the worktree's own code. In src/arci/logs/cli.py, lines 168-177 decide whether two outputs are the same file. They compare `Path.resolve()` results with set equality, which is case- and byte-sensitive. They only call `samefile` when both files already exist. So when two spellings name a file that does not exist yet, the check passes. On case- and normalization-insensitive APFS, both spellings point to one inode. `_write_outputs` moves each staged file onto the target with `os.replace`, so the second move silently overwrites the first.\n\nResults:\n- `--json D/out.txt --markdown D/OUT.txt` with no existing file: returned 1 with empty stderr. The directory held only `out.txt`, which contained the Markdown report. The JSON was lost.\n- NFC `caf\u00e9.txt` with NFD `caf\u00e9.txt`: same result.\n- Repeating the call once `out.txt` existed: returned 3 with `Two output options name the same file.`, as the brief requires.\n\nThis breaks brief L13a item 6, \"two options naming the same file is the usage error `Two output options name the same file.`\", and design record 0016 line 346, \"Two output options may not name the same file\". One requested output is lost while the command reports success. I rate it medium rather than high: it is a reachable edge case that needs the user to spell one path two ways, and only freshly generated report output is lost, never the user's existing data.",
+      "reproduction": "Run `cd /Users/ajay/Developer/.arci-worktrees/wt-v2-logs; .venv/bin/python -c \"from arci.logs import cli; print(cli.run(['--example','--json','/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/l13b/d1/out.txt','--markdown','/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/l13b/d1/OUT.txt']))\"` in an empty directory d1. It prints 1 and nothing on stderr, and d1 then contains a single out.txt holding the Markdown ('Example data, generated. Not a...'). NFC and NFD spellings of 'caf\u00e9.txt' in d2 give the same result. Running the call again once out.txt exists gives 3 and 'Two output options name the same file.'"
+     }
+    },
+    {
+     "title": "HTML page for ERROR leaves out F9 and F17, which the text and Markdown now show",
+     "file": "src/arci/logs/report.py",
+     "line": 277,
+     "severity": "medium",
+     "claim": "Fix 11 adds F9 (with its second line) and F17 to ERROR blocks in the text and Markdown outputs. The HTML renderer was not changed, so an ERROR tool on the HTML page shows no notices. Record 0016 says the HTML page holds, per tool, the same information as the text output. A Codex history that is entirely compressed, read on Python 3.13, gets the 'To read them: uvx --python 3.14 realornoise' hint in text and Markdown but not in HTML.",
+     "evidence": "A synthetic Codex dir held only `sessions/2026/02/01/rollout-a.jsonl.zst`. With `--tool codex --codex-dir DIR --html x.html` the run exits 3 and the text shows F9 and F9_NEXT. In x.html, 'Compressed' in html is False and 'uvx --python' in html is False.",
+     "suggested_fix": "Have html.py render `report.notices(tool)` for ERROR tools too, or state in the record that HTML differs.",
+     "dimension": "cli-output",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I reproduced it. Fix 11 changed report.notices() so that it returns F9, F9_NEXT and F17 for ERROR, and both render_text and render_markdown now call it for ERROR tools. html.py was left alone: src/arci/logs/html.py:115-116 still reads `if tool.result != \"ERROR\": parts.extend(_p(notice) for notice in notices(tool))`, so an ERROR tool on the HTML page shows no notices.\n\nThe record this breaks is docs/design/0016-logs.md, which says: \"The HTML page holds, per tool, the same information as the text output\". The same record's ERROR rule, as changed in the diff, says the text output gives \"then F9 and F17 when they apply\". So the HTML page now holds less than the text output. The brief's fix 11 names only \"the text and Markdown\". That explains how the implementer missed the HTML page, but the normative record still requires the same information on it.\n\nEffect: a user whose Codex history is entirely compressed, reading it on Python 3.13, is told in the terminal and the Markdown file how to read the files ('uvx --python 3.14 realornoise'). A shared HTML page shows only ERROR and \"Session log files could not be read.\" with no cause and no next step. This is a reachable edge case where one output behaves wrongly. The verdict and exit code are unchanged, so it is not a high-severity defect.",
+      "reproduction": "Scratch dir /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/l13b. It holds a synthetic file cdx/sessions/2026/02/01/rollout-a.jsonl.zst that starts with the zstd magic bytes. I ran arci.logs.cli.main(['--tool','codex','--codex-dir',DIR,'--html',x.html,'--markdown',x.md]) with the worktree .venv Python 3.13. It exited 3. The text output showed 'RESULT: ERROR', 'Compressed Codex files not read (Python 3.14 is needed): 1. ...' and 'To read them: uvx --python 3.14 realornoise'. `grep -c \"uvx --python\"` gave 1 for x.md and 0 for x.html."
+     }
+    },
+    {
+     "title": "Record still says the Markdown ERROR block holds nothing beyond the F5 text",
+     "file": "docs/design/0016-logs.md",
+     "line": 324,
+     "severity": "medium",
+     "claim": "Brief item 11 says 'for ERROR the text and Markdown show F9 and F17 when they apply, as the record now says', and the code now adds those notices to Markdown ERROR blocks. The record's Markdown section, and the draft in plan/exec/v2/logs/0016-logs-draft.md line 286, still read 'ERROR: the tool name, `ERROR` and the F5 text, and nothing else.' The only updated sentence is in the text-output layout (item 2). The record therefore states something false about the Markdown output, and code and record disagree.",
+     "evidence": "In the cx.md output for an entirely compressed Codex dir, the Markdown is 'Codex\\nERROR\\nLog files were found...\\nCompressed Codex files not read ...\\nTo read them: uvx --python 3.14 realornoise\\n'. Record line: '- ERROR: the tool name, `ERROR` and the F5 text, and nothing else.'",
+     "suggested_fix": "Change the record's Markdown ERROR bullet to 'the tool name, `ERROR`, the F5 text, then F9 and F17 when they apply' in both the record and the draft.",
+     "dimension": "cli-output",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I confirmed this from the exact lines. In the worktree diff, src/arci/logs/report.py now has notices() return F9, F9_NEXT and F17 for a tool whose result is ERROR, when the counts are non-zero. render_markdown now appends *notices(tool) to every short-form block, ERROR included; before, it skipped ERROR blocks. Brief L13a item 11 says: \"for ERROR the text and Markdown show F9 and F17 when they apply, as the record now says.\" The diff of docs/design/0016-logs.md updates only the text-output layout, line 2 at about record line 373-375 (\"For ERROR: the tool name on its own line, F4 and the F5 reason, then F9 and F17 when they apply\"). The Markdown closing-line list at docs/design/0016-logs.md:316 is untouched and still reads \"- ERROR: the tool name, `ERROR` and the F5 text, and nothing else.\" The draft plan/exec/v2/logs/0016-logs-draft.md:286 has the same sentence. The record therefore says something false about the Markdown output the code now produces: an ERROR block with unread compressed or unreadable files gets the F9, F9_NEXT and F17 lines after the F5 text. Code and the normative record disagree on a stated output contract, and the brief claims the record says it. This is a false statement in a document, so medium. No output is wrong.",
+      "reproduction": "git -C /Users/ajay/Developer/.arci-worktrees/wt-v2-logs diff src/arci/logs/report.py shows that render_markdown appends notices(tool) to ERROR blocks, and that notices() returns F9/F9_NEXT/F17 for ERROR. sed -n 316p docs/design/0016-logs.md still prints \"- ERROR: the tool name, `ERROR` and the F5 text, and nothing else.\" The diff of docs/design/0016-logs.md does not touch that line. Brief L13a-review-fixes.md lines 63-64 say the record now covers the Markdown case."
+     }
+    }
+   ],
+   "low": [
+    {
+     "title": "no_logs text names the default location when a missing --claude-dir or --codex-dir was given",
+     "file": "src/arci/logs/cli.py",
+     "line": 107,
+     "severity": "low",
+     "claim": "Fix 12 now requests a tool whose directory option points at a missing path, and that tool reports no_logs. The fixed no_logs reason then says 'Looked under ~/.claude/projects (or CLAUDE_CONFIG_DIR). Use --claude-dir DIR', but the run looked only under the directory the user gave, not the default. The new reachable case produces a false sentence. The record says this case 'reports no_logs instead of dropping the tool' and gives no text for it.",
+     "evidence": "With `run(['--claude-dir', '/\u2026/missing'], env={}, home=empty)` the run exits 3 and prints 'No session logs found for Claude Code. Looked under ~/.claude/projects (or CLAUDE_CONFIG_DIR). Use --claude-dir DIR, or try: realornoise --example'.",
+     "suggested_fix": "Add a fixed reason variant for a directory that was given (for example 'No session logs found for {Tool} in the directory given to {flag}.'), or record that the default text is accepted."
+    },
+    {
+     "title": "F17 shown under ERROR read_error claims 'The result uses the rest.' when there is no result",
+     "file": "src/arci/logs/report.py",
+     "line": 277,
+     "severity": "low",
+     "claim": "ERROR blocks now show F17, and the read_error path runs when every file that is not compressed was unreadable. F17's fixed text ends 'The result uses the rest.', but there is no rest and no result. The same goes for F9 under ERROR. The output makes a statement that is false for ERROR.",
+     "evidence": "In `notices()`, ERROR returns F9, F9_NEXT and F17 unchanged. In the cli.py reason logic, read_error is chosen when `files_unreadable == len(paths) - files_unread_compressed`. For a Codex dir with only .zst files the text read 'RESULT: ERROR / Log files were found... / Compressed Codex files not read (Python 3.14 is needed): 1. The result uses the rest.'",
+     "suggested_fix": "Use ERROR-specific wording for F9 and F17 without the second sentence, and add it to the record's fixed texts."
+    },
+    {
+     "title": "Staged outputs are installed with mode 0600: an existing file's permissions change and the umask is ignored",
+     "file": "src/arci/logs/cli.py",
+     "line": 206,
+     "severity": "low",
+     "claim": "`tempfile.mkstemp` creates files with mode 0600, and `os.replace` installs that inode. An existing output file at 0644 becomes 0600 after a successful run, and new files ignore the user's umask. The earlier `write_text` kept the existing mode and followed the umask. Shared report files can stop being readable to others.",
+     "evidence": "An existing a.json was set to 0644. After `run(['--example','--json',a.json])` its st_mode was 0o100600, and a newly created a.md was 0o100600.",
+     "suggested_fix": "After staging, copy the existing target's mode with `shutil.copymode` (or `os.chmod` to `0o666 & ~umask` for new files) before `os.replace`."
+    },
+    {
+     "title": "Failure during rollback discards the backup and stops restoring the other targets",
+     "file": "src/arci/logs/cli.py",
+     "line": 222,
+     "severity": "low",
+     "claim": "In `_write_outputs`, if an `os.replace(backup, target)` or `target.unlink()` inside the rollback loop raises, the loop stops, so earlier-installed targets are left changed. The `finally` block then unlinks every temporary path, including the remaining backups, which are the only copies of the original files. The brief requires that on any failure every target is left as it was. A second failure during rollback (a full disk, or a permission change) loses original data.",
+     "evidence": "In the code, the `except BaseException:` loop over `reversed(installed)` has no per-item suppression, and `finally` unlinks every path in `temporary`, backups included. The normal single-failure case was tested and restores correctly: with an injected OSError on the third os.replace, a.json kept 'old-a' and no temp files remained.",
+     "suggested_fix": "Restore each target inside its own try, and keep (do not unlink) any backup whose restore failed."
+    },
+    {
+     "title": "A rendering exception is reported as the write error instead of the internal error",
+     "file": "src/arci/logs/cli.py",
+     "line": 183,
+     "severity": "low",
+     "claim": "When any output option is given, `render_markdown`, `render_html`, `render_text` and `json.dumps` run inside the `try` whose `except BaseException` raises `WRITE_ERROR`. A bug in rendering then prints 'Requested output could not be written.', which is false. Without output options the same failure gives the internal-error text. The exit code is 3 either way.",
+     "evidence": "In cli.py lines 183-197, contents are built and `report.render_text` is called inside the same try as `_write_outputs`, under `except BaseException: raise _UsageError(report.WRITE_ERROR)`.",
+     "suggested_fix": "Render outside that try, so that only `_write_outputs` is mapped to WRITE_ERROR."
+    }
+   ]
+  },
+  {
+   "dimension": "schema-selfcheck",
+   "verified": [
+    {
+     "title": "STATISTICS_LOGS.md tables and power-method sentence no longer match the rewritten self-check",
+     "file": "docs/STATISTICS_LOGS.md",
+     "line": 264,
+     "severity": "medium",
+     "claim": "STATISTICS_LOGS.md says its tables are copied from the final self-check dated 2026-11-15. After the L13a rerun, its power table has different numbers from docs/results/logs-selfcheck.md. Its power paragraph also says Claude Code's measures 'pass through response and edit records, day reduction, and the production decision rule'. That is now false: simulate() builds every cell, power cells included, with streak_table(), which skips measures.build.",
+     "evidence": "Seed 16113057 (7/21, SD 0.35, drop 0): STATISTICS_LOGS.md:~305 shows 24/1389 and 42/1389, while logs-selfcheck.md shows 37/1865 and 54/1865. Seed 16113102 (14/42, SD 0.4, drop 9/20): STATISTICS_LOGS.md:332 shows 397/495, while logs-selfcheck.md shows 465/581. Many other power rows differ in the same way, and the streak-table seconds differ too. bench/selfcheck_logs.py simulate().trial now calls streak_table() unconditionally. The draft says this file is hash-pinned at the 2.3.0 release, so the stale figures would be frozen.",
+     "suggested_fix": "Copy the power and streak tables again from the final docs/results/logs-selfcheck.md. Change the power paragraph to say that the day tables are built directly from the generator and that a unit test checks them against Response/EditResult -> measures.build.",
+     "dimension": "schema-selfcheck",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I confirmed this by reading the files. I did not need to run anything.\n\n1. **The power table was not updated.** `git diff docs/STATISTICS_LOGS.md` changes only the item-3 null-simulation paragraph (around lines 342-349). The power table in the \"Power of the rule as built\" section is unchanged. In the working-tree docs/results/logs-selfcheck.md, which the L13a rerun rewrote:\n   - Seed 16113057 (7/21, SD 0.35, drop 0) now shows `37/1865 ... 54/1865` at line 49. STATISTICS_LOGS.md still shows `24/1389 ... 42/1389`, which is exactly what the HEAD version of logs-selfcheck.md has.\n   - Seed 16113102 (14/42, SD 0.4, drop 9/20) now shows `465/581` at line 94. STATISTICS_LOGS.md still shows `397/495`, again the HEAD value.\n   - The rewritten self-check also adds an `actual` column that STATISTICS_LOGS.md does not have.\n\n2. **The doc says the tables are copied, and they are not.** STATISTICS_LOGS.md:200-201 says the final self-check \"dated 2026-11-15, reports the tables below. Rates are proportions, copied without rounding\". Line 268 says \"Seeds, designs, requested counts and intervals are copied from the self-check.\" Both are now false for the power table. The streak table's counts still match, for example seed 16114135 gives 1524/2000 in both files. Only its seconds column differs (10.72 against 13.46), and that part does not matter.\n\n3. **The method sentence is wrong.** STATISTICS_LOGS.md:264-265 says \"Claude Code's measures pass through response and edit records, day reduction, and the production decision rule.\" In the diff, simulate().trial in bench/selfcheck_logs.py now calls `streak_table(rng, m, n, sigma, drop, rho, shared)` and then `decide.decide_tool(table, ReaderCounters(files_read=1))` for every cell, power cells included. It no longer goes through `history()` and `table_of()`, so it never touches Response/EditResult or measures.build. The self-check's own header was updated to say \"directly constructed day tables, unit-checked against Response/EditResult -> measures.build\". The statistics doc still describes the old method.\n\n4. **This breaks brief items 1 and 16.** Brief L13a item 16 says \"Carry the record changes into ... docs/STATISTICS_LOGS.md\". Item 1 changed how cells are built and required the self-check to be rerun. docs/design/0016-logs.md:407 lists STATISTICS_LOGS.md as newly pinned, so the stale figures and the false method sentence would be frozen at the 2.3.0 release.\n\nSeverity is medium: a normative document states things that are no longer true. The decision rule itself is not affected.",
+      "reproduction": "Run `git -C /Users/ajay/Developer/.arci-worktrees/wt-v2-logs diff docs/STATISTICS_LOGS.md`; it touches only item 3. Then run `grep -n '16113057\\|16113102' docs/STATISTICS_LOGS.md docs/results/logs-selfcheck.md` in the worktree: STATISTICS_LOGS.md has 24/1389 and 397/495, the working-tree self-check has 37/1865 and 465/581. `git show HEAD:docs/results/logs-selfcheck.md | grep 16113057` gives back the old 24/1389, which shows STATISTICS_LOGS.md still carries the pre-rerun numbers. For the method sentence, compare STATISTICS_LOGS.md:264 with the diff of simulate().trial in bench/selfcheck_logs.py, where `history`/`table_of` were replaced by `streak_table`."
+     }
+    }
+   ],
+   "low": [
+    {
+     "title": "MeasureDecision/ToolDecision accept a tampered day value or a wrong day_table_sha256 when the statistics are unchanged",
+     "file": "src/arci/logs/schema.py",
+     "line": 213,
+     "severity": "low",
+     "claim": "The new validator recomputes p_streak, p_real, u_none and p_none, but it never checks day_table_sha256 against the stored day table. An edit to a day value that keeps the ranks, the medians and the strict pair count therefore validates, and seal() produces a valid seal. The record then names a digest that is not the hash of its own day table, and that digest is printed in F11 and in the HTML.",
+     "evidence": "Packaged example (--example --tool both --json), claude-code reasoning_tokens (real_drop). Doubling the largest before-day value (1115 -> 2230) passes seal()/validation. Replacing tools[0].day_table_sha256 with '0'*64 also passes. Changing a DayValue count (for example to 99) passes as well, since count only has a minimum check. By contrast, changing p_streak, p_real, u_none, p_none, the median or the finding is rejected, and doubling the max day value on the codex no_drop measure is rejected as inconsistent_u_none.",
+     "suggested_fix": "In ToolDecision._consistent, recompute the record-0016 digest (method, tool, model, effort, split_date, before, after, alphas, measures with id, margin and days) from the stored fields and reject a mismatch."
+    },
+    {
+     "title": "Gated null cells no longer exercise setting selection or usable-day filtering that STATISTICS item 3 names",
+     "file": "bench/selfcheck_logs.py",
+     "line": 322,
+     "severity": "low",
+     "claim": "STATISTICS_LOGS.md 'Checks that agents run' item 3 says the 20,000-table null simulation includes 'setting selection, usable-day rules and the streak check'. The gated cells now use streak_table(), which fixes model='model-1' and other_settings=1 and puts every day in as usable. Over the 20,000 tables, selection and the usable-day rules are not run. Agreement with measures.build is checked only for seed 17, one table per design (test_gate_tables_match_full_path_for_both_dependence_cases), and usable_days() separately.",
+     "evidence": "simulate().trial: table = streak_table(rng, m, n, sigma, drop, rho, shared), then decide_tool(table, ReaderCounters(files_read=1)). The history() path, which adds a second setting with unusable records, is no longer called in any gated cell. The brief allowed direct construction with a one-time agreement test, so this matters only because the frozen-bound document still describes the gated cell as including selection.",
+     "suggested_fix": "Change item 3 wording, or the self-check description, to say that gated tables are built directly and checked against measures.build by a unit test. Optionally run the agreement test over several seeds."
+    }
+   ]
+  },
+  {
+   "dimension": "docs-consistency",
+   "verified": [
+    {
+     "title": "Power table in STATISTICS_LOGS.md contradicts the rewritten self-check (43 rows stale)",
+     "file": "docs/STATISTICS_LOGS.md",
+     "line": 287,
+     "severity": "medium",
+     "claim": "The 'Power of the rule as built' table still carries the previous run's counts and intervals for every 7/21, 14/42 and 28/84 row (and the 14/42 log SD 0.4 row). The paragraph above it says seeds, requested counts and intervals 'are copied from the self-check', which is false.",
+     "evidence": "Seed 16113057: STATISTICS_LOGS.md has 24/1389 = 0.017279 and 42/1389; docs/results/logs-selfcheck.md has 37/1865 = 0.019839 and 54/1865. The old values are the ones in `git show HEAD:docs/results/logs-selfcheck.md`. A row-by-row comparison by seed finds 43 of the 94 seeded rows with cells that do not appear in the self-check: seeds 16113057-16113091, 16113094-16113097 and 16113099-16113102. The streak table matches except for its seconds column.",
+     "suggested_fix": "Copy the power section from the new docs/results/logs-selfcheck.md, including its 'actual' column, into STATISTICS_LOGS.md before the file is pinned at release.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "The claim holds. I reproduced it in the worktree. docs/STATISTICS_LOGS.md:287 (seed 16113057) still says 24/1389 = 0.017279 and 42/1389. The rewritten docs/results/logs-selfcheck.md:49 says 37/1865 = 0.019839 and 54/1865. The old STATISTICS_LOGS values are exactly what HEAD's logs-selfcheck.md:49 contained, so the doc was never updated. The working-tree diff to STATISTICS_LOGS.md changes only the null-simulation paragraph (item 3, near line 342) and leaves the power table alone.\n\nI compared the two files row by row, matching on seed and checking the count/interval cells. 43 of the 94 seeded rows have cells that do not appear in the self-check, running from 16113057 to 16113102, which matches the reported count.\n\nThis makes a sentence in the normative record false. It is the paragraph directly above the table: \"Seeds, designs, requested counts and intervals are copied from the self-check.\" Brief L13a item 1 says to rerun the self-check and rewrite logs-selfcheck.md. Item 16 says to carry the record changes into docs/STATISTICS_LOGS.md. Both were done only partly, which left the record in conflict with its own source.\n\nSeverity is medium: a document states something false. The table describes power, and no code depends on it.",
+      "reproduction": "grep -n 16113057 docs/STATISTICS_LOGS.md docs/results/logs-selfcheck.md; git show HEAD:docs/results/logs-selfcheck.md | grep 16113057. Then a script that parses every row with a seed (161xxxxx) in both files and checks that the 'k/n = p [lo, hi]' cells in STATISTICS_LOGS are a subset of the self-check row's cells: 94 rows, 43 mismatched, first 16113057, last 16113102."
+     }
+    },
+    {
+     "title": "Self-check descriptions claim the full record path and setting selection, but the simulations now use hand-built day tables",
+     "file": "docs/STATISTICS_LOGS.md",
+     "line": 264,
+     "severity": "medium",
+     "claim": "The power section says 'Claude Code's measures pass through response and edit records, day reduction, and the production decision rule'. Check 3 says the null simulation runs 'including setting selection, usable-day rules'. After L13a, `simulate` (used by the gated null and margin cells and by the power cells) calls `streak_table`. That function builds DayValue lists directly, with a fixed model-1 and other_settings=1, so neither setting selection nor usability rules nor response and edit reduction run in those cells.",
+     "evidence": "bench/selfcheck_logs.py simulate(): `table = streak_table(rng, m, n, sigma, drop, rho, shared)` and `decide.decide_tool(table, ReaderCounters(files_read=1))`. streak_table returns `measures.ToolTable(model=\"model-1\", effort=\"high\", other_settings=1, ...)` without calling `measures.build`. The previous `history()` call added a second setting to exercise selection. The self-check header itself now says 'Claude Code's three measures use directly constructed day tables'.",
+     "suggested_fix": "Reword check 3 and the power paragraph to say that day tables are built directly from the generator (checked once against measures.build) and that setting selection and usable-day boundaries are checked by the separate exact gate.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "This is real, but it is a wording defect, not a defect in the results.\n\nThe code shows it. In the working-tree diff of bench/selfcheck_logs.py, simulate() used to call `history(...)` and then `table_of(result, n)`, which goes through `measures.build`. It now calls `streak_table(rng, m, n, sigma, drop, rho, shared)`. streak_table writes the DayValue lists directly and returns a `measures.ToolTable(model=\"model-1\", effort=\"high\", other_settings=1, ...)`. It never calls measures.build, so setting selection, usable-day filtering and response/edit day reduction do not run. The same simulate() feeds both the gated null/margin cells and the power cells (`simulate(m, n, sd, drop, seed, 2000, 4)`). The second-setting records that history() adds 'to exercise pooled selection and filtering' are never built in either kind of cell.\n\nThe documents still say these steps run:\n- docs/STATISTICS_LOGS.md:264 (power section, unchanged by the diff): \"Claude Code's measures pass through response and edit records, day reduction, and the production decision rule.\" This is now false.\n- docs/STATISTICS_LOGS.md:344, item 3, also in plan/exec/v2/logs/STATISTICS_LOGS-draft.md:227: \"Null simulation with the final rule, including setting selection, usable-day rules and the streak check\". The gated cells it describes no longer run setting selection or the usable-day rules.\n- The self-check's own new header says the opposite: \"measures use directly constructed day tables, unit-checked against Response/EditResult -> measures.build\". So the published record and the self-check output now contradict each other.\n\nWhat keeps the severity down:\n- Brief L13a item 1 explicitly allows building day tables directly for the gated cells, as long as one test shows the direct and full paths agree. The new test test_gate_tables_match_full_path_for_both_dependence_cases does that, and it passes.\n- I also checked further myself. On 1,280 synthetic tables (all 4 designs, both dependence cases, drop 0 and 1/4, rho 0 and 0.5, seeds 0 to 39), `streak_table(...) == table_of(history(...))` held every time.\n\nSo the simulated rates are very likely the same as the full path would give. The defect is that two sentences in the normative statistics document misdescribe how the simulation was done. By the rubric that is \"a document that states something false\", so medium. The fix is wording: at lines 264 and 344, say the tables are built directly and checked against measures.build, including setting selection. Item 3 comes word for word from the draft record, so the record itself needs the change too.",
+      "reproduction": "Run `git -C /Users/ajay/Developer/.arci-worktrees/wt-v2-logs diff bench/selfcheck_logs.py`. In simulate(), `history(...)` and `table_of(...)` were replaced by `streak_table(...)`, and streak_table never calls measures.build. Compare that with docs/STATISTICS_LOGS.md lines 264-265 and 344. To check equivalence, run scratchpad/l13b/eq.py with PYTHONPATH=. from the worktree. It compares streak_table with table_of(history(...)) over 1,280 seeded tables and prints `1280 0`: no mismatch, so the results are unaffected and only the description is false."
+     }
+    },
+    {
+     "title": "Privacy statements leave out dates (and per-day values) that the output contains",
+     "file": "README.md",
+     "line": 22,
+     "severity": "medium",
+     "claim": "README says the output 'holds counts, rates and the names of the model and effort compared'. Record 0016 line 56 says outputs 'hold only counts, rates and the names of the model and effort compared'. The Claude Code SKILL.md, the Codex SKILL.md and integrations/codex/README.md say the same. Every output also prints calendar dates: the period bounds and split date in text and Markdown, and every usable day's date in the JSON day table. That is stronger than what the code does.",
+     "evidence": "`arci logs --example` prints 'before  2026-08-09 to 2026-10-31' and 'split 2026-11-01'. `--json` writes `\"day\": \"2026-11-01\"` for every DayValue, plus the 'day_table_sha256'. docs/recipes/logs.md alone admits it: 'Review the dates and accepted model and effort names before sharing them.'",
+     "suggested_fix": "Say 'counts, rates, dates and the accepted names of the model and effort compared' in README.md, docs/design/0016-logs.md, plugins/realornoise/skills/realornoise/SKILL.md, integrations/codex/skills/realornoise/SKILL.md and integrations/codex/README.md.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I reproduced this on the packaged example. `.venv/bin/python -m arci logs --example` prints \"before  2026-08-09 to 2026-10-31\", \"after   2026-11-01 to 2026-11-14   split 2026-11-01\" and \"days at UTC+00:00\". With `--json` it writes a `\"day\": \"YYYY-MM-DD\"` entry for every day it used.\n\nSeveral sentences state that the output holds only counts, rates and the model and effort names:\n- README.md:22: \"the output holds counts, rates and the names of the model and effort compared\".\n- docs/design/0016-logs.md:56: \"outputs that hold only counts, rates and the names of the model and effort compared\".\n- integrations/codex/README.md:5 and integrations/codex/skills/realornoise/SKILL.md:10 say the same.\n\nThese are false. The output also contains calendar dates: the period bounds and split date, and in JSON every usable day. It also prints the user's UTC offset (\"days at UTC+00:00\"). Together these show which days, and in which offset, the person used the agent.\n\nThe record contradicts itself. Line 129 of 0016 lists dates among the values a JSON walk accepts (\"numbers, booleans, nulls, dates, rationals\"). Line 193 says \"dates are `YYYY-MM-DD`\". Only docs/recipes/logs.md:195 tells the user to \"Review the dates ... before sharing them\".\n\nThe code does what the design intends, so there is no leak beyond the design. The fault is in the documents: the privacy statements a user reads before sharing understate what is in the output. That is a document stating something false, hence medium.",
+      "reproduction": "cd /Users/ajay/Developer/.arci-worktrees/wt-v2-logs && .venv/bin/python -m arci logs --example | head -6   # prints period dates, split date, UTC offset\n.venv/bin/python -m arci logs --example --json | grep -o '\"day\": \"[0-9-]*\"' | head -3   # per-day dates\ngrep -n \"counts, rates\" README.md docs/design/0016-logs.md integrations/codex/README.md integrations/codex/skills/realornoise/SKILL.md"
+     }
+    },
+    {
+     "title": "Record says the Markdown ERROR block holds 'nothing else', but the code now adds F9 and F17",
+     "file": "docs/design/0016-logs.md",
+     "line": 316,
+     "severity": "medium",
+     "claim": "Brief item 11 has Markdown show F9 and F17 for ERROR 'as the record now says'. The record's Markdown section still says ERROR is 'the tool name, `ERROR` and the F5 text, and nothing else'. Only the text-output layout (line 374) was updated.",
+     "evidence": "A Codex dir with one rollout-a.jsonl.zst file, run on Python 3.13 with `--tool codex --markdown err.md`, writes: 'Codex / ERROR / Session log files could not be read. / Compressed Codex files not read (Python 3.14 is needed): 1. The result uses the rest. / To read them: uvx --python 3.14 realornoise'. report.render_markdown appends `*notices(tool)` for ERROR.",
+     "suggested_fix": "Change line 316 to: the tool name, `ERROR`, the F5 text, then F9 and F17 when they apply.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "The defect is real: the code now adds notices to the Markdown ERROR block, but the record still says that block holds nothing else.\n\nWhat the record says: docs/design/0016-logs.md line 316 (Markdown section) still reads \"ERROR: the tool name, `ERROR` and the F5 text, and nothing else.\" The working-tree diff of 0016-logs.md leaves that sentence untouched. It only changes the text-output layout (around line 374), which now says \"then F9 and F17 when they apply\".\n\nWhat the brief says: L13a item 11 states \"for ERROR the text and Markdown show F9 and F17 when they apply, as the record now says.\" That holds for the text output only.\n\nWhat the code does: in src/arci/logs/report.py, render_markdown takes the `tool.model is None` branch for ERROR and appends `*notices(tool)`. For ERROR, notices() returns F9, F9_NEXT and F17 when their counts are nonzero.\n\nSo the Markdown output, which follows the brief, contradicts the normative record's Markdown sentence. Tests and snapshots that check the record's \"nothing else\" wording would disagree with the code. The fix is in the document: line 316 needs the same \"then F9 and F17 when they apply\" wording. The code behaviour is what the brief intends, so this is a record that states something false (medium), not a wrong result.",
+      "reproduction": "Reproduced on synthetic input with the worktree's .venv Python 3.13. Created scratchpad/l13b/md/codex/sessions/2026/11/01/rollout-a.jsonl.zst (content 'x'). Ran arci.logs.cli.main(['--tool','codex','--codex-dir',<that dir>,'--markdown',err.md]) with the worktree src on the path. It exits 3 and err.md contains:\nCodex\nERROR\nSession log files could not be read.\nCompressed Codex files not read (Python 3.14 is needed): 1. The result uses the rest.\nTo read them: uvx --python 3.14 realornoise\nThe last two lines are F9 and F9_NEXT. The record's Markdown sentence at docs/design/0016-logs.md:316 says the ERROR block holds the tool name, ERROR and the F5 text \"and nothing else\"."
+     }
+    },
+    {
+     "title": "HTML report goldens hold the version and are left out of the 'all locations' release list",
+     "file": "docs/RELEASING.md",
+     "line": 31,
+     "severity": "medium",
+     "claim": "RELEASING.md says the listed files 'are all current-version and dependency-pin locations' and that a bump does not regenerate snapshots. tests/unit/html_report/golden/{pass,block,inconclusive,error,v1}.html contain the footer 'ARCI 2.2.0', which html_report renders from `__version__`. test_html_report.py compares them with exact equality, so a bump that follows the documented list turns the unit suite red. test_every_release_version_matches does not cover these files.",
+     "evidence": "`grep -n 2.2.0 tests/unit/html_report/golden/pass.html` gives line 25 `<footer><p>ARCI 2.2.0</p></footer>`. src/arci/html_report.py:213 renders `f\"...ARCI {_text(__version__)}...\"`. test_html_report.py:124 has `assert html == (GOLDENS / f\"{verdict.lower()}.html\").read_text()`.",
+     "suggested_fix": "List the five html_report goldens (regenerate them with tests/unit/html_report/generate.py) in step 1, or normalise the footer version in that test as the log snapshots now do.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I confirmed the defect and reproduced it.\n\n**What the brief asks.** Brief L13a item 15 says: \"`docs/RELEASING.md` lists every place the version or the pin is written (find them all with a search for the current version)\". It also asks for a test that fails when any of those places disagrees with `arci.__version__`.\n\n**What the new text says.** The added lines in RELEASING.md say \"These are all current-version and dependency-pin locations\". They name only these: `pyproject.toml`, `__init__.py`, the realornoise pyproject, its pin and its `__init__`, `plugin.json` and `CITATION.cff`. They also say \"a version bump does not regenerate them\", but that applies only to log snapshots.\n\n**What the list leaves out.** A grep for \"ARCI 2.2.0\" finds six files that hold the current version:\n- `tests/unit/html_report/golden/pass.html`, `block.html`, `inconclusive.html`, `error.html` and `v1.html`. Line 25 of each is `<footer><p>ARCI 2.2.0</p></footer>`.\n- `docs/results/sample-suite-report.html`.\n\n**Why a bump breaks them.** `src/arci/html_report.py:213` renders the footer from `__version__`. `tests/unit/html_report/test_html_report.py` compares the output with exact equality at lines 125 and 200, and line 313 does the same for the sample report. So the list is incomplete, which breaks item 15, and the sentence \"these are all ... locations\" is false. `test_every_release_version_matches` does not check these files either.\n\n**Mitigation.** RELEASING.md also says \"Search the old version before each bump to catch newly added locations\", and CI would turn red before anything is released. A bump made from this list would not ship broken, but the bump commit would fail CI until the six files are regenerated. Because a document states something false and the brief's \"every place\" requirement is not met, I rate it medium, not high.",
+      "reproduction": "Read-only check on the worktree; the only file written was a scratch module, `conftest_bump.py`, under the l13b scratchpad folder. The module sets `arci.html_report.__version__ = \"2.3.0\"`. Then I ran `.venv/bin/python -c \"import conftest_bump, pytest; pytest.main(['-q','-p','no:cacheprovider','tests/unit/html_report'])\"` with `PYTHONPATH` set to that scratchpad folder. This simulates a bump that follows the documented list.\n\nSix tests failed:\n- `test_suite_golden_and_every_numeric_table_field_matches_json[PASS]`\n- `test_suite_golden_and_every_numeric_table_field_matches_json[BLOCK]`\n- `test_suite_golden_and_every_numeric_table_field_matches_json[INCONCLUSIVE]`\n- `test_suite_golden_and_every_numeric_table_field_matches_json[ERROR]`\n- `test_v1_golden_and_escaped_failure_detail`\n- `test_demo_sample_is_current`\n\n`grep -rln \"ARCI 2.2.0\" docs tests src` lists the five goldens and `docs/results/sample-suite-report.html`, and RELEASING.md names none of them."
+     }
+    },
+    {
+     "title": "Record still says any isApiErrorMessage line is unused, and calls a decode failure unreadable",
+     "file": "docs/design/0016-logs.md",
+     "line": 154,
+     "severity": "medium",
+     "claim": "Line 154 says 'Lines carrying `isApiErrorMessage` count as unused types.' Fix 10 changed the code so only `isApiErrorMessage: true` skips a line. LOG_FORMATS.md was updated; the record was not. Line 136 says 'A file that cannot be opened or decoded is counted and left out, with notice F17'. The next sentence and the code say that invalid UTF-8 makes a line not-JSON, not the file unreadable.",
+     "evidence": "src/arci/logs/claude_code.py: `if data.get(\"isApiErrorMessage\") is True:`. records.parse_line decodes bytes and counts a UnicodeError in `lines_not_json` without raising. docs/LOG_FORMATS.md: 'A line with `isApiErrorMessage: true` is unused too; false does not exclude it.'",
+     "suggested_fix": "Line 154: 'Lines with `isApiErrorMessage: true` count as unused types.' Line 136: replace 'opened or decoded' with 'opened, read or decompressed'.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "Confirmed against the working tree. docs/design/0016-logs.md line 154 still reads \"Lines carrying `isApiErrorMessage` count as unused types.\" That sentence is the same as at HEAD (line 146), so the diff did not touch it. The code now skips a line only when the value is true: src/arci/logs/claude_code.py:66 has `if data.get(\"isApiErrorMessage\") is True:`, so a line with `isApiErrorMessage: false` is used as a normal line. docs/LOG_FORMATS.md:47 was updated to say \"false does not exclude it\", but the record was not. Brief item 10 asks for skipping \"only when it is `true`\", and item 16 says to carry the record changes into docs/design/0016-logs.md, so the record breaks the brief. Lines 135-136 still say \"A file that cannot be opened or decoded is counted and left out, with notice F17\", and the sentence added right after them says \"A line that is not valid UTF-8 is a line that is not JSON; it does not make the file unreadable.\" The code agrees with the new sentence: records.py lines 213-214 catch UnicodeError per line and count it as not JSON. It also matches the LOG_FORMATS counter table, where `files_unreadable` covers files that could not be opened, read or decompressed, with no mention of decoding. So the record now contradicts itself and the code about decode failures. Both are false statements in a normative document; the code behaves correctly.",
+      "reproduction": "No code run was needed; the evidence is in the text and diff. 1) `git -C wt-v2-logs show HEAD:docs/design/0016-logs.md | grep -n isApiError` gives line 146 with the same sentence as working-tree line 154, so it was not updated. 2) claude_code.py:66 tests `is True`, so a synthetic Claude Code assistant line with \"isApiErrorMessage\": false goes on to response assembly and is not counted in lines_unknown_type. That is the opposite of what record line 154 says (\"carrying\" means the key is present). 3) Record lines 135-136 (\"cannot be opened or decoded ... F17\") against lines 137-138 and records.py:213-214, where a UnicodeError adds to lines_not_json and not to files_unreadable."
+     }
+    },
+    {
+     "title": "LOG_FORMATS says files_unreadable counts non-regular files, but discovery drops them silently",
+     "file": "docs/LOG_FORMATS.md",
+     "line": 116,
+     "severity": "medium",
+     "claim": "The counter table defines `files_unreadable` as 'Non-regular files or files that could not be opened, read or decompressed'. Discovery now keeps only `is_file()` paths, so a FIFO or device named like a log never reaches a reader and is counted nowhere. The same file also says 'Discovery returns only regular files', which contradicts the table.",
+     "evidence": "A Codex home holding only sessions/2026/11/01/rollout-b.jsonl made with os.mkfifo, run with `arci logs --tool codex --codex-dir cx2 --json f.json`, gives reason `no_logs` with files_read 0 and files_unreadable 0. discover.py filters on `(Path(directory) / name).is_file()`.",
+     "suggested_fix": "Define files_unreadable as files that could not be opened, read or decompressed (or that stopped being regular files after discovery), and say that non-regular files are not discovered.",
+     "dimension": "docs-consistency",
+     "verdict": {
+      "isReal": true,
+      "severity": "medium",
+      "reasoning": "I reproduced it. In the worktree diff, src/arci/logs/discover.py lines 27 and 44 add `and (Path(directory) / name).is_file()` to both claude_files and codex_files. That drops non-regular paths before any reader sees them, and nothing counts them.\n\nThis contradicts three normative texts:\n- docs/LOG_FORMATS.md:116 defines `files_unreadable` as \"Non-regular files or files that could not be opened, read or decompressed.\"\n- docs/LOG_FORMATS.md:132 and docs/design/0016-logs.md:138 both say \"A file is unreadable only when it cannot be opened, is not a regular file (a pipe or a device is never opened)...\" Next to \"A file that cannot be opened or decoded is counted and left out, with notice F17\", this means non-regular files are counted as unreadable.\n- Brief L13a item 7 says \"A file is unreadable only when it ... is not a regular file ... it counts once in `files_unreadable`. F17 must be true.\"\n\nThe implementation follows only item 8 (\"discovery returns only regular files\"). LOG_FORMATS.md:136 says the same, so the document is also inconsistent with itself.\n\nResult: a FIFO named like a log is silently ignored. With that FIFO as the only file, the run reports `no_logs` (\"No session logs found\") instead of `files_unreadable=1` with F17. This is a reachable edge case where the records state something false. It is not a wrong verdict on real data, so the severity is medium, not high.",
+      "reproduction": "Steps:\n1. Make a scratch directory, S/fifo/cx2/sessions/2026/11/01/.\n2. Create a FIFO there with `python -c \"import os; os.mkfifo('cx2/sessions/2026/11/01/rollout-b.jsonl')\"`.\n3. From S/fifo, with HOME=S/fifo, run `wt-v2-logs/.venv/bin/arci logs --tool codex --codex-dir cx2 --json f.json`.\n\nOutput:\n- Prints \"No session logs found for Codex ...\", exit 3.\n- f.json has tools[0].reason = no_logs, counters.files_read = 0 and counters.files_unreadable = 0.\n\nPer LOG_FORMATS.md:116, 0016-logs.md:138 and brief item 7, the expected result is files_unreadable = 1 with notice F17."
+     }
+    }
+   ],
+   "low": [
+    {
+     "title": "Recipe's --tool auto description leaves out the directory-option rule",
+     "file": "docs/recipes/logs.md",
+     "line": 161,
+     "severity": "low",
+     "claim": "The options table says the default `auto` 'requests tools whose roots exist; if neither exists, both report no logs'. Since fix 12, a tool whose `--claude-dir` or `--codex-dir` was given is requested even when that path does not exist. So `--codex-dir /missing` while ~/.claude/projects exists reports Codex no_logs, where the recipe implies Codex is dropped.",
+     "evidence": "src/arci/logs/cli.py: `if root.exists() or (args.claude_dir is not None if tool == \"claude-code\" else args.codex_dir is not None)`. Record 0016 'Command line and layout' states the new rule.",
+     "suggested_fix": "Add: 'a tool whose directory option is given is always requested'."
+    },
+    {
+     "title": "Fixed-text list in the record leaves out two error texts the code prints",
+     "file": "docs/design/0016-logs.md",
+     "line": 270,
+     "severity": "low",
+     "claim": "The F5 'usage errors (exit 3)' list and the rule that errors are 'the fixed texts below and nothing else' leave out 'Two output options name the same file.'. That text appears only in the Command line section and is a literal in cli.py, not a report.py constant. They also leave out 'Internal error.' (report.INTERNAL_ERROR), which run() prints on any unexpected exception.",
+     "evidence": "`arci logs --example --markdown a.md --json a.md` prints 'Two output options name the same file.' and exits 3. src/arci/logs/report.py:68 has `INTERNAL_ERROR = \"Internal error.\"`, and cli.run uses it for every other BaseException.",
+     "suggested_fix": "Add both sentences to the F5 usage-error list, and move the duplicate-output text into report.py as a named constant."
+    }
+   ]
+  }
+ ]
+}
