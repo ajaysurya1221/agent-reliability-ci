@@ -20,7 +20,8 @@ Other tools read the same logs (ccusage for cost; NerfTrack, is-gpt-nerfed and
 claude-nerf-watcher for usage limits; claude-session-analyzer, nerfd and NerfWatch for
 behaviour). ARCI does not claim to be the only one and compares nothing. What this step has:
 one fixed rule with a stated bound on each wrong result, exact arithmetic, a result that can be
-"cannot tell", outputs that hold numbers only, and two stronger steps behind it.
+"cannot tell", outputs that hold only counts, rates and the names of the model and effort
+compared, and two stronger steps behind it.
 
 ## Decision
 
@@ -100,7 +101,14 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
      prints when any line lacked a needed field. A record whose timestamp has no zone is
      counted (`records_without_timezone`) and left out. A file that cannot be opened or
      decoded is counted and left out, with notice F17. Unknown keys are ignored and not
-     counted.
+     counted. A line that is not valid UTF-8 is a line that is not JSON; it does not make the
+     file unreadable. A file is unreadable only when it cannot be opened, is not a regular
+     file (a pipe or a device is never opened), or fails while being read or decompressed;
+     nothing from an unreadable file is used. A byte-order mark at the start of a file is
+     ignored. A timestamp before the year 2000 or after 2200 is treated as a missing field.
+     Within one Codex file, a token-count event whose cumulative usage equals that of the
+     previous token-count event is a repeat: it is counted in `responses_duplicate` and left
+     out, whatever its timestamp.
    - **Order and copies.** Files are visited in the text order of their paths relative to the
      root, written with `/`, and lines in file order. Each file's responses are assembled
      first; a response whose identity was already seen in an earlier file (a resumed or
@@ -178,7 +186,8 @@ denominator (`"0/1"` for zero); dates are `YYYY-MM-DD`.
   "cannot_tell" | "too_few_days"`. Which test fields are filled is fixed by the finding and
   enforced by a validator, together with the thresholds: `too_few_days`: none; `streaky`:
   `p_streak` only; `real_drop`: `p_streak` and `p_real`; `no_drop` and `cannot_tell`: all
-  four.
+  four. The validator also recomputes `p_streak`, `p_real`, `u_none` and `p_none` from the
+  stored day values and rejects a record whose stored values differ.
 - `DayValue`: `day`, `count: int`, `value` (in the measure's own units, not negated).
   `count` is the number of positive counts for `reasoning_tokens` and
   `repeated_value_share`, of known counts for `no_reasoning_share`, and of file-edit results
@@ -300,6 +309,14 @@ realornoise [the same options]
 - `--tool auto` (the default) requests each tool whose log root exists; when neither exists
   both are requested, so both report `no_logs` and the exit code is 3. `both` requests both.
 - `--model` and `--effort` take rendered names (as the output shows them).
+- `--project PATH` is made absolute against the current directory, without touching the
+  file system, before any comparison; `~` is expanded.
+- A tool for which a directory option was given is always requested, also under
+  `--tool auto`, so a wrong path reports `no_logs` instead of dropping the tool.
+- Two output options may not name the same file: `Two output options name the same file.`
+  is a usage error. Output files are written only after every one of them has been
+  rendered, each to a temporary name beside its target and then moved into place; if any
+  write fails, none of the requested files is left changed.
 - `--claude-dir` replaces the `projects` directory itself (the folder that holds one folder
   per project); `--codex-dir` replaces the Codex home (the folder that holds `sessions`).
 - `run` takes the options only (`argv` does not start with `logs`), and `now` must carry a
@@ -324,7 +341,8 @@ Text output, in this order, with one blank line between groups:
 2. For each requested tool, Claude Code first: F2; the two F3 lines; a blank line; F4; the F5
    reason; a blank line; the F6 table; a blank line; the two F7 lines; F8; then each notice
    that applies, in the order F14, F9, F15, F16, F17; then F11. For ERROR: the tool name on
-   its own line, F4 and the F5 reason only. For `no_usable_setting`: the tool name, F4, the
+   its own line, F4 and the F5 reason, then F9 and F17 when they apply (so a Codex history
+   that is entirely compressed, read on an older Python, still names the way to read it). For `no_usable_setting`: the tool name, F4, the
    reason and the notices.
 3. F10, once, when at least one tool has a result other than ERROR. Its third sentence
    begins `For each tool above and one comparison:`.
@@ -333,7 +351,8 @@ Text output, in this order, with one blank line between groups:
 Lines are at most 100 characters. The text is plain ASCII except `·`; no colour, no control
 characters (every rendered name passes through `outcome_report.escape_terminal`).
 
-The Markdown file holds one block per requested tool, separated by a blank line. The JSON
+The Markdown file holds one block per requested tool, separated by a blank line, with no
+line wrapping (a table row is one line). The JSON
 file holds the sealed `LogsDecision`, UTF-8, keys sorted, two-space indent, a final newline.
 The HTML page holds, per tool, the same information as the text output and one strip chart
 per gating measure (one dot per usable day, a vertical line at the split, the two medians),

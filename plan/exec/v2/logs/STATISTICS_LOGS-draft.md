@@ -225,10 +225,11 @@ REAL DROP only remove NO DROP results.
    `p_real` on tie patterns: none; three levels; all equal).
 2. For those cases, the share of labelings on which each test rejects at `α` is at most `α`.
 3. Null simulation with the final rule, including setting selection, usable-day rules and the
-   streak check: 20,000 seeded day tables per design (5/10, 7/21, 14/42, 28/84), measures
-   independent and measures with identical ranks; the rate of REAL DROP is at most 0.0283.
-   With one measure exactly at its margin and the others unchanged, the rate of NO DROP is at
-   most 0.0283.
+   streak check: exactly 20,000 seeded day tables per design (5/10, 7/21, 14/42, 28/84),
+   measures independent and measures with identical ranks; the rate of REAL DROP is at most
+   0.0283. With one measure exactly at its margin and the others unchanged, the rate of NO
+   DROP is at most 0.0283. A gated cell is never run on fewer tables than stated; the script
+   fails if it would be.
 4. The rejection-rate table for the final rule, including the 45% reasoning-token drop at
    14/42 with a log standard deviation of 0.40, each cell with its generator, seed, number of
    simulations and sampling error. There is no power threshold: the streak check alone caps

@@ -1,0 +1,419 @@
+[
+ {
+  "lens": "statistics",
+  "found": {
+   "findings": [
+    {
+     "title": "Self-check null and margin gates run on far fewer than the 20,000 histories the contract requires",
+     "severity": "medium",
+     "where": "bench/selfcheck_logs.py:330-336 and :469-475 (simulate with budget=25 s); contract STATISTICS_LOGS-draft.md 'Checks that agents run' item 3",
+     "what": "Contract check 3 requires 20,000 seeded day tables per design, with the REAL DROP and NO DROP rates at most 0.0283. simulate() times a 3-trial pilot and cuts the count to max(30, min(20000, 25 s / seconds per trial)). The gate is then applied to that smaller count's point estimate, and in the worst case to as few as 30 histories. The gate still prints 'requested 20000' and PASS. At 28/84 the gate rests on a few hundred histories, which cannot tell 0.025 from 0.0283, so check 3 as specified is not what runs.",
+     "evidence": "Timing the generator per design gives these counts: 5/10 independent 11,331, 7/21 independent 7,969, 14/42 independent 3,002, 28/84 independent 386, 28/84 shared 1,124. The committed docs/results/logs-selfcheck.md rows confirm it: '28/84 | independent | 0 | ... | 20000 | 5/401', '28/84 | independent | 1/4 | ... | 20000 | ... 1/354', '14/42 | independent | 0 | ... | 2248'. The Wilson upper bound at 401 is 0.0289, above the 0.0283 limit, and the cell still passes.",
+     "fix": "Use budget=0 for the gated null/margin cells so count == 20000, or put a minimum count into the gate (fail when count < 20000). Otherwise change contract item 3 to state the reduced counts and gate on the Wilson upper bound."
+    },
+    {
+     "title": "Codex repeated token_count events (same cumulative usage, new timestamp) are counted as new responses",
+     "severity": "medium",
+     "where": "src/arci/logs/codex.py:91-101; contract L0-logs-spike.md 'Log formats / Codex' and 0016-logs-draft.md lines 104-109",
+     "what": "L0 says to skip a token_count whose total_token_usage equals the previous one in the same file. The reader only dedupes on (session id, event time, total usage), so a repeat with a later timestamp is kept as a second response. Its reasoning count is identical, so it inflates the counts used for setting selection, the 20-known/10-positive usable-day thresholds, v*, and most directly repeated_value_share, which measures exactly 'positive counts equal to one value'. The 0016 identity rule covers copies across files and does not replace L0's within-file repeat rule.",
+     "evidence": "Synthetic rollout: session_meta, turn_context(gpt-5, high), then two token_count lines with total_tokens 100 and reasoning 64, at 10:00:02Z and 10:00:05Z. codex.read gives 2 responses and responses_duplicate 0. Under the L0 rule it should be 1 response and 1 dropped repeat.",
+     "fix": "Per file, keep the previous total_token_usage and skip (and count as responses_duplicate) a token_count whose total equals it. Keep the cross-file identity check for copies. If the drop rule was meant to change, say so in 0016 so the two texts agree."
+    },
+    {
+     "title": "MeasureDecision validator accepts p-values that contradict the stored day values and u_none",
+     "severity": "low",
+     "where": "src/arci/logs/schema.py:166-215",
+     "what": "The validator recomputes medians from the stored days and checks the finding against the thresholds. It never checks that p_streak, p_real and p_none are the values the stored days give, or that p_none equals G(n, m, u_none). A sealed record can therefore claim real_drop or no_drop for days that cannot produce it. verify_seal only hashes, so the record's self-consistency guarantee is weaker than it looks, even though the inputs to every test are stored in the record.",
+     "evidence": "10 before-days and 5 after-days all at '100/1' (count 20), with p_streak '1/1', p_real '1/1000' and finding 'real_drop', are accepted. The same days with p_real '1/1', u_none 0, p_none '1/1000' and finding 'no_drop' are also accepted, although G(10,5,0) = 1 and p_real is 1 for all-equal values.",
+     "fix": "In _consistent, recompute from the oriented stored day values: p_streak = rank_test.p_streak(before), p_real = rank_test.p_real(before, after), u_none = strict_count(moved, after), p_none = g_tail(n, m, u_none). Reject on any mismatch. These are exact and cheap at these sizes."
+    }
+   ],
+   "checked_and_sound": [
+    "rank_test.p_real (doubled-midrank DP, complement path, unit=2 halving, modulo-(B-1) sum) matches brute-force enumeration on 3,000 random tie patterns with n+m<=13. It also matches an independent dictionary DP on 40 cases up to 84 before x 30 after with half-integer ties.",
+    "g_tail/_u_tails equals brute-force P(U>=u) for all sampled n, m, u. p_streak equals exact enumeration of runs with median-equal days dropped, including even-count medians. It returns 1 when a or b is 0.",
+    "decide._measure: higher-is-worse measures negated exactly once. Margin moves are exact (x*3/4 for tokens, x-margin in the larger-is-better orientation for shares). U is strict x'<y. Thresholds are 1/120, 1/40, 1/10, all with <=. Minimums are 5 after and 10 before. Which test fields are filled per finding matches 0016.",
+    "Ladder order matches steps 3-8: all too_few_days, then any streaky (stops the comparison), then any real_drop, then all three no_drop, then not_enough_evidence. Exit code mapping matches the contract.",
+    "measures.build window: split = N-13, after = s..N, before = s-84..s-1, --since more than 83 days before N is a usage error, --since > N gives after=None. Days use one fixed offset (a 23:30Z response moves to the next day at +01:00). N uses main-thread responses only.",
+    "Setting selection uses pooled main-thread counts over both periods, with ties going to the raw (model, effort) text order via model_order/effort_order. v* is the most common positive count over all selected responses in the window, ties to the smallest. Usable-day rules are 20 known, 20 known plus 10 positive, and 10 edit results. Medians of even counts are the mean of the two middle values.",
+    "Sub-agent responses and edits are excluded from N, counts, selection, v* and all day values (main_thread filter on responses and on edits through the answering response). Unknown reasoning is never treated as 0.",
+    "Proof: no counterexample found against the code as built. Selection, v* and usability are label-free functions of the window. The streak check and REAL DROP precedence only remove results. Claim 2's monotonicity holds because y_j <= g(w_j) for positive token medians and for shifted shares. The exact runs test flags about 8% per measure at 42 before-days and about 22% per comparison, matching the contract text."
+   ]
+  },
+  "verdicts": [
+   {
+    "title": "Self-check null/margin gates run on far fewer than 20,000 histories",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "bench/selfcheck_logs.py simulate() sets count = max(30, min(requested, int(budget/seconds))) and the full run passes budget=25. The committed docs/results/logs-selfcheck.md rows show the reduced counts: 28/84 independent 401 and 354, 14/42 independent 2248. The Wilson upper bound for 5/401 is 0.0289, above the 0.0283 limit, yet the gate passes on the point estimate. Contract check 3 says 20,000 seeded tables per design. The 'requested 20000' column is misleading."
+   },
+   {
+    "title": "Codex repeated token_count (same cumulative usage, later timestamp) counted as new response",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "I built a synthetic rollout with two token_count lines, same total_token_usage and different timestamps, and ran codex.read. It returned 2 responses and responses_duplicate 0. The dedupe key is (session, time, total), so it only catches cross-file copies. L0 says to skip a token_count equal to the previous one in the same file, and 0016 says L0 governs except where it says otherwise. 0016 only redefines identity for copies across files. The repeats inflate counts and repeated_value_share."
+   },
+   {
+    "title": "MeasureDecision validator accepts p-values inconsistent with stored days and u_none",
+    "verdict": "confirmed",
+    "severity": "low",
+    "reason": "I constructed MeasureDecision with 10 before-days and 5 after-days all 100/1 (count 20), p_streak 1/1, p_real 1/1000 and finding real_drop. The model validated without error. schema._consistent only checks medians, thresholds and field presence, never recomputing p-values from the days. A tampered or buggy record is accepted, but the records come from the tool's own code and verify_seal only hashes, so the practical impact is limited."
+   }
+  ]
+ },
+ {
+  "lens": "privacy",
+  "found": {
+   "findings": [
+    {
+     "title": "--project with '.', '' or '/' keeps every session but the record still says project_filtered",
+     "severity": "medium",
+     "where": "src/arci/logs/records.py in_project (around line 165); src/arci/logs/cli.py line 113 (Path(args.project) used without making it absolute)",
+     "what": "in_project compares path parts lexically and never makes --project absolute. Path('.').parts and Path('').parts are both (), so child[:0] == () is true for every cwd and `--project .` keeps every session from every project. A relative name such as `--project sub` matches nothing. Either way the record sets project_filtered=true and the output reads as filtered to one project. That breaks decision 5 ('keeps only sessions whose working directory is that path or below it') and misleads the user.",
+     "evidence": ".venv/bin/python -c \"from arci.logs.records import in_project; from pathlib import Path; [print(repr(p), in_project('/home/u/other', Path(p))) for p in ['.','','sub','/']]\" prints '.' True, '' True, 'sub' False, '/' True.",
+     "fix": "In cli.py, turn --project into an absolute path lexically (os.path.abspath, which does not resolve symlinks) before calling the readers, and reject an empty value with the usage error."
+    },
+    {
+     "title": "One log line with a very early timestamp aborts the whole run with exit 3",
+     "severity": "medium",
+     "where": "src/arci/logs/measures.py build(), the responses comprehension (r.when.astimezone(zone)) and the edit loop",
+     "what": "time_of accepts any zoned timestamp, for example 0001-01-01T00:30:00+00:00. In build, every in-project response that is not in the future is converted to the local zone before the window filter runs. With a negative offset that conversion overflows, and the code raises UsageError('calendar_range') for the whole run. So one corrupt or hostile line, far outside any window, turns the result into 'Comparison dates are outside the supported calendar range.' with exit 3. Decision 6 says per-line faults are counted, and this error is meant for split dates, not for single records. Edits with such a timestamp fail the same way.",
+     "evidence": "I added one line to a synthetic Claude Code log that otherwise gives a result: {\"type\":\"assistant\",\"timestamp\":\"0001-01-01T00:30:00+00:00\",\"effort\":\"high\",\"message\":{\"id\":\"early1\",\"model\":\"claude-opus-4-5\"}}. run(..., now=2026-11-10T12:00+00:00) returns 2 with a normal report. The same call with now at UTC-05:00 returns 3 with 'Comparison dates are outside the supported calendar range.'",
+     "fix": "Convert each record's timestamp to the local zone separately and count an overflow there as a per-line fault (for example lines_lacking_field or records_without_timezone), or set aside readers' timestamps outside a sane range (year 1971 to 9998) when reading. Keep calendar_range for split and window arithmetic only."
+    },
+    {
+     "title": "A failed write leaves earlier output files written, against 'no output file is written'",
+     "severity": "medium",
+     "where": "src/arci/logs/cli.py lines 163-167 (the loop that writes the outputs)",
+     "what": "The outputs are written one by one: JSON, then Markdown, then HTML. When a later write fails, the files already written stay on disk and the command exits 3 with 'Requested output could not be written.' The command-line section of record 0016 says that on a usage error 'Nothing is written to standard output and no output file is written.' The user gets a JSON record that looks valid but comes from a run reported as failed.",
+     "evidence": "run(['--tool','claude-code','--claude-dir',D,'--json',OUT+'/x.json','--markdown',D+'/nodir/x.md']) returns 3, with stderr 'Requested output could not be written.\\n'. Afterwards os.listdir(OUT) is ['x.json'].",
+     "fix": "Write each output to a temporary file in its target directory first. Rename them into place only after all have been written, and remove the temporary files if any write fails. Otherwise, check every target directory before writing and remove already-written files on failure."
+    },
+    {
+     "title": "Claude Code skill pre-approves realornoise with any arguments, including writing to any path",
+     "severity": "medium",
+     "where": "plugins/realornoise/skills/realornoise/SKILL.md frontmatter, allowed-tools: Bash(uvx realornoise), Bash(uvx realornoise *)",
+     "what": "The `!` line has already run the fixed command before the model sees the skill, so the model needs no Bash permission at all. The wildcard grant still lets the model, during the skill turn, run `uvx realornoise --json/--html/--markdown <any path>` with no permission prompt. That would overwrite any file the user can write, such as ~/.bashrc or a source file. It also allows other flags (--claude-dir, --project), so the skill can run more than the fixed command it describes. The Codex skill limits itself in prose only ('once, with no other arguments').",
+     "evidence": "The frontmatter has 'allowed-tools: Bash(uvx realornoise), Bash(uvx realornoise *)', and the body has '!`uvx realornoise 2>&1 || true`'. cli.py writes any path given to --json, --markdown or --html via Path(path).write_text.",
+     "fix": "Drop allowed-tools, since the `!` pre-run needs none, or limit it to exactly Bash(uvx realornoise) with no wildcard."
+    },
+    {
+     "title": "Both skills claim the output is 'numbers only' and that nothing was sent, but it names models and goes into the chat",
+     "severity": "low",
+     "where": "plugins/realornoise/skills/realornoise/SKILL.md body; integrations/codex/skills/realornoise/SKILL.md body",
+     "what": "The skills say the command 'printed numbers only; it sent nothing anywhere'. The output also includes every model name that passes the grammar, and decision 6 says the grammar 'does not promise that a name is not private'. The skill then puts that output into the conversation, which goes to the model provider. Also, `uvx realornoise` resolves an unpinned package from the package index on each run, which is network traffic and an unpinned code fetch. Only the program itself 'sends nothing'. The wording overstates the privacy guarantee to the user.",
+     "evidence": "Record 0016 decision 6: 'An accepted name is disclosed in full ... does not promise that a name is not private.' The synthetic run printed 'Claude Code · claude-opus-4-5 · effort high'. SKILL.md: 'printed numbers only; it sent nothing anywhere'.",
+     "fix": "Reword to: 'It printed counts, dates and the model and effort names; the program sent nothing, and its output is now part of this conversation.' Consider pinning the version in the command (uvx realornoise==X.Y.Z)."
+    },
+    {
+     "title": "A symlinked .jsonl file is opened outside the log root; a symlink to a FIFO or device hangs the command",
+     "severity": "low",
+     "where": "src/arci/logs/discover.py claude_files/codex_files; src/arci/logs/claude_code.py and codex.py path.open('rb')",
+     "what": "os.walk does not descend into symlinked directories, but a file entry named *.jsonl or rollout-*.jsonl that is a symlink is followed and opened, whatever it points to. Its content is never printed, so this does not leak. But a link to a FIFO blocks forever, and a link to /dev/zero or a huge file with no newline makes Python build an unbounded line in memory. Neither the record nor L0 says how symlinks are handled, while in_project carefully avoids following symlinks.",
+     "evidence": "I made mkfifo c4/fifo and the link c4/claude/p/a.jsonl -> ../../fifo, then called run(['--tool','claude-code','--claude-dir',c4/claude]). It was still blocked after 5 s; the alarm handler's SystemExit came back as 'Internal error.' exit 3.",
+     "fix": "Skip entries that are not regular files, using os.stat with follow_symlinks=False or stat.S_ISREG after lstat and/or open with O_NOFOLLOW, and count them as unreadable. State the symlink rule in decision 5 or 6."
+    }
+   ],
+   "checked_and_sound": [
+    "Canary run: synthetic Claude Code and Codex logs had a canary in the file names, directory names, cwd, version, session id, message ids, tool_use ids, tool_result content, efforts and model ids. Model ids included a lower-case model-shaped canary, a 60-character id, an ANSI escape, '<script>' and a full-width digit look-alike. There was also a 100,000-deep '{' line, a NUL-bearing string, invalid UTF-8, a 50 MB JSON line and a fake .zst file. Runs with --project <canary path>, --model <canary> and --since: no canary, ESC, '<script' or look-alike appeared in stdout, stderr, JSON, Markdown or HTML.",
+    "render_model matches the decision 6 grammar: ASCII-only [a-z0-9] class, 48-character cap, at most 6 parts, empty parts rejected, number, letter-digit and date rules as written. Rejected ids become model-N, numbered in sorted raw order among the unknown ones, and the schema's _model and _effort validators accept only those forms.",
+    "Error handling in run(): a custom _Parser.error raises only fixed constants; every other exception, BaseException included, becomes the fixed 'Internal error.'; output-file write errors print the fixed WRITE_ERROR with no path; --project, --claude-dir and --codex-dir values are never echoed.",
+    "Readers keep only integer indices for versions, workdirs, sessions and models in Response and EditResult; ReadResult keeps rendered names only. A repr of the records or a pydantic validation error therefore holds no raw log string.",
+    "HTML: every inserted value goes through html_base._text (html.escape with quote=True after visible_text). The page has no script and no external reference, and all values come from closed sets anyway.",
+    "No direct import of socket, subprocess, urllib, random or http in src/arci/logs or html_base.py. importlib is used only for compression.zstd. random, urllib and email appear in sys.modules only through pydantic, and nothing calls them.",
+    "--example reads packaged files in place and writes nothing; discovery reads no file contents and renders no paths.",
+    "The `arci logs` dispatch in src/arci/cli.py hands the arguments straight to arci.logs.cli.main before the main argparse runs, so the main parser's error messages cannot echo log-related arguments."
+   ]
+  },
+  "verdicts": [
+   {
+    "title": "--project '.', '' or '/' keeps every session; relative names match nothing",
+    "verdict": "confirmed",
+    "reason": "Ran in_project('/home/u/other', Path(p)): '.' True, '' True, 'sub' False, '/' True. cli.py uses Path(args.project) without making it absolute. '/' is arguably correct (everything is below /), so the real defect is '.', '' and relative names. Decision 5 says 'that path or below it' and the record still sets project_filtered=true. It needs a deliberate odd argument, so impact is limited.",
+    "severity": "low"
+   },
+   {
+    "title": "One early-timestamp log line aborts run with exit 3 (calendar_range)",
+    "verdict": "confirmed",
+    "reason": "Built a synthetic Claude log with 28 normal days plus one line at 0001-01-01T00:30:00+00:00. With now at +00:00 the run exits 2 with a normal report. With now at -05:00 it prints 'Comparison dates are outside the supported calendar range.' and exits 3. time_of accepts the timestamp, and astimezone(-05:00) raises OverflowError inside the broad try in measures.build. One corrupt line therefore breaks the whole run, against the per-line fault counting.",
+    "severity": "medium"
+   },
+   {
+    "title": "Failed write leaves earlier output files on disk",
+    "verdict": "confirmed",
+    "reason": "Ran --json OUT/x.json --markdown NOEXIST/x.md. It returned 3 with 'Requested output could not be written.' and OUT still contained x.json. Record 0016 lists that sentence among the usage errors (line 231) and says a usage error writes no output file (line 315). The two plainly conflict. The sentence is a usage error of F5, and the loop in cli.py writes outputs one by one without cleanup.",
+    "severity": "medium"
+   },
+   {
+    "title": "Claude Code skill pre-approves 'uvx realornoise *' with any arguments",
+    "verdict": "confirmed",
+    "reason": "SKILL.md frontmatter has allowed-tools: Bash(uvx realornoise), Bash(uvx realornoise *), and the body uses a '!' pre-run, so the wildcard grant is not needed for it. cli.py writes any path given to --json, --markdown or --html. The grant therefore lets the model, during the skill turn, overwrite arbitrary user-writable files without a prompt. No contract text requires this grant. The skill is user-invoked only (disable-model-invocation: true), which limits the risk, so I rate it medium rather than high.",
+    "severity": "medium"
+   },
+   {
+    "title": "Skills claim 'numbers only; sent nothing', yet output names models and goes into the chat",
+    "verdict": "confirmed",
+    "reason": "Both SKILL.md files say 'numbers only; it sent nothing anywhere'. Decision 6 discloses accepted model names in full and does not promise they are not private. The program sends nothing, but uvx fetches the package from the index, and the output enters the conversation. The skill text does admit the output becomes visible to the assistant, which softens the harm. The wording 'numbers only' is also used in 0016 line 23 and in the L11 README text, so it is a wording overstatement rather than a code defect.",
+    "severity": "low"
+   },
+   {
+    "title": "Symlinked .jsonl to a FIFO hangs the command",
+    "verdict": "confirmed",
+    "reason": "Created a FIFO and a symlink claude/p/a.jsonl pointing to it, then ran cli.run with --claude-dir. It was still blocked when `timeout 10` killed it (exit 124). The code has no O_NOFOLLOW, S_ISREG or islink checks. It is a local self-inflicted case with no leak, and neither the record nor L0 states a symlink rule. This is very unlikely in real log directories.",
+    "severity": "low"
+   }
+  ]
+ },
+ {
+  "lens": "readers",
+  "found": {
+   "findings": [
+    {
+     "title": "A relative --project path matches everything or nothing",
+     "severity": "high",
+     "where": "src/arci/logs/cli.py:111 (Path(args.project), never made absolute) and src/arci/logs/records.py:166-173 in_project",
+     "what": "in_project compares path parts as text without making --project absolute. `--project .` normalises to parts () and every working directory matches, so the filter does nothing. The output still says it filtered (project_filtered=True, and the F13/'project' wording). `--project sub` or `--project ../x` never matches an absolute cwd, so every session counts as outside the project. The user gets no_usable_setting or a much smaller sample with no hint why. Decision 5 says `--project PATH` keeps only sessions whose working directory is that path or below it.",
+     "evidence": "in_project('/elsewhere/x', Path('.')) -> True; in_project('/x', Path('')) -> True (script /private/tmp/rv-readers/t1.py). cli.py:111 is `project = Path(args.project) if args.project is not None else None`, with no absolute() or cwd join.",
+     "fix": "In cli.py, make the path absolute before use: Path(os.path.abspath(args.project)). This is still lexical, with no resolve() and no symlinks followed."
+    },
+    {
+     "title": "A file counted as unreadable still feeds its records into the result",
+     "severity": "medium",
+     "where": "src/arci/logs/claude_code.py:165-179 and src/arci/logs/codex.py:52-138",
+     "what": "Decision 6 says a file that cannot be opened or decoded is counted and left out, and F17 says 'The result uses the rest'. A bad UTF-8 byte in the middle of a Claude Code file aborts the loop, but the code still adds pending responses and edits from the lines before the fault, and updates `seen`. Everything after the fault is lost without notice. Codex appends responses as it reads, so a truncated or corrupt .jsonl.zst, or a decode fault partway through, keeps the records read before the fault while the file is also counted in files_unreadable. One file is then both 'not read' and part of the comparison. The ERROR rule in cli.py:126 (all files unreadable) can also fire even though records from those files were used.",
+     "evidence": "Claude file with lines a(1),u(1),a(2), then b'\\xff\\xfe bad', then a(3): responses=2, edits=1, files_unreadable=1. On Python 3.14, a valid 3000-response .jsonl.zst cut in half: 682 responses kept and files_unreadable=1 (script /private/tmp/rv-readers/t3.py).",
+     "fix": "Collect each file's records in local lists and merge them into responses, edits and seen (and the latest_main_response update) only after the file finishes without a fault. On a fault, drop the local lists."
+    },
+    {
+     "title": "Codex repeated token_count events are counted twice when timestamps differ or the session id is missing",
+     "severity": "medium",
+     "where": "src/arci/logs/codex.py:91-101; contract: L0-logs-spike.md 'Codex' (skip a token_count whose total_token_usage equals the previous one in the same file) vs 0016 decision 6 'Order and copies' (identity = session id, event time, cumulative usage)",
+     "what": "The only repeat check is the key (session id, event time, total_token_usage). The spike's format rule is to skip a token_count whose cumulative usage equals the previous one in the same file. The code drops that rule, so a repeat written a few milliseconds later counts as a new response and adds a second copy of its reasoning value. That inflates n and the repeated-value and no-reasoning shares. When session_meta has no payload.id, no repeat is dropped at all, not even identical lines. 0016 says the spike text defines how a response is assembled 'except where this record says otherwise'. It changes the cross-file identity but never says the within-file 'equals the previous one' rule is gone, so the two texts disagree.",
+     "evidence": "File with session_meta id s1 and token_count lines (01:00:00.000Z, total 100), (01:00:00.050Z, total 100), (01:00:00.050Z, total 100): 2 responses, duplicate 1. The same file without payload.id: 3 responses, duplicate 0 (script /private/tmp/rv-readers/t2.py).",
+     "fix": "Keep the previous total_token_usage per file and skip (counting responses_duplicate) a token_count whose total equals it. Keep the (session, time, total) key for copies across files. If no session id is present, still apply the within-file rule. State both rules in 0016."
+    },
+    {
+     "title": "A UTF-8 BOM silently drops a whole Codex file (and the first Claude Code line)",
+     "severity": "medium",
+     "where": "src/arci/logs/codex.py:55-60; src/arci/logs/claude_code.py:52 (raw.decode('utf-8'))",
+     "what": "Lines are decoded with 'utf-8', not 'utf-8-sig', so a leading BOM stays in the text and json.loads rejects it. In Codex, the session_meta line then fails to parse and the whole file is skipped through the 'no session header' branch. It is not counted as unreadable or outside the project, and no notice (F15 or F17) prints, so every response in the file vanishes with only lines_not_json=1 in the JSON. In Claude Code, the first response of the file is lost the same way.",
+     "evidence": "Codex file with b'\\xef\\xbb\\xbf' before a valid session_meta, a turn_context and a token_count: responses=0, files_unreadable=0, lines_not_json=1. Claude Code file with a BOM and CRLF over 3 responses: 2 responses, lines_not_json=1 (scripts t1.py and t2.py in /private/tmp/rv-readers).",
+     "fix": "Decode the first line of each file with 'utf-8-sig', or strip a leading '﻿' from it. Also count a readable Codex file without a session_meta header somewhere that leads to a notice."
+    },
+    {
+     "title": "--project is case-sensitive on Windows",
+     "severity": "low",
+     "where": "src/arci/logs/records.py:166-173 in_project",
+     "what": "The match compares Path(...).parts tuples of plain strings. On Windows, Path is WindowsPath, whose own equality ignores case, but a parts tuple compares case-sensitively. A cwd logged as 'C:\\Users\\A\\proj\\sub' does not match `--project c:\\users\\a\\proj`. The drive-letter case often differs between tools and what the user types, so every session counts as outside the project.",
+     "evidence": "PureWindowsPath(ntpath.normpath(r'C:\\Users\\A\\proj\\sub')).parts[:4] == PureWindowsPath(ntpath.normpath(r'c:\\users\\a\\proj')).parts -> False.",
+     "fix": "Compare PurePath objects, e.g. `PurePath(child_norm).is_relative_to(PurePath(project_norm))`. On Windows this uses case-insensitive flavour rules and is still purely lexical. Or use os.path.normcase on both sides before splitting."
+    },
+    {
+     "title": "Presence checks where the contract means a value: isApiErrorMessage false drops real responses, a null effort blocks the perTurnEffort fallback",
+     "severity": "low",
+     "where": "src/arci/logs/claude_code.py:56 (`\"isApiErrorMessage\" in data`) and :61 (`data.get(\"effort\", data.get(\"perTurnEffort\"))`)",
+     "what": "The spike describes isApiErrorMessage as 'present and true on synthetic error lines'. The code skips any line that has the key at all, so a client version that writes isApiErrorMessage:false on normal lines would lose every response and report it only as unknown line types. Decision 6 says effort is 'the line's effort, else its perTurnEffort; each must be a non-empty string'. When effort is present but null, a number or an empty string, dict.get never falls back, so a valid perTurnEffort is ignored and the response counts as without a setting.",
+     "evidence": "An assistant line with isApiErrorMessage:false: 0 responses, lines_unknown_type=1. An assistant line with effort:null and perTurnEffort:'high': 0 responses, responses_without_setting=1 (script /private/tmp/rv-readers/t1.py).",
+     "fix": "Use `data.get(\"isApiErrorMessage\") is True` for the skip, and `effort = string_of(data.get(\"effort\")) or string_of(data.get(\"perTurnEffort\"))`."
+    }
+   ],
+   "checked_and_sound": [
+    "Valid JSON that is not an object, and objects with odd field types (message as a string, content as a dict, usage as a list, numeric timestamp, model null, numeric id): handled by object_of, array_of and string_of; they count as lines_not_json, lines_lacking_field or without a setting, and nothing crashes.",
+    "The fast path that skips json.loads: it needs `type` as the first key with an unused value, no backslash, exactly one '\"type\"', and a strict regex for flat JSON. It cannot misclassify a used type or hide malformed JSON (nested, escaped or duplicate keys all go through the decoder).",
+    "Interleaved Claude Code responses: pending is keyed by message id, so blocks of two responses that alternate are put together correctly, with the first timestamp and the last line's usage.",
+    "Copies across Claude Code files: `seen` comes from earlier files only, each copied id counts once per file in responses_duplicate, and edit results in a copied file are not counted again.",
+    "Performance: a 142 MB, 200,000-line Claude Code file reads in 0.75 s; memory per file is bounded by that file's response and tool-call maps, with no quadratic work.",
+    "Discovery: os.walk lists only files, so a directory named like a .jsonl file is ignored; journal.jsonl is skipped; the sort by relative POSIX path puts <session>.jsonl before <session>/subagents/; an unreadable file is counted in files_unreadable without crashing.",
+    "Timestamps: offsets are converted to UTC (the same instant written with two offsets dedupes as one Codex key), fractional seconds parse, zone-less stamps go to records_without_timezone, future records to records_in_future, and an overflow is caught.",
+    ".jsonl.zst on Python 3.13 (no compression.zstd) counts as files_unread_compressed; a garbage .zst on 3.14 counts as unreadable with no records; empty files, files without a trailing newline and CRLF endings parse correctly."
+   ]
+  },
+  "verdicts": [
+   {
+    "title": "Relative --project path matches everything or nothing",
+    "verdict": "confirmed",
+    "reason": "Reproduced: in_project('/elsewhere/x', Path('.')) returns True and in_project('/a/sub', Path('sub')) returns False. cli.py:111 builds Path(args.project) with no absolute(), and in_project compares parts lexically. `--project .` is the natural invocation, so the filter silently does nothing while the output still says it filtered.",
+    "severity": "high"
+   },
+   {
+    "title": "Unreadable file still feeds its records into the result",
+    "verdict": "confirmed",
+    "reason": "Reproduced for Claude Code: a file with a valid line, a bad UTF-8 line, then another valid line gives responses=1 and files_unreadable=1. The first line's record is kept even though the file is counted as unreadable. This contradicts 0016 ('counted and left out') and F17 ('uses the rest'). The Codex append-as-you-read path has the same structure in the code; I did not run the truncated .zst case.",
+    "severity": "medium"
+   },
+   {
+    "title": "Codex repeated token_count with different timestamp counted twice",
+    "verdict": "confirmed",
+    "reason": "Reproduced: same session id and same total_token_usage but timestamps .000Z and .050Z give 2 responses and responses_duplicate=0. The spike says to skip a token_count equal to the previous one in the same file. 0016 defines the identity as (session, time, usage) and says it overrides the spike only 'where this record says otherwise', which is ambiguous. The code drops the within-file rule, and with no payload.id nothing is deduplicated. Real inflation depends on whether real logs repeat with a changed timestamp.",
+    "severity": "medium"
+   },
+   {
+    "title": "UTF-8 BOM silently drops Codex file / first Claude Code line",
+    "verdict": "confirmed",
+    "reason": "Reproduced: Codex file with a leading BOM gives responses=0, files_unreadable=0, lines_not_json=1, with no notice. A Claude Code file with a BOM gives 2 of 3 responses and lines_not_json=1. The contract says nothing about a BOM, and real Codex and Claude logs rarely carry one, so impact is low.",
+    "severity": "low"
+   },
+   {
+    "title": "--project case-sensitive on Windows",
+    "verdict": "confirmed",
+    "reason": "Not run on Windows. in_project compares tuples of plain path-part strings, which are case-sensitive in Python even for WindowsPath, so drive-letter or directory case differences fail to match. Real but only affects Windows use.",
+    "severity": "low"
+   },
+   {
+    "title": "Presence checks: isApiErrorMessage false and null effort",
+    "verdict": "unclear",
+    "reason": "Reproduced the behaviour: isApiErrorMessage:false gives 0 responses and lines_unknown_type=1. But 0016 explicitly says 'Lines carrying isApiErrorMessage count as lines of an unused type', which overrides the spike's 'present and true', so the code matches the governing record; the claim is refuted for that half. Effort null with perTurnEffort 'high' gives responses_without_setting=1; 0016 says 'effort, else perTurnEffort; each must be a non-empty string', which can be read either way. Low impact.",
+    "severity": "low"
+   }
+  ]
+ },
+ {
+  "lens": "interface",
+  "found": {
+   "findings": [
+    {
+     "title": "A file with one undecodable line is counted as unreadable, yet its responses are still used, and F17 says the opposite",
+     "severity": "high",
+     "where": "src/arci/logs/claude_code.py:161-172 (same pattern in src/arci/logs/codex.py:132-136); classification in src/arci/logs/cli.py:121-131",
+     "what": "When a line fails UTF-8 decoding, the reader catches UnicodeError and adds 1 to files_unreadable. But everything already assembled from that file is kept: pending responses are appended after the try block, and edits and Codex responses were appended during the loop. Record 0016 (Reading faults) says a file that cannot be decoded is counted and left out. Two wrong outputs follow. (a) With one file, files_unreadable == len(paths), so the tool becomes ERROR read_error ('Session log files could not be read.') and throws away every response it recovered. (b) With several files, F17 prints 'Files that could not be read: 1. The result uses the rest.', but the day table also contains that file's responses. The sealed record's counters and the notice both misstate what the result was computed from.",
+     "evidence": "Synthetic test in TMPDIR, based on the packaged example. history.jsonl with b'\\xff\\xfe\\n' appended: rc=3, 'RESULT: ERROR / Session log files could not be read.', counters files_read=1, files_unreadable=1, responses=1128. Good file plus a second file (2000 lines, ids renamed, then a \\xff line): text shows 'Files that could not be read: 1. The result uses the rest.' with responses=2256. The good file alone gives responses=1128, so the 'unreadable' file's 1128 responses were used.",
+     "fix": "Collect each file's responses and edits in per-file lists, and merge them into the result only when the file finishes without a decode error. Otherwise discard them, and roll back that file's model, effort, version and workdir registrations and its duplicate identities."
+    },
+    {
+     "title": "A failed output write leaves earlier output files on disk",
+     "severity": "medium",
+     "where": "src/arci/logs/cli.py:154-171",
+     "what": "Outputs are written one at a time in the order JSON, Markdown, HTML. If a later path cannot be written (a directory, a missing parent, no permission), the run exits 3 with 'Requested output could not be written.', but the earlier files have already been written. Record 0016 (Command line and layout) says that on a usage error 'no output file is written'. A script that sees exit 3 is left with a sealed JSON on disk from a run that was reported as failed.",
+     "evidence": "run(['--example','--json',S/'b.json','--html',S/'adir']), where adir is a directory: rc=3, stderr 'Requested output could not be written.', and b.json exists afterwards.",
+     "fix": "Check every target before writing any of them. Write each to a temporary file beside its target and rename only after all writes succeed, or delete the files already written when a later write fails."
+    },
+    {
+     "title": "Two output options naming the same file silently overwrite each other",
+     "severity": "medium",
+     "where": "src/arci/logs/cli.py:154-171",
+     "what": "--json, --markdown and --html can name the same path. The later write replaces the earlier one with no error, so the file named by --json does not hold the sealed record. The run exits with the normal result code, so a script reading the JSON gets Markdown. The record says --json FILE holds the sealed arci-logs/1 record.",
+     "evidence": "run(['--example','--json',S/'c.out','--markdown',S/'c.out']): rc=1, empty stderr, and c.out begins \"Example data, generated. Not anyone's lo\" (the Markdown), not '{'.",
+     "fix": "Before writing anything, reject repeated targets (compare resolved paths) as a usage error with exit 3, and write no file."
+    },
+    {
+     "title": "If every Codex file is compressed and Python is older than 3.14, the user gets ERROR with no hint about Python 3.14",
+     "severity": "medium",
+     "where": "src/arci/logs/cli.py:121-131 with report.render_text ERROR branch (report.py:296-305); contract 0016 text layout 'For ERROR: ... F4 and the F5 reason only'",
+     "what": "When every Codex file is .jsonl.zst and Python is 3.13 or older, files_unreadable (0) equals len(paths) - files_unread_compressed (0), so the tool is classified read_error. The ERROR layout leaves out all notices, so F9 and 'To read them: uvx --python 3.14 realornoise' never print. The user sees only 'Session log files could not be read.', which is false: the files are intact, just compressed. D-16 chose not to require 3.14 because a run that reports unread compressed files is better than one that fails, and this is exactly the case where that report disappears. D-16 also names the default uvx interpreter as 3.13, the setup this case hits.",
+     "evidence": "Codex dir with only sessions/rollout-a.jsonl.zst on the venv's Python 3.13.12: rc=3, output 'Codex / RESULT: ERROR / Session log files could not be read.', no F9 lines.",
+     "fix": "Print F9 and its follow-up line for an ERROR tool whenever files_unread_compressed is at least 1. Alternatively, do not classify a tool whose only unread files are compressed as read_error. Change contract 0016's ERROR layout to match."
+    },
+    {
+     "title": "--tool auto silently drops a tool whose directory option names a missing path",
+     "severity": "low",
+     "where": "src/arci/logs/cli.py:105-106; contract 0016 'Command line and layout', first bullet",
+     "what": "In auto mode a tool is requested only if its root exists, and that applies to roots given explicitly with --claude-dir or --codex-dir. A typo in --claude-dir, while ~/.codex exists, makes Claude Code vanish from the output: no ERROR, no no_logs notice, and the exit code comes from Codex alone. The no_logs text that suggests '--claude-dir DIR' exists for exactly this case and never appears. The contract wording allows this, but it misleads a user and a script.",
+     "evidence": "run(['--claude-dir', S/'typo', '--codex-dir', <example codex>]): rc=0; the output has only 'Codex · model-1 · ...', no Claude Code block.",
+     "fix": "In auto mode, always request a tool whose directory option was given (it then reports no_logs if nothing is there). Say so in record 0016."
+    },
+    {
+     "title": "Markdown is wrapped at 100 characters, although the record says it has no line limit, and a wide table row would break the table",
+     "severity": "low",
+     "where": "src/arci/logs/report.py:344-367 (wrap_text applied to every Markdown block)",
+     "what": "Record 0016 says 'The Markdown and HTML outputs have no line limit', but render_markdown runs wrap_text on each block. In GitHub issue comments a newline inside a paragraph renders as a hard break, so the pasted split/F7 line, the closing line and the limits paragraph show ragged breaks. The code comment says table rows 'fit with aligned columns', but a Codex row is 91 characters plus the change cell. A change of ±100.0 pts (10 characters) makes 101, and wrap_text then splits that row into two lines, which breaks the table.",
+     "evidence": "--example Markdown output: 'split 2026-11-01 · client versions 1 before, 1 after, 1 in both · working directories 1 before, 1' / 'after · sub-agent share ...' is broken across two lines. Codex widths are 31+13+12+cw+23 plus 4 separators of ' | ' = 91+cw, so 101 for '-100.0 pts', over the limit wrap_text applies.",
+     "fix": "Do not apply wrap_text in render_markdown (keep it for render_text only)."
+    }
+   ],
+   "checked_and_sound": [
+    "The fixed texts in report.py (F1-F17, the usage errors, the Markdown closing lines and the Markdown limits paragraph, F10's ten lines) match record 0016 character for character, and the text output of --example has no line over 100 characters.",
+    "Block and notice order in the text output matches 0016: F2, F3, blank, F4+F5, blank, F6, blank, F7, F8, then F14/F9/F15/F16/F17 and F11. F8 is left out when K=0, a notice prints only when its count is at least 1, the ERROR and no_usable_setting layouts follow the record, and F10 prints once when any tool is not ERROR.",
+    "--since edges: 83 days before the newest day is accepted, 84 is a usage error with the fixed text; a date after the newest day gives CANNOT TELL with 'after   no days'; 0000-00-00, 2026-02-30, 2026-1-01, an empty value, a date with a time and full-width digits all give '--since needs a date as YYYY-MM-DD.' Each usage error prints one line to stderr, nothing to stdout, and writes no file.",
+    "Unknown options, missing values, bad --tool values and stray positional arguments print exactly 'Usage error. Run: realornoise --help' to stderr and exit 3, through both `arci logs` and arci.logs.cli.run.",
+    "Exit codes follow the STATISTICS rule: REAL DROP over CANNOT TELL over NO DROP among non-ERROR tools, and ERROR + NO DROP gives 0. With --tool auto and neither root present, both tools report no_logs and exit 3.",
+    "Text, Markdown, HTML and JSON from --example are byte-identical across runs. The JSON has sorted keys, two-space indent and a final newline, re-validates as LogsDecision, verify_seal is True, and the day-table digest recomputed from the JSON alone, per 0016's recipe, matches day_table_sha256 for both tools.",
+    "--example ignores --claude-dir, prints F13 as the second text line and in the Markdown and HTML outputs, and gives REAL DROP for Claude Code and NO DROP for Codex.",
+    "Rendering: format_number rounds half up and never produces '-0' or '-0.0 pts'; margins render as 25%, 10 pts, 3 pts; a missing value renders as '-'; the token change is left out when the before median is 0 (positive day values make that impossible anyway). The HTML has no script and no external reference."
+   ]
+  },
+  "verdicts": [
+   {
+    "title": "File with one undecodable line is counted unreadable but its responses are still used",
+    "verdict": "confirmed",
+    "severity": "high",
+    "reason": "Reproduced. I copied the packaged Claude example and appended b'\\xff\\xfe\\n'. The run gave rc=3 and ERROR 'Session log files could not be read.' The sealed counters show files_unreadable=1 and responses=1128, so the 'unreadable' file's responses were recovered and then discarded. Record 0016 says a file that cannot be decoded is 'counted and left out'. The code in claude_code.py and codex.py keeps the pending responses and the edits appended before the error. I did not run the multi-file case, but the code path is the same: F17 would claim the rest was used while the table includes the bad file."
+   },
+   {
+    "title": "Failed output write leaves earlier output files on disk",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "Reproduced with --example --json b.json --html <existing directory>. rc=3, stderr 'Requested output could not be written.', and b.json existed afterwards. Record 0016 says a usage error leaves no output file written. The writes in cli.py are sequential with no pre-check or rollback. The record does not strictly say a write error is a usage error, but the code raises _UsageError for it, so the contradiction stands."
+   },
+   {
+    "title": "Two output options naming the same path silently overwrite each other",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "Reproduced with --json c.out --markdown c.out. rc=1, empty stderr, and c.out starts with 'Example data, generated. Not a...' (the Markdown), not the sealed JSON. The record says --json FILE holds the sealed arci-logs/1 record, so a script reading it gets the wrong content with no warning."
+   },
+   {
+    "title": "All-compressed Codex files on Python <3.14 give ERROR with no F9 / uvx --python 3.14 hint",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "Reproduced on the venv's Python 3.13.12 with a codex dir holding only sessions/rollout-a.jsonl.zst. rc=3 and the output is only 'Codex / RESULT: ERROR / Session log files could not be read.' F9 and the follow-up line are absent. The 0016 text says the ERROR layout is the tool name, ERROR and the F5 text only, and the spec lists F9 after other notices only for non-ERROR tools. The message is false for intact compressed files and hides the fix. D-16 deliberately chose to report unread compressed files rather than fail, and this case defeats that. This is a contract gap that misleads a user."
+   },
+   {
+    "title": "--tool auto silently drops a tool whose explicit --claude-dir/--codex-dir path is missing",
+    "verdict": "confirmed",
+    "severity": "low",
+    "reason": "Reproduced. With --claude-dir <nonexistent> and --codex-dir <example codex>, rc=0 and the output has only the Codex block, with no no_logs notice for Claude Code. This matches the literal 0016 wording ('requests each tool whose log root exists'), so the code follows the contract. The cost is a typo in the option that is silently ignored. That is a minor usability and contract-design issue, not a code defect."
+   },
+   {
+    "title": "Markdown is wrapped at 100 chars despite 'no line limit'; wide table row would break",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "Confirmed. render_markdown applies wrap_text to every block, and wrap_text fills any line over 100 chars. In the example Markdown the 'split ... client versions ...' line is broken at 'working directories 1 before, 1 / after'. Record 0016 says the Markdown and HTML outputs have no line limit. For tables, the Markdown row is built unwrapped from column widths, so a row over 100 chars (a long change cell or large day counts) is then split by wrap_text into two lines and breaks the table. I did not construct such a row, but the code path is plain. The packaged example rows are under 100, so the table break is an edge case; the prose wrapping contradiction is certain."
+   }
+  ]
+ },
+ {
+  "lens": "release",
+  "found": {
+   "findings": [
+    {
+     "title": "The only test of the built wheels never runs, in CI or locally",
+     "severity": "medium",
+     "where": "tests/unit/packaging/test_realornoise_distribution.py:84 (test_realornoise_and_main_wheel_file_lists); uv.lock; .github/workflows/ci.yml check job",
+     "what": "This test is the only automated check of what the built wheels actually contain: the four example files in the main wheel, the realornoise wheel holding only __init__.py and py.typed, the console_scripts entry, `Requires-Dist: agent-reliability-ci==X` and `Requires-Python: >=3.11`. It skips whenever hatchling cannot be imported, and hatchling is in neither the dev group nor uv.lock. So the CI check job (`uv sync --frozen`, then `.venv/bin/pytest`) skips it on both Python versions every time. The release build job only prints the realornoise wheel listing (`python -m zipfile -l`) and checks pyproject text in the guard. Nothing fails if the built realornoise wheel's metadata drifts, for example a pin rewritten by the build backend or an extra file. The smoke covers the example data only indirectly, by running `--example`.",
+     "evidence": "`.venv/bin/pytest -p no:cacheprovider tests/unit/packaging tests/unit/plugin -rs` -> `SKIPPED [1] tests/unit/packaging/test_realornoise_distribution.py:84: Hatchling build backend unavailable offline` (30 passed, 1 skipped). `grep -n hatchling uv.lock` -> no match. In CI the .venv comes from `uv sync --frozen`, so the skip happens there too.",
+     "fix": "Run the file-list and metadata assertions on the wheels the workflow already built. Either add a step after `uv build` in release.yml build and in ci.yml build-realornoise that runs this test against `dist/` and `dist-realornoise/` (pass them through an environment variable), or run the test with `uv run --with 'hatchling>=1.27,<2'` in one CI job. Make the test fail rather than skip when CI is set."
+    },
+    {
+     "title": "RELEASING.md bump steps leave out files the 2.3.0 bump has to change",
+     "severity": "low",
+     "where": "docs/RELEASING.md section 1, steps 2 and 4; compare tests/unit/plugin/test_plugin_files.py:39, CITATION.cff:10, record 0016 \"Files\" (re-freeze list)",
+     "what": "Step 2 lists the version and pin locations as pyproject.toml, src/arci/__init__.py, packages/realornoise/pyproject.toml (version and pin) and packages/realornoise/src/realornoise/__init__.py. It leaves out three places. First, plugins/realornoise/.claude-plugin/plugin.json `version`: test_plugin_manifest_matches_the_package asserts it equals arci.__version__, so a bump made by following the doc fails the CI check job. Second, CITATION.cff `version`: record 0016 lists it as changed, and no test checks it. Third, uv.lock's own `version = \"2.2.0\"` entry, which only `uv lock` rewrites. Step 4 lists only pyproject.toml, uv.lock and the new design record for the FROZEN.sha256 re-hash. Record 0016 also re-freezes AGENTS.md and newly pins the record itself, docs/STATISTICS_LOGS.md, src/arci/logs/schema.py and tests/acceptance/test_logs.py. These are absent from the doc's list.",
+     "evidence": "`git grep -n -E '2\\.2\\.0'` outside docs shows these release-relevant places: CITATION.cff:10, packages/realornoise/pyproject.toml:3 and 9, packages/realornoise/src/realornoise/__init__.py:3, plugins/realornoise/.claude-plugin/plugin.json:4, pyproject.toml:3, src/arci/__init__.py:3, uv.lock:11. RELEASING.md step 2 names neither plugin.json nor CITATION.cff. 0016 \"Re-freeze at the release: pyproject.toml, uv.lock, AGENTS.md ... Newly pinned: this record, docs/STATISTICS_LOGS.md, src/arci/logs/schema.py, tests/acceptance/test_logs.py\" against RELEASING step 4's three files.",
+     "fix": "In step 2, add plugin.json `version` and CITATION.cff `version`. In step 4, list every file 0016 re-freezes or newly pins. Optionally add CITATION.cff to the release guard or to a unit test, as plugin.json already is."
+    }
+   ],
+   "checked_and_sound": [
+    "Release guard covers the second distribution and runs before anything is built. It refuses a non-tag ref, a tag other than v+version, a module version mismatch, a realornoise project or module version mismatch, and any dependency list other than exactly [agent-reliability-ci==X]. The parametrised unit test exercises all six cases and passes.",
+    "Publish order and gating. publish-realornoise needs [build, smoke, publish], so it cannot run if the main build, any smoke entry or the main publish fails. It uses the same environment (pypi), the same id-token: write permission, the same pinned pypa/gh-action-pypi-publish SHA, and attestations: true with skip-existing: false. Its packages-dir is dist-realornoise/.",
+    "No artefact collisions. Separate output directories (dist/, dist-realornoise/) feed separate artifact names (dist, dist-realornoise), each with its own SHA256SUMS. The publish jobs download into matching paths and `cd` into the right one. `sha256sum -- *` skips uv's dist/.gitignore, and upload-artifact excludes hidden files.",
+    "Built locally with uv 0.12.5 (offline, output in /private/tmp). The main wheel contains all four example files, and its sdist has only allowlisted entries. The realornoise wheel contains only realornoise/__init__.py and py.typed plus metadata with `Requires-Dist: agent-reliability-ci==2.2.0`, `Requires-Python: >=3.11` and entry point `realornoise = arci.logs.cli:main`. Its sdist contains no plan/ files and no logs; the only stray file is the repository root .gitignore. The frozen pyproject.toml needs no change for the example data.",
+    "Ran .github/scripts/wheel_smoke.sh end to end on the two locally built wheels with Homebrew Python 3.11.16 and 3.14.7: both printed `wheel_smoke: OK`. `arci logs --example` and `realornoise --example` exit 1 with an exact `RESULT: REAL DROP` line, the example checker rejects exit 0, 2 and 3 and a missing line, and nothing is left in the working directory.",
+    "The ttfv-reference.yml inputs cannot be injected into a shell. `inputs.package` and `inputs.command` reach the job only through env variables. The Python step reads them with os.environ and shlex.split and passes them as an argv list to subprocess, with no `${{ }}` inside any run: script. The command input is a fixed choice, and the push trigger was removed.",
+    "All three workflows parse as YAML, and wheel_smoke.sh passes `bash -n`. UV_VERSION is defined at workflow level in ci.yml and release.yml. Every job that builds installs uv first. CI's build-realornoise job runs once and its artifact is downloaded into every wheel-smoke entry (3.11 and 3.14, Linux and macOS).",
+    "Version drift. plugin.json's version is test-bound to arci.__version__, and marketplace.json carries no version. The logs snapshots and test records use a fixed arci_version, and the acceptance test reads the version from the record, so moving from 2.2.0 to 2.3.0 breaks no logs or acceptance test. requires-python >=3.11 in both distributions matches decision 8 and D-16."
+   ]
+  },
+  "verdicts": [
+   {
+    "title": "Wheel file-list/metadata test never runs (skips without hatchling)",
+    "verdict": "confirmed",
+    "severity": "medium",
+    "reason": "The venv has no hatchling (import fails). It is not in uv.lock; it appears only in pyproject build-system requires. The test at test_realornoise_distribution.py:84 skips when find_spec('hatchling') is None, and ci.yml runs plain .venv/bin/pytest after uv sync --frozen, so it skips in CI. The wheel-smoke script only runs the --example commands and checks RESULT: REAL DROP. It does not check the realornoise wheel's file list, Requires-Dist or Requires-Python. The coverage gap is real. Medium is a fair rating because the smoke jobs do cover install and run."
+   },
+   {
+    "title": "RELEASING.md bump steps omit plugin.json, CITATION.cff and several re-freeze files",
+    "verdict": "confirmed",
+    "severity": "low",
+    "reason": "RELEASING.md step 2 names pyproject, __init__ and the realornoise package files, not plugins/realornoise/.claude-plugin/plugin.json (version 2.2.0). test_plugin_manifest_matches_the_package asserts that version equals arci.__version__, so a bump that follows the doc would fail that test. CITATION.cff is also not named; it already says 2.3.0 while pyproject and __init__ still say 2.2.0, so it is updated outside the documented steps. Step 4 lists only pyproject.toml, uv.lock and the new design record for re-freezing. I read the doc and the test directly. I did not re-check the 0016 re-freeze list, which comes from the reviewer's quote. It is a documentation omission, not a code defect."
+   }
+  ]
+ }
+]
