@@ -4,6 +4,10 @@
 
 - **Docs:** the README now starts with a generated banner (`docs/assets/banner-{light,dark}.svg`,
   from `make_figures.py`) whose dots are the packaged example's day values, checked by a test.
+- **Tests:** `test_slow_healthy_predecessor_has_no_gate_deadline` now uses a wait limit of
+  0.3 s and tool calls of 0.8 s (before: 0.03 s and 0.08 s). On a loaded CI machine the
+  gap between one tool call ending and the next starting could pass 0.03 s and fail the
+  test with "tool order wait timeout". The released code uses 30 s and was not affected.
 
 ## v2.3.0 (2026-11-15)
 
