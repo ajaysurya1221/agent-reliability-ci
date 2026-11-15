@@ -227,16 +227,20 @@ by its margin or more, the probability that the tool's result is NO DROP is at m
 With two tools, the chance that at least one shows a wrong REAL DROP is at most 5%.
 
 **How far the bound can fail.** Both claims need A1, and Claim 2 also A3 and A4, together with
-A2. When neighbouring days resemble each other, A1 fails and the bounds are no longer
-guaranteed. The self-check measures how far they can fail in the cases it tests. The text
-output, the HTML page and each non-ERROR Markdown block print two of its figures (the text and
-HTML in the closing limits paragraph, the Markdown in the footer): the largest wrong REAL DROP
-rate of the rule as built, over the tested positive correlations, with 5 days after the split
-against 10 before (`{rate_5_10}`) and with 7 against 21 (`{rate_7_21}`). A test holds the
-printed figures equal to the self-check file. The 2.4.0 self-check gives
-215/2000 = 0.107500 [0.094670, 0.121835] at 5/10 (rho 0.7, seed 18112140),
-and 86/2000 = 0.043000 [0.034951, 0.052801] at 7/21 (rho 0.3, seed 18112144).
-These are the AR(1) rows specified by record 0017, not maxima over every generator below.
+A2. When neighbouring days resemble each other, or when work comes in phases, A1 fails and the
+bounds are no longer guaranteed. The self-check measures how far they can fail in the cases it
+tests. The text output, the HTML page and each non-ERROR Markdown block print the worst of
+its figures (the text and HTML in the closing limits paragraph, the Markdown in the footer):
+the largest wrong REAL DROP rate of the rule as built over every no-change row of the
+correlation table and of the weekly-cycle and regime table, with the design of that row
+(`{rate_max}`, `{worst_after}`, `{worst_before}`; the rule is in record 0017, "Coverage of the
+bound"). A test holds the printed values equal to the self-check file. The 2.4.0 self-check
+gives 362/2000 = 0.181000 [0.164743, 0.198480] at 14 days after against 16 before, for days in
+regimes (two states, switch probability 0.08, log amplitude 0.6; seed 18112185). Among the
+histories of that cell that pass the streak check the rate is higher:
+362/910 = 0.397802 [0.366496, 0.429968]. The largest rate in the correlation table is
+215/2000 = 0.107500 [0.094670, 0.121835] at 5/10 (rho 0.7, seed 18112140).
+These are rates for the generators tested. Another pattern can give more.
 
 Nothing is claimed about cause, about answer quality, or about a change to a model. Between
 the periods the user's tasks, prompts, projects, client version and habits may have changed,
@@ -661,8 +665,9 @@ The 2.4.0 self-check adds:
     correlation and power tables.
 13. Report only: days from a weekly cycle and days from a regime-switching generator, with no
     check, a per-measure check and the rule as built.
-14. The two figures printed in every output (section "How far the bound can fail"), read from
-    the correlation table; a test holds the printed figures equal to this file.
+14. The figure printed in every output (section "How far the bound can fail") and its design,
+    read from the correlation table and the weekly-cycle and regime table; a test holds the
+    printed values equal to this file.
 15. The kept-table rules under every condition of the promise in the section "Days from the kept
     table": immutable records, no late arrival with an earlier timestamp, deletion only of
     batches strictly older than 30 times 24 hours, the same instant, options, offset and window
