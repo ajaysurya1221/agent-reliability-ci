@@ -47,8 +47,9 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
 4. **Defaults.** Split date: 13 days before the newest day found, so the after period is 14
    days. Before period: 84 days. A measure is tested with at least 5 usable after-days and 10
    usable before-days; the usable-day rule is per measure (statistics contract, "Measures").
-   `--since DATE` replaces the split date; a malformed date is a usage error with fixed text
-   and exit 3; a date after the newest day gives CANNOT TELL with no after-days. No scan over
+   `--since DATE` replaces the split date; a malformed date, or one more than 83 days before the
+   newest day, is a usage error with fixed text and exit 3; a date after the newest day gives
+   CANNOT TELL with no after-days. No scan over
    dates, no comparison of two models, no stored history: each is left out of this version
    and named in "Not built".
 
@@ -65,13 +66,17 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    - The command opens no socket, starts no process, and writes only the files named by
      `--markdown`, `--html` and `--json`.
    - Readers return records made of numbers, timestamps and names from closed lists.
-   - **Model names are rendered from a closed vocabulary, never copied.** A model id is split
-     at `-`, `.` and `_`; it is shown as written only when every part is a number of at most
-     8 digits or a word in the list in `records.py` (vendor and family words such as `claude`,
-     `opus`, `sonnet`, `haiku`, `fable`, `gpt`, `codex`, `astra`, `mini`, `preview`). Any
-     other id is shown as `model-1`, `model-2`, ... numbered by response count in the window,
-     and is still compared. Effort is one of a closed list or `other`. A private deployment
-     name therefore cannot reach an output (review finding 4).
+   - **Model and effort names are rendered by rule, never copied through.** A model id is
+     shown as written only when it passes a closed grammar in `records.py`: lower-case parts
+     separated by `-`, `.` or `_`, each part a word from a fixed list (`claude`, `opus`,
+     `sonnet`, `haiku`, `fable`, `gpt`, `codex`, `astra`, `mini`, ...), a number of at most two
+     digits, or a short letter-digit token such as `4o`, with at most one eight-digit date
+     part that starts with `20`. An effort is shown as written only when it is in the fixed
+     list. Anything else is shown as `model-1`, `model-2`, ... or `effort-1`, ..., numbered in
+     the text order of the raw values, and is still compared: two different unknown names are
+     never merged. The review asked for a table of complete names instead; the grammar is
+     kept because a table would print every new model as `model-1` until the next release,
+     and what the grammar can leak is the choice of a few listed words and small numbers.
    - Client versions and working directories are never output: each is reduced to counts of
      distinct values and, for `--project`, to a yes or no.
    - No exception text, warning or output may carry a string read from a log. Per-line faults
@@ -82,10 +87,17 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
      the named paths; a walk of the JSON output accepts only numbers, booleans, nulls, dates,
      rationals as strings and names the code can generate; an import allow-list covers
      `src/arci/logs/`.
-   - **Reading faults.** A tool's logs are `format_not_recognised` when files were found and
-     no response could be recovered from them. Otherwise lines that are not JSON, lines of an
-     unknown type, and lines of a known type that lack a needed field are counted and left
-     out, and notice F15 prints when the last kind exceeds 5% of the lines of that type.
+   - **Reading faults.** Lines that are not JSON, lines of a type the reader does not use, and
+     lines of a used type that lack a needed field are counted and left out; notice F15
+     prints when any line lacked a needed field. A file that cannot be opened or decoded is
+     counted and left out, with notice F17. Unknown keys are ignored and not counted. The
+     same response found in two files (a resumed or copied session) is counted once: Claude
+     Code by message id, Codex by session id, event time and cumulative usage.
+   - **Effort.** Claude Code: the line's `effort`, else its `perTurnEffort` (on this
+     project's logs `effort` matched the effort of the recorded request on every one of
+     12,986 lines). Codex: the latest `turn_context`.
+   - **`--project` on Codex** reads the first line of a session file and skips the rest of
+     the file when its working directory is outside the project.
 
 7. **Outputs.** Terminal text (fixed texts below), `--markdown FILE` (a block made to paste
    into an issue thread), `--json FILE` (the sealed `arci-logs/1` record), `--html FILE` (one
@@ -109,61 +121,81 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
 ## Record model (`src/arci/logs/schema.py`, pinned)
 
 Pydantic models, `extra="forbid"`, frozen, sealed with `hashing.hash_record` like
-`outcome_schema.py`. Rationals are strings `"p/q"` in lowest terms; dates are `YYYY-MM-DD`.
+`outcome_schema.py`. Rationals are strings `"p/q"` in lowest terms with a positive
+denominator (`"0/1"` for zero); dates are `YYYY-MM-DD`.
 
 - `LogsDecision`: `schema_version: "arci-logs/1"`, `arci_version`, `example: bool`,
-  `utc_offset_minutes`, `tools: list[ToolDecision]` (Claude Code first, then Codex),
-  `exit_code`, `seal` (`hash_record` of the record without `seal`).
+  `utc_offset_minutes: int`, `project_filtered: bool`, `tools: list[ToolDecision]` (Claude
+  Code first, then Codex; only requested tools), `exit_code`, `seal` (`hash_record` of the
+  record without `seal`).
 - `ToolDecision`: `tool: "claude-code" | "codex"`, `result: "REAL_DROP" | "NO_DROP" |
-  "CANNOT_TELL" | "ERROR"`, `reason: ReasonCode`, `model`, `effort`, `other_settings: int`,
-  `split_date`, `before: Period`, `after: Period`, `measures: list[MeasureDecision]` (in the
-  order of the contract's table),
-  `context: ContextCounts`, `counters: ReaderCounters`, `day_table_sha256`. For ERROR, and for
-  a tool with no usable setting, every field without a value is null; no date or p-value is
-  invented.
+  "CANNOT_TELL" | "ERROR"`, `reason: ReasonCode`, `model: str | None`, `effort: str | None`
+  (rendered names), `other_settings: int`, `split_date: date | None`,
+  `before: Period | None`, `after: Period | None`, `measures: list[MeasureDecision]` (in the
+  order of the contract's table; empty when there is no selected setting),
+  `context: ContextCounts | None`, `counters: ReaderCounters`,
+  `day_table_sha256: str | None`. With ERROR or `no_usable_setting`, `model`, `effort`,
+  `before`, `after`, `context` and `day_table_sha256` are null and `measures` is empty;
+  `split_date` is kept when it is known. When the split is later than the newest day,
+  `after` is null and the after-day lists are empty.
 - `Period`: `first_day`, `last_day` (calendar bounds of the period).
-- `MeasureDecision`: `id`, `worse: "lower" | "higher"`, `margin`, `before_days` and
-  `after_days` (`list[DayValue]`, ascending by day, no day twice), `median_before`,
-  `median_after` (median of the day values; an even number of days gives the mean of the two
-  middle ones; null with no usable day), `p_streak`, `p_real`, `u_none`, `p_none` (null when not computed),
-  `finding: "streaky" | "real_drop" | "no_drop" | "cannot_tell" | "too_few_days"`.
-- `DayValue`: `day`, `count: int` (the denominator of that measure on that day), `value`
-  (in the measure's own units, not negated).
-- `ContextCounts`: client versions before / after / in both; distinct working directories
-  before / after; sub-agent share of responses before / after.
-- `ReaderCounters`: files read, files not read (compressed), lines, lines that are not JSON,
-  lines of unknown type, lines lacking a needed field, records stamped in the future,
-  responses, responses without a reasoning count, edit results denied, edit results unmatched.
+- `MeasureDecision`: `id`, `worse: "lower" | "higher"`, `margin` (the adverse change:
+  `"1/4"`, `"1/10"`, `"3/100"`), `before_days` and `after_days` (`list[DayValue]`, ascending
+  by day, no day twice), `median_before`, `median_after` (median of the day values; an even
+  number of days gives the mean of the two middle ones; null with no usable day),
+  `p_streak`, `p_real`, `u_none`, `p_none`, `finding: "streaky" | "real_drop" | "no_drop" |
+  "cannot_tell" | "too_few_days"`. Which test fields are filled is fixed by the finding and
+  enforced by a validator, together with the thresholds: `too_few_days`: none; `streaky`:
+  `p_streak` only; `real_drop`: `p_streak` and `p_real`; `no_drop` and `cannot_tell`: all
+  four.
+- `DayValue`: `day`, `count: int`, `value` (in the measure's own units, not negated).
+  `count` is the number of positive counts for `reasoning_tokens` and
+  `repeated_value_share`, of known counts for `no_reasoning_share`, and of file-edit results
+  for `edit_failure_share`.
+- `ContextCounts`, over all responses of the tool in the window after the `--project`
+  filter, before the main-thread and setting filters: `client_versions_before`,
+  `client_versions_after`, `client_versions_both`, `workdirs_before`, `workdirs_after`
+  (counts of distinct values), `subagent_share_before`, `subagent_share_after` (rationals;
+  null when the period has no response).
+- `ReaderCounters`: `files_read`, `files_unread_compressed`, `files_unreadable`,
+  `files_outside_project`, `lines`, `lines_not_json`, `lines_unknown_type`,
+  `lines_lacking_field`, `records_in_future`, `responses`, `responses_duplicate`,
+  `responses_without_reasoning`, `responses_without_setting`, `edits_denied`,
+  `edits_unmatched`.
 - `ReasonCode`: `real_drop`, `no_drop`, `not_enough_evidence`, `too_few_days`,
-  `streaky_days`, `no_logs`, `format_not_recognised`, `no_usable_setting`.
-- `day_table_sha256` is `hash_record` of `{method, tool, model, effort, split_date, before,
-  after, alpha_real, alpha_none, measures: [{id, margin, before_days, after_days}]}` in the
-  fixed orders above.
+  `streaky_days`, `no_usable_setting`, `no_logs`, `read_error`, `format_not_recognised`.
+- `day_table_sha256` is `hash_record` of `{method: "arci-logs/1", tool, model, effort,
+  split_date, before, after, alpha_real: "1/120", alpha_none: "1/40", measures: [{id, margin,
+  before_days, after_days}]}` in the fixed orders above, with the rendered model and effort.
 
 Rendering: reasoning counts as integers rounded half up; shares as percentages with one
 decimal; the change of `reasoning_tokens` as a whole percentage of the before median; the
-change of a share in percentage points with one decimal; margins as `25%`, `10 pts`, `3 pts`.
-Rendered numbers decide nothing.
+change of a share in percentage points with one decimal; margins as `25%`, `10 pts`, `3 pts`;
+a value that is not available as `-`. Rendered numbers decide nothing.
 
 ## Fixed texts
 
 `{}` marks a value. Numbers are rendered from the record; nothing else varies.
 
 - **F1 header:** `realornoise {version} · reads local session logs · sends nothing · writes nothing unless asked`
-- **F2 scope:** `{Tool} · {model} · effort {effort} · main thread · days in local time`
-- **F3 periods:** `before  {first} to {last}` and `after   {first} to {last}   split {s}`
+- **F2 scope:** `{Tool} · {model} · effort {effort} · main thread · days at UTC{+hh:mm}`
+- **F3 periods:** `before  {first} to {last}` and `after   {first} to {last}   split {s}`; with no
+  after-days the second line is `after   no days   split {s}`
 - **F4 result (per tool):** `RESULT: REAL DROP` / `RESULT: NO DROP` / `RESULT: CANNOT TELL` /
   `RESULT: ERROR`. The process exit code prints once, on the last line: `exit {code}`.
 - **F5 reasons:**
-  - `real_drop`: `In at least one recorded measure, the days after the split sit lower than the days before by more than a chance ordering of your days explains.`
+  - `real_drop`: `In at least one recorded measure, the days after the split moved toward worse by more than a chance ordering of your days explains.`
   - `no_drop`: `No recorded measure moved toward worse by its margin or more. This does not say anything improved.`
   - `not_enough_evidence`: `The days are too few or too variable to tell a shift from noise.`
   - `too_few_days`: `Too few usable days for every measure (5 needed after the split, 10 before).`
   - `streaky_days`: `Your earlier days come in streaks in a recorded measure, so this comparison cannot tell a streak from a drop.`
-  - `no_logs`: `No session logs found. Looked under ~/.claude/projects (or CLAUDE_CONFIG_DIR) and ~/.codex (or CODEX_HOME). Use --claude-dir DIR or --codex-dir DIR, or try: realornoise --example`
+  - `no_usable_setting`: `No model and effort setting has a response in the window.`
+  - `no_logs`: `No session logs found for {Tool}. Looked under {default}. Use {flag} DIR, or try: realornoise --example`
+    where `{default}` and `{flag}` are `~/.claude/projects (or CLAUDE_CONFIG_DIR)` and
+    `--claude-dir`, or `~/.codex (or CODEX_HOME)` and `--codex-dir`
+  - `read_error`: `Session log files could not be read.`
   - `format_not_recognised`: `Log files were found, but this version could not recover a response from them.`
-  - `no_usable_setting`: `No model and effort setting has a usable day in the window.`
-  - usage error: `--since needs a date as YYYY-MM-DD.`
+  - usage errors (exit 3): `--since needs a date as YYYY-MM-DD.` · `--since can be at most 83 days before the newest day in the logs.` · `Requested output could not be written.`
 - **F6 table:** header `measure, median day` / `before (days)` / `after (days)` / `change` /
   `finding`; each period cell is the median followed by the number of usable days in
   brackets; row names `reasoning tokens per response`, `responses with no reasoning`,
@@ -171,33 +203,38 @@ Rendered numbers decide nothing.
   `no drop (margin {margin})`, `cannot tell`, `too few days`, `days come in streaks`.
 - **F7 context:** `Context counts; differences between the periods are not tested:` then
   `client versions {a} before, {b} after, {c} in both · working directories {d} before, {e} after · sub-agent share {f}% -> {g}%`
-- **F8 streak check:** `Streak check on the earlier days: passed for {k} of {K} tested measures.`
+- **F8 streak check:** `Streak check: {k} of {K} tested measures were not flagged.` (`K` measures with
+  enough days, `k` of them with `p_streak > 1/10`)
 - **F9 unread:** `{k} compressed Codex files were not read (Python 3.14 is needed); the result uses the rest.`
-- **F10 limits (every tool with a result):**
+- **F10 limits (every tool with REAL DROP, NO DROP or CANNOT TELL):**
   `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`
   `to the model: your tasks, prompts, projects or client version may have changed.`
-  `For this tool: if nothing shifted, REAL DROP appears at most 2.5% of the time; if a measure moved`
-  `toward worse by its margin or more, NO DROP appears at most 2.5% of the time. Both hold only if`
-  `days are interchangeable when nothing changes; the split date, model and effort were not chosen`
-  `from these numbers; a shift moves every day alike; and a shift leaves the same days usable.`
-  `None of these is checked.`
+  `For this tool and this one comparison: if nothing shifted, REAL DROP appears at most 2.5% of the`
+  `time; if a measure moved toward worse by its margin or more, NO DROP appears at most 2.5% of the`
+  `time. Both hold only if: (1) days are interchangeable when nothing changes; (2) any date, model,`
+  `effort or project you gave was not chosen from these logs; (3) a change moves every day alike;`
+  `(4) a change leaves the same days, setting and reference value in use. None of these is checked,`
+  `and the streak check does not prove them. Running this again and again until a result appears`
+  `is not covered.`
 - **F11 method:** `method arci-logs/1 · exact rank tests · no random numbers · day-table digest {12 hex}`
 - **F12 next:** `Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run`
 - **F13 example label:** `Example data, generated. Not anyone's logs.`
 - **F14 other settings:** `Not compared: {k} other model or effort settings.`
-- **F15 skipped lines:** `{k} lines of a known type lacked a needed field and were left out.`
+- **F15 skipped lines:** `{k} lines lacked a needed field and were left out.`
 - **F16 future records:** `{k} records stamped later than now were left out.`
+- **F17 unreadable files:** `{k} files could not be read; the result uses the rest.`
 
 The Markdown block carries F2 in bold with the result, the F6 table, one line with the split
 date and F7's counts, and one closing line that depends on the result:
-- REAL DROP: `One person's logs. The after-days sit lower in a recorded measure; this shows no cause and says nothing about answer quality.`
+- REAL DROP: `One person's logs. Evidence of movement toward worse in a recorded measure; this establishes no cause and says nothing about answer quality.`
 - NO DROP: `One person's logs. No recorded measure moved toward worse by its margin; this does not say anything improved.`
 - CANNOT TELL: `One person's logs. Not enough to tell a shift from noise.`
+- ERROR: the tool name, `ERROR` and the F5 text, and nothing else.
 
-followed in each case by: `Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this
-tool, only under unchecked assumptions (interchangeable days; split, model and effort not
-chosen from the data; uniform shift; same usable days). arci-logs/1, digest {12 hex}.
-Yours: uvx realornoise`.
+followed, except for ERROR, by: `Wrong REAL DROP and wrong NO DROP are each at most 2.5% for
+this tool and one comparison, only under unchecked assumptions (interchangeable days; no date,
+model, effort or project chosen from these logs; a uniform shift; the same days, setting and
+reference value in use). arci-logs/1, digest {12 hex}. Yours: uvx realornoise`.
 
 ## Files
 

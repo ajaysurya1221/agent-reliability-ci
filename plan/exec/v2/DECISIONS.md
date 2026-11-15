@@ -153,3 +153,33 @@ after and 21 before and to 1% or less at larger sizes, for a loss of about 10 to
 power on independent days. It replaces the self-check in the contract. The bound is still
 stated under interchangeable days; the measured rates under correlation are published with
 the tool.
+
+## D-13: dispositions of the second records review (2026-11-15)
+
+`consults/L1b-records-recheck-codex.md`: 10 open findings. Taken as written: 1 (the pooled
+reference value and the before-day values are part of assumption A4), 3 (user choices must
+not depend on period labels; A1 is conditional on the window procedure; ties by raw text
+order), 4 (the spike's guard figures are not claimed for the final rule; no power
+threshold), 5 (record states fixed by the finding; exact counters and context counts),
+8 (result and reason mapping, empty templates), 9 (fixed-offset calendar named as such),
+10 (the margin is stored as the adverse change).
+
+Taken with a difference:
+- 2: unknown model and effort names are rendered as opaque labels and never merged, as
+  asked. Known names still pass a grammar, now tighter (numbers of at most two digits, one
+  date part), not a table of complete names: a table would print every new model as
+  `model-1` until the next release. What the grammar can leak is stated in the record.
+- 6: a response found in two files is counted once (first copy wins); copies that disagree
+  are not an ERROR. Unreadable files are counted and reported; ERROR only when no file of a
+  tool can be read. Claude Code effort stays `effort` first, then `perTurnEffort`: on this
+  project's logs `effort` equalled the recorded request's effort on 12,986 of 12,986 lines.
+- 7: the REAL DROP sentence says "moved toward worse", which is right for both directions,
+  in plain words instead of "evidence against interchangeable days". The limits text lists
+  the four assumptions in plain words and says repeated runs are not covered.
+
+One process note. While checking the readers, the orchestrator once ran the Codex reader over
+every Codex session file with the project filter applied afterwards, so file, line and
+response totals across all projects were computed and printed (no content, no per-project
+detail). The maintainer's rule was to read only the working-directory field of other
+projects' files. The product reader now stops at that field (`--project` on Codex), and
+real-log runs pre-filter the file list.
