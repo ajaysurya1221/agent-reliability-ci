@@ -1007,6 +1007,27 @@ def _says(text: str, sentence: str) -> None:
     assert _flat(sentence) in _flat(text), sentence
 
 
+def _row_finding(measure: Mapping[str, Any], reason: str) -> str:
+    """The F6 finding cell for one measure.
+
+    Record 0016, F6: "when the tool's reason is `streaky_days`, every row that is not `days come
+    in streaks` or `too few days` shows `not used` instead of its own finding (the record keeps
+    the finding)".
+    """
+    finding = measure["finding"]
+    if finding == "streaky":
+        return "days come in streaks"
+    if finding == "too_few_days":
+        return "too few days"
+    if reason == "streaky_days":
+        return "not used"
+    if finding == "real_drop":
+        return "real drop"
+    if finding == "no_drop":
+        return f"no drop (margin {RENDERED_MARGIN[measure['id']]})"
+    return "cannot tell"
+
+
 def _wrapped(sentence: str) -> list[str]:
     """The sentence broken as the text output breaks it.
 
@@ -1269,6 +1290,75 @@ def test_a_measure_without_enough_days_does_not_block_a_real_drop(tmp_path: Path
     assert findings["edit_failure_share"] == "too_few_days"
     assert tool["result"] == "REAL_DROP"
     assert outcome.code == 1
+
+
+def _streaky_plans(*, after_zeros: int, edits: tuple[bool, ...] = ()) -> dict[date, Day]:
+    """Monotone before-days for the token measure, so its before-days come in streaks.
+
+    With ten zero counts on each after-day the no-reasoning share rises from 0 to 1/2, which on
+    its own is a real drop; with none it stays 0, which on its own is a no-drop.
+    """
+    plans = {
+        day: Day(counts=(value,) * 20, edits=edits)
+        for day, value in zip(BEFORE_DAYS, RISING, strict=True)
+    }
+    plans.update(
+        {
+            day: Day(counts=(value,) * (20 - after_zeros) + (0,) * after_zeros, edits=edits)
+            for day, value in zip(AFTER_DAYS, MIDDLE, strict=True)
+        }
+    )
+    return plans
+
+
+def test_a_streaky_measure_stops_a_real_drop_and_marks_the_others_not_used(
+    tmp_path: Path,
+) -> None:
+    """Contract step 5: `streaky_days` is decided before REAL DROP, and the record keeps both."""
+    plans = _streaky_plans(after_zeros=10)
+    root = tmp_path / "claude"
+    write_claude(root, plans)
+    outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown", "html"))
+    tool = _check(outcome, "claude-code", plans)
+    assert (tool["result"], tool["reason"]) == ("CANNOT_TELL", "streaky_days")
+    assert outcome.code == 2
+    tokens, share, edits = tool["measures"]
+    assert [tokens["finding"], share["finding"], edits["finding"]] == [
+        "streaky",
+        "real_drop",
+        "too_few_days",
+    ]
+    # The stopped measure keeps the two fields its own finding fills.
+    assert share["p_streak"] is not None and share["p_real"] is not None
+    assert share["u_none"] is None and share["p_none"] is None
+    _block(outcome, REASONS["streaky_days"])
+    # The table marks it as not used; the measure without enough days keeps its own text.
+    assert _row_finding(tokens, "streaky_days") == "days come in streaks"
+    assert _row_finding(share, "streaky_days") == "not used"
+    assert _row_finding(edits, "streaky_days") == "too few days"
+    for measure in tool["measures"]:
+        _says(outcome.out, _row_finding(measure, tool["reason"]))
+    assert "real drop" not in outcome.out
+    _says(outcome.text("markdown"), "not used")
+    assert "real drop" not in outcome.text("markdown")
+    _says(outcome.text("html"), "not used")
+
+
+def test_a_streaky_measure_also_stops_a_no_drop(tmp_path: Path) -> None:
+    plans = _streaky_plans(after_zeros=0, edits=(False,) * 10)
+    outcome = _claude_run(tmp_path, plans)
+    tool = _check(outcome, "claude-code", plans)
+    assert (tool["result"], tool["reason"]) == ("CANNOT_TELL", "streaky_days")
+    assert outcome.code == 2
+    findings = [measure["finding"] for measure in tool["measures"]]
+    assert findings == ["streaky", "no_drop", "no_drop"]
+    # Both no-drops keep all four test fields in the record and show `not used` in the table.
+    for measure in tool["measures"][1:]:
+        assert all(measure[name] is not None for name in TEST_FIELDS)
+        assert _row_finding(measure, "streaky_days") == "not used"
+    _says(outcome.out, "not used")
+    assert "no drop (margin" not in outcome.out
+    assert "RESULT: CANNOT TELL" in outcome.lines
 
 
 def test_a_real_drop_beside_a_cannot_tell_exits_1(tmp_path: Path) -> None:
@@ -1535,7 +1625,7 @@ def test_sub_agent_responses_are_left_out_and_only_counted_as_context(tmp_path: 
     assert all(row["count"] == 20 and row["value"] == "100/1" for row in tokens["before_days"])
     assert tool["context"]["subagent_share_before"] == _rational(Fraction(1, 5))
     assert tool["context"]["subagent_share_after"] == _rational(Fraction(1, 5))
-    # `responses` counts responses kept: a sub-agent response has a setting and is not a copy.
+    # `responses` includes sub-agent responses (record 0016, "Fixed texts", last paragraph).
     assert tool["counters"]["responses"] == 25 * 15
 
 
@@ -1585,6 +1675,10 @@ def test_project_keeps_only_the_claude_code_responses_inside_it(tmp_path: Path) 
     assert all(row["count"] == 20 for row in tool["measures"][0]["before_days"])
     assert tool["context"]["workdirs_before"] == 1
     assert tool["context"]["workdirs_after"] == 1
+    # `files_outside_project` is used for Codex only: a Claude Code line is filtered on its own
+    # working directory, so no file is set aside.
+    assert tool["counters"]["files_outside_project"] == 0
+    assert tool["counters"]["files_read"] == 3
 
 
 def test_the_client_version_counts_are_per_period(tmp_path: Path) -> None:
@@ -1796,6 +1890,8 @@ def test_project_keeps_only_the_sessions_inside_it(tmp_path: Path) -> None:
     assert outcome.body["project_filtered"] is True
     tool = _check(outcome, "codex", plans)
     assert tool["counters"]["files_outside_project"] == 15
+    # `files_read` counts every file opened, a file left after its first line included.
+    assert tool["counters"]["files_read"] == 30
     # `lines` counts every line read, and for a file outside the project its first line only:
     # fifteen kept files of 22 lines each, plus one line from each of the fifteen others.
     assert tool["counters"]["lines"] == 15 * 22 + 15
@@ -2216,11 +2312,12 @@ def test_the_fixed_lines_of_a_run_with_a_result(tmp_path: Path) -> None:
     # Every notice count is zero here, so no notice prints.
     for notice in NOTICES:
         assert notice.split("{")[0] not in outcome.out
-    # The table names every gating measure of this tool and no other.
-    for measure in TOOL_MEASURES["claude-code"]:
-        _says(outcome.out, ROW_NAMES[measure])
-        _says(outcome.out, f"no drop (margin {RENDERED_MARGIN[measure]})")
+    # The table names every gating measure of this tool and no other, with its own finding.
+    for measure in tool["measures"]:
+        _says(outcome.out, ROW_NAMES[measure["id"]])
+        _says(outcome.out, _row_finding(measure, tool["reason"]))
     assert ROW_NAMES["repeated_value_share"] not in outcome.out
+    assert "not used" not in outcome.out
 
 
 def test_the_streak_line_counts_the_measures_that_were_not_flagged(tmp_path: Path) -> None:
@@ -2232,7 +2329,10 @@ def test_the_streak_line_counts_the_measures_that_were_not_flagged(tmp_path: Pat
     assert findings["edit_failure_share"] == "too_few_days"
     # Two measures have enough days; one of them was flagged.
     assert "Streak check: 1 of 2 tested measures were not flagged." in outcome.lines
-    _says(outcome.out, "days come in streaks")
+    assert (tool["result"], tool["reason"]) == ("CANNOT_TELL", "streaky_days")
+    for measure in tool["measures"]:
+        _says(outcome.out, _row_finding(measure, tool["reason"]))
+    assert "no drop (margin" not in outcome.out
     assert outcome.lines[-1] == "exit 2"
 
 
@@ -2281,6 +2381,9 @@ def test_the_markdown_block_closes_with_the_line_for_the_result(
     _says(block, "Yours: uvx realornoise")
     _says(block, outcome.tool()["day_table_sha256"][:12])
     assert "**" in block
+    for measure in outcome.tool()["measures"]:
+        _says(block, _row_finding(measure, outcome.tool()["reason"]))
+    assert ("not used" in block) is (outcome.tool()["reason"] == "streaky_days")
 
 
 def test_an_error_markdown_block_holds_only_the_tool_the_result_and_the_reason(
