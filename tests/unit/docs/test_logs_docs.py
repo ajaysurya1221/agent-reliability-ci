@@ -121,21 +121,80 @@ def test_percentages_have_a_source() -> None:
 def test_published_selfcheck_tables_are_copied_without_rounding() -> None:
     source = read("docs/results/logs-selfcheck.md")
     text = section(read("docs/STATISTICS_LOGS.md"), "What the method cannot see")
-    for heading in ("Power (report only)", "Days that come in streaks (report only)"):
+    for heading in (
+        "Power (report only)",
+        "Days that come in streaks (report only)",
+        "Null and exact reasoning-margin boundary",
+        "Setting changes (gate)",
+        "Competitive setting choice (gate)",
+        "Assumption failures (report only)",
+        "Weekly cycles and regime switches (report only)",
+        "Kept-table checks",
+    ):
         for line in section(source, heading).splitlines():
             if line.startswith("|"):
                 assert line in text, f"missing or changed measured row: {line}"
     # README rates must keep the design, variant and count used by these source rows.
     summary = section(read("README.md"), README_SECTIONS[0])
-    for design, rate in (("5/10", "0.080500"), ("7/21", "0.035500"), ("14/42", "0.002500")):
+    for design in ("5/10", "7/21", "14/42"):
         rows = [
             line
             for line in section(source, "Days that come in streaks (report only)").splitlines()
             if line.startswith(f"| {design} | 0.5 | 0.45 | 0 | wrong REAL DROP |")
         ]
-        assert len(rows) == 1 and f"= {rate} " in rows[0].split("|")[10]
-        assert rate in summary and design in summary
+        assert len(rows) == 1
+        match = re.search(r"= ([0-9.]+) ", rows[0].split("|")[10])
+        assert match is not None
+        assert match.group(1) in summary and design in summary
     assert "2000 histories each" in summary and "rule as built" in summary
+
+
+def measured_rows(text: str, heading: str) -> list[dict[str, str]]:
+    lines = [line for line in section(text, heading).splitlines() if line.startswith("|")]
+    columns = [cell.strip() for cell in lines[0].strip("|").split("|")]
+    return [
+        dict(zip(columns, (cell.strip() for cell in line.strip("|").split("|")), strict=True))
+        for line in lines[2:]
+    ]
+
+
+def test_logs2_run_counts_and_conditional_rates() -> None:
+    source = read("docs/results/logs-selfcheck.md")
+    assert "seed base: 18112026" in source and "method: arci-logs/2" in source
+    for heading in ("Setting changes (gate)", "Competitive setting choice (gate)"):
+        rows = measured_rows(source, heading)
+        assert {row["scenario"] for row in rows} == {
+            "null",
+            "reasoning_tokens",
+            "no_reasoning_share",
+            "edit_failure_share",
+        }
+        for row in rows:
+            assert row["requested"] == row["generated"] == "20000"
+            column = "REAL DROP (95% CI)" if row["scenario"] == "null" else "NO DROP (95% CI)"
+            count = int(row[column].split("/", 1)[0])
+            assert count <= 566
+            if heading.startswith("Competitive"):
+                assert all(int(n) > 0 for n in row["choices old/current/rival"].split("/")[1:])
+    for row in measured_rows(source, "Power (report only)"):
+        assert row["requested"] == row["tested"] == "2000"
+        assert int(row["generated"]) == int(row["tested"]) + int(row["stopped"])
+    for heading in (
+        "Days that come in streaks (report only)",
+        "Weekly cycles and regime switches (report only)",
+    ):
+        for row in measured_rows(source, heading):
+            for prefix, column in (
+                ("per-measure", "per-measure check (95% CI)"),
+                ("as-built", "as built (95% CI)"),
+            ):
+                numerator = row[column].split("/", 1)[0]
+                denominator = row[prefix + " passed"]
+                assert row[prefix + " conditional (95% CI)"].startswith(
+                    f"{numerator}/{denominator} = "
+                )
+    assert "Demonstration outside A1 (arci-logs/2):" in source
+    assert "Gate summary: 32/32 passed; 0 failed." in source
 
 
 def test_example_output_is_real_and_labelled(tmp_path: Path) -> None:
