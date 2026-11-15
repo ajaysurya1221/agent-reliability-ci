@@ -138,9 +138,9 @@ def test_bad_lines_missing_fields_future_and_files(tmp_path: Path) -> None:
     actual = read([path, invalid, tmp_path / "CANARY-missing"], project=None, now=NOW)
     assert len(actual.responses) == 1
     assert actual.counters.files_read == 2
-    assert actual.counters.files_unreadable == 2
+    assert actual.counters.files_unreadable == 1
     assert actual.counters.lines == 15
-    assert actual.counters.lines_not_json == 5
+    assert actual.counters.lines_not_json == 6
     assert actual.counters.lines_unknown_type == 2
     assert actual.counters.lines_lacking_field == 2
     assert actual.counters.records_without_timezone == 1
@@ -196,7 +196,14 @@ def test_project_lexical_parts(
         raise AssertionError("project check must not access filesystem")
 
     monkeypatch.setattr(Path, "resolve", forbidden)
-    monkeypatch.setattr(Path, "stat", forbidden)
+    original_stat = Path.stat
+
+    def checked_stat(path: Path, *, follow_symlinks: bool = True):
+        if str(path).startswith("/project"):
+            raise AssertionError("project check must not access filesystem")
+        return original_stat(path, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(Path, "stat", checked_stat)
     actual = read([path], project=Path("/project"), now=NOW)
     assert actual.responses[0].in_project is inside
 
@@ -256,7 +263,7 @@ def test_copied_session_counts_each_response_once_in_path_order(tmp_path: Path) 
 
 def test_missing_first_setting_is_not_replaced_by_later_content(tmp_path: Path) -> None:
     path = tmp_path / "session.jsonl"
-    write_rows(path, [assistant(effort=None, perTurnEffort="max"), assistant(effort="high")])
+    write_rows(path, [assistant(effort=None, perTurnEffort=None), assistant(effort="high")])
     actual = read([path], project=None, now=NOW)
     assert actual.responses == ()
     assert actual.counters.responses_without_setting == 1

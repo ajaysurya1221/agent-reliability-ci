@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Collection
 from fractions import Fraction
 
 from arci.outcome_report import escape_terminal
 
+from .records import Tool
 from .schema import LogsDecision, MeasureDecision, ToolDecision
 
 __all__ = [
@@ -60,6 +62,11 @@ F5 = {
         "Log files were found, but this version could not recover a response from them."
     ),
 }
+F5_DIRECTORY = (
+    "No session logs found for {Tool} under the directory given with {flag}. "
+    "Or try: realornoise --example"
+)
+DUPLICATE_OUTPUT = "Two output options name the same file."
 SINCE_DATE = "--since needs a date as YYYY-MM-DD."
 SINCE_EARLY = "--since can be at most 83 days before the newest day in the logs."
 WRITE_ERROR = "Requested output could not be written."
@@ -87,6 +94,7 @@ F7 = (
 )
 F8 = "Streak check: {k} of {K} tested measures were not flagged."
 F9 = "Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest."
+F9_ERROR = "Compressed Codex files not read (Python 3.14 is needed): {k}."
 F9_NEXT = "To read them: uvx --python 3.14 realornoise"
 F10 = (
     "This shows what your logs recorded. It does not establish answer quality, "
@@ -116,6 +124,7 @@ F14 = "Other model or effort settings, not compared: {k}."
 F15 = "Lines that lacked a needed field, left out: {k}."
 F16 = "Records stamped later than now, left out: {k}."
 F17 = "Files that could not be read: {k}. The result uses the rest."
+F17_ERROR = "Files that could not be read: {k}."
 MD_CLOSING = {
     "REAL_DROP": (
         "One person's logs. Evidence of movement toward worse in a recorded "
@@ -179,8 +188,9 @@ def format_scope(tool: ToolDecision, decision: LogsDecision) -> str:
     )
 
 
-def reason_text(tool: ToolDecision) -> str:
-    return F5[tool.reason].format(
+def reason_text(tool: ToolDecision, *, directory_given: bool = False) -> str:
+    template = F5_DIRECTORY if tool.reason == "no_logs" and directory_given else F5[tool.reason]
+    return template.format(
         Tool=TOOL_NAMES[tool.tool], default=DEFAULTS[tool.tool], flag=FLAGS[tool.tool]
     )
 
@@ -274,6 +284,16 @@ def context_text(tool: ToolDecision) -> str:
 
 def notices(tool: ToolDecision) -> list[str]:
     c = tool.counters
+    if tool.result == "ERROR":
+        return [
+            template.format(k=count)
+            for template, count in (
+                (F9_ERROR, c.files_unread_compressed),
+                (F9_NEXT, c.files_unread_compressed),
+                (F17_ERROR, c.files_unreadable),
+            )
+            if count
+        ]
     return [
         template.format(k=count)
         for template, count in (
@@ -288,18 +308,20 @@ def notices(tool: ToolDecision) -> list[str]:
     ]
 
 
-def render_text(decision: LogsDecision) -> str:
+def render_text(decision: LogsDecision, *, directory_tools: Collection[Tool] = ()) -> str:
     header = F1.format(version=escape_terminal(decision.arci_version))
     groups = [header + ("\n" + F13 if decision.example else "")]
     for tool in decision.tools:
-        result = F4[tool.result] + "\n" + reason_text(tool)
+        result = (
+            F4[tool.result] + "\n" + reason_text(tool, directory_given=tool.tool in directory_tools)
+        )
         if tool.model is None:
             groups.append(
                 "\n".join(
                     [
                         TOOL_NAMES[tool.tool],
                         result,
-                        *(notices(tool) if tool.result != "ERROR" else []),
+                        *notices(tool),
                     ]
                 )
             )
@@ -341,15 +363,21 @@ def render_text(decision: LogsDecision) -> str:
     return wrap_text("\n\n".join(groups)) + "\n"
 
 
-def render_markdown(decision: LogsDecision) -> str:
+def render_markdown(decision: LogsDecision, *, directory_tools: Collection[Tool] = ()) -> str:
     blocks: list[str] = [F13] if decision.example else []
     for tool in decision.tools:
         if tool.model is None:
             block = "\n".join(
-                [TOOL_NAMES[tool.tool], tool.result.replace("_", " "), reason_text(tool)]
+                [
+                    TOOL_NAMES[tool.tool],
+                    tool.result.replace("_", " "),
+                    reason_text(tool, directory_given=tool.tool in directory_tools),
+                ]
             )
-            if tool.result != "ERROR":
-                block += "\n" + "\n".join([*notices(tool), F10])
+            block += "\n" + "\n".join(
+                [*notices(tool), *([" ".join(F10.splitlines())] if tool.result != "ERROR" else [])]
+            )
+            block = block.rstrip()
         else:
             block = "\n\n".join(
                 [
@@ -362,6 +390,4 @@ def render_markdown(decision: LogsDecision) -> str:
                 ]
             )
         blocks.append(block)
-    # Markdown table rows must stay intact. Their compact representation fits normal
-    # counts; prose uses ordinary soft line breaks.
-    return "\n\n".join(wrap_text(block) for block in blocks) + "\n"
+    return "\n\n".join(blocks) + "\n"

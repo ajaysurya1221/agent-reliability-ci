@@ -40,25 +40,39 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
     seen: set[str] = set()
     latest_main_response: datetime | None = None
     for path in paths:
+        saved_counts = counts
+        counts = replace(counts)
+        saved_models, saved_efforts = models.copy(), efforts.copy()
+        saved_versions, saved_workdirs = versions.copy(), workdirs.copy()
+        saved_latest = latest_main_response
+        file_edits: list[EditResult] = []
         file_seen: set[str] = set()
         duplicates: set[str] = set()
         pending: dict[str, Response] = {}
         calls: dict[str, tuple[bool, Response]] = {}
         try:
+            if not path.is_file():
+                raise OSError
             with path.open("rb") as stream:
                 counts.files_read += 1
-                for raw in stream:
-                    data = parse_line(raw.decode("utf-8"), _USED, counts)
+                for line_number, raw in enumerate(stream):
+                    data = parse_line(
+                        raw.removeprefix(b"\xef\xbb\xbf") if line_number == 0 else raw,
+                        _USED,
+                        counts,
+                    )
                     if data is None:
                         continue
-                    if "isApiErrorMessage" in data:
+                    if data.get("isApiErrorMessage") is True:
                         counts.lines_unknown_type += 1
                         continue
                     message = object_of(data.get("message"))
                     if data["type"] == "assistant":
                         identity = string_of(message.get("id"))
                         model = string_of(message.get("model"))
-                        effort = string_of(data.get("effort", data.get("perTurnEffort")))
+                        effort = string_of(data.get("effort")) or string_of(
+                            data.get("perTurnEffort")
+                        )
                         when = time_of(data.get("timestamp"))
                         if without_timezone(data.get("timestamp")):
                             counts.records_without_timezone += 1
@@ -146,7 +160,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                             elif when > now:
                                 counts.records_in_future += 1
                             else:
-                                edits.append(
+                                file_edits.append(
                                     EditResult(
                                         "claude-code",
                                         when,
@@ -158,12 +172,17 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                                     )
                                 )
                         counts.lines_lacking_field += lacking_time
-        except UnicodeError:
-            # The physical line was read even though it could not be decoded.
-            counts.lines += 1
+        except Exception:
+            # Keep physical read counts, but discard all semantic state from this file.
+            saved_counts.files_read = counts.files_read
+            saved_counts.lines = counts.lines
+            counts = saved_counts
             counts.files_unreadable += 1
-        except (OSError, ValueError):
-            counts.files_unreadable += 1
+            models, efforts = saved_models, saved_efforts
+            versions, workdirs = saved_versions, saved_workdirs
+            latest_main_response = saved_latest
+            continue
+        edits.extend(file_edits)
         seen.update(file_seen)
         for response in pending.values():
             if response.when > now:

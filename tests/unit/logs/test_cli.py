@@ -12,7 +12,7 @@ from arci.logs import cli, report
 from arci.logs.example import load
 from arci.logs.schema import LogsDecision, verify_seal
 from tests.unit.logs.synth_logs import assistant, generate, write_rows
-from tests.unit.logs.test_report import SNAPSHOTS
+from tests.unit.logs.test_report import SNAPSHOTS, normalize_version
 
 
 def invoke(tmp_path: Path, args: list[str], *, now: datetime | None = None) -> tuple[int, str, str]:
@@ -191,20 +191,20 @@ def test_internal_errors_are_fixed(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert invoke(tmp_path, ["--example"]) == (3, "", report.INTERNAL_ERROR + "\n")
 
 
-def test_calendar_error(tmp_path: Path) -> None:
+def test_out_of_range_timestamp_is_not_a_calendar_error(tmp_path: Path) -> None:
     root = tmp_path / "logs"
     write_rows(root / "a.jsonl", [assistant(stamp="0001-01-01T12:00:00Z")])
-    assert invoke(tmp_path, ["--tool", "claude-code", "--claude-dir", str(root)]) == (
-        3,
-        "",
-        report.CALENDAR_RANGE + "\n",
-    )
+    code, out, err = invoke(tmp_path, ["--tool", "claude-code", "--claude-dir", str(root)])
+    assert code == 3 and not err
+    assert report.F5["format_not_recognised"] in out
 
 
 def test_main_dispatch(capsys: pytest.CaptureFixture[str]) -> None:
     assert arci_cli.main(["logs", "--example"]) == 1
     output = capsys.readouterr()
-    assert output.out == (SNAPSHOTS / "example.txt").read_text()
+    assert normalize_version(output.out) == normalize_version(
+        (SNAPSHOTS / "example.txt").read_text()
+    )
     assert output.out.splitlines()[1] == report.F13
     assert output.err == ""
 
@@ -223,7 +223,7 @@ def test_unreadable_tool_files(tmp_path: Path) -> None:
     root.mkdir()
     (root / "a.jsonl").write_bytes(b"\xff\xfeCANARY")
     code, out, err = invoke(tmp_path, ["--tool", "claude-code", "--claude-dir", str(root)])
-    assert code == 3 and not err and report.F5["read_error"] in out
+    assert code == 3 and not err and report.F5["format_not_recognised"] in out
     assert "CANARY" not in out
 
 

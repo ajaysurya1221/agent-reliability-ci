@@ -160,7 +160,14 @@ def time_of(value: object) -> datetime | None:
         return None
     try:
         parsed = datetime.fromisoformat(value)
-        return parsed.astimezone(UTC) if parsed.tzinfo is not None else None
+        if parsed.tzinfo is None:
+            return None
+        parsed = parsed.astimezone(UTC)
+        return (
+            parsed
+            if datetime(2000, 1, 1, tzinfo=UTC) <= parsed <= datetime(2200, 1, 1, tzinfo=UTC)
+            else None
+        )
     except (ValueError, OverflowError):
         return None
 
@@ -171,7 +178,10 @@ def in_project(cwd: str | None, project: Path | None) -> bool:
     if not cwd:
         return False
     # Lexical comparison only: no resolve(), stat(), or symlink traversal.
-    child, parent = Path(os.path.normpath(cwd)).parts, Path(os.path.normpath(project)).parts
+    child, parent = (
+        Path(os.path.normpath(cwd)).parts,
+        Path(os.path.abspath(os.path.expanduser(project))).parts,
+    )
     return child[: len(parent)] == parent
 
 
@@ -194,8 +204,16 @@ def _invalid_constant(value: str) -> NoReturn:
     raise ValueError("invalid JSON constant")
 
 
-def parse_line(line: str, used: frozenset[str], counts: ReaderCounters) -> dict[str, object] | None:
+def parse_line(
+    line: str | bytes, used: frozenset[str], counts: ReaderCounters
+) -> dict[str, object] | None:
     counts.lines += 1
+    if isinstance(line, bytes):
+        try:
+            line = line.decode("utf-8")
+        except UnicodeError:
+            counts.lines_not_json += 1
+            return None
     first = _TYPE_FIRST.match(line)
     if (
         first is not None
@@ -227,6 +245,7 @@ def without_timezone(value: object) -> bool:
     if not isinstance(value, str):
         return False
     try:
-        return datetime.fromisoformat(value).tzinfo is None
+        parsed = datetime.fromisoformat(value)
+        return parsed.tzinfo is None and datetime(2000, 1, 1) <= parsed <= datetime(2200, 1, 1)
     except (ValueError, OverflowError):
         return False

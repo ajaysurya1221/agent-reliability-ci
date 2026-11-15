@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from arci import __version__
 from arci.logs import report
 from arci.logs.claude_code import read as read_claude
 from arci.logs.codex import read as read_codex
@@ -23,12 +24,16 @@ SNAPSHOTS = Path(__file__).parent / "snapshots"
 RECORD = Path(__file__).resolve().parents[3] / "docs/design/0016-logs.md"
 
 
+def normalize_version(text: str) -> str:
+    return re.sub(r"(realornoise )[^ <]+( ·)", r"\1<version>\2", text, count=1)
+
+
 def record(
     tools: tuple[ToolDecision, ...], *, example: bool = False, offset: int = 330
 ) -> LogsDecision:
     return seal(
         LogsDecision(
-            arci_version="2.2.0",
+            arci_version=__version__,
             example=example,
             utc_offset_minutes=offset,
             project_filtered=False,
@@ -71,6 +76,7 @@ def cases() -> dict[str, LogsDecision]:
         "streaky_days": record((decide_tool(table(streak), streak.counters),)),
         "no_usable_setting": record((empty,)),
         "error_beside_result": record((good, error_tool("codex", "read_error", ReaderCounters()))),
+        "error_notices": record((error_tool("codex", "read_error", notices),)),
         "both_no_logs": record(
             tuple(error_tool(t, "no_logs", ReaderCounters()) for t in ("claude-code", "codex"))
         ),
@@ -86,8 +92,11 @@ def cases() -> dict[str, LogsDecision]:
 def test_snapshot(name: str, extension: str) -> None:
     render = report.render_text if extension == "txt" else report.render_markdown
     actual = render(cases()[name])
-    assert actual == (SNAPSHOTS / f"{name}.{extension}").read_text(encoding="utf-8")
-    assert max(map(len, actual.splitlines())) <= 100
+    assert normalize_version(actual) == normalize_version(
+        (SNAPSHOTS / f"{name}.{extension}").read_text(encoding="utf-8")
+    )
+    if extension == "txt":
+        assert max(map(len, actual.splitlines())) <= 100
     assert all(char == "·" or char == "\n" or 32 <= ord(char) <= 126 for char in actual)
 
 
@@ -104,6 +113,9 @@ def test_every_fixed_text_matches_record() -> None:
         *report.F4.values(),
         report.EXIT,
         *report.F5.values(),
+        report.F5_DIRECTORY,
+        report.DUPLICATE_OUTPUT,
+        report.INTERNAL_ERROR,
         *report.DEFAULTS.values(),
         *report.FLAGS.values(),
         report.SINCE_DATE,

@@ -1,4 +1,4 @@
-realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked
+realornoise <version> · reads local session logs · sends nothing · writes nothing unless asked
 
 Claude Code · gpt-5.3 · effort high · main thread · days at UTC+00:00
 before  2026-02-06 to 2026-04-30

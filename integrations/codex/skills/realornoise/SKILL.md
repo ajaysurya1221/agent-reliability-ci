@@ -7,8 +7,8 @@ Run this command in the shell, once, with no other arguments:
 
     uvx realornoise
 
-It reads local session logs and prints counts, rates and the names of the model and effort
-setting it compared. The command itself sends nothing anywhere. Its output becomes part of
+It reads local session logs and prints counts, rates, dates and the names of the model and
+effort compared. The command itself sends nothing anywhere. Its output becomes part of
 this conversation, so what it prints is visible to this assistant and goes wherever this
 conversation goes.
 

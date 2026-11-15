@@ -2,6 +2,7 @@
 
 Reads the Claude Code and Codex session logs already on your disk and reports REAL DROP,
 NO DROP or CANNOT TELL for recorded measures. Sends nothing. Writes nothing unless asked.
+The output holds counts, rates, dates and the names of the model and effort compared.
 Runs on Python 3.11 or newer. Compressed Codex logs are read only on Python 3.14;
 the output reports how many files were not read. To read compressed logs, run
 `uvx --python 3.14 realornoise` (uv fetches that Python if needed).

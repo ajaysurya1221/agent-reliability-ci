@@ -25,6 +25,44 @@ if [ "$#" -eq 2 ]; then
   [ -f "$2" ] || { echo "wheel_smoke: no such wheel: $2" >&2; exit 64; }
   second_wheel="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
 fi
+# Validate the built artifacts before installation, in both CI and release smoke jobs.
+"$python" - "$wheel" "$second_wheel" <<'WHEEL_CHECK'
+import configparser
+import email
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as wheel:
+    names = set(wheel.namelist())
+    assert {
+        "arci/logs/example/now.txt",
+        "arci/logs/example/claude/history.jsonl",
+        "arci/logs/example/codex/sessions/rollout-example.jsonl",
+        "arci/logs/example/codex/archived_sessions/rollout-subagent.jsonl",
+    } <= names, "main wheel is missing example data"
+    metadata = [name for name in names if name.endswith(".dist-info/METADATA")]
+    assert len(metadata) == 1
+    version = email.message_from_bytes(wheel.read(metadata[0]))["Version"]
+if sys.argv[2]:
+    with zipfile.ZipFile(sys.argv[2]) as wheel:
+        prefix = f"realornoise-{version}.dist-info/"
+        names = set(wheel.namelist())
+        package = {"realornoise/__init__.py", "realornoise/py.typed"}
+        allowed = package | {prefix + name for name in (
+            "METADATA", "WHEEL", "RECORD", "entry_points.txt"
+        )}
+        assert package <= names
+        assert all(name in allowed or name.startswith(prefix + "licenses/") for name in names), "unexpected second-wheel file"
+        metadata = email.message_from_bytes(wheel.read(prefix + "METADATA"))
+        assert metadata["Version"] == version
+        assert metadata.get_all("Requires-Dist") == [f"agent-reliability-ci=={version}"]
+        assert metadata["Requires-Python"] == ">=3.11"
+        entry = configparser.ConfigParser()
+        entry.read_string(wheel.read(prefix + "entry_points.txt").decode("utf-8"))
+        assert dict(entry["console_scripts"]) == {"realornoise": "arci.logs.cli:main"}
+print("wheel_smoke: artifact contents OK")
+WHEEL_CHECK
+
 trace_smoke="$(cd "$(dirname "$0")" && pwd)/trace_check_smoke.py"
 triage_smoke="$(cd "$(dirname "$0")" && pwd)/triage_smoke.py"
 

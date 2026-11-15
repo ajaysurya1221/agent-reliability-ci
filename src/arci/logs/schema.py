@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from datetime import date
 from fractions import Fraction
 from itertools import pairwise
-from typing import Annotated, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
@@ -23,6 +23,9 @@ from pydantic import (
 from arci.hashing import hash_record
 
 from .records import EFFORTS, Tool, render_model
+
+if TYPE_CHECKING:
+    from .measures import ToolTable
 
 MeasureId = Literal[
     "reasoning_tokens", "no_reasoning_share", "edit_failure_share", "repeated_value_share"
@@ -210,6 +213,22 @@ class MeasureDecision(Model):
             self.finding == "no_drop"
         ):
             raise ValueError("invalid_none_finding")
+        from . import rank_test
+        from .decide import move_before
+
+        direction = 1 if self.worse == "lower" else -1
+        before = [direction * Fraction(day.value) for day in self.before_days]
+        after = [direction * Fraction(day.value) for day in self.after_days]
+        if self.p_streak is not None and Fraction(self.p_streak) != rank_test.p_streak(before):
+            raise ValueError("inconsistent_p_streak")
+        if self.p_real is not None and Fraction(self.p_real) != rank_test.p_real(before, after):
+            raise ValueError("inconsistent_p_real")
+        if self.u_none is not None:
+            moved = [move_before(self.id, value) for value in before]
+            if self.u_none != rank_test.strict_count(moved, after):
+                raise ValueError("inconsistent_u_none")
+            if self.p_none is None or Fraction(self.p_none) != rank_test.p_none(moved, after):
+                raise ValueError("inconsistent_p_none")
         if self.u_none is not None and self.u_none > len(self.before_days) * len(self.after_days):
             raise ValueError("invalid_pair_count")
         return self
@@ -294,7 +313,37 @@ class ToolDecision(Model):
                     not period.first_day <= d.day <= period.last_day for d in days
                 ):
                     raise ValueError("day_outside_period")
+        if self.day_table_sha256 != day_table_digest(self):
+            raise ValueError("inconsistent_day_table_sha256")
         return self
+
+
+def day_table_digest(table: ToolTable | ToolDecision) -> str:
+    from .decide import ALPHA_NONE, ALPHA_REAL, MARGINS
+    from .measures import fraction_str
+
+    return hash_record(
+        {
+            "method": "arci-logs/1",
+            "tool": table.tool,
+            "model": table.model,
+            "effort": table.effort,
+            "split_date": table.split_date,
+            "before": table.before.model_dump(mode="json") if table.before else None,
+            "after": table.after.model_dump(mode="json") if table.after else None,
+            "alpha_real": fraction_str(ALPHA_REAL),
+            "alpha_none": fraction_str(ALPHA_NONE),
+            "measures": [
+                {
+                    "id": m.id,
+                    "margin": fraction_str(MARGINS[m.id]),
+                    "before_days": [d.model_dump(mode="json") for d in m.before_days],
+                    "after_days": [d.model_dump(mode="json") for d in m.after_days],
+                }
+                for m in table.measures
+            ],
+        }
+    )
 
 
 class LogsDecision(Model):

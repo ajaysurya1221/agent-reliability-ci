@@ -186,3 +186,37 @@ def test_no_obsolete_branch_links_outside_frozen_files() -> None:
         except UnicodeError:
             continue
         assert obsolete.search(text) is None, relative
+
+
+def test_every_published_seed_row_matches_final_selfcheck() -> None:
+    source = set(read("docs/results/logs-selfcheck.md").splitlines())
+    text = read("docs/STATISTICS_LOGS.md")
+    seed_column: int | None = None
+    rows = 0
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            seed_column = None
+            continue
+        cells = [cell.strip() for cell in line.split("|")]
+        if "seed" in cells:
+            seed_column = cells.index("seed")
+        elif seed_column is not None and cells[seed_column].isdigit():
+            assert line in source, f"changed seed row: {line}"
+            rows += 1
+    assert rows > 0
+
+
+@pytest.mark.parametrize("document", NEW_DOCS[:2])
+def test_records_drop_superseded_sentences(document: str) -> None:
+    text = " ".join(read(document).split())
+    for old in (
+        "hold only counts, rates and the names of the model and effort compared",
+        "A file that cannot be opened or decoded is counted and left out, with notice F17.",
+        "Lines carrying `isApiErrorMessage` count as unused types.",
+        "ERROR: the tool name, `ERROR` and the F5 text, and nothing else.",
+        "Null simulation with the final rule, including setting selection, usable-day rules "
+        "and the streak check:",
+        "Claude Code's measures pass through response and edit records, day reduction, "
+        "and the production decision rule.",
+    ):
+        assert old not in text

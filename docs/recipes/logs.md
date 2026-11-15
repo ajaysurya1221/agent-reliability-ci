@@ -31,11 +31,10 @@ arci logs --example
 ```
 
 Example data, generated, not anyone's logs. This is the complete output captured in the
-checkout on 2026-11-15. The banner still reports 2.2.0 before the release version change;
-its numbers and text below are unchanged.
+checkout on 2026-11-15.
 
 ```text
-realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked
+realornoise 2.3.0 · reads local session logs · sends nothing · writes nothing unless asked
 Example data, generated. Not anyone's logs.
 
 Claude Code · model-1 · effort high · main thread · days at UTC+00:00
@@ -126,6 +125,9 @@ Exit 1 is expected here because Claude Code has REAL DROP, even though Codex has
 | CANNOT TELL | The available days do not distinguish a shift from noise, or a streak stops the comparison. | There was no change. |
 
 ERROR means no logs, no readable file or no recovered response for a requested tool.
+When its directory option was given and no logs were found, the text is
+`No session logs found for {Tool} under the directory given with {flag}. Or try: realornoise --example`
+where the flag is `--claude-dir` or `--codex-dir`. The directory itself is never printed.
 Other tools can still have results. The margins are a 25% fall in reasoning tokens,
 10 percentage points for no-reasoning and repeated-value shares, and 3 points for failed
 file edits. A measure is a recorded quantity, not answer quality.
@@ -155,7 +157,7 @@ a desired result appears. Use controlled runs when the question needs stronger e
 
 | Option | Meaning |
 |---|---|
-| `--tool auto\|claude-code\|codex\|both` | Default `auto` requests tools whose roots exist; if neither exists, both report no logs. |
+| `--tool auto\|claude-code\|codex\|both` | Default `auto` requests tools whose roots exist; under `auto`, a tool whose directory option is given is always requested, also when the directory does not exist. If neither root exists and no directory option was given, both report no logs. |
 | `--since YYYY-MM-DD` | Set the split, at most 83 days before the newest day; a later-than-newest split gives no after-days. |
 | `--model NAME`, `--effort NAME` | Select names as printed, including opaque labels. Default is the most frequent setting over both periods, ties by raw text order. |
 | `--project PATH` | Keep sessions whose working directory is that path or below it. |

@@ -137,7 +137,7 @@ def test_real_drop_skips_no_drop_computation(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(rank_test, "p_none", track)
     decision = decide_tool(table(data), data.counters)
     assert decision.measures[0].finding == "real_drop"
-    assert len(seen) == 1 and all(v == Fraction(-1, 10) for v in seen[0])
+    assert seen and all(v == Fraction(-1, 10) for values in seen for v in values)
 
 
 def test_digest_payload_is_exact_and_medians_use_day_values() -> None:

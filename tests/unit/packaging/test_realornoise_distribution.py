@@ -81,7 +81,10 @@ def test_realornoise_requires_python_matches_main() -> None:
 
 def test_realornoise_and_main_wheel_file_lists(tmp_path: Path) -> None:
     if importlib.util.find_spec("hatchling") is None:
-        pytest.skip("Hatchling build backend unavailable offline; no dependency downloads allowed")
+        pytest.skip(
+            "Hatchling unavailable offline; built-wheel checks run in "
+            ".github/scripts/wheel_smoke.sh in CI and release smoke jobs"
+        )
     wheels: list[Path] = []
     for index, source in enumerate((ROOT, SECOND)):
         output = tmp_path / str(index)

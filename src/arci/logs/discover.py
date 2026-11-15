@@ -22,7 +22,9 @@ def claude_files(root: Path) -> list[Path]:
             found.extend(
                 Path(directory) / name
                 for name in names
-                if name.endswith(".jsonl") and name != "journal.jsonl"
+                if name.endswith(".jsonl")
+                and name != "journal.jsonl"
+                and (Path(directory) / name).is_file()
             )
     except (OSError, ValueError):
         pass
@@ -37,7 +39,9 @@ def codex_files(root: Path) -> list[Path]:
                 found.extend(
                     Path(directory) / name
                     for name in names
-                    if name.startswith("rollout-") and name.endswith((".jsonl", ".jsonl.zst"))
+                    if name.startswith("rollout-")
+                    and name.endswith((".jsonl", ".jsonl.zst"))
+                    and (Path(directory) / name).is_file()
                 )
         except (OSError, ValueError):
             pass

@@ -2,7 +2,8 @@
 
 These formats are not documented by their vendors as public interfaces and can change.
 The readers were checked against Claude Code client versions 2.1.309, 2.1.321 and 2.1.325
-and Codex CLI versions 0.154.0 and 0.167.0 on one machine, and on no Windows machine.
+and Codex CLI versions 0.154.0 and 0.167.0 on one machine.
+`arci logs` is untested on Windows; Windows case rules are unchanged.
 This describes the readers in [the repository](../src/arci/logs/), not a vendor contract.
 The [statistics](STATISTICS_LOGS.md) define the day table and comparison;
 [record 0016](design/0016-logs.md) defines the output record and fixed texts.
@@ -20,18 +21,20 @@ Codex's root is `$CODEX_HOME`, or `~/.codex` when the variable is absent or empt
 `archived_sessions` recursively for names starting with `rollout-` and ending in
 `.jsonl` or `.jsonl.zst`. Session paths normally include `sessions/YYYY/MM/DD/`.
 Compressed files use Python 3.14's `compression.zstd`. Earlier Pythons count them as
-unread compressed files, report that the result uses the rest, and print
-`uvx --python 3.14 realornoise`. No decompression dependency is installed.
+unread compressed files, report the count (and, when other files give a result, that the
+result uses the rest), and print `uvx --python 3.14 realornoise`. No decompression dependency is installed.
 
 Each tool's files are sorted by their paths relative to the root, written with `/`.
 Lines are read in file order. The first assembled copy of a response wins, even when
 later copies disagree. Claude Code uses the message id across files. Codex uses the
 session id, event timestamp and complete cumulative-usage object, including all its keys;
-the object is compared independent of key order. Repeated totals alone at a different
-timestamp do not identify a duplicate. If Codex lacks a session id or a cumulative-usage
-object, that identity cannot be formed and the response is not deduplicated by it.
+the object is compared independent of key order. Within one Codex file, a token-count
+event whose cumulative usage equals that of the previous token-count event is a repeat,
+whatever its timestamp and whether or not a session id exists. Without a session id or
+cumulative-usage object the cross-file identity cannot be formed.
 
-`--project PATH` compares normalized path components lexically: the working directory must
+`--project PATH` is made absolute against the current directory, without touching the
+file system, before any comparison; `~` is expanded. It compares path components lexically: the working directory must
 be that path or below it. It does not resolve symlinks. Claude Code is filtered per response;
 its file still gets read. Codex reads only the first line of files outside the project.
 Reader counters describe the scan, including sub-agents and, for Claude Code, responses
@@ -40,8 +43,8 @@ outside the project. They are not the selected setting's usable-day denominators
 ## Claude Code
 
 Each line is a JSON object; top-level `type` selects `assistant` or `user`. Other types,
-including `system`, `attachment` and `api-request`, are unused. Any line carrying
-`isApiErrorMessage` is unused too, regardless of its value. Unknown keys are ignored
+including `system`, `attachment` and `api-request`, are unused. A line with
+`isApiErrorMessage: true` is unused too; false does not exclude it. Unknown keys are ignored
 and are not counted. Prompt text, answer text and thinking signatures are not output.
 
 An assistant line uses:
@@ -51,7 +54,7 @@ An assistant line uses:
 | `message.id` | Response identity within and across files. |
 | `timestamp` | A zoned ISO timestamp; the first line fixes the response time. |
 | `message.model` | Model setting from the first line. |
-| `effort`, else `perTurnEffort` | Effort setting from the first line; fallback applies when `effort` is absent. An empty or non-string value is not a setting. |
+| `effort`, else `perTurnEffort` | Effort setting from the first line; the first non-empty string is used. An empty or non-string `effort` falls back to `perTurnEffort`. |
 | `cwd` | Working directory on the first line, used for the project filter and context counts. |
 | `version` | Client version on the first line, reduced to distinct-value counts. |
 | `isSidechain` | Exactly `true` means a sub-agent response. |
@@ -103,17 +106,17 @@ versions and working directories become counts, never printed strings.
 ## Counters and records left out
 
 The JSON output includes every `ReaderCounters` field below. Counts can overlap: a file
-opened before a decode error counts as both read and unreadable. Records assembled before
-a read error can still be retained. Counters are not an exhaustive partition of input.
+opened before a read error counts as both read and unreadable. Nothing assembled from
+an unreadable file is retained. Counters are not an exhaustive partition of input.
 
 | Field | Meaning |
 |---|---|
 | `files_read` | Files opened, including a Codex file left after its first line. |
 | `files_unread_compressed` | Compressed Codex files skipped because stdlib zstd is unavailable. |
-| `files_unreadable` | Files that could not be opened, read, decoded or decompressed. |
+| `files_unreadable` | Files that could not be opened, or that failed while being read or decompressed. |
 | `files_outside_project` | Codex files skipped after the header's working-directory check; always zero for Claude Code. |
 | `lines` | Every physical line read, including a line that fails decoding; only the first line of a Codex file outside the project. |
-| `lines_not_json` | Invalid JSON, non-object JSON and JSON constants the decoder refuses. |
+| `lines_not_json` | Invalid UTF-8, invalid JSON, non-object JSON and JSON constants the decoder refuses. |
 | `lines_unknown_type` | Unused or missing line types, Claude Code API-error lines, and Codex events other than token counts. Unknown keys do not increment this. |
 | `lines_lacking_field` | Used lines lacking fields needed to recover a response or timed edit result, such as a message id or valid timestamp. Missing reasoning and setting have separate counters. |
 | `records_in_future` | Responses or matched file-edit results stamped later than the one start instant, left out. |
@@ -124,6 +127,13 @@ a read error can still be retained. Counters are not an exhaustive partition of 
 | `responses_without_setting` | Responses left out because model or effort is missing, empty or not a string. |
 | `edits_denied` | Matched Claude Code file-edit results excluded as permission denials. |
 | `edits_unmatched` | Claude Code results matching no recorded call of any tool, left out. |
+
+A line that is not valid UTF-8 is a line that is not JSON; it does not make the
+file unreadable. A file is unreadable only when it cannot be opened, or fails while being read or decompressed;
+nothing from an unreadable file is used. A byte-order mark at the start of a file is
+ignored. A timestamp before 2000-01-01 or after 2200-01-01 is a missing field.
+Discovery returns only regular files, including symlinks to regular files. Paths that are
+not regular files (pipes, devices and directories) are not discovered and are counted nowhere.
 
 The run reads the clock once. Timestamps use that instant's local UTC offset throughout
 the calendar, or offset zero with `--utc`; this does not reconstruct historical daylight

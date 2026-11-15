@@ -28,6 +28,20 @@ publisher is a maintainer action, not something this repository's tests establis
    (`__version__`) to the same `X.Y.Z`. Set `packages/realornoise/pyproject.toml`'s version,
    its sole dependency `agent-reliability-ci==X.Y.Z`, and
    `packages/realornoise/src/realornoise/__init__.py`'s `__version__` to match.
+   Also set `plugins/realornoise/.claude-plugin/plugin.json` (`version`) and
+   `CITATION.cff` (`version`) to `X.Y.Z`. These are the package metadata and dependency-pin
+   locations; `uv.lock` also contains the main package version and is regenerated below.
+   `tests/unit/packaging/test_review_fixes.py::test_every_release_version_matches` checks
+   every location against `arci.__version__`. Log snapshots normalize the header version;
+   a version bump does not regenerate them. The five HTML goldens under
+   `tests/unit/html_report/golden/` (`pass.html`, `block.html`, `inconclusive.html`,
+   `error.html` and `v1.html`) hold the version in their footer and are regenerated at a
+   bump with `.venv/bin/python -m tests.unit.html_report.generate`. That command also
+   regenerates `docs/results/sample-suite-report.html`. Historical release notes, design records,
+   compatibility tables, recipes and archived reports keep their historical versions, with
+   one exception: the captured banner line in `docs/recipes/logs.md` (`realornoise X.Y.Z`)
+   is a current-version location and is set at the bump.
+   Search the old version before each bump to catch newly added locations.
    Both distributions support Python 3.11 onward.
    It is not a uv workspace member and does not add an entry to the root lockfile.
    Regenerate the main package's `uv.lock` with `uv lock`. `uv lock` may also
@@ -35,7 +49,10 @@ publisher is a maintainer action, not something this repository's tests establis
    versions must not change, `uv lock --check` must pass, and the design record says what moved.
 3. Move the CHANGELOG `Unreleased` entries under `vX.Y.Z (YYYY-MM-DD)`.
 4. Recompute `FROZEN.sha256` for the files the bump touched (`pyproject.toml`, `uv.lock`, the new
-   design record) and check that every other hash is unchanged:
+   design record) and check that every other hash is unchanged. For the 2.3.0 release,
+   record 0016 also re-freezes `AGENTS.md` and newly pins `docs/design/0016-logs.md`,
+   `docs/STATISTICS_LOGS.md`, `src/arci/logs/schema.py` and `tests/acceptance/test_logs.py`.
+   Only the release orchestrator may change these frozen files or their hashes:
    `shasum -a 256 -c FROZEN.sha256`.
 5. Commit on `main` (for example `release: vX.Y.Z`) and wait for CI to be green, including the
    `wheel-smoke` jobs.
@@ -63,7 +80,9 @@ The tag must be exactly `v` + the version in `pyproject.toml`.
   an empty directory. Every matrix entry runs `arci logs --example` and
   `realornoise --example`. Each example must exit **1** and print
   the line `RESULT: REAL DROP`; any other status or a missing line fails the smoke.
-  `.github/scripts/wheel_smoke.sh` is shared with CI. CI runs the full unit suite, including
+  `.github/scripts/wheel_smoke.sh` verifies the main wheel's packaged examples and the
+  second wheel's file allowlist, version, dependency pin, Python range and entry point
+  before installation. It is shared with CI. CI runs the full unit suite, including
   the log tests, on both Python 3.11 and 3.14. In each workflow, the second distribution
   is built once and its artifact is smoke-tested on every Python version in the smoke
   matrix. Python 3.14-only compressed-log test steps remain in place.

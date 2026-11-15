@@ -200,7 +200,7 @@ def test_json_contains_only_renderable_values() -> None:
     walk(json.loads(decision().model_dump_json()))
 
 
-def test_threshold_equalities_and_field_presence() -> None:
+def test_threshold_values_must_also_match_day_values() -> None:
     from arci.logs.schema import MeasureDecision
 
     original = decision().tools[0].measures[0].model_dump()
@@ -212,7 +212,8 @@ def test_threshold_equalities_and_field_presence() -> None:
     ]
     for changes in valid:
         payload = {**original, **changes}
-        assert MeasureDecision.model_validate(payload).finding == changes["finding"]
+        with pytest.raises(ValidationError):
+            MeasureDecision.model_validate(payload)
         for field in ("p_streak", "p_real", "u_none", "p_none"):
             payload_bad = {
                 **payload,

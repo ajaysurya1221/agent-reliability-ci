@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>realornoise · local session logs</title><style>
+:root { color-scheme: light dark; --paper: #fff; --ink: #17202a; --line: #677583; }
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #141a20; --ink: #edf2f7; --line: #9aaaba; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink);
+  font: 16px/1.6 system-ui, sans-serif; }
+main { max-width: 1100px; margin: auto; padding: clamp(16px, 4vw, 48px); }
+h1 { font-size: clamp(24px, 5vw, 38px); line-height: 1.2; }
+h2 { margin-top: 2em; font-size: 1.25em; }
+.long-value { overflow-wrap: anywhere; }
+.verdict { border: 2px solid currentColor; padding: 16px; font-weight: bold; }
+.table { overflow-x: auto; margin: 1em 0; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 8px; }
+th { vertical-align: bottom; } td { vertical-align: top; min-width: 6ch; }
+svg { display: block; width: 100%; height: auto; color: var(--ink); }
+pre { white-space: pre-wrap; }
+@media print { .table { overflow: visible; } body { font-size: 10pt; } }
+figure { margin: 1.5em 0; }
+</style></head><body><main><h1>realornoise</h1><p>realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked</p><section><h2>Codex</h2><p class="verdict">RESULT: ERROR</p><p>Session log files could not be read.</p><p>Compressed Codex files not read (Python 3.14 is needed): 2.</p><p>To read them: uvx --python 3.14 realornoise</p><p>Files that could not be read: 1.</p></section><p>Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run</p><p>exit 3</p></main></body></html>

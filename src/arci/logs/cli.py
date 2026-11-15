@@ -6,7 +6,10 @@ import argparse
 import json
 import os
 import re
+import shutil
+import stat
 import sys
+import tempfile
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from datetime import UTC, date, datetime, timedelta
@@ -103,12 +106,23 @@ def _execute(
     roots: dict[Tool, Path] = {"claude-code": claude_root, "codex": codex_root}
     requested: list[Tool]
     if args.tool == "auto":
-        requested = [tool for tool, root in roots.items() if root.exists()] or list(roots)
+        requested = [
+            tool
+            for tool, root in roots.items()
+            if root.exists()
+            or (
+                args.claude_dir is not None if tool == "claude-code" else args.codex_dir is not None
+            )
+        ] or list(roots)
     elif args.tool == "both":
         requested = list(roots)
     else:
         requested = [cast(Tool, args.tool)]
-    project = Path(args.project) if args.project is not None else None
+    project = (
+        Path(os.path.abspath(os.path.expanduser(args.project)))
+        if args.project is not None
+        else None
+    )
     decisions: list[ToolDecision] = []
     for tool in requested:
         paths = (discover.claude_files if tool == "claude-code" else discover.codex_files)(
@@ -151,26 +165,99 @@ def _execute(
             exit_code=exit_code(decisions),
         )
     )
-    outputs: list[tuple[str, str]] = []
+    try:
+        targets = [
+            Path(path).expanduser().resolve()
+            for path in (args.json, args.markdown, args.html)
+            if path is not None
+        ]
+        duplicate = len(set(targets)) != len(targets) or any(
+            a.exists() and b.exists() and a.samefile(b)
+            for i, a in enumerate(targets)
+            for b in targets[i + 1 :]
+        )
+    except BaseException:
+        raise _UsageError(report.WRITE_ERROR) from None
+    if duplicate:
+        raise _UsageError(report.DUPLICATE_OUTPUT)
+    directory_tools: tuple[Tool, ...] = tuple(
+        tool
+        for tool in roots
+        if (args.claude_dir if tool == "claude-code" else args.codex_dir) is not None
+    )
+    text = report.render_text(decision, directory_tools=directory_tools)
+    contents: list[str] = []
     if args.json is not None:
-        outputs.append(
-            (
-                args.json,
-                json.dumps(decision.model_dump(mode="json"), sort_keys=True, indent=2) + "\n",
-            )
+        contents.append(
+            json.dumps(decision.model_dump(mode="json"), sort_keys=True, indent=2) + "\n"
         )
     if args.markdown is not None:
-        outputs.append((args.markdown, report.render_markdown(decision)))
+        contents.append(report.render_markdown(decision, directory_tools=directory_tools))
     if args.html is not None:
-        outputs.append((args.html, render_html(decision)))
-    text = report.render_text(decision)
-    for path, content in outputs:
-        try:
-            Path(path).write_text(content, encoding="utf-8")
-        except (OSError, ValueError):
-            raise _UsageError(report.WRITE_ERROR) from None
+        contents.append(render_html(decision, directory_tools=directory_tools))
+    try:
+        _write_outputs(list(zip(targets, contents, strict=True)))
+    except _UsageError:
+        raise
+    except BaseException:
+        raise _UsageError(report.WRITE_ERROR) from None
     out.write(text)
     return decision.exit_code
+
+
+def _write_outputs(outputs: Sequence[tuple[Path, str]]) -> None:
+    """Stage all output and backups before replacement; roll back on a failed move."""
+    staged: dict[Path, Path] = {}
+    backups: dict[Path, Path] = {}
+    installed: list[Path] = []
+    temporary: list[Path] = []
+    placeholders: set[Path] = set()
+    keep: set[Path] = set()
+
+    def temporary_for(target: Path) -> Path:
+        fd, name = tempfile.mkstemp(prefix=".realornoise-", dir=target.parent)
+        path = Path(name)
+        temporary.append(path)
+        os.close(fd)
+        return path
+
+    try:
+        checked: list[Path] = []
+        for target, _ in outputs:
+            if not target.exists():
+                fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+                placeholders.add(target)
+                os.close(fd)
+            if any(target.samefile(other) for other in checked):
+                raise _UsageError(report.DUPLICATE_OUTPUT)
+            checked.append(target)
+        for target, content in outputs:
+            if not target.is_file():
+                raise OSError
+            staged[target] = temporary_for(target)
+            staged[target].write_text(content, encoding="utf-8")
+            os.chmod(staged[target], stat.S_IMODE(target.stat().st_mode))
+            if target not in placeholders:
+                backups[target] = temporary_for(target)
+                shutil.copy2(target, backups[target])
+        for target, _ in outputs:
+            os.replace(staged[target], target)
+            installed.append(target)
+    except BaseException:
+        for target in reversed(installed):
+            try:
+                if target in backups:
+                    os.replace(backups[target], target)
+                else:
+                    target.unlink()
+            except BaseException:
+                if target in backups:
+                    keep.add(backups[target])
+        raise
+    finally:
+        for path in (set(temporary) - keep) | (placeholders - set(installed)):
+            with suppress(OSError):
+                path.unlink(missing_ok=True)
 
 
 def run(

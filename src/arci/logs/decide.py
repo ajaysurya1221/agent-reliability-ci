@@ -7,8 +7,6 @@ from dataclasses import asdict
 from fractions import Fraction
 from typing import TYPE_CHECKING
 
-from arci.hashing import hash_record
-
 from . import rank_test
 from .records import ReaderCounters as InputCounters
 from .records import Tool
@@ -21,6 +19,9 @@ from .schema import (
     Result,
     ToolDecision,
     median,
+)
+from .schema import (
+    day_table_digest as day_table_digest,
 )
 
 if TYPE_CHECKING:
@@ -94,33 +95,6 @@ def _measure(table: MeasureTable) -> MeasureDecision:
         u_none=count,
         p_none=fraction_str(none) if none is not None else None,
         finding=finding,
-    )
-
-
-def day_table_digest(table: ToolTable) -> str:
-    from .measures import fraction_str
-
-    return hash_record(
-        {
-            "method": "arci-logs/1",
-            "tool": table.tool,
-            "model": table.model,
-            "effort": table.effort,
-            "split_date": table.split_date,
-            "before": table.before.model_dump(mode="json") if table.before else None,
-            "after": table.after.model_dump(mode="json") if table.after else None,
-            "alpha_real": fraction_str(ALPHA_REAL),
-            "alpha_none": fraction_str(ALPHA_NONE),
-            "measures": [
-                {
-                    "id": m.id,
-                    "margin": fraction_str(MARGINS[m.id]),
-                    "before_days": [d.model_dump(mode="json") for d in m.before_days],
-                    "after_days": [d.model_dump(mode="json") for d in m.after_days],
-                }
-                for m in table.measures
-            ],
-        }
     )
 
 

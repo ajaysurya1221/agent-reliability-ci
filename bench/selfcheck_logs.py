@@ -1,7 +1,7 @@
 """Exact checks and seeded final-rule simulations on synthetic in-memory records.
 
 Run: .venv/bin/python -m bench.selfcheck_logs --date YYYY-MM-DD
-A short pilot fixes each cell's count before collecting it, to bound laptop runtime.
+Gated cells use exact counts; only report-only power cells use a timing pilot.
 """
 
 from __future__ import annotations
@@ -197,10 +197,10 @@ def history(
 
 
 def streak_table(
-    rng: random.Random, m: int, n: int, sigma: float, drop: F, rho: float
+    rng: random.Random, m: int, n: int, sigma: float, drop: F, rho: float, shared: bool = False
 ) -> measures.ToolTable:
-    """Section 4 only: exactly the same synthetic days, without expanding responses."""
-    days = history_days(rng, m, n, sigma, drop, rho=rho)
+    """Exactly the same synthetic days, without expanding responses."""
+    days = history_days(rng, m, n, sigma, drop, shared=shared, rho=rho)
     tokens: list[DayValue] = []
     zeros: list[DayValue] = []
     edits: list[DayValue] = []
@@ -317,23 +317,26 @@ def simulate(
     budget: float,
     shared: bool = False,
     rho: float = 0.0,
+    *,
+    gated: bool = False,
 ) -> tuple[int, int, int, int, int]:
     def trial(rng: random.Random) -> tuple[ToolDecision, str]:
-        result = history(rng, m, n, sigma, drop, shared, rho)
-        table = table_of(result, n)
+        table = streak_table(rng, m, n, sigma, drop, rho, shared)
         assert table.model == "model-1" and table.other_settings == 1
         assert all(len(row.before_days) == n and len(row.after_days) == m for row in table.measures)
-        decision = decide.decide_tool(table, result.counters)
+        decision = decide.decide_tool(table, ReaderCounters(files_read=1))
         unguarded = without_streak(table) if rho else decision.result
         return decision, unguarded
 
-    # Separate pilot seed; count is fixed before the measured stream starts.
-    started = perf_counter()
-    pilot = random.Random(f"{seed}:timing-only")
-    for _ in range(3):
-        trial(pilot)
-    seconds = (perf_counter() - started) / 3
-    count = requested if not budget else max(30, min(requested, int(budget / seconds)))
+    count = requested
+    if budget and not gated:
+        # Report-only cells may choose their count from an independent timing pilot.
+        started = perf_counter()
+        pilot = random.Random(f"{seed}:timing-only")
+        for _ in range(3):
+            trial(pilot)
+        seconds = (perf_counter() - started) / 3
+        count = max(30, min(requested, int(budget / seconds)))
     rng = random.Random(seed)
     real = none = raw_real = raw_none = 0
     for _ in range(count):
@@ -439,12 +442,13 @@ def run(quick: bool, stamp: str) -> int:
     )
     print(
         "\nAll simulated rates include counts and Wilson 95% intervals. Claude Code's three "
-        "measures are generated through Response/EditResult -> measures.build -> decide_tool. "
+        "measures use directly constructed day tables, unit-checked against "
+        "Response/EditResult -> measures.build; production decide_tool runs for every table. "
         "Reasoning: log-normal, quantized to multiples of 100 before exact changes. "
         "Independent shares: rounded (0.10+0.25 Phi(Z)) and (0.05+0.25 Phi(Z)), denominator 100. "
         "Shared ranks: both shares 10/(20+pooled reasoning rank), oriented alike. "
         "AR(1): stationary Gaussian innovations on all three independent latent streams. "
-        "Pilot-based count reductions use timing only, never measured outcomes; "
+        "Gated cells always run the stated count. Report-only power cells use timing pilots; "
         "requested and actual counts are printed. "
         "Simulation gates are implementation checks, not proofs."
     )
@@ -455,10 +459,10 @@ def run(quick: bool, stamp: str) -> int:
     gates.append(("selected-setting usable-day boundaries", True))
     print("\n## Null and exact reasoning-margin boundary\n")
     print(
-        "| after/before | dependence | drop | seed | requested | "
+        "| after/before | dependence | drop | seed | requested | actual | "
         "REAL DROP (95% CI) | NO DROP (95% CI) | seconds |"
     )
-    print("|---|---|---|---:|---:|---|---|---:|")
+    print("|---|---|---|---:|---:|---:|---|---|---:|")
     cell = 0
     for m, n in ((7, 21),) if quick else DESIGNS:
         for shared in (False, True):
@@ -468,22 +472,27 @@ def run(quick: bool, stamp: str) -> int:
                 start = perf_counter()
                 requested = 300 if quick else 20000
                 real, none, _, _, count = simulate(
-                    m, n, 0.45, drop, seed, requested, 0 if quick else 25, shared
+                    m, n, 0.45, drop, seed, requested, 0, shared, gated=True
                 )
                 dependence = "shared" if shared else "independent"
                 name = f"{'null REAL' if not drop else 'margin NO'} {m}/{n} {dependence}"
-                gates.append((name, F(none if drop else real, count) <= LIMIT))
+                gates.append(
+                    (
+                        f"{name} ({count}/{requested} tables)",
+                        count == requested and F(none if drop else real, count) <= LIMIT,
+                    )
+                )
                 print(
-                    f"| {m}/{n} | {dependence} | {drop} | {seed} | {requested} | "
+                    f"| {m}/{n} | {dependence} | {drop} | {seed} | {requested} | {count} | "
                     f"{rate(real, count)} | {rate(none, count)} | {perf_counter() - start:.2f} |",
                     flush=True,
                 )
     print("\n## Power (report only)\n")
     print(
-        "| after/before | log SD | drop | seed | requested | "
+        "| after/before | log SD | drop | seed | requested | actual | "
         "REAL DROP (95% CI) | NO DROP (95% CI) | seconds |"
     )
-    print("|---|---|---|---:|---:|---|---|---:|")
+    print("|---|---|---|---:|---:|---:|---|---|---:|")
     if quick:
         print("Skipped in quick mode.")
     else:
@@ -500,7 +509,7 @@ def run(quick: bool, stamp: str) -> int:
             start = perf_counter()
             real, none, _, _, count = simulate(m, n, sd, drop, seed, 2000, 4)
             print(
-                f"| {m}/{n} | {sd} | {drop} | {seed} | 2000 | "
+                f"| {m}/{n} | {sd} | {drop} | {seed} | 2000 | {count} | "
                 f"{rate(real, count)} | {rate(none, count)} | "
                 f"{perf_counter() - start:.2f} |",
                 flush=True,

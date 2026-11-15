@@ -7,7 +7,7 @@ import pytest
 
 from arci.logs.html import render_html
 from arci.logs.report import render_text
-from tests.unit.logs.test_report import SNAPSHOTS, cases
+from tests.unit.logs.test_report import SNAPSHOTS, cases, normalize_version
 
 
 class Page(HTMLParser):
@@ -40,12 +40,12 @@ class Page(HTMLParser):
             self.words.append(data)
 
 
-@pytest.mark.parametrize("name", ["example", "too_few_days", "both_no_logs"])
+@pytest.mark.parametrize("name", ["example", "too_few_days", "both_no_logs", "error_notices"])
 def test_html_snapshot(name: str) -> None:
     decision = cases()[name]
     actual = render_html(decision)
     assert actual == render_html(decision)
-    assert actual == (SNAPSHOTS / f"{name}.html").read_text()
+    assert normalize_version(actual) == normalize_version((SNAPSHOTS / f"{name}.html").read_text())
 
 
 @pytest.mark.parametrize("name", list(cases()))

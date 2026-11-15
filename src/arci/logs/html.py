@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import date
 from fractions import Fraction
 
 from arci.html_base import _CSS, _heading, _p, _table, _text
 
 from . import report
+from .records import Tool
 from .report import context_text, format_number, format_scope, measure_row, notices, reason_text
 from .schema import LogsDecision, MeasureDecision, ToolDecision
 
@@ -69,7 +71,7 @@ def _chart(measure: MeasureDecision, split_date: str) -> str:
     return "".join(parts)
 
 
-def _tool(tool: ToolDecision, decision: LogsDecision) -> str:
+def _tool(tool: ToolDecision, decision: LogsDecision, directory_tools: Collection[Tool]) -> str:
     parts = ["<section>", _heading(report.TOOL_NAMES[tool.tool])]
     if tool.model is not None:
         assert tool.before is not None
@@ -86,7 +88,12 @@ def _tool(tool: ToolDecision, decision: LogsDecision) -> str:
                 ),
             ]
         )
-    parts.extend([f'<p class="verdict">{_text(report.F4[tool.result])}</p>', _p(reason_text(tool))])
+    parts.extend(
+        [
+            f'<p class="verdict">{_text(report.F4[tool.result])}</p>',
+            _p(reason_text(tool, directory_given=tool.tool in directory_tools)),
+        ]
+    )
     if tool.model is not None:
         parts.extend(
             [
@@ -112,8 +119,7 @@ def _tool(tool: ToolDecision, decision: LogsDecision) -> str:
                     )
                 )
             )
-    if tool.result != "ERROR":
-        parts.extend(_p(notice) for notice in notices(tool))
+    parts.extend(_p(notice) for notice in notices(tool))
     if tool.model is not None:
         assert tool.split_date is not None and tool.day_table_sha256 is not None
         parts.extend(_chart(m, tool.split_date) for m in tool.measures)
@@ -121,7 +127,7 @@ def _tool(tool: ToolDecision, decision: LogsDecision) -> str:
     return "".join([*parts, "</section>"])
 
 
-def render_html(decision: LogsDecision) -> str:
+def render_html(decision: LogsDecision, *, directory_tools: Collection[Tool] = ()) -> str:
     """Render numbers and fixed copy without reading logs or other external state."""
     parts = [
         '<!doctype html><html lang="en"><head><meta charset="utf-8">',
@@ -134,7 +140,7 @@ def render_html(decision: LogsDecision) -> str:
     ]
     if decision.example:
         parts.append(_p(report.F13))
-    parts.extend(_tool(tool, decision) for tool in decision.tools)
+    parts.extend(_tool(tool, decision, directory_tools) for tool in decision.tools)
     if any(tool.result != "ERROR" for tool in decision.tools):
         parts.append(_p(" ".join(report.F10.splitlines())))
     parts.extend([_p(report.F12), _p(report.EXIT.format(code=decision.exit_code))])

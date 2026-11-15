@@ -1,4 +1,4 @@
-realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked
+realornoise <version> · reads local session logs · sends nothing · writes nothing unless asked
 
 Codex
 RESULT: ERROR

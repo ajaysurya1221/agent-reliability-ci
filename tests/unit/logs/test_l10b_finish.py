@@ -47,9 +47,9 @@ def test_api_error_marker_counts_as_unused_type(tmp_path: Path, flag: object) ->
     )
     data = claude_code.read([path], project=None, now=NOW)
     assert data.counters.lines == 3
-    assert data.counters.lines_unknown_type == 2
-    assert data.counters.responses == 1
-    assert data.counters.edits_unmatched == 0
+    assert data.counters.lines_unknown_type == (2 if flag is True else 0)
+    assert data.counters.responses == (1 if flag is True else 2)
+    assert data.counters.edits_unmatched == (0 if flag is True else 1)
 
 
 @pytest.mark.parametrize("tool", ["claude-code", "codex"])
@@ -59,12 +59,13 @@ def test_files_read_counts_opened_files_even_if_decode_fails(tmp_path: Path, too
     reader = claude_code.read if tool == "claude-code" else codex.read
     data = reader([path, tmp_path / "absent.jsonl"], project=None, now=NOW)
     assert data.counters.files_read == 1
-    assert data.counters.files_unreadable == 2
+    assert data.counters.files_unreadable == 1
+    assert data.counters.lines_not_json == 1
     assert data.counters.responses == 0
 
 
 @pytest.mark.parametrize("tool", ["claude-code", "codex"])
-def test_decode_failure_still_reports_read_error(tmp_path: Path, tool: str) -> None:
+def test_decode_failure_reports_unrecognised_format(tmp_path: Path, tool: str) -> None:
     root = tmp_path / "logs"
     path = root / (
         "project/session.jsonl" if tool == "claude-code" else "sessions/rollout-example.jsonl"
@@ -74,7 +75,7 @@ def test_decode_failure_still_reports_read_error(tmp_path: Path, tool: str) -> N
     flag = "--claude-dir" if tool == "claude-code" else "--codex-dir"
     code, out, err = invoke(tmp_path, ["--tool", tool, flag, str(root)])
     assert code == 3 and not err
-    assert "Session log files could not be read." in out
+    assert report.F5["format_not_recognised"] in out
 
 
 @pytest.mark.parametrize("tool", ["claude-code", "codex"])

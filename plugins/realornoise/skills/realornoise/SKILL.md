@@ -6,7 +6,7 @@ allowed-tools: Bash(uvx realornoise)
 ---
 
 The command below has already run on this machine. It read local session logs and printed
-counts, rates and the names of the model and effort setting it compared. The command itself
+counts, rates, dates and the names of the model and effort compared. The command itself
 sent nothing anywhere. Its output is now part of this conversation, so what it printed is
 visible to this assistant and goes wherever this conversation goes.
 

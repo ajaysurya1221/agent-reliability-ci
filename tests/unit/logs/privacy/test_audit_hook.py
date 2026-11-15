@@ -37,6 +37,8 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path) ->
         _active = False
     assert code == 2 and not error.getvalue()
     writes: set[Path] = set()
+    placeholders: set[Path] = set()
+    moved: set[Path] = set()
     for event, args in _EVENTS:
         assert not event.startswith(("socket.", "os.exec", "os.posix_spawn")), event
         assert event not in {"subprocess.Popen", "os.system", "urllib.Request"}, event
@@ -49,6 +51,21 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path) ->
             if writing:
                 assert isinstance(name, str), (event, args)
                 path = Path(name).absolute()
-                assert path in targets, path
+                if path in targets:
+                    assert isinstance(flags, int)
+                    assert flags & os.O_CREAT and flags & os.O_EXCL
+                    assert not flags & (os.O_TRUNC | os.O_APPEND)
+                    placeholders.add(path)
+                    continue
+                assert path.parent == tmp_path and path.name.startswith(".realornoise-"), path
                 writes.add(path)
-    assert writes == set(targets)
+        if event == "os.chmod":
+            assert Path(str(args[0])) in writes
+        if event == "os.rename":
+            source, target, *_ = args
+            assert isinstance(source, str) and isinstance(target, str)
+            assert Path(source) in writes and Path(target) in targets
+            moved.add(Path(target))
+    assert moved == set(targets)
+    assert placeholders == set(targets)
+    assert all(not path.exists() for path in writes)

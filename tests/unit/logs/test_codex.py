@@ -131,7 +131,7 @@ def test_empty_missing_and_non_utf8(tmp_path: Path, capsys: pytest.CaptureFixtur
     empty.touch()
     bad.write_bytes(b"\xff\xfe\n")
     actual = read([empty, bad, tmp_path / "CANARY-absent"], project=None, now=NOW)
-    assert actual.counters.files_unreadable == 2 and actual.responses == ()
+    assert actual.counters.files_unreadable == 1 and actual.responses == ()
     assert actual.counters.files_read == 2
     assert actual.counters.lines == 1
     assert capsys.readouterr() == ("", "")
@@ -267,7 +267,14 @@ def test_project_lexical_parts(
         raise AssertionError("project check must not access filesystem")
 
     monkeypatch.setattr(Path, "resolve", forbidden)
-    monkeypatch.setattr(Path, "stat", forbidden)
+    original_stat = Path.stat
+
+    def checked_stat(path: Path, *, follow_symlinks: bool = True):
+        if str(path).startswith("/project"):
+            raise AssertionError("project check must not access filesystem")
+        return original_stat(path, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(Path, "stat", checked_stat)
     actual = read([path], project=Path("/project"), now=NOW)
     assert len(actual.responses) == int(inside)
     assert all(r.in_project for r in actual.responses)
@@ -285,6 +292,7 @@ def test_unavailable_compression_is_counted_without_opening(
     def forbidden(*args: object, **kwargs: object) -> None:
         raise AssertionError("unavailable compression must not open input")
 
+    (tmp_path / "rollout-CANARY.jsonl.zst").touch()
     monkeypatch.setattr("arci.logs.codex.importlib.import_module", absent)
     monkeypatch.setattr(Path, "open", forbidden)
     actual = read([tmp_path / "rollout-CANARY.jsonl.zst"], project=None, now=NOW)

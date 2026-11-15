@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, cast
@@ -38,6 +39,21 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
     seen: set[tuple[str, datetime, str]] = set()
     latest_main_response: datetime | None = None
     for path in paths:
+        saved_counts = counts
+        counts = replace(counts)
+        saved_models, saved_efforts = models.copy(), efforts.copy()
+        saved_versions, saved_workdirs = versions.copy(), workdirs.copy()
+        saved_latest = latest_main_response
+        file_seen: set[tuple[str, datetime, str]] = set()
+        pending: list[Response] = []
+        previous_total: object = None
+        try:
+            regular = path.is_file()
+        except OSError:
+            regular = False
+        if not regular:
+            counts.files_unreadable += 1
+            continue
         compressed = path.name.endswith(".zst")
         zstd = None
         if compressed:
@@ -51,7 +67,11 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
             with stream:
                 counts.files_read += 1
                 first = stream.readline()
-                meta = parse_line(first.decode("utf-8"), _USED, counts) if first else None
+                meta = (
+                    parse_line(first.removeprefix(b"\xef\xbb\xbf"), _USED, counts)
+                    if first
+                    else None
+                )
                 if meta is None or meta["type"] != "session_meta":
                     # A readable file with no session header has an unrecognised
                     # format, not an I/O or decoding fault.
@@ -68,7 +88,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                 main = payload.get("thread_source") != "subagent"
                 context: dict[str, object] | None = None
                 for raw in stream:
-                    data = parse_line(raw.decode("utf-8"), _USED, counts)
+                    data = parse_line(raw, _USED, counts)
                     if data is None:
                         continue
                     payload = object_of(data.get("payload"))
@@ -79,8 +99,15 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                         counts.lines_unknown_type += 1
                         continue
                     if payload.get("info") is None:
+                        previous_total = None
                         continue
                     info = object_of(payload.get("info"))
+                    total = info.get("total_token_usage")
+                    repeated = isinstance(total, dict) and total == previous_total
+                    previous_total = total
+                    if repeated:
+                        counts.responses_duplicate += 1
+                        continue
                     when = time_of(data.get("timestamp"))
                     if without_timezone(data.get("timestamp")):
                         counts.records_without_timezone += 1
@@ -95,10 +122,10 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                         except (ValueError, RecursionError):
                             counts.lines_lacking_field += 1
                             continue
-                        if key in seen:
+                        if key in seen or key in file_seen:
                             counts.responses_duplicate += 1
                             continue
-                        seen.add(key)
+                        file_seen.add(key)
                     if when > now:
                         counts.records_in_future += 1
                         continue
@@ -112,7 +139,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     reasoning = reasoning_of(
                         object_of(info.get("last_token_usage")).get("reasoning_output_tokens")
                     )
-                    responses.append(
+                    pending.append(
                         Response(
                             "codex",
                             when,
@@ -127,13 +154,18 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     )
                     counts.responses += 1
                     counts.responses_without_reasoning += reasoning is None
-        except UnicodeError:
-            counts.lines += 1
-            counts.files_unreadable += 1
         except Exception:
-            # Decompression errors have interpreter-specific classes. No exception
-            # (including its private input/path) is rendered or retained.
+            # Keep physical read counts, but discard all semantic state from this file.
+            saved_counts.files_read = counts.files_read
+            saved_counts.lines = counts.lines
+            counts = saved_counts
             counts.files_unreadable += 1
+            models, efforts = saved_models, saved_efforts
+            versions, workdirs = saved_versions, saved_workdirs
+            latest_main_response = saved_latest
+            continue
+        responses.extend(pending)
+        seen.update(file_seen)
     return WindowReadResult(
         "codex",
         tuple(responses),

@@ -19,9 +19,9 @@ RESULT: REAL DROP
 reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-Nothing leaves your machine, and the output holds numbers only. It shows what your logs
-recorded, not why: your tasks, prompts and client changed too. With a short history the usual
-answer is `CANNOT TELL`.
+Nothing leaves your machine, and the output holds counts, rates, dates and the names of the model
+and effort compared. It shows what your logs recorded, not why: your tasks, prompts and client
+changed too. With a short history the usual answer is `CANNOT TELL`.
 [How to read it](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md) ·
 [the method and its limits](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS_LOGS.md)
 
@@ -49,7 +49,7 @@ REAL DROP means a recorded measure moved toward worse beyond a chance ordering o
 NO DROP rules out each measure's margin under the stated assumptions; it does not mean improvement.
 CANNOT TELL means the history is too short, variable or streaky to decide.
 This cannot show cause, answer quality or a change to a model; tasks, prompts and clients can change too.
-In the final AR(1) self-check at correlation 0.5 and log SD 0.45, the rule as built gave wrong REAL DROP rates of 0.080500, 0.035500 and 0.002500 and wrong NO DROP rates of 0.005000, 0.005000 and 0.000500 at 5/10, 7/21 and 14/42 after/before days (2000 histories each); the first two wrong REAL DROP rates exceed 2.5%, and [the method](docs/STATISTICS_LOGS.md#what-the-method-cannot-see) gives all variants, wrong-NO-DROP rates and intervals.
+In the final AR(1) self-check at correlation 0.5 and log SD 0.45, the rule as built gave wrong REAL DROP rates of 0.080500, 0.035500 and 0.002500 and wrong NO DROP rates of 0.005000, 0.005000 and 0.000500 at 5/10, 7/21 and 14/42 after/before days (2000 histories each); the first two wrong REAL DROP rates exceed the nominal bound of 0.025, and [the method](docs/STATISTICS_LOGS.md#what-the-method-cannot-see) gives all variants, wrong-NO-DROP rates and intervals.
 
 Claude Code: `/plugin marketplace add ajaysurya1221/agent-reliability-ci`, `/plugin install realornoise@agent-reliability-ci`, then `/realornoise:realornoise`.
 Codex: copy [`integrations/codex/skills/realornoise`](integrations/codex/skills/realornoise/SKILL.md) into `~/.agents/skills/`.
