@@ -38,6 +38,7 @@ Acceptance items covered elsewhere, with the reason:
 
 from __future__ import annotations
 
+import html
 import io
 import itertools
 import json
@@ -1315,6 +1316,22 @@ class Outcome:
     def text(self, name: str) -> str:
         return self.extra[name].read_text(encoding="utf-8")
 
+    def page(self) -> str:
+        """The HTML page's own text, for comparing a fixed text with it."""
+        return _unescaped(self.text("html"))
+
+
+def _unescaped(page: str) -> str:
+    """An HTML page with its character references resolved.
+
+    Record 0017, "Command line and layout": in the HTML output the characters `&`, `<`, `>`,
+    `"` and `'` are written as HTML character references, so a fixed text that holds one of
+    them appears on the page escaped, and a test compares it after unescaping the page. The
+    structural checks (no script, no external reference, the strip charts' circles) stay on the
+    page as it is written.
+    """
+    return html.unescape(page)
+
 
 def _flat(text: str) -> str:
     """The text with every run of whitespace collapsed, for sentences the record may wrap."""
@@ -1835,8 +1852,10 @@ def test_a_streaky_measure_stops_a_real_drop_and_marks_the_others_not_used(
     assert "real drop" not in outcome.out
     _says(outcome.text("markdown"), "not used")
     assert "real drop" not in outcome.text("markdown")
-    _says(outcome.text("html"), "not used")
-    for place in (outcome.out, outcome.text("markdown"), outcome.text("html")):
+    _says(outcome.page(), "not used")
+    # The F5 reason reaches the Markdown file only in an ERROR block and for a tool with no
+    # selected setting, so the changed wording is held against the text output and the page.
+    for place in (outcome.out, outcome.page()):
         _says(place, STREAKY_LINES[1])
 
 
@@ -1963,8 +1982,8 @@ def test_an_error_tool_prints_its_notices_without_their_second_sentence(tmp_path
     assert "2.5%" not in block
     _absent(block, FOOTER_FIRST_WORDS)
     # The HTML page shows the notices of an ERROR tool.
-    _says(outcome.text("html"), F17_ERROR.format(1))
-    assert SECOND_SENTENCE not in outcome.text("html")
+    _says(outcome.page(), F17_ERROR.format(1))
+    assert SECOND_SENTENCE not in outcome.page()
 
 
 def test_an_error_tool_still_names_the_way_to_read_compressed_files(tmp_path: Path) -> None:
@@ -1991,7 +2010,7 @@ def test_an_error_tool_still_names_the_way_to_read_compressed_files(tmp_path: Pa
         block = outcome.text("markdown")
         _says(block, F9_ERROR.format(1))
         _says(block, F9_NEXT)
-        _says(outcome.text("html"), F9_NEXT)
+        _says(outcome.page(), F9_NEXT)
     assert SECOND_SENTENCE not in outcome.out
     assert SECOND_SENTENCE not in outcome.text("markdown")
 
@@ -2201,6 +2220,9 @@ def test_an_edit_takes_the_setting_of_the_response_that_called_it(tmp_path: Path
 
 
 EDIT_ONLY_DAY = date(2026, 10, 10)
+# The day the calling response sits on, before the window's first day, so that the response
+# itself enters no day of the comparison while its results fall on a day inside the window.
+BEFORE_WINDOW = date(2026, 7, 1)
 
 
 def _edit_only_lines(
@@ -2236,10 +2258,11 @@ def test_a_day_of_file_edit_results_without_a_response(tmp_path: Path) -> None:
     write_claude(root, logs)
     _write_lines(
         root / PROJECT_DIR / "02.jsonl",
-        _edit_only_lines(response_day=NEWEST, result_day=EDIT_ONLY_DAY, failed=1),
+        _edit_only_lines(response_day=BEFORE_WINDOW, result_day=EDIT_ONLY_DAY, failed=1),
     )
     outcome = _run(tmp_path, _args("claude-code", claude=root))
-    # The extra day holds ten results, one of them failed, and no response.
+    # The calling response is dated before the window, so it enters no day of the comparison;
+    # the extra day holds ten results, one of them failed, and no response.
     plans = {**logs, EDIT_ONLY_DAY: Day(counts=(), edits=(True,) + (False,) * 9)}
     tool = _check(outcome, "claude-code", plans)
     edits = tool["measures"][2]
@@ -2846,10 +2869,15 @@ def _canary_outcome(tmp_path: Path) -> Outcome:
         output=CANARY_OUTPUT,
     )
     # A third rejected id (nine parts) and one the grammar accepts, which sorts before every
-    # rejected one: the rejected names must still be numbered 1 and 2.
+    # rejected one: the rejected names must still be numbered 1 and 2. This session carries the
+    # version-shaped canary too, since the version population is every response of the tool in
+    # the after period, whichever session file or setting it belongs to.
     write_claude(
         root,
-        {day: Day(counts=(1,) * 3, other=(1,) * 2) for day in (*BEFORE_DAYS, *AFTER_DAYS)},
+        {
+            day: Day(counts=(1,) * 3, other=(1,) * 2, version=CANARY_VERSION)
+            for day in (*BEFORE_DAYS, *AFTER_DAYS)
+        },
         session="02",
         prefix="t",
         setting=Setting(CANARY_MODEL_C, "high"),
@@ -2873,13 +2901,15 @@ def test_no_canary_token_reaches_any_output(tmp_path: Path) -> None:
         "markdown": outcome.text("markdown"),
         "html": outcome.text("html"),
     }
+    places["page"] = outcome.page()
     for where, text in places.items():
         for canary in CANARIES:
             assert canary not in text, (where, canary)
         for part in CANARY_PARTS:
             assert part not in text, (where, part)
-    # The version-shaped canary does not match the version pattern, so F26 is absent and the
-    # version counts in `+k more` instead.
+    # Every session of the fixture carries the version-shaped canary, which does not match the
+    # version pattern, so no after-period version matches, F26 is absent, and the one version
+    # counts in `+k more` instead.
     assert "Client versions after the split" not in outcome.out
     context = outcome.tool()["context"]
     assert context["client_versions_after_shown"] == []
@@ -2962,7 +2992,7 @@ def test_the_client_version_line(tmp_path: Path) -> None:
     assert context["client_versions_before"] == 2
     assert context["client_versions_both"] == 1
     # The before-only version is in no output.
-    for place in (outcome.out, outcome.text("markdown"), outcome.text("html")):
+    for place in (outcome.out, outcome.text("markdown"), outcome.page()):
         assert "1.2.3" not in place
         _says(place, line)
     assert "1.2.3" not in outcome.json_path.read_text(encoding="utf-8")
@@ -3813,7 +3843,18 @@ def test_every_new_state_round_trips(tmp_path: Path, state: str) -> None:
     elif state == "since":
         extra = ("--since", "2026-11-01")
     elif state == "keep":
+        # `--keep` writes the table after the run and a table that exists is read on every run,
+        # so two successive `--keep` runs need not have the same inputs. The table written here
+        # holds one row the write rule keeps (its pair is larger) and one row per other day
+        # whose pair ties with the logs row, so the write leaves every row as it is and both
+        # runs read the same table.
         extra = ("--keep",)
+        kept_days = {
+            day: (Day(counts=(300,) * 25) if day == BEFORE_DAYS[0] else logs[day])
+            for day in (*BEFORE_DAYS, *AFTER_DAYS)
+        }
+        rows = [_kept_from_day("claude-code", day, plan) for day, plan in kept_days.items()]
+        plans, sources = _merge("claude-code", logs, kept_days)
     store = tmp_path / "store"
     if state == "unreadable":
         write_kept(store / TABLE_NAME, rows or [], schema="realornoise-days/9")
@@ -3858,7 +3899,7 @@ def test_every_new_state_round_trips(tmp_path: Path, state: str) -> None:
         "read": "read",
         "unreadable": "unreadable",
         "since": "absent",
-        "keep": "absent",
+        "keep": "read",
         "two_tools": "absent",
     }[state]
     assert first.body["kept_table"] == wanted
@@ -3866,6 +3907,10 @@ def test_every_new_state_round_trips(tmp_path: Path, state: str) -> None:
     assert first.body["keep"] is (state == "keep")
     if sources is not None:
         _check(first, "claude-code", plans, sources=sources)
+    if state == "keep":
+        # Neither run changed the table, so both had the same inputs.
+        assert rows is not None
+        assert _rows(store / TABLE_NAME) == sorted(rows, key=_row_key)
     if state == "two_tools":
         assert [tool["reason"] for tool in first.tools()] == ["real_drop", "no_usable_setting"]
 
@@ -3938,7 +3983,7 @@ def test_the_closing_paragraph_and_the_footer_carry_the_same_two_figures(
     outcome = _run(tmp_path, _args("claude-code", claude=root), outputs=("markdown", "html"))
     rates = _rates(outcome.out)
     assert rates == _footer_rates(outcome.text("markdown"))
-    assert rates == _rates(outcome.text("html"))
+    assert rates == _rates(outcome.page())
     _run_of(outcome, _f10_lines(rates))
     _says(outcome.text("markdown"), FOOTER_BOUND.format(rate_5_10=rates[0], rate_7_21=rates[1]))
     digest = outcome.tool()["day_table_sha256"][:12]
@@ -4000,7 +4045,7 @@ def test_the_earliest_test_date_and_the_compared_setting_lines(tmp_path: Path, s
     date_line = F19[0].format(last=NEWEST.isoformat(), date=wanted.isoformat())
     _block(outcome, first)
     _run_of(outcome, [date_line, *_wrapped(F19[1])])
-    for place in (outcome.text("markdown"), outcome.text("html")):
+    for place in (outcome.text("markdown"), outcome.page()):
         _says(place, first)
         _says(place, date_line)
         _says(place, F19[1])
@@ -4030,7 +4075,7 @@ def test_no_compared_setting_lines_outside_too_few_days(tmp_path: Path, shape: s
     )
     tool = outcome.tool()
     assert tool["earliest_test_date"] is None
-    for place in (outcome.out, outcome.text("markdown"), outcome.text("html")):
+    for place in (outcome.out, outcome.text("markdown"), outcome.page()):
         assert "Earliest test date" not in place
         if shape != "since":
             assert "This setting: first response" not in place
@@ -4152,8 +4197,8 @@ def test_the_order_of_the_new_lines_in_every_format(tmp_path: Path) -> None:
     ]
     found = [_flat(block).index(_flat(one)) for one in wanted]
     assert found == sorted(found), wanted
-    # The HTML page holds the same information.
-    page = outcome.text("html")
+    # The HTML page holds the same information, after its character references are resolved.
+    page = outcome.page()
     for one in (
         "This setting: first response in the window",
         "Earliest test date if this setting is used",
@@ -4189,7 +4234,7 @@ def test_a_tool_without_a_setting_has_no_method_line_and_no_footer(tmp_path: Pat
     first = _flat(block).index(_flat(REASONS["no_usable_setting"]))
     second = _flat(block).index(_flat(FOOTER_FIRST_WORDS))
     assert first < second
-    _says(outcome.text("html"), REASONS["no_usable_setting"])
+    _says(outcome.page(), REASONS["no_usable_setting"])
 
 
 def test_the_streak_line_counts_the_measures_that_were_not_flagged(tmp_path: Path) -> None:
@@ -4280,7 +4325,7 @@ def test_the_html_page_has_no_script_and_no_external_reference(tmp_path: Path) -
     assert "<script" not in page.lower()
     assert "http://" not in page and "https://" not in page
     assert "<svg" in page.lower()
-    _says(page, REASONS["real_drop"])
+    _says(outcome.page(), REASONS["real_drop"])
 
 
 def test_help_reads_no_logs_and_names_every_option(tmp_path: Path) -> None:
@@ -4324,7 +4369,7 @@ def test_the_html_charts_draw_a_kept_day_as_an_open_circle(tmp_path: Path) -> No
     assert "<circle" in page.lower()
     assert "<script" not in page.lower()
     assert "http://" not in page and "https://" not in page
-    _says(page, F21.format(b=1, a=0))
+    _says(with_table.page(), F21.format(b=1, a=0))
 
     # A page with no kept day draws no open circle.
     plain, _ = _kept_run(tmp_path / "plain", logs, None, outputs=("html",), stem="plain")
@@ -4347,7 +4392,8 @@ def test_the_example_run(tmp_path: Path) -> None:
     assert outcome.lines[1] == F13
     assert [tool["result"] for tool in outcome.tools()] == ["REAL_DROP", "NO_DROP"]
     assert outcome.code == 1
-    for place in (outcome.text("markdown"), outcome.text("html")):
+    # F13 holds an apostrophe, which the page writes as a character reference.
+    for place in (outcome.text("markdown"), outcome.page()):
         _says(place, F13)
     # Every row of both tables has enough days.
     for tool in outcome.tools():
@@ -4848,24 +4894,25 @@ def test_old_rows_are_pruned_on_write(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("stored_plan", "winner"),
     [
-        # A stored row whose pair is larger stays.
-        (Day(counts=(7,) * 30, edits=(False,) * 10), "stored"),
+        # The row of the table, whose pair is larger, stays.
+        (Day(counts=(7,) * 30, edits=(False,) * 10), "kept"),
         # A row from the logs whose pair is at least as large replaces it, a tie included.
         (Day(counts=(7,) * 20, edits=(False,) * 10), "logs"),
         (Day(counts=(7,) * 19, edits=(False,) * 10), "logs"),
-        # A stored row with equal responses and more file-edit results stays.
-        (Day(counts=(7,) * 20, edits=(False,) * 11), "stored"),
+        # The row of the table, with equal responses and more file-edit results, stays.
+        (Day(counts=(7,) * 20, edits=(False,) * 11), "kept"),
     ],
 )
 def test_the_write_rule_pair_decides(tmp_path: Path, stored_plan: Day, winner: str) -> None:
     """Item 25: for each (tool, offset, setting, day) the two rows are compared by the pair
-    (responses, file-edit results), in that order; a row is written whole."""
+    (responses, file-edit results), in that order; a row is written whole. `winner` is the
+    record's own value for a day's source: `kept` or `logs`."""
     day = BEFORE_DAYS[0]
     logs = _uniform(ALTERNATING, DROPPED, edits=(False,) * 10)
     stored = _kept_from_day("claude-code", day, stored_plan)
     outcome, path = _kept_run(tmp_path, logs, [stored], extra=("--keep",))
     written = next(row for row in _rows(path) if row["day"] == day.isoformat())
-    wanted = stored if winner == "stored" else _kept_from_day("claude-code", day, logs[day])
+    wanted = stored if winner == "kept" else _kept_from_day("claude-code", day, logs[day])
     assert written == wanted
     # The use rule reads the same pair, so the day's source follows the same winner.
     merged, sources = _merge("claude-code", logs, {day: stored_plan})
@@ -4895,13 +4942,21 @@ def test_f21_prints_the_kept_day_counts(tmp_path: Path) -> None:
     ignored, _ = _kept_run(tmp_path / "ignored", logs, rows, extra=("--ignore-kept",))
     assert "Days from the kept table" not in ignored.out
 
-    # An ERROR tool and a tool with no usable setting carry no F21 block.
+    # An ERROR tool and a tool with no usable setting carry no F21 block. A stored row of this
+    # tool inside the window would make its setting a candidate under the use rule, so the
+    # table here holds a row of the other tool and one dated outside the window.
     claude = tmp_path / "blank" / "claude"
     write_claude(claude, logs, setting=Setting(CLAUDE_MODEL, None))
     codex = tmp_path / "blank" / "codex"
     codex.mkdir(parents=True)
     store = tmp_path / "blank" / "store"
-    write_kept(store / TABLE_NAME, rows)
+    write_kept(
+        store / TABLE_NAME,
+        [
+            *other,
+            _kept_from_day("claude-code", NEWEST - timedelta(days=150), Day(counts=(5,) * 3)),
+        ],
+    )
     blank = _run(
         tmp_path / "blank",
         _args("both", claude=claude, codex=codex),
@@ -4967,8 +5022,8 @@ def _fault_table(path: Path, shape: str) -> None:
     elif shape == "not_a_file":
         path.mkdir(parents=True, exist_ok=True)
     elif shape == "unreadable":
+        # Written readable here; the test takes its bytes and then removes the permission.
         write_kept(path, [good])
-        path.chmod(0o000)
     elif shape == "duplicate_json_key":
         body = json.dumps({"schema": TABLE_SCHEMA, "rows": [good]})
         path.write_text(body.replace('"rows"', '"schema": "x", "rows"', 1), encoding="utf-8")
@@ -5026,10 +5081,14 @@ def test_a_faulty_table_is_not_used_at_all(tmp_path: Path, shape: str) -> None:
     store = tmp_path / "store"
     path = store / TABLE_NAME
     _fault_table(path, shape)
-    if shape == "unreadable" and os.access(path, os.R_OK):
-        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
-        pytest.skip("this process can read a file with no read permission")
+    # The bytes are taken while the file can still be read, and only then is the permission
+    # removed for the fault that needs it.
     before = path.read_bytes() if path.is_file() else None
+    if shape == "unreadable":
+        path.chmod(0o000)
+        if os.access(path, os.R_OK):
+            path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+            pytest.skip("this process can read a file with no read permission")
     try:
         outcome, _ = _kept_run(
             tmp_path,
@@ -5047,7 +5106,7 @@ def test_a_faulty_table_is_not_used_at_all(tmp_path: Path, shape: str) -> None:
     # F24 prints once, after F1, and in the other two forms.
     assert outcome.lines.count(F24) == 1
     assert outcome.lines.index(F24) == 1
-    for place in (outcome.text("markdown"), outcome.text("html")):
+    for place in (outcome.text("markdown"), outcome.page()):
         _says(place, F24)
     # The result is the result with no table, and the exit code is the result's.
     plain, _ = _kept_run(tmp_path / "plain", logs, None)
@@ -5350,7 +5409,7 @@ def test_an_edit_only_day_takes_the_row_with_more_results(tmp_path: Path) -> Non
     write_claude(root, logs)
     _write_lines(
         root / PROJECT_DIR / "02.jsonl",
-        _edit_only_lines(response_day=NEWEST, result_day=day, count=5, failed=0),
+        _edit_only_lines(response_day=BEFORE_WINDOW, result_day=day, count=5, failed=0),
     )
     stored = kept_row("claude-code", day, edits=12, edits_failed=3)
     store = tmp_path / "store"
