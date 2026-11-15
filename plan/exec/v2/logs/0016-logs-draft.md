@@ -81,8 +81,8 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
      An accepted name is disclosed in full; the grammar bounds what it can carry (listed
      words, three small numbers, one date) and does not promise that a name is not private.
      Anything else is shown as `model-1`, `model-2`, ... or `effort-1`, ..., numbered in the
-     text order of the raw values, and is still compared: two different unknown names are
-     never merged. The canary tests apply to rejected names and to every other free string.
+     text order of the raw values among the unknown ones only, and is still compared: two
+     different unknown names are never merged. The canary tests apply to rejected names and to every other free string.
      The review asked for a table of complete names; the grammar is kept because a table
      would print every new model as `model-1` until the next release.
    - Client versions and working directories are never output: each is reduced to counts of
@@ -110,7 +110,15 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    - **Formats.** Until `docs/LOG_FORMATS.md` is written (task L11, from the same text), the
      sections "Claude Code" and "Codex" of `plan/exec/v2/tasks/L0-logs-spike.md` define the
      fields and how a response is assembled, except where this record says otherwise. A
-     missing reasoning count is an unknown count; the response is still a response.
+     missing reasoning count is an unknown count; the response is still a response. The
+     working directory of a Claude Code line is its top-level `cwd`; the session id of a
+     Codex file is `session_meta.payload.id`. Lines carrying `isApiErrorMessage` count as
+     lines of an unused type.
+   - **Counter meanings.** `lines` counts every line read (for a Codex file outside the
+     project, its first line only). `responses` counts responses kept, after duplicates and
+     responses without a setting are set aside. `edits_unmatched` counts results whose id
+     matches no recorded tool call of any tool; a result that answers a call of a tool that
+     is not a file-edit tool is not counted anywhere.
    - **Effort.** Claude Code: the line's `effort`, else its `perTurnEffort` (on this
      project's logs `effort` matched the effort of the recorded request on every one of
      12,986 lines); each must be a non-empty string. Codex: the latest `turn_context`.
@@ -154,7 +162,8 @@ denominator (`"0/1"` for zero); dates are `YYYY-MM-DD`.
   `context: ContextCounts | None`, `counters: ReaderCounters`,
   `day_table_sha256: str | None`. With ERROR or `no_usable_setting`, `model`, `effort`,
   `before`, `after`, `context` and `day_table_sha256` are null and `measures` is empty;
-  `split_date` is kept when it is known. When the split is later than the newest day,
+  `split_date` is kept whenever the tool has a main-thread response (so it is set for
+  `no_usable_setting` unless there is no response at all). When the split is later than the newest day,
   `after` is null and the after-day lists are empty.
 - `Period`: `first_day`, `last_day` (calendar bounds of the period).
 - `MeasureDecision`: `id`, `worse: "lower" | "higher"`, `margin` (the adverse change:
@@ -184,7 +193,9 @@ denominator (`"0/1"` for zero); dates are `YYYY-MM-DD`.
   `streaky_days`, `no_usable_setting`, `no_logs`, `read_error`, `format_not_recognised`.
 - `day_table_sha256` is `hash_record` of `{method: "arci-logs/1", tool, model, effort,
   split_date, before, after, alpha_real: "1/120", alpha_none: "1/40", measures: [{id, margin,
-  before_days, after_days}]}` in the fixed orders above, with the rendered model and effort.
+  before_days, after_days}]}` in the fixed orders above, with the rendered model and effort,
+  dates and rationals as the strings of the record, periods and day values as the record's
+  objects (a missing period is null).
 
 Rendering: reasoning counts as integers rounded half up; shares as percentages with one
 decimal; the change of `reasoning_tokens` as a whole percentage of the before median; the
@@ -222,8 +233,8 @@ a value that is not available as `-`. Rendered numbers decide nothing.
 - **F7 context:** `Context counts; differences between the periods are not tested:` then
   `client versions {a} before, {b} after, {c} in both · working directories {d} before, {e} after · sub-agent share {f}% -> {g}%`
 - **F8 streak check:** `Streak check: {k} of {K} tested measures were not flagged.` (`K` measures with
-  enough days, `k` of them with `p_streak > 1/10`)
-- **F9 unread:** `{k} compressed Codex files were not read (Python 3.14 is needed); the result uses the rest.`
+  enough days, `k` of them with `p_streak > 1/10`); left out when `K` is 0
+- **F9 unread:** `Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest.`
 - **F10 limits (every tool with REAL DROP, NO DROP or CANNOT TELL):**
   `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`
   `to the model: your tasks, prompts, projects or client version may have changed.`
@@ -238,10 +249,13 @@ a value that is not available as `-`. Rendered numbers decide nothing.
 - **F11 method:** `method arci-logs/1 · exact rank tests · no random numbers · day-table digest {12 hex}`
 - **F12 next:** `Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run`
 - **F13 example label:** `Example data, generated. Not anyone's logs.`
-- **F14 other settings:** `Not compared: {k} other model or effort settings.`
-- **F15 skipped lines:** `{k} lines lacked a needed field and were left out.`
-- **F16 future records:** `{k} records stamped later than now were left out.`
-- **F17 unreadable files:** `{k} files could not be read; the result uses the rest.`
+- **F14 other settings:** `Other model or effort settings, not compared: {k}.`
+- **F15 skipped lines:** `Lines that lacked a needed field, left out: {k}.`
+- **F16 future records:** `Records stamped later than now, left out: {k}.`
+- **F17 unreadable files:** `Files that could not be read: {k}. The result uses the rest.`
+
+A notice prints only when its `{k}` is at least 1. A fixed sentence longer than 100 characters
+is broken at the last space at or before column 100, and so on for the rest.
 
 The Markdown block carries F2 in bold with the result, the F6 table, one line with the split
 date and F7's counts, and one closing line that depends on the result:
@@ -274,12 +288,20 @@ realornoise [the same options]
 - `--tool auto` (the default) requests each tool whose log root exists; when neither exists
   both are requested, so both report `no_logs` and the exit code is 3. `both` requests both.
 - `--model` and `--effort` take rendered names (as the output shows them).
+- `--claude-dir` replaces the `projects` directory itself (the folder that holds one folder
+  per project); `--codex-dir` replaces the Codex home (the folder that holds `sessions`).
+- `run` takes the options only (`argv` does not start with `logs`), and `now` must carry a
+  zone.
 - `--example` ignores the directory options, reads the packaged synthetic logs with a fixed
   "now" stored beside them, and prints F13 as the second line of the text output, in the
   Markdown block and on the HTML page. The packaged example gives REAL DROP for Claude Code
-  and NO DROP for Codex.
-- Unknown options, a malformed value and the usage errors of F5 print one fixed line to
-  standard error and exit 3. Nothing else is written to standard error.
+  and NO DROP for Codex, and every row of both tables has enough days: each day has at least
+  ten file-edit results for Claude Code, some responses with no reasoning, and for Codex some
+  responses at one repeated value.
+- Unknown options, a malformed value and the usage errors of F5 print exactly one fixed line
+  to standard error (the sentence alone, no prefix) and exit 3; an unknown option or malformed
+  value prints `Usage error. Run: realornoise --help`. Nothing is written to standard output
+  and no output file is written. Nothing else is ever written to standard error.
 - `arci.logs.cli.run(argv, *, now=None, env=None, home=None, out=None, err=None) -> int` is
   the testable entry; `main(argv=None)` calls it with the real clock, environment, home and
   streams. `arci logs ...` and `realornoise ...` call `main`.
