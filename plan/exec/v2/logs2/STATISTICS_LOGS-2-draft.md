@@ -84,21 +84,33 @@ number of main-thread responses, the frequency of each known reasoning count (0 
 number of unknown counts, and for Claude Code the file-edit results and the failed ones. That is
 enough to compute every day value of the table above.
 
-For each setting and day in the window, the row from the logs is used when it has at least as
-many responses as the stored row; otherwise the stored row is used. Which row a day uses depends
-on response counts only. The candidates, the after-period counts of the setting choice, `v*`,
+For each setting and day in the window, the two rows are compared by the pair (number of
+responses, number of file-edit results), in that order; the row from the logs is used when its
+pair is at least as large, and otherwise the stored row is used. So the row from the logs wins a
+tie, a day holding file-edit results and no response is decided by its file-edit count, and a
+Codex row counts as 0 file-edit results. A row is used whole. Which row a day uses depends on
+those two counts only. The candidates, the after-period counts of the setting choice, `v*`,
 the usable days and the tests then run on the days as used, with no other change.
 
 The kept table changes no claim. The claims are statements about the days the comparison uses.
-The rule that picks a day's row reads response counts, which are part of the log structure
-defined in the proof, and never a day value, so the proof below covers the days as used without
-change. What the table changes is which days exist to be compared: it can supply before-days
-whose session files are gone. It also adds ways for A1 to fail, listed below.
+The rule that picks a day's row reads which rows exist and their response and file-edit counts,
+all part of the log structure defined under "What is claimed, and under which assumptions", and
+never a day value or whether an edit failed, so
+the proof below covers the days as used without change. What the table changes is which days
+exist to be compared: it can supply before-days whose session files are gone. It also adds ways
+for A1 to fail, listed below.
+
+What it promises is limited to the case the spike behind this version tested: rows admitted to
+the table, one UTC offset, a window inside the 180 days the table holds, deletion of whole days
+or of parts of days by age, and no gap longer than 29 days between `--keep` runs. Under those
+conditions the days used equal the days an undeleted history would give. A day never captured
+whole cannot be recovered, and a longer gap loses days outright.
 
 Its limits: kept rows are not checked against logs again; they hold the counts as the readers
 of the version that wrote them saw them; an edited table gives an edited result, and the seal
-does not detect a table edited before the run. The output marks kept days (a count line, and
-`source: "kept"` on each such day in the JSON record, which the day-table digest covers). Rows
+does not detect a table edited before the run. The output marks kept days (a count line, which
+counts every day whose row came from the table, usable or not, and `source: "kept"` on each
+usable such day in the JSON record, which the day-table digest covers). Rows
 are kept only for settings whose names pass the bounded name rules, and for at most 180 days
 before `N`. A row, from the logs or kept, can hold only part of a day: a kept row written before
 its day ended, or a log row after some of the day's session files were deleted; its value then
@@ -132,9 +144,10 @@ Leave out days equal to `M`; mark each other day above or below `M`; let `R` be 
 runs of equal marks, with `a` days above and `b` below. `p_streak` is the probability of `R`
 or fewer runs when `a` above-marks and `b` below-marks are arranged uniformly at random
 (the exact runs distribution; 1 when `a` or `b` is 0). The measure is **streaky** when
-`p_streak ≤ 1/10`. A streaky measure is not tested, and one streaky measure stops the whole
-comparison for the tool: when good days follow good days in any recorded measure, the days
-are not interchangeable, and a two-period comparison cannot tell a streak from a drop.
+`p_streak ≤ 1/10`. A streaky measure is not tested, and one flagged measure stops the whole
+comparison for the tool. The check flags an unusually small number of runs; the method
+therefore withholds a result. A flag does not establish dependence: exchangeable days can be
+ordered that way by chance, and passing the check does not establish A1 either.
 
 **Result for a tool, in this order.**
 
@@ -163,10 +176,11 @@ No random number is drawn anywhere. The same day table gives the same result on 
 
 All statements are per tool and for one comparison.
 
-The **log structure** of a run is: which responses of the tool exist in the window, the day of
-each, its setting (or none) and its thread, and, for days from the kept table, the same facts
-as the row records them (its day, setting and number of responses). Reasoning counts, file-edit
-results and day values are not part of it.
+The **log structure** of a run is: which responses of the tool exist in the window and which
+file-edit results exist, the day of each, its setting (or none), and for a response its thread;
+and, for the stored rows of the kept table, which rows exist and the same facts as each row
+records them (its day, setting, number of responses and number of file-edit results). Reasoning
+counts, whether a file-edit result failed, and day values are not part of it.
 
 **A1 (days are interchangeable when nothing changes; restated in `arci-logs/2`).** If the
 tool's behaviour did not change at the split, then, given the log structure, the options of the
@@ -182,10 +196,10 @@ this, because it treated the counts as interchangeable too. It also fails when n
 resemble each other.
 
 **A2 (nothing was chosen by looking).** Any `--since`, `--model`, `--effort` or `--project`
-was fixed without reference to the reasoning counts, file-edit results or day values of the
-records compared, or by a rule that depends on the log structure only, so that, given the log
-structure, the options carry no information about those values. Choosing a date, model or
-effort because a measure looked low is excluded.
+was fixed without reference to the reasoning counts, the failures of the file-edit results, or
+the day values of the records compared, or by a rule that depends on the log structure only, so
+that, given the log structure, the options carry no information about those values. Choosing a
+date, model or effort because a measure looked low is excluded.
 
 **A3 (a change moves every day alike).** Each measure has its own shift `δ`. If a measure
 changed, each after-day value is exactly what that day would have shown without the change,
@@ -234,11 +248,13 @@ those values with the group sizes fixed.
 Proof. `N` is the newest day with a main-thread response in the logs: a function of the
 structure. The split is `N - 13`, or the `--since` date, which A2 fixes without reference to
 values. The window follows from `N` and the split. Which row a day uses (logs or kept) depends on
-two response counts, both part of the structure. The candidates are the settings with a
+which rows exist and on the pair (responses, file-edit results) of each, all part of the
+structure, with the logs row winning a tie. The candidates are the settings with a
 main-thread response in the window, kept by `--model` and `--effort` (fixed by A2). Each
 candidate's score is its number of main-thread responses dated `s` to `N` (or, when no candidate
 has one, in the before period): a count over the structure. Ties go to the order of raw names,
-also part of the structure. No step reads a reasoning count, a file-edit result or a day value. A permutation of the compared setting's
+also part of the structure. No step reads a reasoning count, whether a file-edit result failed,
+or a day value. A permutation of the compared setting's
 usable day values with the group sizes fixed changes values only, so it changes none of these
 inputs, and the chosen setting, split, window and day sources are the same. The usable days, and
 so `n` and `m`, are held fixed by the statement.
@@ -294,10 +310,15 @@ REAL DROP only remove NO DROP results.
   most about 16 days of files, not 84. At least 10 of them must be usable for a measure to be
   tested, so a default user often gets CANNOT TELL (`too_few_days`) on Claude Code. The output
   then names the first date a test is possible in the best case. Days whose files are gone come
-  back only from the kept table, and only if `--keep` ran while the files existed. This tool
-  does not change the Claude Code setting.
+  back only from the kept table, and only if `--keep` ran while the files existed, with no gap
+  longer than 29 days between those runs. A day never captured whole cannot be recovered. This
+  tool does not change the Claude Code setting.
 - **A setting adopted recently** has few earlier days, and its first days may differ from later
-  ones, for example while the user learns it; A1 can then fail. The tool does not compare across
+  ones, for example while the user learns it; A1 can then fail. In the spike for this version,
+  with a generator whose first five days of a newly adopted setting ran 1.15 times its later
+  days and no shift at the split, wrong REAL DROP was 535 of 20,000 histories at 14 days after
+  against 16 before, and 415 of 20,000 at 7 after against 21 before. The 2.4.0 self-check keeps
+  that cell, report only. The tool does not compare across
   a change of model or effort: the days of other settings never fill the compared setting's
   before period. When a setting was adopted after the split, its before period is empty and the
   result is CANNOT TELL (`too_few_days`).
@@ -305,7 +326,8 @@ REAL DROP only remove NO DROP results.
   The [self-check](results/logs-selfcheck.md) of 2.3.0, dated 2026-11-15, reports the tables
   below; the 2.4.0 self-check replaces them. Rates are proportions, copied without rounding; brackets are Wilson 95%
   intervals. Counts show the actual runs, not just the requested runs. These are simulation
-  results for the stated generators, not evidence that a user's days satisfy A1.
+  results for the stated generators, not evidence that a user's days satisfy A1; and a flag in a
+  run is not evidence that they do not.
 
 ### Correlation and the cost of the check
 
@@ -477,27 +499,43 @@ figures from the 2.3.0 self-check; replaced at the 2.4.0 self-check
 
 The 2.4.0 self-check adds:
 
-7. The null gate with setting changes under the setting rule of `arci-logs/2`: exactly 20,000
-   histories per design, each holding two or three settings and a change of setting inside the
-   window, built through response records so that the setting choice runs; the compared
-   setting's responses per day after the split are drawn larger than before (for example 3
-   times), and day values are computed from those responses; the rates of wrong REAL DROP and
-   wrong NO DROP are each at most 0.0283. A report-only cell has the same imbalance and one
-   setting.
-8. Each streak-check rate is also given conditional on passing the check: among the histories
-   the check does not stop, the share with a wrong result, with its count and interval.
-9. Power cells run until the stated number of tested histories is reached; the table says what
-   each count is (histories generated, histories tested, histories stopped by the check).
-10. The design 14 after against 16 before (Claude Code's default retention) in the null,
+7. A gate with setting changes under the setting rule of `arci-logs/2`, from a generator that
+   keeps A1. Each history holds two or three settings and a change of setting inside the window,
+   is built through response records so that the setting choice runs, and draws each day value
+   independently of that day's number of responses, so the compared setting's usable day values
+   stay exchangeable given the response structure. The cells are separate, with exactly 20,000
+   histories each: a null cell, in which nothing changed and the rate of REAL DROP is at most
+   0.0283; and one cell per gating measure, in which that measure sits exactly at its margin and
+   the others are unchanged, and the rate of NO DROP is at most 0.0283. Under the null, NO DROP
+   is not an error and is not counted as one; in a margin cell, REAL DROP is not an error.
+8. A second gate of the same kind, with the same cells, denominators of 20,000 histories and
+   bounds, in which two settings have close after-period counts, so the choice is exercised and
+   is not fixed by construction. Its generator keeps A1 in the same way.
+9. Report only, never gated, each cell naming the assumption it breaks, on 20,000 histories per
+   cell: a generator in which the compared setting has many more responses per day after the
+   split than before (it breaks A1, since a median or a share over more responses varies less);
+   and a generator whose newly adopted setting runs its first five days 1.15 times its later
+   days, with no shift at the split (it breaks A1, since the early before-days differ from the
+   later ones). In the spike for this version the second gave wrong REAL DROP 535 of 20,000 at
+   14 days after against 16 before, and 415 of 20,000 at 7 after against 21 before. A low rate
+   in a cell like these would not establish A1, and the claims do not cover them.
+10. Each streak-check rate is also given conditional on passing the check: among the histories
+    the check does not stop, the share with a wrong result, with its count and interval.
+11. Power cells run until the stated number of tested histories is reached; the table says what
+    each count is (histories generated, histories tested, histories stopped by the check).
+12. The design 14 after against 16 before (Claude Code's default retention) in the null,
     correlation and power tables.
-11. Report only: days from a weekly cycle and days from a regime-switching generator, with no
+13. Report only: days from a weekly cycle and days from a regime-switching generator, with no
     check, a per-measure check and the rule as built.
-12. The two figures printed in every output (section "How far the bound can fail"), read from
+14. The two figures printed in every output (section "How far the bound can fail"), read from
     the correlation table; a test holds the printed figures equal to this file.
-13. The kept-table rules: when deletion removes whole days and a `--keep` run happened after
-    each deleted day ended, a run with the kept table gives the same day table as the run before
-    the deletion. One further case has a session file that spans the deletion boundary.
-14. The first counterexample of item 6 prints as `Demonstration outside A1 (arci-logs/2): ...`.
+15. The kept-table rules, inside the deletion model of the section "Days from the kept table":
+    admitted rows, one offset, a window inside the stored 180 days, deletion of whole days or of
+    parts of days by age, and a `--keep` run after each deleted day ended, never more than 29
+    days apart. Then a run with the kept table gives the same day table as the run before the
+    deletion. One further case has a session file that spans the deletion boundary, and one has a
+    gap longer than 29 days, which loses days and is recorded as the stated limit.
+16. The first counterexample of item 6 prints as `Demonstration outside A1 (arci-logs/2): ...`.
 
 The streak check itself is unchanged in this version. Open: one pre-stated check instead of the
 three variants reported; an unknown split date; repeated daily looks.
