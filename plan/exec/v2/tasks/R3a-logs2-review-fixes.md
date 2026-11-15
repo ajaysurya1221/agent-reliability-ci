@@ -145,3 +145,33 @@ item 72 as amended and the new items 74 to 77. Do not edit `docs/design/`,
 
 One line per numbered item; the gate summary and elapsed time of the new run; the figures
 that moved, if any; the commands and their last lines; anything you could not do.
+
+## Addendum (ruling after the first run stopped at a quick-mode gate)
+
+The first run of this task added the moved measure's own count (item 6) and then stopped,
+correctly, because the quick mode failed: in the competitive-choice cell for the token
+margin, seed 18112035, the moved measure's own finding was `no drop` in 2 of 30 histories,
+above 0.0283. The changes so far are in `bench/selfcheck_logs.py` in the working tree;
+continue from them.
+
+**Ruling.** Two of 30 says nothing either way: with a true rate of 1/40 the chance of two
+or more in 30 is about 17%. A fixed rate of 0.0283 is a gate for 20,000 histories, not for
+30. So:
+
+- **Full mode is unchanged:** every rate gate keeps the bound 0.0283 on exactly 20,000
+  histories (the older tables keep their own sizes and bounds as they are).
+- **Quick mode** (any cell smaller than its full size): a rate gate passes when the count
+  is at most `limit(n)`, the smallest `c` for which the probability that a binomial count
+  with `n` trials and success probability 1/40 exceeds `c` is at most 1/1000, computed
+  exactly with fractions. This holds for every rate gate in quick mode, old and new. Print
+  the limit beside each quick gate, and say in the quick-mode header that quick gates are
+  smoke checks under this rule and do not support any claim. Unit test: `limit(n)` against
+  an independent calculation for three sizes, and that the quick mode now passes with the
+  seeds as they are.
+- Change no seed, no generator and no full-mode threshold.
+
+Then carry out every item of this brief. For item 9: if, in the **full** run, a moved
+measure's own count is above 566 of 20,000 in any margin cell, stop and report the cell,
+the count, the tool-level count beside it, and how many of those histories had the streak
+check flag the tool. Do not change anything to make it pass. That would be a finding
+about the method or the generator, and the orchestrator decides.
