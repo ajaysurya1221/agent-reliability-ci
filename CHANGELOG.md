@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **CI:** CodeQL (Python and Actions) and zizmor now scan every push to `main` and
+  `sprint/**` and every pull request, Dependabot opens one monthly grouped pull request for
+  GitHub Actions versions, uv is installed from a hash-pinned requirements file in every
+  workflow that can check out the repository first, and a new "oracle / SciPy" CI job checks
+  the exact rank test against SciPy's own permutation and Mann-Whitney tests.
+- **Docs:** added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates,
+  and a test that these files exist and stay consistent with each other.
 - **Docs:** the README now starts with a generated banner (`docs/assets/banner-{light,dark}.svg`,
   from `make_figures.py`) whose dots are the packaged example's day values, checked by a test.
 - **Tests:** `test_slow_healthy_predecessor_has_no_gate_deadline` now uses a wait limit of
