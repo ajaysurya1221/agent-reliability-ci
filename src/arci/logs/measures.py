@@ -9,7 +9,7 @@ from fractions import Fraction
 from typing import Literal
 
 from . import kept
-from .records import ReadResult, Response, Tool, version_key
+from .records import ReadResult, Response, Tool, version_order
 from .schema import ContextCounts, DayValue, MeasureId, Period, validate_rational
 
 
@@ -87,9 +87,7 @@ def _context(
 ) -> ContextCounts:
     vb, va = {r.version for r in before}, {r.version for r in after}
     names = [versions[i] for i in va if 0 <= i < len(versions) and versions[i] is not None]
-    shown = tuple(
-        sorted((name for name in names if name is not None), key=version_key, reverse=True)[:3]
-    )
+    shown = tuple(version_order(name for name in names if name is not None)[:3])
     return ContextCounts(
         client_versions_after_shown=shown,
         client_versions_after_more=len(va) - len(shown),

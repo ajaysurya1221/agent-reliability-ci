@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -264,3 +265,8 @@ def version_name(raw: str | None) -> str | None:
 
 def version_key(name: str) -> tuple[tuple[int, ...], str]:
     return tuple(int(part) for part in name.split(".")), name
+
+
+def version_order(names: Iterable[str]) -> list[str]:
+    """Highest numeric tuple first; equal tuples in ascending code-point order."""
+    return sorted(sorted(names), key=lambda name: version_key(name)[0], reverse=True)

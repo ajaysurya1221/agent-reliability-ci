@@ -112,7 +112,7 @@ raised, and nothing in this record departs from it.
   effort, each in code-point order.
 - Candidates, the after-period counts of the choice and `other_settings` are taken from the days
   as used, kept rows included; the context counts and reader counters come from the logs only.
-- Client versions: equal numeric tuples are ordered by text; `k` counts every distinct
+- Client versions: equal numeric tuples go in ascending code-point order of their text; `k` counts every distinct
   after-period version not listed, matching or not. The memo asks each reader for the
   after-period versions; a reader does not know the split, so the readers return a version name
   only when the string matches the pattern, and `measures.build` applies the after-period
@@ -200,7 +200,7 @@ notices, the client-version line, the new record fields below, and two usage err
   `client_versions_after` (all responses of the tool in the after period, after the
   `--project` filter, before the main-thread and setting filters). The printed list holds the
   three highest matching versions by numeric order (each version read as a tuple of integers,
-  compared as tuples; equal tuples, such as `1.01` and `1.1`, are ordered by text), highest
+  compared as tuples; equal tuples, such as `1.01` and `1.1`, go in ascending code-point order of their text, so `1.01` comes before `1.1`), highest
   first. `k` is the number of distinct after-period client versions not listed, whether or not
   they match. The list is followed by ` +{k} more` when `k` is at least 1. When no version
   matches, the line is left out. A version that does not match is never printed. Working
@@ -345,6 +345,10 @@ parts that are not available, the period lines, the measure table, the context c
 digest are left out; no digest is made up. In the Markdown file such a block ends with the F10
 text and no footer, since the footer carries a digest; the footer appears only for a tool with a
 selected setting and a result other than ERROR.
+
+In the HTML output the characters `&`, `<`, `>`, `"` and `'` are written as HTML character
+references, so a fixed text that holds one of them appears on the page escaped, and a test
+compares it after unescaping the page.
 
 The HTML page holds, per tool, the same information as the text output, F18 to F26 included,
 and one strip chart per gating measure (one dot per usable day, a vertical line at the split,
@@ -1031,7 +1035,7 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
     passes and one of 49 does not; six parts pass and seven do not; three numeric parts pass and
     four do not; one date part passes and two do not; `4o`, `o3` and `r1` pass. Client versions
     are ordered as tuples of integers: `2.1.325` before `2.1.40`; `1.01` and `1.1` are equal
-    tuples and go in text order; two, three and four numbers all match, one and five do not; a
+    tuples and go in ascending text order (`1.01` before `1.1`); two, three and four numbers all match, one and five do not; a
     number of five digits matches and one of six does not; two non-matching strings count as two
     in `k`.
 60. The version population is every response of the tool in the after period after the

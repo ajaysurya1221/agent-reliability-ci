@@ -884,15 +884,17 @@ def test_version_grammar(version: str, admitted: bool) -> None:
 
 
 def test_version_ties_and_json_exception_are_scoped() -> None:
-    from arci.logs.records import version_key
+    from arci.logs.records import version_order
     from tests.unit.logs.privacy.test_json_leaves import allowed
 
-    assert sorted(["1.01", "1.1", "2.1.40", "2.1.325"], key=version_key, reverse=True) == [
+    # Highest numeric tuple first; equal tuples in ascending text order (record 0017, Names).
+    assert version_order(["1.1", "1.01", "2.1.40", "2.1.325"]) == [
         "2.1.325",
         "2.1.40",
-        "1.1",
         "1.01",
+        "1.1",
     ]
+    assert version_order(["1.1", "1.01", "1.001", "1.0001"])[:3] == ["1.0001", "1.001", "1.01"]
     assert allowed("2.1.325", "client_versions_after_shown")
     assert not allowed("2.1.325", "other")
     assert not allowed("9.8.7654321", "client_versions_after_shown")
@@ -1044,3 +1046,11 @@ def test_no_selected_setting_beside_selected_tool_roundtrips(tmp_path: Path) -> 
         assert render(record) == render(restored)
     block = report.render_markdown(record).split("**Codex", 1)[0]
     assert "digest" not in block and " ".join(report.limits_text().splitlines()) in block
+
+
+def test_a_table_path_below_a_regular_file_is_absent(tmp_path: Path) -> None:
+    """Record 0017: kept_table is absent when the path does not exist."""
+    from arci.logs import kept
+
+    (tmp_path / "blocked").write_text("not a directory", encoding="utf-8")
+    assert kept.read(tmp_path / "blocked" / "in" / "days-1.json") == ("absent", ())

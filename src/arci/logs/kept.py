@@ -96,11 +96,12 @@ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
         data: object = json.loads(raw.decode("utf-8"), object_pairs_hook=_object)
         table = KeptTable.model_validate(data)
         return "read", table.rows
-    except FileNotFoundError:
-        # A dangling symlink is a path that exists but cannot be read.
+    except (FileNotFoundError, NotADirectoryError):
+        # The path is absent when it does not exist, also when a parent is not a
+        # directory. A dangling symlink is a path that exists but cannot be read.
         try:
             path.lstat()
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             return "absent", ()
         except OSError:
             pass

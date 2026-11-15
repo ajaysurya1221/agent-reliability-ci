@@ -22,7 +22,7 @@ from pydantic import (
 
 from arci.hashing import hash_record
 
-from .records import EFFORTS, VERSION_PATTERN, Tool, render_model, version_key
+from .records import EFFORTS, VERSION_PATTERN, Tool, render_model, version_order
 
 if TYPE_CHECKING:
     from .measures import ToolTable
@@ -388,10 +388,7 @@ class ContextCounts(Model):
         names = self.client_versions_after_shown
         if any(VERSION_PATTERN.fullmatch(name) is None for name in names):
             raise ValueError("invalid_version")
-        if (
-            len(set(names)) != len(names)
-            or tuple(sorted(names, key=version_key, reverse=True)) != names
-        ):
+        if len(set(names)) != len(names) or tuple(version_order(names)) != names:
             raise ValueError("invalid_version_order")
         if len(names) + self.client_versions_after_more != self.client_versions_after:
             raise ValueError("invalid_version_count")
