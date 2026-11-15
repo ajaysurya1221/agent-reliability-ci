@@ -75,20 +75,25 @@ probability that this count is at least `u` when `n + m` distinct values are arr
 uniformly at random; it depends on `n`, `m` and `u` only and is computed exactly.
 `p_none = G(n, m, U)`. The measure is a **no-drop** when `p_none ≤ α_none = 1/40`.
 
-**Self-check.** For each gating measure with enough days, order its usable before-days by
-date and cut them into a first half and a second half (an odd day goes to the first half).
-Run the real-drop test with the first half as "before" and the second half as "after" at
-`α_real`; the minimum-day rule does not apply to the halves. The self-check **fires** when
-any of these rejects.
+**Streak check.** For each gating measure with enough days, take its usable before-days in
+date order and their median `M` (an even number of days: the mean of the two middle values).
+Leave out days equal to `M`; mark each other day above or below `M`; let `R` be the number of
+runs of equal marks, with `a` days above and `b` below. `p_streak` is the probability of `R`
+or fewer runs when `a` above-marks and `b` below-marks are arranged uniformly at random
+(the exact runs distribution; 1 when `a` or `b` is 0). The measure is **streaky** when
+`p_streak ≤ 1/10`. A streaky measure is not tested: when good days follow good days, a
+two-period comparison cannot tell a streak from a drop.
 
 **Result for a tool, in this order.**
 
 1. ERROR when the logs cannot be read as specified (design record, reason codes).
 2. CANNOT TELL (`too_few_days`) when no gating measure has enough days.
-3. If any gating measure is a real drop: CANNOT TELL (`self_check_shift`) when the self-check
-   fires, REAL DROP otherwise. Nothing below is evaluated.
-4. NO DROP when all three gating measures have enough days and each is a no-drop.
-5. CANNOT TELL (`not_enough_evidence`) otherwise.
+3. Each gating measure with enough days gets a finding: `streaky`, or else `real_drop`, or
+   else `no_drop`, or else `cannot_tell`. A measure without enough days is `too_few_days`.
+4. REAL DROP when any finding is `real_drop`.
+5. NO DROP when all three findings are `no_drop`.
+6. CANNOT TELL otherwise: `streaky_days` when any finding is `streaky`, else
+   `not_enough_evidence`.
 
 **Process exit code.** Among tools without ERROR: 1 if any is REAL DROP; otherwise 2 if any is
 CANNOT TELL; otherwise 0. If every tool is ERROR, or no logs are found, 3. Each tool's result
@@ -143,7 +148,8 @@ a uniformly random choice of `m` of the `n + m` values, which is exactly the ref
 distribution of `p_real`. So `P(p_real ≤ α) ≤ α` for every `α`, with any ties.
 
 *Claim 1.* At most three measures are tested, each at `(1/40)/3`; the union bound gives
-`1/40` whatever the dependence between measures. The self-check only removes rejections.
+`1/40` whatever the dependence between measures. The streak check only removes findings, so
+the probability of a REAL DROP result is no larger with it than without it.
 
 *No-drop test with ties.* Let `a_1..a_n, b_1..b_m` be exchangeable. Break ties by an
 independent uniformly random order; the strict ranking is then a uniformly random
@@ -159,7 +165,8 @@ it is strictly increasing, so `(g(x_i), g(w_j))` are exchangeable, and `y_j ≤ 
 `δ ≥ margin`. The count `U` of pairs with `x'_i < y_j` is non-decreasing in each `y_j`, so it
 is at most the count with `g(w_j)` in place of `y_j`, to which the previous paragraph
 applies. Hence measure `k` is a no-drop with probability at most `α_none`. NO DROP needs every
-gating measure to be a no-drop, measure `k` included, and step 3 only removes NO DROP results.
+gating measure to be a no-drop, measure `k` included; the streak check and the precedence of
+REAL DROP only remove NO DROP results.
 
 ## What the method cannot see
 
@@ -172,6 +179,12 @@ gating measure to be a no-drop, measure `k` included, and step 3 only removes NO
   drop, day-to-day spread, seed and number of simulations), computed with this document's
   final rule. Any figure quoted from it carries those conditions. The simulation thresholds
   are checks of the implementation; the bounds above are proved, not simulated.
+- **Days that come in streaks break A1.** In simulation, with day values correlated at 0.5
+  from one day to the next and no streak check, a wrong REAL DROP appeared in about 14 to 20%
+  of runs instead of at most 2.5%. The streak check is there for this case; with it the
+  simulated rate was about 4% at 7 days after and 21 before and under 1% at 14 and 42. It is
+  a guard, not a proof: A1 is still assumed, and `bench/selfcheck_logs.py` prints the measured
+  rates with and without the guard for correlations of 0.3, 0.5 and 0.7.
 - A change that began before the before period, a change in how a vendor counts tokens, and a
   change in what the user works on all look the same to the test.
 - One person's logs say nothing about another person's.
@@ -182,13 +195,15 @@ gating measure to be a no-drop, measure `k` included, and step 3 only removes NO
    `p_real` on tie patterns: none; three levels; all equal).
 2. For those cases, the share of labelings on which each test rejects at `α` is at most `α`.
 3. Null simulation with the final rule, including setting selection, usable-day rules and the
-   self-check: 20,000 seeded day tables per design (5/10, 7/21, 14/42, 28/84), measures
+   streak check: 20,000 seeded day tables per design (5/10, 7/21, 14/42, 28/84), measures
    independent and measures with identical ranks; the rate of REAL DROP is at most 0.0283.
    With one measure exactly at its margin and the others unchanged, the rate of NO DROP is at
    most 0.0283.
 4. The rejection-rate table, and the planted-shift check (a 45% drop at 14/42 with a log
    standard deviation of 0.40 gives REAL DROP in at least 95% of runs).
-5. Reported, not gated: the wrong-REAL rate when day values follow an AR(1) process with
-   coefficient 0.5, which breaks A1; and the reviewer's two counterexamples (selection by
+5. The exact runs distribution equals brute-force enumeration for every `a + b ≤ 14`.
+6. Reported, not gated: the wrong-REAL and wrong-NO-DROP rates when day values follow an AR(1)
+   process with coefficient 0.3, 0.5 and 0.7, which breaks A1, with and without the streak
+   check; and the reviewer's two counterexamples (selection by
    after-period counts; a change that swaps which days are usable), each shown to break the
    bound when its assumption is dropped.

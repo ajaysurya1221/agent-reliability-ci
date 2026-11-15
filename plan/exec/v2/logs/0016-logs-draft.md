@@ -39,8 +39,8 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    effort), main thread; usable days before and after a split date; three gating measures per
    tool; per measure an exact conditional rank test at `(1/40)/3` for a real drop, and a
    strict-count test against a fixed reference at `1/40`, after moving the before-days by the
-   margin, for a no-drop; a self-check inside the before period whose firing ends in CANNOT
-   TELL; no random numbers. The setting is chosen from response counts over both periods
+   margin, for a no-drop; a streak check on the before-days (an exact runs test) that withholds
+   a measure whose days come in streaks; no random numbers. The setting is chosen from response counts over both periods
    together, never from one period: choosing by the after period alone can make a wrong REAL
    DROP certain (review finding 1).
 
@@ -117,7 +117,7 @@ Pydantic models, `extra="forbid"`, frozen, sealed with `hashing.hash_record` lik
 - `ToolDecision`: `tool: "claude-code" | "codex"`, `result: "REAL_DROP" | "NO_DROP" |
   "CANNOT_TELL" | "ERROR"`, `reason: ReasonCode`, `model`, `effort`, `other_settings: int`,
   `split_date`, `before: Period`, `after: Period`, `measures: list[MeasureDecision]` (in the
-  order of the contract's table), `self_check: "no_shift" | "shift_found" | "not_run"`,
+  order of the contract's table),
   `context: ContextCounts`, `counters: ReaderCounters`, `day_table_sha256`. For ERROR, and for
   a tool with no usable setting, every field without a value is null; no date or p-value is
   invented.
@@ -125,8 +125,8 @@ Pydantic models, `extra="forbid"`, frozen, sealed with `hashing.hash_record` lik
 - `MeasureDecision`: `id`, `worse: "lower" | "higher"`, `margin`, `before_days` and
   `after_days` (`list[DayValue]`, ascending by day, no day twice), `median_before`,
   `median_after` (median of the day values; an even number of days gives the mean of the two
-  middle ones; null with no usable day), `p_real`, `u_none`, `p_none` (null when not tested),
-  `finding: "real_drop" | "no_drop" | "cannot_tell" | "too_few_days"`.
+  middle ones; null with no usable day), `p_streak`, `p_real`, `u_none`, `p_none` (null when not computed),
+  `finding: "streaky" | "real_drop" | "no_drop" | "cannot_tell" | "too_few_days"`.
 - `DayValue`: `day`, `count: int` (the denominator of that measure on that day), `value`
   (in the measure's own units, not negated).
 - `ContextCounts`: client versions before / after / in both; distinct working directories
@@ -135,7 +135,7 @@ Pydantic models, `extra="forbid"`, frozen, sealed with `hashing.hash_record` lik
   lines of unknown type, lines lacking a needed field, records stamped in the future,
   responses, responses without a reasoning count, edit results denied, edit results unmatched.
 - `ReasonCode`: `real_drop`, `no_drop`, `not_enough_evidence`, `too_few_days`,
-  `self_check_shift`, `no_logs`, `format_not_recognised`, `no_usable_setting`.
+  `streaky_days`, `no_logs`, `format_not_recognised`, `no_usable_setting`.
 - `day_table_sha256` is `hash_record` of `{method, tool, model, effort, split_date, before,
   after, alpha_real, alpha_none, measures: [{id, margin, before_days, after_days}]}` in the
   fixed orders above.
@@ -159,7 +159,7 @@ Rendered numbers decide nothing.
   - `no_drop`: `No recorded measure moved toward worse by its margin or more. This does not say anything improved.`
   - `not_enough_evidence`: `The days are too few or too variable to tell a shift from noise.`
   - `too_few_days`: `Too few usable days for every measure (5 needed after the split, 10 before).`
-  - `self_check_shift`: `A shift of the same kind shows inside the before period, so a real drop is not claimed.`
+  - `streaky_days`: `Your earlier days come in streaks in a recorded measure, so this comparison cannot tell a streak from a drop.`
   - `no_logs`: `No session logs found. Looked under ~/.claude/projects (or CLAUDE_CONFIG_DIR) and ~/.codex (or CODEX_HOME). Use --claude-dir DIR or --codex-dir DIR, or try: realornoise --example`
   - `format_not_recognised`: `Log files were found, but this version could not recover a response from them.`
   - `no_usable_setting`: `No model and effort setting has a usable day in the window.`
@@ -168,10 +168,10 @@ Rendered numbers decide nothing.
   `finding`; each period cell is the median followed by the number of usable days in
   brackets; row names `reasoning tokens per response`, `responses with no reasoning`,
   `file edits that failed`, `reasoning at one repeated value`; findings `real drop`,
-  `no drop (margin {margin})`, `cannot tell`, `too few days`.
+  `no drop (margin {margin})`, `cannot tell`, `too few days`, `days come in streaks`.
 - **F7 context:** `Context counts; differences between the periods are not tested:` then
   `client versions {a} before, {b} after, {c} in both · working directories {d} before, {e} after · sub-agent share {f}% -> {g}%`
-- **F8 self-check:** `Same test inside the before period (first half against second half): no shift found.`
+- **F8 streak check:** `Streak check on the earlier days: passed for {k} of {K} tested measures.`
 - **F9 unread:** `{k} compressed Codex files were not read (Python 3.14 is needed); the result uses the rest.`
 - **F10 limits (every tool with a result):**
   `This shows what your logs recorded. It does not establish answer quality, a cause, or a change`

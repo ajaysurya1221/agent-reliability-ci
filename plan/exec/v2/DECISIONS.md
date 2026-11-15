@@ -142,3 +142,14 @@ Maintainer decisions of 2026-11-15, then the plan approved the same day.
 6. **Stop rule.** 14 Dec 2026 stays. Its third criterion becomes "one result block from the
    tool posted publicly by someone else", since a tool that runs on a private machine leaves
    no public repository.
+
+## D-12: L0 passed; go, with a streak check (2026-11-15)
+
+The spike met every threshold (`spikes/L0-logs/REPORT.md` and `ORCHESTRATOR.md`). It also
+showed that day values correlated from one day to the next raise the wrong-REAL-DROP rate to
+about 14 to 20%. The half-split self-check of the first draft barely helps. An exact runs
+test on a measure's before-days, at 1/10, brings the simulated rate to about 4% at 7 days
+after and 21 before and to 1% or less at larger sizes, for a loss of about 10 to 20 points of
+power on independent days. It replaces the self-check in the contract. The bound is still
+stated under interchangeable days; the measured rates under correlation are published with
+the tool.
