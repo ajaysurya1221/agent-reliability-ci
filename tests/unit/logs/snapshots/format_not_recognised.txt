@@ -1,0 +1,8 @@
+realornoise <version> · reads local session logs · sends nothing · writes nothing unless asked
+
+Codex
+RESULT: ERROR
+Log files were found, but this version could not recover a response from them.
+
+Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run
+exit 3

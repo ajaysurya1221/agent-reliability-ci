@@ -10,8 +10,8 @@ Each run was registered in a pushed commit, with a written prediction, before it
 trial: run 1 at
 [`8ff0c3a`](https://github.com/ajaysurya1221/agent-reliability-ci/commit/8ff0c3a), run 2 at
 [`6fbdb1c`](https://github.com/ajaysurya1221/agent-reliability-ci/commit/6fbdb1c). The
-working records (pre-registrations, rendered reports, full write-ups) are on the branch
-[`v2/phase0`](https://github.com/ajaysurya1221/agent-reliability-ci/tree/v2/phase0/plan/exec/v2/study).
+working records (pre-registrations, rendered reports, full write-ups) are at commit
+[`d46367d`](https://github.com/ajaysurya1221/agent-reliability-ci/tree/d46367d/plan/exec/v2/study).
 The run stores and logs are kept by the maintainer and are not in the repository.
 
 Update: the two runs' sealed stores are now committed under

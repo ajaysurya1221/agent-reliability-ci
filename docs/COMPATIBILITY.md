@@ -70,3 +70,19 @@ Not promised: the wording and layout of the suite Markdown and HTML reports; `mi
 LangChain adapter's internal call shape, async agents or interrupts; the terminal and
 Markdown layout of an `arci verdict` report; and anything else design records 0011-0015
 list as not built. Each of those may change without a major-version bump.
+
+## Session logs in 2.3.0
+
+2.3.0 adds `arci logs`, the `realornoise` distribution and the new record kind
+`arci-logs/1`. Existing commands and records retain their meaning. Within this method
+version, the record fields, exit codes and fixed texts in
+[record 0016](design/0016-logs.md) are promised: REAL DROP/1, NO DROP/0, CANNOT TELL/2,
+ERROR/3. With several tools the process uses the precedence in
+[STATISTICS_LOGS.md](STATISTICS_LOGS.md); an ERROR for one tool does not erase the other
+result. Usage and requested-output write errors exit 3.
+
+The log formats of other vendors' tools are not promised. The checked client versions
+are listed in [LOG_FORMATS.md](LOG_FORMATS.md); future formats can need reader changes.
+Windows is untested for `arci logs`. A record seal checks consistency, not authenticity
+or the truth of the statistical assumptions. The general presentation disclaimer above
+does not remove the fixed-text commitment within this method version.

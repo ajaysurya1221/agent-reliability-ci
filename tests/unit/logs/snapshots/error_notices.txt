@@ -1,0 +1,11 @@
+realornoise 2.2.0 · reads local session logs · sends nothing · writes nothing unless asked
+
+Codex
+RESULT: ERROR
+Session log files could not be read.
+Compressed Codex files not read (Python 3.14 is needed): 2.
+To read them: uvx --python 3.14 realornoise
+Files that could not be read: 1.
+
+Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: arci verdict, arci run
+exit 3

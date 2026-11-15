@@ -1,0 +1,204 @@
+"""Stream Claude Code logs into closed-vocabulary, path-free records."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import replace
+from datetime import datetime
+from pathlib import Path
+
+from .measures import WindowReadResult
+from .records import (
+    EditResult,
+    ReaderCounters,
+    ReadResult,
+    Response,
+    array_of,
+    effort_of,
+    in_project,
+    object_of,
+    parse_line,
+    reasoning_of,
+    render_model,
+    string_of,
+    time_of,
+    without_timezone,
+)
+
+_USED = frozenset({"assistant", "user"})
+_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
+
+
+def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadResult:
+    counts = ReaderCounters()
+    models: dict[str, int] = {}
+    efforts: dict[str, int] = {}
+    versions: dict[str | None, int] = {}
+    workdirs: dict[str | None, int] = {}
+    responses: list[Response] = []
+    edits: list[EditResult] = []
+    seen: set[str] = set()
+    latest_main_response: datetime | None = None
+    for path in paths:
+        saved_counts = counts
+        counts = replace(counts)
+        saved_models, saved_efforts = models.copy(), efforts.copy()
+        saved_versions, saved_workdirs = versions.copy(), workdirs.copy()
+        saved_latest = latest_main_response
+        file_edits: list[EditResult] = []
+        file_seen: set[str] = set()
+        duplicates: set[str] = set()
+        pending: dict[str, Response] = {}
+        calls: dict[str, tuple[bool, Response]] = {}
+        try:
+            if not path.is_file():
+                raise OSError
+            with path.open("rb") as stream:
+                counts.files_read += 1
+                for line_number, raw in enumerate(stream):
+                    data = parse_line(
+                        raw.removeprefix(b"\xef\xbb\xbf") if line_number == 0 else raw,
+                        _USED,
+                        counts,
+                    )
+                    if data is None:
+                        continue
+                    if data.get("isApiErrorMessage") is True:
+                        counts.lines_unknown_type += 1
+                        continue
+                    message = object_of(data.get("message"))
+                    if data["type"] == "assistant":
+                        identity = string_of(message.get("id"))
+                        model = string_of(message.get("model"))
+                        effort = string_of(data.get("effort")) or string_of(
+                            data.get("perTurnEffort")
+                        )
+                        when = time_of(data.get("timestamp"))
+                        if without_timezone(data.get("timestamp")):
+                            counts.records_without_timezone += 1
+                            if identity:
+                                # Later blocks cannot replace the first response timestamp.
+                                file_seen.add(identity)
+                            continue
+                        if not identity or when is None:
+                            counts.lines_lacking_field += 1
+                            continue
+                        if identity in seen:
+                            if identity not in duplicates:
+                                counts.responses_duplicate += 1
+                                duplicates.add(identity)
+                            continue
+                        if identity not in file_seen:
+                            file_seen.add(identity)
+                            if (
+                                when <= now
+                                and data.get("isSidechain") is not True
+                                and in_project(string_of(data.get("cwd")), project)
+                                and (latest_main_response is None or when > latest_main_response)
+                            ):
+                                latest_main_response = when
+                            if not model or not effort:
+                                counts.responses_without_setting += 1
+                                continue
+                        elif identity not in pending:
+                            # A later content block cannot supply a missing first setting.
+                            continue
+                        usage = object_of(
+                            object_of(message.get("usage")).get("output_tokens_details")
+                        )
+                        reasoning = reasoning_of(usage.get("thinking_tokens"))
+                        if identity not in pending:
+                            assert model and effort
+                            version, cwd = (
+                                string_of(data.get("version")),
+                                string_of(data.get("cwd")),
+                            )
+                            pending[identity] = Response(
+                                "claude-code",
+                                when,
+                                models.setdefault(model, len(models)),
+                                efforts.setdefault(effort, len(efforts)),
+                                data.get("isSidechain") is not True,
+                                reasoning,
+                                versions.setdefault(version, len(versions)),
+                                workdirs.setdefault(cwd, len(workdirs)),
+                                in_project(cwd, project),
+                            )
+                        else:
+                            pending[identity] = replace(pending[identity], reasoning=reasoning)
+                        response = pending[identity]
+                        for value in array_of(message.get("content")):
+                            block = object_of(value)
+                            call_id = string_of(block.get("id"))
+                            if block.get("type") == "tool_use" and call_id:
+                                name = string_of(block.get("name"))
+                                calls.setdefault(call_id, (name in _EDIT_TOOLS, response))
+                    else:
+                        denied = "toolDenialKind" in data or (
+                            object_of(data.get("permissionDecision")).get("decision") == "reject"
+                        )
+                        when = time_of(data.get("timestamp"))
+                        lacking_time = False
+                        for value in array_of(message.get("content")):
+                            block = object_of(value)
+                            if block.get("type") != "tool_result":
+                                continue
+                            call_id = string_of(block.get("tool_use_id"))
+                            call = calls.get(call_id) if call_id else None
+                            if call is None:
+                                counts.edits_unmatched += 1
+                                continue
+                            is_edit, response = call
+                            if not is_edit:
+                                continue
+                            if without_timezone(data.get("timestamp")):
+                                counts.records_without_timezone += 1
+                            elif denied:
+                                counts.edits_denied += 1
+                            elif when is None:
+                                lacking_time = True
+                            elif when > now:
+                                counts.records_in_future += 1
+                            else:
+                                file_edits.append(
+                                    EditResult(
+                                        "claude-code",
+                                        when,
+                                        response.model,
+                                        response.effort,
+                                        response.main_thread,
+                                        block.get("is_error") is True,
+                                        response.in_project,
+                                    )
+                                )
+                        counts.lines_lacking_field += lacking_time
+        except Exception:
+            # Keep physical read counts, but discard all semantic state from this file.
+            saved_counts.files_read = counts.files_read
+            saved_counts.lines = counts.lines
+            counts = saved_counts
+            counts.files_unreadable += 1
+            models, efforts = saved_models, saved_efforts
+            versions, workdirs = saved_versions, saved_workdirs
+            latest_main_response = saved_latest
+            continue
+        edits.extend(file_edits)
+        seen.update(file_seen)
+        for response in pending.values():
+            if response.when > now:
+                counts.records_in_future += 1
+            else:
+                responses.append(response)
+                counts.responses += 1
+                counts.responses_without_reasoning += response.reasoning is None
+    return WindowReadResult(
+        "claude-code",
+        tuple(responses),
+        tuple(edits),
+        tuple(render_model(model) for model in models),
+        tuple(effort_of(effort) for effort in efforts),
+        tuple(models[model] for model in sorted(models)),
+        tuple(efforts[effort] for effort in sorted(efforts)),
+        counts,
+        latest_main_response,
+    )

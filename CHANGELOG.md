@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.3.0 (2026-11-15)
+
+- **Added:** `arci logs` reads local Claude Code and Codex session logs and compares daily
+  recorded measures for one model and effort setting per tool. Results are REAL DROP,
+  NO DROP, CANNOT TELL or ERROR, separate from controlled-trial verdicts. The second
+  distribution, `realornoise`, pins the main package's version and supports Python 3.11
+  onward; compressed Codex logs need Python 3.14. New sealed record kind `arci-logs/1`,
+  Markdown, JSON and self-contained HTML reports, a packaged generated example, a Claude
+  Code plugin and a Codex skill. The plugin and skill put printed numbers into the
+  assistant's conversation.
+- **Added:** the [session-log self-check](docs/results/logs-selfcheck.md), with exact
+  enumeration and simulated rates, counts, seeds and intervals. At AR(1) correlation 0.5,
+  log SD 0.45 and 2000 histories per design, wrong REAL DROP with the rule as built was
+  0.080500 [0.069365, 0.093243] at 5/10 after/before days,
+  0.035500 [0.028240, 0.044541] at 7/21, and
+  0.002500 [0.001068, 0.005839] at 14/42 (Wilson 95% intervals).
+  Short correlated histories can exceed the nominal bound; passing the streak check
+  does not establish the assumptions. The self-check publishes wrong NO DROP, all
+  three check variants and the cost on independent days too.
+- **Changed:** the README starts with logs, then imported outcomes, then controlled
+  trials. The timing workflow uses a manual trigger with package and command inputs;
+  CI and release workflows build both distributions, and release publishes the main
+  package before `realornoise`.
+- **Not in this release:** a scan over split dates; comparison of two models; a day table
+  stored beyond log retention; a range for the change; other coding agents; Windows
+  paths checked on a real machine; formats older than the listed clients; usage-limit
+  or cost measures; sending data anywhere.
+- **Docs:** finished log statistics and design record 0016, reader-format reference and
+  log recipe; controlled-trial caveats and quickstart moved together; related local-log
+  tools named without comparison claims; compatibility, roadmap and citation metadata
+  updated. The order-desk working-record link uses commit `d46367d`. Documentation tests
+  check first-screen length, links, numerical sources and the published fixed-text record.
+
+
 ## v2.2.0 (2026-11-15)
 
 - **Added:** `arci verdict`, `arci verdict-rule` and `arci verdict --example`: a baseline-

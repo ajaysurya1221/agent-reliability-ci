@@ -1,43 +1,60 @@
-# Did this change make your agent less reliable?
+# Did your agent get worse? Real, noise, or cannot tell.
 
 [![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
 
-You swapped the model, edited the prompt or removed a retry. ARCI (agent-reliability-ci) runs the
-old agent and the new one on the same predeclared tasks, injects tool timeouts, errors and empty
-results, and returns `PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR` with an exit code. A statistical
-`PASS` or `BLOCK` is wrong at most 2.5% of the time each, at the defaults and under assumptions
-ARCI states and does not check.
+ARCI (agent-reliability-ci) answers that question in three ways, from the least effort and the
+weakest evidence to the most. Each one prints the assumptions it cannot check.
 
-A LangChain `create_agent` example, offline, no API key:
+**1. Logs you already have.** If you use Claude Code or Codex, the session logs on your disk
+record how the model behaved each day. One command compares recent days with earlier ones:
 
 ```bash
-pip install 'agent-reliability-ci[langchain]'
-mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
+uvx realornoise
 ```
+
+On the packaged example data (`uvx realornoise --example`):
 
 ```text
-VERDICT: BLOCK (exit 1)
-pairs: 96 (192 trials)
-baseline 96/96 passed, candidate 48/96 passed
+RESULT: REAL DROP
+reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-The candidate is the baseline with one retry removed. Next:
-[swap the model](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/model-swap.md) ·
-[your own agent](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/langchain.md) ·
-[plain Python functions](#gate-your-own-agent) ·
-no install: `uvx --from agent-reliability-ci arci demo`
+Nothing leaves your machine, and the output holds counts, rates, dates and the names of the model
+and effort compared. It shows what your logs recorded, not why: your tasks, prompts and client
+changed too. With a short history the usual answer is `CANNOT TELL`.
+[How to read it](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md) ·
+[the method and its limits](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/STATISTICS_LOGS.md)
 
-`baseline + candidate → same predeclared tasks/faults → repeated trials → verdict → minimise/replay`
+**2. Results you already have.** `arci verdict` decides a baseline against a candidate from
+pass/fail results another tool produced (Inspect AI, pytest, CSV).
+[Recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/verdict.md)
 
-**PASS means only this:** for this predeclared experiment, the evidence supports that any reliability
-drop from baseline to candidate is smaller than the allowed drop. It is **not** a claim of absolute
-reliability.
+**3. Controlled trials.** `arci run` runs the old agent and the new one on the same predeclared
+tasks, injects tool timeouts, errors and empty results, and returns `PASS`, `BLOCK`,
+`INCONCLUSIVE` or `ERROR`. A `PASS` or `BLOCK` is wrong at most 2.5% of the time each, at the
+defaults and under assumptions ARCI states and does not check.
+[Start here](#controlled-trials-arci-run) · no install: `uvx --from agent-reliability-ci arci demo`
 
-A small first run will often be **INCONCLUSIVE**. That is a valid result; use `arci plan` before
-choosing a larger confirmatory run.
+## New in 2.3: a result from logs you already have
 
-ARCI observes calls that cross its tool boundary. It is not a sandbox, it does not replay model
-inference, and trace divergence shows where runs differ, not why.
+`arci logs` reads local Claude Code and Codex session logs, runs no model, and compares usable days for one model and effort setting per tool.
+Packaged example data (`arci logs --example`), Claude Code:
+
+```text
+RESULT: REAL DROP
+reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
+```
+
+REAL DROP means a recorded measure moved toward worse beyond a chance ordering of days.
+NO DROP rules out each measure's margin under the stated assumptions; it does not mean improvement.
+CANNOT TELL means the history is too short, variable or streaky to decide.
+This cannot show cause, answer quality or a change to a model; tasks, prompts and clients can change too.
+In the final AR(1) self-check at correlation 0.5 and log SD 0.45, the rule as built gave wrong REAL DROP rates of 0.080500, 0.035500 and 0.002500 and wrong NO DROP rates of 0.005000, 0.005000 and 0.000500 at 5/10, 7/21 and 14/42 after/before days (2000 histories each); the first two wrong REAL DROP rates exceed the nominal bound of 0.025, and [the method](docs/STATISTICS_LOGS.md#what-the-method-cannot-see) gives all variants, wrong-NO-DROP rates and intervals.
+
+Claude Code: `/plugin marketplace add ajaysurya1221/agent-reliability-ci`, `/plugin install realornoise@agent-reliability-ci`, then `/realornoise:realornoise`.
+Codex: copy [`integrations/codex/skills/realornoise`](integrations/codex/skills/realornoise/SKILL.md) into `~/.agents/skills/`.
+Both put the printed numbers into that assistant's conversation.
+[Recipe](docs/recipes/logs.md) · [Statistics and limits](docs/STATISTICS_LOGS.md) · [Design record](docs/design/0016-logs.md).
 
 ## New in 2.2: a verdict from results another tool produced
 
@@ -63,6 +80,41 @@ A rule written from files that already exist is always labelled a **descriptive 
 never claims the error bound; claiming the bound needs a rule written and declared
 `fixed_before_runs: true` before either arm ran. See the
 [verdict recipe](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/verdict.md).
+
+## Controlled trials: arci run
+
+**PASS means only this:** for this predeclared experiment, the evidence supports that any reliability
+drop from baseline to candidate is smaller than the allowed drop. It is **not** a claim of absolute
+reliability.
+
+A small first run will often be **INCONCLUSIVE**. That is a valid result; use `arci plan` before
+choosing a larger confirmatory run.
+
+ARCI observes calls that cross its tool boundary. It is not a sandbox, it does not replay model
+inference, and trace divergence shows where runs differ, not why.
+
+A LangChain `create_agent` example, offline, no API key:
+
+```bash
+pip install 'agent-reliability-ci[langchain]'
+mkdir try-arci && cd try-arci && arci init --langchain && arci run arci.yaml
+```
+
+```text
+VERDICT: BLOCK (exit 1)
+pairs: 96 (192 trials)
+baseline 96/96 passed, candidate 48/96 passed
+```
+
+The candidate is the baseline with one retry removed. Next:
+[swap the model](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/model-swap.md) ·
+[your own agent](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/langchain.md) ·
+[plain Python functions](#gate-your-own-agent) ·
+no install: `uvx --from agent-reliability-ci arci demo`
+
+`baseline + candidate → same predeclared tasks/faults → repeated trials → verdict`
+
+For single-task experiments a failing trial can then be minimised and replayed; for suites those commands are not built yet.
 
 ## New in 2.0: many tasks, and LangChain agents
 
@@ -141,10 +193,26 @@ welcome as issues.
 - Evaluation platforms and frameworks (LangSmith, promptfoo, DeepEval, Inspect AI, Braintrust,
   Phoenix) score and compare runs; use them for that.
 
-What ARCI adds is the join: injected tool faults, a baseline-against-candidate verdict from a rule
-fixed before the run, a stated bound on each kind of wrong statistical verdict, and a count of whether each
-fault fired. We did not find another tool that does all four together. If you know one,
-please open an issue.
+Tools that read the same local logs include [ccusage](https://github.com/ccusage/ccusage)
+(`npx ccusage`, usage and cost from local logs). The following descriptions are quoted from
+those projects: [kiyoakii/is-gpt-nerfed](https://github.com/kiyoakii/is-gpt-nerfed),
+"Shrinkflation detector for Codex"; [NerfTrack/NerfTrack](https://github.com/NerfTrack/NerfTrack),
+"Think Codex limits got nerfed by can't prove it? Prove it with NerfTrack!";
+[One-Lyf/claude-nerf-watcher](https://github.com/One-Lyf/claude-nerf-watcher),
+"Claude Code skill: is your plan quietly giving you less? Tracks work per 1% of the 5-hour limit vs your own baseline.";
+[lucemia/claude-session-analyzer](https://github.com/lucemia/claude-session-analyzer),
+"Quantitative analysis tool for Claude Code session logs — thinking depth, Read:Edit ratio, behavioral signals, sentiment, cost. Replicates methodology from anthropics/claude-code#42796";
+[jspaterson000/nerfd](https://github.com/jspaterson000/nerfd),
+"The public record of how AI coding models actually perform on real work. Local-first, privacy-first scorecard captured from Claude Code, Codex, OpenCode and other terminals.";
+[tendaigomo/NerfWatch](https://github.com/tendaigomo/NerfWatch),
+"The Taravangian Test for AI: catch silent model degradation before your users do. SPC-based reasoning-quality monitoring for Claude, GPT, Gemini, and Grok."
+[haowang02/codex-candy-eval](https://github.com/haowang02/codex-candy-eval) is a script that
+re-runs one question against Codex; its own description is in Chinese.
+ARCI did not test any of these tools and does not claim to be the only tool of this kind.
+
+ARCI joins injected tool faults, a baseline-against-candidate verdict from a rule fixed
+before the run, a stated bound on each kind of wrong statistical verdict, and a count of
+whether each fault fired. The local-log comparison is a separate observational method.
 
 ## Try the offline demo
 
@@ -511,15 +579,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v2.2.0`, the current release (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==2.2.0`). See
+This example pins `v2.3.0`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.3.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v2.2.0
+- uses: ajaysurya1221/agent-reliability-ci@v2.3.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -532,8 +600,8 @@ you have verified. The report lands in the job summary (a start-up failure shows
 stderr). `BLOCK` and `ERROR` always fail the job; `INCONCLUSIVE` fails it unless you set
 `allow-inconclusive: "true"`. The `verdict` output (`PASS`, `BLOCK`, `INCONCLUSIVE` or `ERROR`) is
 there for steps that run after the gate. This repository's own CI runs the test suite,
-re-derives the archived decisions, smoke-tests the built wheel on Linux and macOS, and runs the Action
-on a committed fixture that must BLOCK.
+re-derives the archived decisions, builds both distributions, smoke-tests their wheels on
+Linux and macOS, and runs the Action on a committed fixture that must BLOCK.
 
 Since v2.0.0 the Action has an opt-in `pr-comment: "true"`: it uploads the offline HTML
 report and creates or updates a PR summary. Grant `pull-requests: write` and serialize runs for
@@ -558,12 +626,19 @@ never change the gate result. Racing duplicate comments are refreshed on the nex
 
 ## What it does not do
 
+- **Logs cannot establish cause or answer quality.** `arci logs` reads recorded measures,
+  not a controlled model comparison. Short histories and streaks often give CANNOT TELL;
+  passing the streak check does not establish interchangeable days. The measured error
+  rates under correlation can exceed the claimed bound's nominal level, as
+  [the statistics](docs/STATISTICS_LOGS.md) show. There is no scan over dates, comparison
+  of two models, stored history beyond log retention, range for the change, cost or
+  usage-limit measure, or reader for other agents. Windows is untested for this command.
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
   boundary. Command agents use a separate harness-owned MCP boundary, which is isolation from
   accident, not containment. Both assume buggy, non-hostile agent code; a hostile agent could still
   forge or bypass its record. See [docs/TRUST_MODEL.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/TRUST_MODEL.md).
-- **It only sees the tool boundary.** Files, network and subprocesses the agent touches directly are
-  invisible, as is any decision call that does not go through the injected base URL.
+- **Controlled trials only see the tool boundary.** Files, network and subprocesses the agent
+  touches directly are invisible, as is any decision call that does not go through the injected base URL.
 - **It replays the boundary, not the model.** Deterministic replay is guaranteed for seeded,
   fixture-backed agents. A live model will not repeat itself token for token, so replaying its
   bundle is usually INVALID; what survives is the recorded trace and the reduced fault condition.
@@ -592,7 +667,7 @@ never change the gate result. Racing duplicate comments are refreshed on the nex
   transport, no concurrent decisions.
 - **Since 2.2.0**, `arci verdict` reads pass/fail outcomes another tool already produced
   (Inspect AI JSON logs, JUnit XML, CSV, JSONL) and gives a verdict only; there are still no
-  trace importers (OTLP, Claude Code, Codex), and imported outcomes cannot be replayed,
+  replay-capable trace importers (OTLP, Claude Code, Codex), and imported outcomes cannot be replayed,
   minimised or fault-accounted. POSIX only: on Windows the package installs and `arci --help`
   runs, but experiments are unsupported.
 
@@ -620,8 +695,8 @@ here claims adoption, performance or superiority.
 ## Roadmap
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need. What is not in 2.2.0 (reading an Inspect
-`.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
+asks for it, or when a recorded run shows the need. What is not in 2.3.0 (stored log history,
+a scan over split dates, reading an Inspect `.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
 example with several faults in one condition, a second framework adapter, the v1 commands that
 do not yet accept suites) and the earlier candidate list (last revised for v0.8.0) are in
 [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
@@ -633,8 +708,11 @@ pair-programmers (recorded in the commit messages). Through v1.0.0 the experimen
 decision rule and its calibration, the trust model and the acceptance tests are the maintainer's
 own. For 2.0.0 and 2.1.0 the design records were drafted by Claude as orchestrator and approved
 by the maintainer; for 2.2.0 the maintainer approved the plan, and design record 0015 was drafted
-by Claude and reviewed twice by Codex. The implementation of all three was by Codex from written
-briefs (design records 0011 to 0015). The retry demo, the calibration table and the test suite reproduce from
+by Claude and reviewed twice by Codex. For 2.3.0, record 0016 and the log statistics had
+three read-only reviews before product code (13, 10 and 6 findings, all handled, with the
+recorded differences in the maintainer's choices). An agent wrote acceptance tests from
+the records alone without seeing the code. Implementation was by Codex from written
+briefs (design records 0011 to 0016). The retry demo, the calibration table and the test suite reproduce from
 a clean clone.
 Issues and PRs welcome.
 Where the code came from and who holds it: [docs/PROVENANCE.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/PROVENANCE.md).
@@ -658,13 +736,15 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v2.2.0 is the current release. Install `agent-reliability-ci==2.2.0` from PyPI
-(`agent-reliability-ci[langchain]==2.2.0` for the LangChain adapter) or use Action tag `v2.2.0`.
+**Availability:** v2.3.0 is the current release. Install `agent-reliability-ci==2.3.0` from PyPI
+(`agent-reliability-ci[langchain]==2.3.0` for the LangChain adapter), use `uvx realornoise`,
+or use Action tag `v2.3.0`. The `realornoise` distribution pins the same main-package version.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
-builds once, tests the wheel on Ubuntu/macOS, and publishes through trusted
-publishing with attestations. The single-task gate, `triage`, `trace-check`, the packaged demo,
-descriptors, initialization, planner and opt-in pass^k reporting from earlier releases remain
+builds both distributions, tests their wheels on Ubuntu/macOS, and publishes the main
+package before `realornoise` through trusted publishing with attestations. The timing
+workflow is manually triggered and can time either packaged log example or `arci demo`.
+The single-task gate, `triage`, `trace-check`, the packaged demo, descriptors, initialization, planner and opt-in pass^k reporting from earlier releases remain
 available.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
