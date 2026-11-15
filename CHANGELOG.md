@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Docs:** the README now starts with a generated banner (`docs/assets/banner-{light,dark}.svg`,
+  from `make_figures.py`) whose dots are the packaged example's day values, checked by a test.
+
 ## v2.3.0 (2026-11-15)
 
 - **Added:** `arci logs` reads local Claude Code and Codex session logs and compares daily

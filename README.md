@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/banner-dark.svg">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/banner-light.svg" alt="Real or noise? Dots for 42 earlier days scatter inside one band; dots for 14 recent days sit well below it. Generated example data. Command: uvx realornoise." width="100%">
+</picture>
+
 # Did your agent get worse? Real, noise, or cannot tell.
 
 [![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
