@@ -39,8 +39,8 @@ one fixed rule with a stated bound on each wrong result, exact arithmetic, a res
    effort), main thread; usable days before and after a split date; three gating measures per
    tool; per measure an exact conditional rank test at `(1/40)/3` for a real drop, and a
    strict-count test against a fixed reference at `1/40`, after moving the before-days by the
-   margin, for a no-drop; a streak check on the before-days (an exact runs test) that withholds
-   a measure whose days come in streaks; no random numbers. The setting is chosen from response counts over both periods
+   margin, for a no-drop; a streak check on the before-days (an exact runs test): one measure whose
+   earlier days come in streaks stops the comparison for that tool; no random numbers. The setting is chosen from response counts over both periods
    together, never from one period: choosing by the after period alone can make a wrong REAL
    DROP certain (review finding 1).
 
@@ -229,7 +229,9 @@ a value that is not available as `-`. Rendered numbers decide nothing.
   `finding`; each period cell is the median followed by the number of usable days in
   brackets; row names `reasoning tokens per response`, `responses with no reasoning`,
   `file edits that failed`, `reasoning at one repeated value`; findings `real drop`,
-  `no drop (margin {margin})`, `cannot tell`, `too few days`, `days come in streaks`.
+  `no drop (margin {margin})`, `cannot tell`, `too few days`, `days come in streaks`; when the
+  tool's reason is `streaky_days`, every row that is not `days come in streaks` or
+  `too few days` shows `not used` instead of its own finding (the record keeps the finding).
 - **F7 context:** `Context counts; differences between the periods are not tested:` then
   `client versions {a} before, {b} after, {c} in both · working directories {d} before, {e} after · sub-agent share {f}% -> {g}%`
 - **F8 streak check:** `Streak check: {k} of {K} tested measures were not flagged.` (`K` measures with

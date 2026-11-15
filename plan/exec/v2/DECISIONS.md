@@ -195,3 +195,18 @@ fixed; unknown keys are not counted; outputs with no selected setting are define
 outside the calendar is a usage error; zone-less timestamps have their own counter. No
 further read-only round is run on the drafts: the adversarial review before release reads
 the final text against the code.
+
+## D-15: one streaky measure stops the whole comparison (2026-11-15)
+
+The first full self-check of the final rule (`bench/selfcheck_logs.py`, L8) showed that the
+per-measure streak check protects much less than the spike's quick simulation suggested,
+because that simulation had used a veto by any measure. With day values correlated at 0.5:
+a wrong REAL DROP in 13.0% of runs at 5 days after and 10 before (14.6% with no check),
+11.5% at 7 and 21 (18.3%), 6.9% at 14 and 42 (19.8%). A streak in any one measure is evidence
+that the days are not interchangeable for the tool as a whole, so the rule now stops the
+comparison when any gating measure with enough days is streaky. Both claims still hold (the
+check only turns results into CANNOT TELL). The cost is power: on independent days about one
+comparison in five is stopped at 42 before-days. The self-check prints all three variants
+(no check, per measure, as built) so the choice can be judged from the numbers, and the
+measured rates are published with their conditions. They are not expected to reach 2.5% at
+the smallest sizes; the contract says so.

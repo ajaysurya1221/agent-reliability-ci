@@ -91,8 +91,9 @@ Leave out days equal to `M`; mark each other day above or below `M`; let `R` be 
 runs of equal marks, with `a` days above and `b` below. `p_streak` is the probability of `R`
 or fewer runs when `a` above-marks and `b` below-marks are arranged uniformly at random
 (the exact runs distribution; 1 when `a` or `b` is 0). The measure is **streaky** when
-`p_streak ≤ 1/10`. A streaky measure is not tested: when good days follow good days, a
-two-period comparison cannot tell a streak from a drop.
+`p_streak ≤ 1/10`. A streaky measure is not tested, and one streaky measure stops the whole
+comparison for the tool: when good days follow good days in any recorded measure, the days
+are not interchangeable, and a two-period comparison cannot tell a streak from a drop.
 
 **Result for a tool, in this order.**
 
@@ -104,10 +105,11 @@ two-period comparison cannot tell a streak from a drop.
    `streaky` if its before-days are streaky; else `real_drop`; else `no_drop`; else
    `cannot_tell`.
 4. CANNOT TELL (`too_few_days`) when every finding is `too_few_days`.
-5. REAL DROP when any finding is `real_drop`.
-6. NO DROP when all three findings are `no_drop`.
-7. CANNOT TELL otherwise: `streaky_days` when any finding is `streaky`, else
-   `not_enough_evidence`.
+5. CANNOT TELL (`streaky_days`) when any finding is `streaky`. The other measures keep the
+   findings their own tests gave, and the output marks them as not used.
+6. REAL DROP when any finding is `real_drop`.
+7. NO DROP when all three findings are `no_drop`.
+8. CANNOT TELL (`not_enough_evidence`) otherwise.
 
 **Process exit code.** Among tools without ERROR: 1 if any is REAL DROP; otherwise 2 if any is
 CANNOT TELL; otherwise 0. If every requested tool is ERROR, 3. A usage error, or a requested
@@ -170,8 +172,8 @@ a uniformly random choice of `m` of the `n + m` values, which is exactly the ref
 distribution of `p_real`. So `P(p_real ≤ α) ≤ α` for every `α`, with any ties.
 
 *Claim 1.* At most three measures are tested, each at `(1/40)/3`; the union bound gives
-`1/40` whatever the dependence between measures. The streak check only removes findings, so
-the probability of a REAL DROP result is no larger with it than without it.
+`1/40` whatever the dependence between measures. The streak check only turns results into
+CANNOT TELL, so the probability of a REAL DROP result is no larger with it than without it.
 
 *No-drop test with ties.* Let `a_1..a_n, b_1..b_m` be exchangeable. Break ties by an
 independent uniformly random order; the strict ranking is then a uniformly random
@@ -201,14 +203,18 @@ REAL DROP only remove NO DROP results.
   drop, day-to-day spread, seed and number of simulations), computed with this document's
   final rule. Any figure quoted from it carries those conditions. The simulation thresholds
   are checks of the implementation; the bounds above are proved, not simulated.
-- **Days that come in streaks break A1.** In the spike's simulation, with day values
-  correlated at 0.5 from one day to the next and no guard, a wrong REAL DROP appeared in about
-  14 to 20% of runs instead of at most 2.5%. The streak check is there for this case. The
-  spike's guard figures used a veto by any measure, which is not this version's per-measure
-  rule, so no rate for the final rule is claimed until `bench/selfcheck_logs.py` regenerates
-  it; that script prints the rates with and without the check for correlations of 0.3, 0.5
-  and 0.7. The streak check also costs power on independent days: with 42 before-days it
-  flags a measure about 8% of the time by chance.
+- **Days that come in streaks break A1, and the streak check is only a partial guard.**
+  `bench/selfcheck_logs.py` simulates day values correlated from one day to the next
+  (coefficients 0.3, 0.5 and 0.7) and prints the wrong-REAL-DROP and wrong-NO-DROP rates
+  three ways: with no check, with a check that withholds only the streaky measure, and with
+  the rule as built (one streaky measure stops the comparison). The first full run, with the
+  per-measure form, gave a wrong REAL DROP in 11.5% of runs at 7 days after and 21 before
+  and 6.9% at 14 and 42, at a correlation of 0.5, against 18.3% and 19.8% with no check;
+  that is why the rule stops the whole comparison instead. The figures for the rule as
+  built are in `docs/results/logs-selfcheck.md` and are quoted with their conditions. With
+  few days the check has little power to notice streaks, and the rates stay above 2.5%.
+  The check also costs power on independent days: with 42 before-days each measure is
+  flagged about 8% of the time by chance, so about one comparison in five is stopped.
 - A change that began before the before period, a change in how a vendor counts tokens, and a
   change in what the user works on all look the same to the test.
 - One person's logs say nothing about another person's.
@@ -226,10 +232,10 @@ REAL DROP only remove NO DROP results.
 4. The rejection-rate table for the final rule, including the 45% reasoning-token drop at
    14/42 with a log standard deviation of 0.40, each cell with its generator, seed, number of
    simulations and sampling error. There is no power threshold: the streak check alone caps
-   power near 92% at 42 before-days.
+   power near 78% at 42 before-days.
 5. The exact runs distribution equals brute-force enumeration for every `a + b ≤ 14`.
 6. Reported, not gated: the wrong-REAL and wrong-NO-DROP rates when day values follow an AR(1)
-   process with coefficient 0.3, 0.5 and 0.7, which breaks A1, with and without the streak
-   check; and the reviewer's two counterexamples (selection by
+   process with coefficient 0.3, 0.5 and 0.7, which breaks A1, with no check, with a
+   per-measure check, and with the rule as built; and the reviewer's two counterexamples (selection by
    after-period counts; a change that swaps which days are usable), each shown to break the
    bound when its assumption is dropped.
