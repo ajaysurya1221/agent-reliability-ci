@@ -31,13 +31,75 @@ Inspect. Link the recipe and the statistical contract.
 Before sending: run the recipe's Inspect commands against logs produced by the current
 inspect-ai release, not only the 0.3.289 fixtures.
 
-## 2. Awesome lists
+## 2. Awesome lists (prepared 2026-11-15, not yet opened)
 
-`tensorchord/Awesome-LLMOps`, `kelvins/awesome-mlops`, `Vvkmnn/awesome-ai-eval`. Read each
-list's contribution rules and entry format when the fork is made; one line each, in the list's
-own style, for example: "ARCI: regression testing for AI agents in CI; a PASS, BLOCK or
-INCONCLUSIVE verdict for a candidate against its baseline, from its own fault-injecting runs
-or from pass/fail results another tool produced."
+Each is one line on branch `add-arci` of a fork under the maintainer's account, placed in
+alphabetical order, checked with the list's own check where it has one. Not listed in any of
+the three before (README and earlier pull requests searched). All three lists merged pull
+requests within the last three weeks; Awesome-LLMOps had 443 open pull requests on 15 Nov,
+awesome-mlops 109, awesome-ai-eval 15, so a merge may take weeks or not happen.
+
+### tensorchord/Awesome-LLMOps
+
+Section `## LLMOps` (table), between App AI Gateway and Arize-Phoenix. Commit `ab2f555`.
+
+Title: `Add ARCI to LLMOps`
+
+Body:
+
+```markdown
+Adds [ARCI](https://github.com/ajaysurya1221/agent-reliability-ci) to the LLMOps table, in alphabetical order (between App AI Gateway and Arize-Phoenix).
+
+ARCI (Apache-2.0, on PyPI as `agent-reliability-ci`) is regression testing for AI agents in CI. It compares a candidate with its baseline over repeated, paired runs and returns PASS, BLOCK or INCONCLUSIVE as an exit code, from one rule file. The error bound is claimed only when that rule was fixed before the runs. It can run the trials itself with injected tool faults, or read pass/fail results another tool produced (Inspect AI JSON logs, JUnit XML, CSV or JSONL).
+
+One row added to `README.md`, with the star badge in the same form as its neighbours. Not listed before; I searched the README and earlier pull requests.
+```
+
+### kelvins/awesome-mlops
+
+Section `## Model Testing & Validation`, after AIsbom. Commit `16a066c`. `check_order.py` passes.
+
+Title: `Add ARCI`
+
+Body:
+
+```markdown
+## What is this tool for?
+
+[ARCI](https://github.com/ajaysurya1221/agent-reliability-ci) (Apache-2.0, on PyPI as `agent-reliability-ci`) is regression testing for AI agents in CI. It compares a candidate agent with its baseline over repeated, paired runs and returns PASS, BLOCK or INCONCLUSIVE as an exit code, from one rule file. The error bound is claimed only when that rule was fixed before the runs. It can run the trials itself with injected tool faults (timeouts, errors, empty results), or read pass/fail results another tool produced (Inspect AI JSON logs, JUnit XML, CSV or JSONL). A GitHub Action is included.
+
+## What's the difference between this tool and similar ones?
+
+- The entries now under "Model Testing & Validation" check a model, its data or its files. ARCI compares two versions of an agent on the same tasks and gives a gate verdict for the change.
+- The decision is a sequential non-inferiority test in exact arithmetic. PASS means "not worse by the margin or more", never that the candidate is better, and INCONCLUSIVE is a normal result when there are too few runs.
+- It is not the only tool that compares two runs statistically. It differs in using one rule file, repeated rounds and a stated margin, and in labelling a verdict descriptive when the rule was written after the results existed.
+
+`python check_order.py` passes with the new line.
+
+---
+
+Anyone who agrees with this pull request could submit an *Approve* review to it.
+```
+
+### Vvkmnn/awesome-ai-eval
+
+Section `### Frameworks` under Tools, between align and autoevals; 18 words. Commit `290db4d`. `pnpm lint` (awesome-lint 2.2.2) passes when run against the upstream remote; on the fork it fails only on the fork's missing `awesome` topics.
+
+Title: `Add ARCI`
+
+Body:
+
+```markdown
+Adds [ARCI](https://github.com/ajaysurya1221/agent-reliability-ci) under Tools, Frameworks: a regression gate for agents in CI. It compares a candidate with its baseline over repeated runs (its own, with injected tool faults, or pass/fail results from Inspect AI, JUnit, CSV or JSONL) and returns PASS, BLOCK or INCONCLUSIVE.
+
+- [x] One entry, added to `README.md` in the section that fits, in alphabetical order.
+- [x] Format: `- [Name](https://example.com) - What it is and what it does.` 20 words or fewer, ending with a period.
+- [x] No badges, images, bold, emoji, or numbers that will change.
+- [x] The link works without a login.
+- [x] The project is not already in `README.md` or `archive.md`.
+
+`pnpm lint` passes.
+```
 
 ## 3. pytest plugin list
 
