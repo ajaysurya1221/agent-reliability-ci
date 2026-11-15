@@ -1,6 +1,6 @@
 name: TTFV reference machines
 
-# Times the packaged demo (`uvx --from agent-reliability-ci==0.8.0 arci demo`) on clean
+# Times a selected package command (default `uvx --from agent-reliability-ci arci demo`) on clean
 # GitHub-hosted runners: no checkout, no secrets, no telemetry. Per OS: five cold samples, each
 # with its own fresh, empty uv cache (the case the memo target is about: a first-time user), then
 # two warm samples that reuse the cache the last cold sample filled. Every sample is bounded
@@ -11,17 +11,32 @@ name: TTFV reference machines
 # as cold readers (docs/measurement/ttfv-protocol.md section 1.4).
 
 on:
-  push:
-    branches:
-      - 'sprint/t18-**'
   workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to install (optionally pinned with ==X.Y.Z)"
+        required: true
+        default: agent-reliability-ci
+        type: string
+      command:
+        description: "Command to time; examples expect exit 1 and RESULT: REAL DROP"
+        required: true
+        default: arci demo
+        type: choice
+        options:
+          - arci demo
+          - realornoise --example
+          - arci logs --example
 
 permissions:
   contents: read
 
 env:
   UV_VERSION: "0.12.5"
-  PACKAGE: "agent-reliability-ci==0.8.0"
+  PACKAGE: ${{ inputs.package }}
+  COMMAND: ${{ inputs.command }}
+  EXPECTED_EXIT_CODE: ${{ inputs.command == 'arci demo' && '0' || '1' }}
+  SUCCESS_MARKER: "${{ inputs.command == 'arci demo' && 'All six steps held.' || 'RESULT: REAL DROP' }}"
   UV_NO_PROGRESS: "1"
   COLD_SAMPLES: "5"
   WARM_SAMPLES: "2"
@@ -69,11 +84,11 @@ jobs:
         timeout-minutes: 5
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ inputs.command == 'arci demo' && '3.12' || '3.14' }}
       - name: Install uv
         timeout-minutes: 5
         run: python -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
-      - name: Time the demo (five cold samples, then two warm)
+      - name: Time the command (five cold samples, then two warm)
         # Backstop only. The loop ends RESERVE_S before the job deadline (plus the kill/join of a
         # last timed-out sample, ~10 s) and the probe takes at most 120 s, so this step ends by job
         # time 2400 - 420 + 10 + 120 s; counted from the step's start that is under 38 minutes.
@@ -88,6 +103,7 @@ jobs:
           import json
           import os
           import platform
+          import shlex
           import signal
           import subprocess
           import sys
@@ -97,6 +113,7 @@ jobs:
           from pathlib import Path
 
           PACKAGE = os.environ["PACKAGE"]
+          COMMAND = shlex.split(os.environ["COMMAND"])
           OUT_DIR = Path(os.environ["OUT_DIR"])
           COLD = int(os.environ["COLD_SAMPLES"])
           WARM = int(os.environ["WARM_SAMPLES"])
@@ -218,7 +235,7 @@ jobs:
                   log.write_text(message, encoding="utf-8")
                   code, timed_out, started = None, True, False
               else:
-                  cmd = ["uvx", "--from", PACKAGE, "arci", "demo"]
+                  cmd = ["uvx", "--from", PACKAGE, *COMMAND]
                   code, timed_out = run(cmd, log, env, work, timeout)
                   started = True
               # "sample": the per-sample limit killed a hang; "budget": the loop deadline cut the
@@ -253,7 +270,7 @@ jobs:
           left = JOB_TIMEOUT - (time.time() - JOB_START)
           timing["seconds_left_after_sampling"] = round(left)
 
-          # The interpreter uvx actually ran arci with (after the samples, so it times nothing).
+          # The interpreter uvx actually ran the command with (after the samples, so it times nothing).
           # Only if the job deadline leaves room for it and for what follows; else skipped.
           python = ""
           if left < PROBE_MIN_LEFT:
@@ -305,6 +322,7 @@ jobs:
               "demo_banner": "arci demo:",
               "demo_verdict": "VERDICT:",
               "all_steps_held": "All six steps held",
+              "command_held": os.environ["SUCCESS_MARKER"],
           }
           env = os.environ.get
           COLD = int(env("COLD_SAMPLES", "0"))
@@ -358,6 +376,7 @@ jobs:
                       stamps = first_stamps(log)
                       if record.get("timed_out") is True:
                           stamps["all_steps_held"] = None  # killed: never counts as held
+                          stamps["command_held"] = None
                       samples.append(
                           {
                               "sample": n,
@@ -408,7 +427,9 @@ jobs:
               "kind": "reference-machine timing",
               "label": "clean GitHub-hosted runner; not a receipt, never a cold reader",
               "package": env("PACKAGE"),
-              "command": f"uvx --from {env('PACKAGE')} arci demo",
+              "command": f"uvx --from {env('PACKAGE')} {env('COMMAND')}",
+              "expected_exit_code": int(os.environ["EXPECTED_EXIT_CODE"]),
+              "success_marker": os.environ["SUCCESS_MARKER"],
               "runner": {
                   "os": env("REF_RUNNER_OS"),
                   "arch": env("REF_RUNNER_ARCH"),
@@ -479,8 +500,8 @@ jobs:
                   s.get("started") is True
                   and s.get("timed_out") is False
                   and s.get("missing") is not True
-                  and s.get("exit_code") == 0
-                  and bool(s.get("all_steps_held"))
+                  and s.get("exit_code") == doc["expected_exit_code"]
+                  and bool(s.get("command_held"))
               )
 
 
