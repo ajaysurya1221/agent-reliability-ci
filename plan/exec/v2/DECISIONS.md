@@ -369,6 +369,7 @@ finding reproduced by a second agent before it counted. Reports are in `reviews/
 | Review of those fixes (4 areas) | `R3b-logs2-fixes-review-workflow.json` | 11; all confirmed | medium | all fixed (brief R3b) |
 | Final check of the write path (3 lenses) | `R3c-logs2-final-check-workflow.json` | 12; all confirmed; 10 distinct | medium | all fixed (brief R3c); one regression of the fix caught by the orchestrator (a platform without the lock module) |
 | Last check, real processes | `R3d-logs2-last-check-workflow.json` | 5; 4 confirmed, 1 allowed by the record | medium | design changed, see below (brief R3d) |
+| Check of the simpler design | `R3e-logs2-simpler-design-check-workflow.json` | 8; all confirmed | low | all fixed (brief R3e); about 900 groups of real overlapping processes clean |
 
 None was critical or high. No finding touched the statistics, a published figure or the
 privacy rules: the reports and privacy areas came back with no defect in every round.
@@ -404,3 +405,20 @@ Nothing else changes for a user.
 **Lesson for the next design.** A rule that sounds tidy ("a failed run leaves nothing
 behind") was the source of four rounds of concurrency faults. When two rounds of fixes
 land in the same few lines, question the rule before the third patch.
+
+**After the decision.** The check of the simpler design found nothing medium or higher.
+Its eight low findings are fixed: the reserved-name test also covers the file a path
+resolves to (a symbolic link); an interrupt during the same-file check or at a move is
+restored; five test gaps closed. The record gained a paragraph, "A run that is interrupted
+or killed", that says what can be left behind. With the checker's script of 3,000 random
+interrupts (seed 7), 63 runs had left an empty new target and 52 had left one report
+replaced beside one missing; after the fix neither occurs, and 98 runs leave a
+`.realornoise.out-` temporary file beside a report, which the record now states. (The
+commit message of `3fc34dd` gives the second figure as 70; 52 is right.) Acceptance
+items: 79; blind tests: 140 functions, 236 cases. The review of the write path ends here.
+
+**Re-freeze.** Commit `987a963` on `v2/logs2`: the five released files re-hashed, record
+0017 newly pinned, 76 files, every other hash unchanged. Whole suite on that commit:
+5,147 passed, 21 skipped (LangChain extra, SciPy, Node SDK, two Python 3.14 cases,
+Hatchling; each run in its own environment: adapters 414 passed, oracle 300 passed, logs
+on Python 3.14 pass). Both wheels pass `wheel_smoke.sh` on Python 3.11 and 3.14.
