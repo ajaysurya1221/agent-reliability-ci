@@ -42,6 +42,7 @@ def test_every_release_version_matches() -> None:
     )
     for relative in (
         "plugins/realornoise/skills/realornoise/SKILL.md",
+        "plugins/realornoise/README.md",
         "integrations/codex/skills/realornoise/SKILL.md",
     ):
         pins = re.findall(
