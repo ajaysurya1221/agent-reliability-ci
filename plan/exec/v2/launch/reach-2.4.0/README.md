@@ -1,17 +1,20 @@
 # Reach for 2.4.0: what is ready, in the order to do it
 
-Prepared on 2026-11-16 by agents; every outward step is the maintainer's, by hand. Each
-venue's rules were read that day and re-opened by a second agent. Nothing here has been
-posted or submitted by an agent. One fork and one branch were prepared for a listing pull
-request (item 3), as for the earlier listings.
+Prepared on 2026-11-16 by agents. Each venue's rules were read that day and re-opened by a
+second agent. Later the same day the maintainer told the orchestrator to carry out the
+steps itself in their signed-in browser ("use my chrome and do it yourself", then "take
+full control"). Steps 1, 2, 3 and 5 were done that way; the table says what happened.
+Step 4 stays with the maintainer, because that list requires a person to write and send
+the recommendation. Step 6 stays with the maintainer, because it publishes their own
+usage numbers.
 
 | # | Step | Needs | File | State |
 |---|---|---|---|---|
-| 1 | Repository description, topics, Discussions | 30 seconds | `../repo-settings-2.4.0.md` | ready |
-| 2 | Merge the plugin README and icon | a pull request from `v2/reach` | `pr-reach.md` | ready; the maintainer approved the icon as drawn on 2026-11-16 |
-| 3 | awesome-observability listing | click "Create pull request" | `awesome-observability.md` | branch pushed to the fork |
+| 1 | Repository description, topics, Discussions | 30 seconds | `../repo-settings-2.4.0.md` | **done** 2026-11-16 (description set, four topics added, Discussions on; read back) |
+| 2 | Merge the plugin README and icon | a pull request from `v2/reach` | `pr-reach.md` | **done** 2026-11-16: pull request 28 merged as `c4fcb66` (the icon approved by the maintainer; a privacy page and listing links added after the directory's form was read) |
+| 3 | awesome-observability listing | click "Create pull request" | `awesome-observability.md` | **opened** 2026-11-16: pull request 223 at the list |
 | 4 | awesome-claude-code form | the maintainer writes the description themself | `awesome-claude-code.md` | facts ready |
-| 5 | Anthropic plugin directory | step 2 merged; a paid claude.ai plan | `anthropic-directory.md` | text ready |
+| 5 | Anthropic plugin directory | step 2 merged; a paid claude.ai plan | `anthropic-directory.md` | **submitted** 2026-11-16 (`main` at `c4fcb66`, listed for Claude Code only); waiting for the scan and a reviewer |
 | 6 | Blog post about the maintainer's own run | the maintainer's yes to post their numbers | private draft, not in this branch | draft ready |
 | 7 | OpenAI directory for the Codex skill | a manifest, an icon, a privacy page, a verified organization | `openai-codex.md` | not now |
 | 8 | Two more lists | their rules are unclear today | `later-lists.md` | not now |

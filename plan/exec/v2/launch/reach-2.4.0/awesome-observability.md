@@ -15,13 +15,19 @@ runs (whatbroke).
 ## Prepared
 
 Fork `ajaysurya1221/awesome-observability` (created 2026-11-16), branch `add-realornoise`,
-commit `a57e5f6`, one line added, based on the list's current `master`:
+commit `dc4a228` (first pushed as `a57e5f6`; reworded without the co-author line, same change), one line added, based on the list's current `master`:
 
 ```markdown
 - [realornoise](https://github.com/ajaysurya1221/agent-reliability-ci) - Local Python CLI that reads Claude Code and Codex session logs and compares recent days with earlier days on recorded measures such as reasoning tokens per response and failed file edits. Prints REAL DROP, NO DROP or CANNOT TELL; with a short history the usual answer is CANNOT TELL. Runs no model and sends nothing. It does not show a cause or answer quality. Apache-2.0.
 ```
 
-## To open it
+## Opened
+
+Opened on 2026-11-16 as https://github.com/adriannovegil/awesome-observability/pull/223, at the
+maintainer's instruction, by the orchestrator in the maintainer's signed-in browser, with the
+summary below and the first four boxes ticked.
+
+## How it was opened
 
 Link (title filled in): https://github.com/adriannovegil/awesome-observability/compare/master...ajaysurya1221:awesome-observability:add-realornoise?expand=1&title=Add%20realornoise%20to%20LLM%20%26%20AI%20Observability
 

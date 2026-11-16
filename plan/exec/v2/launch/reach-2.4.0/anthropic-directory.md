@@ -72,3 +72,68 @@ The portal's own Validate result; the text of the acknowledgements and the answe
 whether the form has a category, support or privacy-policy field; how the portal reads the
 interpreter request `--python 3.14`; the archive size GitHub builds (the limit is 50 MiB;
 GitHub reports about 11 MB).
+
+## What the form asked when read signed in (2026-11-16)
+
+Read in the maintainer's signed-in browser, first against branch `v2/reach` as an unsent
+draft, then against `main`.
+
+- **Step 1, Source.** Its list of checks: a README that explains what the plugin does and
+  any data it sends; a licence; "An icon in plugin.json"; a privacy policy URL if it talks
+  to a remote server; pinned `npx` and `uvx` launchers. A folder link with a branch name
+  that contains a slash is split wrongly (`v2/reach` became branch `v2`); the path and
+  branch fields had to be typed.
+- **Validation on `v2/reach` at `cb9fbc4`:** passed, 7 checks, name and publisher checks
+  passed. Notes only: the inline shell line, and that inline shell and `allowed-tools`
+  beyond Read, Grep, Glob and LS will later be accepted only from Verified organizations.
+- **Step 2, Listing details**, read from the manifest and the README: the display name was
+  shown as "Realornoise"; keywords were not set; the privacy policy was not set; and
+  "Documentation" was taken from the README as `docs.astral.sh/uv/`, which is uv's page.
+  Listed surfaces were ticked for Claude Code, Cowork and the Claude apps, with the note
+  that inline shell does not run on the last two.
+- **Step 3, Data handling:** four questions with fixed answers. Read or store personal
+  data (No, Reads only, Reads and stores); send data to a service other than the declared
+  connectors (No, Yes listed in README); how long the service retains data from Claude
+  (Not retained, Under 30 days, Longer); intended for under 18 (No, Yes). Choosing "Reads
+  only" brought a warning that no privacy policy URL was found.
+- **Step 4, Compliance:** a contact email (filled in by the site from the account) and four
+  boxes: agreement to the Software Directory Terms and the Directory Policy; "The plugin's
+  privacy policy accurately describes the data it handles."; "The plugin does not
+  exfiltrate credentials or execute code outside its declared MCP servers."; and that
+  Anthropic may contact that address.
+
+What changed in the repository because of it (commit `d8a8a57`, in pull request 28):
+`docs/PRIVACY.md`; `displayName`, `keywords`, `documentationUrl`, `supportUrl`,
+`privacyPolicyUrl` and `icon` in the manifest; the icon moved from `.claude-plugin/` to the
+plugin folder (the plugin reference says to name it in `icon` and to keep only the
+manifest in `.claude-plugin`). Three reviewers checked the privacy page against the code,
+the other documents and the official plugin documentation before the commit; ten
+corrections to the page and two to the plugin README were applied. The plugin installs
+with the new fields in an empty configuration folder (Claude Code 2.1.322).
+
+## Submitted (2026-11-16)
+
+- Source: `ajaysurya1221/agent-reliability-ci`, path `plugins/realornoise`, the default
+  branch; validated at `main` @ `c4fcb66`: passed, 7 checks, 4 warnings (three listing
+  fields that released Claude Code builds do not read, and `icon`, which only the
+  directory reads; the form says no action is needed).
+- Listing as read: name `realornoise`; links to the privacy page, the issue tracker, the
+  repository and the guide; no terms of service link.
+- Listed on: Claude Code only. Cowork and the Claude apps were unticked, because the
+  plugin's one shell line does not run there.
+- Data handling answers: Reads only; Yes, listed in README; Not retained; No.
+- Compliance: the four boxes were ticked in the maintainer's browser while the
+  orchestrator was working elsewhere; the orchestrator did not tick them.
+- Auto-publish of later versions: turned off. The status page says no version goes live
+  without an Anthropic reviewer for now.
+- Submitted by the orchestrator at the maintainer's instruction ("use my chrome and do it
+  yourself"; "take full control"). Status page:
+  https://claude.ai/directory/manage/plugins/64c64d0b-5eca-4054-bc02-ee514f0fd7ea
+  (version v2.4.0 at `c4fcb66`, "Scanning" at the time of writing).
+
+Open point for the maintainer: the third box says the plugin does not "execute code
+outside its declared MCP servers". The plugin declares no MCP server and runs one pinned
+shell command, which the form's own scan lists as an accepted note and the README states.
+If a reviewer reads that box literally, expect a question.
+
+Not verified: the result of the security scan and of the review; how long either takes.
