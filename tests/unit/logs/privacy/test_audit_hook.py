@@ -57,7 +57,7 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
     removed: set[Path] = set()
     for event, args in _EVENTS:
         assert not event.startswith(("socket.", "os.exec", "os.posix_spawn")), event
-        assert event not in {"subprocess.Popen", "os.system", "urllib.Request"}, event
+        assert event not in {"subprocess.Popen", "os.system", "urllib.Request", "os.rmdir"}, event
         if event == "open":
             name, mode, flags = args
             writing = (isinstance(mode, str) and any(c in mode for c in "wax+")) or (

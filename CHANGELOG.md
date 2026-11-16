@@ -21,15 +21,17 @@
   wrong REAL DROP 362/2000 = 0.181000 [0.164743, 0.198480] (18.1%, Wilson 95% interval),
   seed 18112185, regime-switching days with log SD 0.45, 14 days after and 16 before.
   Work in phases can break the bound; other patterns can give more.
-- **Fixed:** report temporary files use their own names, so table cleanup does not
-  remove another run's pending outputs. A waiting writer checks the locked directory
-  and recreates it if a failed writer removed it, including when the lock open finds it
-  missing. Other lock-open errors fail the write. Failed writes remove created
-  directories before releasing the lock, check device and inode, and skip missing
-  directories. Cleanup preserves this run's requested outputs. Tests cover lock lifetime, rollback
-  without a lock, unreadable tables, explicit gates under Python optimization and
-  figure provenance. The README pins the LangChain extra to this release and states
-  when days are kept; gate descriptions match the recorded self-check.
+- **Fixed:** the tool never removes a directory. A failed write restores files;
+  the table directory and any parents it created stay, empty, with mode 0700.
+  Existing directories keep their mode. Overlapping table writes merge under an
+  exclusive directory lock, held through moves and cleanup. Failure to open the
+  directory is a write error; an unavailable lock module or failed lock call
+  allows the write to proceed without a lock. The tool assumes no other program
+  removes or replaces the directory during a run. Output names beginning with
+  `.realornoise-`, after NFKC normalization and case folding, are refused before
+  any read or write. Successful table writes remove regular files with that prefix
+  while holding the lock. Report temporary files use `.realornoise.out-`, so table
+  cleanup leaves another run's pending reports alone.
 - **Fixed:** equal numeric client-version tuples now use ascending text order in both
   the displayed list and record validation. With four equivalent spellings, the wrong
   three had been shown. A kept-table path below a regular file is now absent rather

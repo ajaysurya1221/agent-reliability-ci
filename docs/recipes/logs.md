@@ -219,13 +219,18 @@ is refused with the general usage line and exit 3, before reading or writing any
 Placeholders used to check target names are removed before staging. With `--keep`, the
 writer locks the table directory, reads the table again, merges and writes it under that
 lock, so overlapping runs keep each other's rows. Where directory locking is unavailable,
-the run proceeds without it. An existing table directory that cannot be opened for
-the lock is a write error. A failed run removes only the directories it created,
-while their device and inode still match, before releasing the lock.
+the run proceeds without it. A table directory that cannot be opened for
+the lock is a write error. The tool never removes a directory. The table directory
+and any missing parents are created before staging files, with mode 0700. If the
+write fails, those directories stay, empty; existing directories keep their mode.
+The tool assumes no other program removes or replaces the table directory while a
+run uses it.
 The result still uses the table read at the start.
 After a successful write, leftover regular files whose names begin with `.realornoise-`
-are removed from the table directory while the lock is held; requested outputs and
-other names are left alone.
+are removed from the table directory while the lock is held. Output file names
+beginning with `.realornoise-`, compared after Unicode normalization (NFKC) and
+case folding, are refused with the general usage line and exit 3 before any read
+or write. Other names are left alone.
 Other outputs use `.realornoise.out-` temporary names, which the table cleanup never
 removes. Without a lock, an overlapping `--keep` run can fail with the write error
 and leaves the table and all requested outputs as they were.

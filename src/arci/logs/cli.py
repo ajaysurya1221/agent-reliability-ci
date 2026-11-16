@@ -132,6 +132,11 @@ def _execute(
         malformed
         or args.tool not in {"auto", "claude-code", "codex", "both"}
         or args.keep_dir == ""
+        or any(
+            unicodedata.normalize("NFKC", Path(path).name).casefold().startswith(".realornoise-")
+            for path in (args.json, args.markdown, args.html)
+            if path is not None
+        )
     )
     if args.help and not malformed:
         out.write(parser.format_help())
@@ -323,35 +328,21 @@ def _execute(
 
 
 @contextmanager
-def _directory_lock(directory: Path) -> Generator[bool]:
+def _directory_lock(directory: Path) -> Generator[None]:
     """Lock the directory itself; unsupported platforms continue without a lock."""
     try:
         import fcntl
     except ImportError:
-        # No lock call on this platform (Windows cannot even open a directory): go on unlocked.
-        yield True
+        yield
         return
-    try:
-        descriptor: int | None = os.open(directory, os.O_RDONLY)
-    except (FileNotFoundError, NotADirectoryError):
-        yield False
-        return
+    descriptor: int | None = os.open(directory, os.O_RDONLY)
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX)
         except OSError:
             os.close(descriptor)
             descriptor = None
-        current = True
-        if descriptor is not None:
-            locked = os.fstat(descriptor)
-            try:
-                actual = os.stat(directory)
-            except FileNotFoundError:
-                current = False
-            else:
-                current = (locked.st_dev, locked.st_ino) == (actual.st_dev, actual.st_ino)
-        yield current
+        yield
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -371,7 +362,6 @@ def _write_outputs(
     temporary: list[Path] = []
     placeholders: set[Path] = set()
     keep: set[Path] = set()
-    created: dict[Path, tuple[int, int]] = {}
     succeeded = False
     locks = ExitStack()
     modes: dict[Path, int] = {}
@@ -387,27 +377,20 @@ def _write_outputs(
 
     try:
         if table_path is not None:
-            for _ in range(8):
-                missing: list[Path] = []
-                parent = table_path.parent
-                while not parent.exists():
-                    missing.append(parent)
-                    parent = parent.parent
-                for directory in reversed(missing):
-                    try:
-                        directory.mkdir(mode=0o700)
-                    except FileExistsError:
-                        if not directory.is_dir():
-                            raise
-                    else:
-                        info = directory.stat()
-                        created[directory] = (info.st_dev, info.st_ino)
-                        directory.chmod(0o700)
-                if locks.enter_context(_directory_lock(table_path.parent)):
-                    break
-                locks.close()
-            else:
-                raise OSError("table directory changed while locking")
+            missing: list[Path] = []
+            parent = table_path.parent
+            while not parent.exists():
+                missing.append(parent)
+                parent = parent.parent
+            for directory in reversed(missing):
+                try:
+                    directory.mkdir(mode=0o700)
+                except FileExistsError:
+                    if not directory.is_dir():
+                        raise
+                else:
+                    directory.chmod(0o700)
+            locks.enter_context(_directory_lock(table_path.parent))
             if table_updates is not None:
                 state, latest = kept.read(table_path)
                 outputs = [(path, content) for path, content in outputs if path != table_path]
@@ -473,21 +456,10 @@ def _write_outputs(
         if succeeded and table_path is not None and table_path in installed:
             with suppress(OSError):
                 for path in table_path.parent.iterdir():
-                    if path.name.startswith(".realornoise-") and path not in staged:
+                    if path.name.startswith(".realornoise-"):
                         with suppress(OSError):
                             if stat.S_ISREG(path.lstat().st_mode):
                                 path.unlink()
-        if not succeeded:
-            for directory in sorted(created, key=lambda path: len(path.parts), reverse=True):
-                try:
-                    info = directory.stat()
-                    if (info.st_dev, info.st_ino) != created[directory]:
-                        break
-                    directory.rmdir()
-                except FileNotFoundError:
-                    continue
-                except OSError:
-                    break
         locks.close()
 
 
