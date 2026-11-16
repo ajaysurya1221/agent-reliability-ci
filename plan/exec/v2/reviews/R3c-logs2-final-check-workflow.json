@@ -1,0 +1,267 @@
+{
+ "results": [
+  {
+   "lens": "races",
+   "review": {
+    "summary": "I found 4 defects in the lock and rollback path of src/arci/logs/cli.py at 5b37da5 and showed each one with a script. Two are medium. (1) A failed run releases the directory lock (locks.close(), line 476) before it removes the directories it created (lines 477-482). A run that was waiting gets the lock, passes the new same-directory check, then has its directory removed from under it and fails with the write error. Record 0017 lines 516-518 say that run recreates the directory and locks the new one. (2) When os.open of the table directory fails because the directory has just been removed, _directory_lock treats it like a platform with no lock and yields True (lines 338-342). That run then writes the table without a lock while another run holds the lock on the recreated directory, and the first run's rows are lost with exit 2 and no error. Two are low. (3) A run that recreates the table directory after it was removed keeps duplicate entries in `created`. When it later fails, rmdir hits FileNotFoundError and stops at `break`, so a parent directory the run created is left behind. (4) Rollback removes directories by path, so after another process recreated the directory, the run removes a directory it did not create. Everything else I ran held: two and three overlapping --keep processes paused before the lock, at the re-read, at the move and in cleanup kept every row with exit 2 and no leftovers. --keep runs mixed with runs that write --json, --markdown and --html into the table directory, in both orders and paused at each move, kept all rows and left no temporary files. SIGKILL of the lock holder released the lock, and the next run proceeded and removed the .realornoise- leftovers. A failed table move restored the other three outputs byte for byte with their modes. A table directory replaced by a regular file while the run waits gives exit 3 and leaves the file untouched.",
+    "checked": [
+     "Read git diff 68ec006..5b37da5 for src/arci/logs/cli.py and docs/design/0017-logs-2.md; read cli.py lines 140-509 (_execute tail, _directory_lock, _write_outputs, run)",
+     "Read record 0017 paragraphs 'An interrupted write, and two runs at once', 'Whose temporary files the cleanup may remove', the Rollback rule (lines 482-490), line 1116-1120, and acceptance items 74-77",
+     "Read tests/unit/logs/test_logs2.py overlap/lock tests (overlapping writer, unavailable lock, report moves survive cleanup, unlocked cleanup rollback, lock held through cleanup, waiting writer relocks)",
+     "Copied src/tests/bench/docs to scratchpad/review24c/races/copy; confirmed arci.__file__ is the copy",
+     "s1_unlock_before_rmdir.py: failed run A releases the lock before rmdir; waiting run B passes the check, then fails with exit 3 and the directory is gone",
+     "s2_relock_rounds.py once-then-fail / remove-always / recreate-always: 8-round limit gives exit 3; created parent left behind; a directory created by someone else removed",
+     "s3_misc.py file: table directory replaced by a regular file while waiting gives exit 3 and the file bytes are unchanged; symlink: the table is written in the symlink target, exit 2",
+     "s3_misc.py tablemove: table os.replace fails after json/md/html are installed; all three restored byte for byte with modes 640/604/755, table unchanged, exit 3, no leftovers",
+     "s4_procs.py three: three overlapping --keep processes paused at prelock/reread/move/cleanup; all rows m1, m2 and m3 kept (9 rows), exit 2 each, only days-1.json left",
+     "s4_procs.py kill: SIGKILL of the lock holder at reread/move/cleanup; the next --keep run got the lock with exit 2, its rows kept, and .realornoise- leftovers removed",
+     "s4_procs.py mixed: a run without --keep writing json/md/html into the table directory, paused at each move, alongside a --keep run in both orders; all exit 2, the table holds the --keep run's rows, no temporary files left",
+     "s5_open_fails_unlocked.py: os.open of the directory fails, the run proceeds unlocked while another run holds the lock, and its rows are lost with both runs exiting 2"
+    ],
+    "findings": [
+     {
+      "id": "races-1",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A failed --keep run releases the directory lock before it removes the table directory it created. A run waiting on that lock can pass its 'is this still the same directory' check in that gap and then has the directory removed from under it. It fails with the write error, although the record says it recreates the directory and locks the new one.",
+      "evidence": "cli.py line 476 `locks.close()` runs before lines 477-482 (`if not succeeded: for directory in reversed(created): directory.rmdir()`). Record 0017 lines 516-518: \"If an earlier run's failed write removed that directory in the meantime, the run creates the directory again and locks that one.\" Script /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/races/s1_unlock_before_rmdir.py has two runs: A has --keep-dir store and --json missing-dir/a.json, so it creates store and fails; B has --keep-dir store and waits on the lock. Its rmdir runs after B's check, at a point the code allows. Output: `A exit 3 'Requested output could not be written.\\n'` / `B exit 3 'Requested output could not be written.\\n'` / `store dir: ['<absent>']` / `table: absent set()`. B's write fails only because of A's late rmdir, so B's rows are not kept.",
+      "repro": "cd scratchpad/review24c/races && TMPDIR=$PWD/runs PYTHONPATH=$PWD/copy/src:$PWD .venv/bin/python s1_unlock_before_rmdir.py",
+      "suggested_fix": "Remove the created directories while the lock is still held, before locks.close(). Or have the waiting run check again just before it creates files, and retry the lock rounds if the directory has gone."
+     },
+     {
+      "id": "races-2",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "When os.open of the table directory fails because the directory was just removed (ENOENT), _directory_lock treats it like a platform without locks and yields True. The run goes on without any lock, overlaps a run that holds the lock on the recreated directory, and its rows are silently lost.",
+      "evidence": "cli.py lines 335-342: `descriptor = os.open(directory, os.O_RDONLY)` and the flock call share one `except OSError:` that sets descriptor=None. Line 342 then sets `current = True`, so the retry loop at line 402 breaks and no lock is taken. Record lines 500-503 say two overlapping runs keep each other's rows, and the unlocked fallback is only 'where the platform offers no such lock'. Script /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/races/s5_open_fails_unlocked.py: B's open of store meets a removed directory, standing in for an earlier failed run's rollback as in races-1. C then recreates store, locks it, re-reads and pauses. B finishes, and C resumes. Output: `B finished while C holds the lock: 2 ''` / `table after B: read ['m1']` / `C: 2 ''` / `flock calls: ['C']` (B never called flock) / `final table: read ['m2'] ['days-1.json']`. Model m1's rows are lost and both runs exit 2 with no error.",
+      "repro": "cd scratchpad/review24c/races && TMPDIR=$PWD/runs PYTHONPATH=$PWD/copy/src:$PWD .venv/bin/python s5_open_fails_unlocked.py",
+      "suggested_fix": "Treat an os.open failure (FileNotFoundError, and any failure other than an unsupported lock) as not current, so the loop retries. Proceed without a lock only when flock itself reports that locking is unsupported."
+     },
+     {
+      "id": "races-3",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "When the table directory a run created is removed while the run waits, the run recreates it and appends the same path to `created` a second time. If the write then fails, the second rmdir of that path raises FileNotFoundError, the loop stops at `break`, and an empty parent directory the run created is left behind.",
+      "evidence": "cli.py lines 393-400 append to `created` again on every round, and lines 478-482 stop at the first OSError. Record line 486-487: \"Rollback then removes every directory this run created, the missing parents included, deepest first, and stops at the first directory that is not empty or that the run did not create.\" Script /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/races/s2_relock_rounds.py once-then-fail (keep dir parent/store, both missing; store removed once before the first lock; --json to a missing directory). Output: `once-then-fail exit 3 ... flock calls 2` / `P exists: True D exists: False listing P: []`. The same happens at the 8-round limit (remove-always): `flock calls 8` / `P exists: True D exists: False`.",
+      "repro": "TMPDIR=$PWD/runs PYTHONPATH=$PWD/copy/src:$PWD .venv/bin/python s2_relock_rounds.py once-then-fail",
+      "suggested_fix": "Do not add a path to `created` twice, or skip FileNotFoundError during rollback instead of stopping at `break`."
+     },
+     {
+      "id": "races-4",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "Rollback removes directories by path, so if another process removed and recreated the table directory while the run waited, the failing run removes that other process's directory, which this run did not create.",
+      "evidence": "cli.py lines 478-480 rmdir every path in `created`, with no check of which inode the run made. Record line 487-488 says rollback stops at the first directory \"that the run did not create\". Script /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/races/s2_relock_rounds.py recreate-always: the run creates parent/store; before each lock another actor does rmdir and mkdir of store with mode 0755, so the run creates nothing in rounds 2-8. Output: `recreate-always exit 3 ... flock calls 8` / `P exists: False D exists: False` / `last foreign D inode 162483508 D still there: False`. The other actor's directory is removed. This needs a repeated outside replacement, which is an unusual set-up.",
+      "repro": "TMPDIR=$PWD/runs PYTHONPATH=$PWD/copy/src:$PWD .venv/bin/python s2_relock_rounds.py recreate-always",
+      "suggested_fix": "Record (st_dev, st_ino) for each directory the run creates, and during rollback remove a path only while it still has that identity."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "races-1",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "Reproduced on my own copy (verify-races/v.py 1), calling cli._write_outputs directly from two threads. At src/arci/logs/cli.py:476, locks.close() runs before the rollback rmdir at lines 477-482. Run A creates store and then fails because its --json directory is missing. Run B was waiting in flock. It wakes, checks that store has the same identity (it still does), and goes on to kept.read. Only then does A's rmdir remove the empty store. B fails with FileNotFoundError on store/days-1.json (exit 3 in the CLI), and store ends up absent. This breaks the record's rule (0017, 'An interrupted write, and two runs at once') that a waiting run whose directory was removed by an earlier failed write recreates it and locks the new one. Nothing is lost silently: B fails and leaves everything as it was. Medium is right: a stated rule fails for two real runs in a narrow timing window."
+    },
+    {
+     "id": "races-2",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "Reproduced (verify-races/v.py 2). At cli.py:335-342, os.open and flock share one 'except OSError', so when the table directory is missing (ENOENT), descriptor is None and the function yields current=True. The run goes on with no lock, which the record allows only where the platform offers no such lock. In my run, B's open found store removed (standing in for another run's rollback). C then recreated store, locked it, read the table and paused, and B wrote gpt-5-sol while C held the lock. C then wrote the merge of its stale read: the final table has only ['gpt-5'], flock was called only by C, and both runs reported success. This is silent row loss. It needs three overlapping runs, one of which fails and rolls back a directory it created, plus tight timing, so I keep medium rather than high."
+    },
+    {
+     "id": "races-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced (verify-races/v.py remove-once). parent/store is created and locked, then removed between flock and the os.stat check, so the run retries and recreates store. That appends the same path to `created` a second time (cli.py:393-400). On failure, the second rmdir of store raises FileNotFoundError, and line 482 breaks out of the loop. The empty parent the run created is left behind: 'P exists True D exists False listing P []'. The record says rollback removes every directory the run created. Low: it needs an outside removal timed between flock and stat."
+    },
+    {
+     "id": "races-4",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced (verify-races/v.py replace-once). The run creates parent/store, and one outside rmdir and mkdir of store happens between flock and stat (new inode 162530034). In round 2 the directory exists, so it is not appended again, and the run locks the foreign directory. When the write then fails, rollback removes it by path (cli.py:478-480): 'P exists False D exists False'. One replacement is enough; the checker's repeated replacement is not needed. This breaks the record's rule that rollback stops at a directory the run did not create. Low: it needs an outside replacement timed inside the lock window."
+    }
+   ]
+  },
+  {
+   "lens": "logic",
+   "review": {
+    "summary": "I read all of _directory_lock and _write_outputs at 5b37da5 and ran reproductions on a scratch copy. arci.__file__ printed the copy's path, so the copy was the code that ran. Three defects are shown by real runs. (1) Medium. In the finally block, locks.close() runs before the created directories are removed. A run that was waiting for the lock can take it and pass the new identity check, and only then does the failed run remove the directory. The waiting run then fails with the write error. If a third run recreates the directory in that window, two runs both report success and one run's rows are lost. The record says the waiting run creates the directory again and that overlapping runs do not lose each other's rows. Neither holds here. (2) Low. The success cleanup removes a requested output whose name begins with `.realornoise-` in the table directory. The run exits 2 with nothing on standard error, but the file is gone. (3) Low. When os.open of the table directory fails on a platform that has fcntl (a 0o300 directory), _directory_lock yields True and holds no lock. Two overlapping `--keep` runs then both succeed and one run's rows are lost. The record only allows running without a lock where the platform offers none. Everything else checked out: the 8-round loop and the ExitStack reuse, the two temporary prefixes with the duplicate-output check, the size check, the modes of staged files, a run without --keep, and writes staying inside the paths given.",
+    "checked": [
+     "git diff 68ec006..5b37da5 --stat and the diff of src/arci/logs/cli.py",
+     "Read src/arci/logs/cli.py lines 1-512 (_execute, _directory_lock, _write_outputs, run)",
+     "Read docs/design/0017-logs-2.md lines 495-527 (interrupted write and two runs, whose temporary files, one size limit)",
+     "Read the brief R3b-logs2-second-review-fixes.md items 1-11",
+     "Read the new tests in tests/unit/logs/test_logs2.py, including test_waiting_writer_relocks_removed_directory and test_exclusive_lock_is_held_through_cleanup",
+     "grep of kept.py: MAX_BYTES 33_554_432 and the reader's > comparison match the writer's check at cli.py:441",
+     "Copied src/tests/bench/docs to the scratchpad .../review24c/logic/copy; printed arci.__file__, which was the copy",
+     "Ran .../review24c/logic/copy/tests/unit/logs/test_logic_repro.py with pytest -p no:cacheprovider -o addopts='' (4 reproductions, all fail on unmodified code; output in .../review24c/logic/repro_output.txt)",
+     "Tried a mutated copy (.../review24c/logic/fixed2) that removes the directories before locks.close(); my timing harness deadlocks by design under that order, so it does not validate a fix",
+     "Reasoned through the 8-round loop: ExitStack.close() empties the stack so it can be reused; no lock from an earlier round stays held; an exception inside the lock generator closes its descriptor",
+     "Temporary prefixes: table_path is resolved and the targets are resolved; an output reaching the table through a symlink or another spelling is caught by DUPLICATE_OUTPUT in _execute and by samefile at cli.py:430; a table temporary is always made in table_path.parent",
+     "A run without --keep: table_output is None, so there is no mkdir, lock or iterdir of the table directory (kept.read opens only the table file)",
+     "Modes: the staged table is 0o600, other outputs keep their old mode (or the umask mode of the placeholder), and copy2 backups keep the mode"
+    ],
+    "findings": [
+     {
+      "id": "logic-1",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A failed run releases the table directory lock (locks.close(), line 476) before it removes the directories it created (lines 477-482). A run that was waiting for the lock can take it and pass the new fstat/stat identity check (lines 343-350) while the directory still exists. The failed run then removes that directory. The waiting run then fails with the write error instead of creating the directory again and locking that one. If a third run arrives meanwhile and recreates the directory, it locks a different inode, so two runs write the table at once and one run's rows are lost even though both exit with success.",
+      "evidence": "Script: /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/logic/copy/tests/unit/logs/test_logic_repro.py::test_failed_run_removes_directory_after_releasing_lock. Two runs: RESULTS {'a': (3, WRITE_ERROR), 'b': (3, 'Requested output could not be written.')}, TABLE missing. Three runs: RESULTS {'a': (3, WRITE_ERROR), 'c': (2, ''), 'b': (2, '')}, TABLE read ['gpt-6'] (C's gpt-7 rows are lost). Output saved in .../review24c/logic/repro_output.txt. Record 0017 line 517-518: 'If an earlier run's failed write removed that directory in the meantime, the run creates the directory again and locks that one.' Lines 501-502: 'two runs that overlap do not lose each other's rows'.",
+      "repro": "cd <scratch>/copy && PYTHONPATH=<scratch>/copy/src /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python -m pytest -p no:cacheprovider -o addopts='' -s -q tests/unit/logs/test_logic_repro.py -k releasing. Run A (--keep-dir kd, kd missing) fails inside the lock. Run B waits on the lock and passes the identity check before A's rmdir. A's rmdir is held back by an event, which forces the window that the real lines 476-482 leave open. With third=True, run C recreates kd, locks the new inode, re-reads and moves its table. B moves a table merged from its stale read.",
+      "suggested_fix": "Remove the created directories before releasing the lock: move the `if not succeeded: rmdir` loop above `locks.close()`. A waiting run's stat then sees the directory missing or replaced and starts another round. Add a test for this interleaving."
+     },
+     {
+      "id": "logic-2",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "After a successful table write, the cleanup (lines 469-475) unlinks every regular file in the table directory whose name begins with '.realornoise-'. That includes a requested output the run has just installed. The run exits 2 with nothing on standard error, yet the requested output does not exist. Record 0017 limits the cleanup to temporary files the tool left behind ('temporary files that this tool left in the table directory').",
+      "evidence": "test_requested_output_with_table_prefix_is_deleted in .../review24c/logic/copy/tests/unit/logs/test_logic_repro.py prints: CODE 2 '' exists: False table: True. The command was `--json <home>/.realornoise/.realornoise-report.json --keep`.",
+      "repro": "realornoise --tool claude-code --claude-dir <logs> --keep --json ~/.realornoise/.realornoise-report.json, then check that the json file is missing although the exit code is 2 and standard error is empty.",
+      "suggested_fix": "Do not unlink paths that were installed as outputs in this run (skip `installed`). Or reject an output name inside the table directory that carries the table temporary prefix."
+     },
+     {
+      "id": "logic-3",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "On a platform that has fcntl, _directory_lock swallows a failed os.open of the directory (lines 335-341) and yields True with no descriptor. The run then reads, merges and moves the table with no lock. For example, a table directory with mode 0o300 is writable and searchable but cannot be opened O_RDONLY. Two overlapping --keep runs then both report success and one run's rows are lost. The record allows running without the lock only 'Where the platform offers no such lock'. Even for that case it says the overlapping run fails with the write error, not that rows are lost.",
+      "evidence": "test_unreadable_table_directory_runs_without_lock_and_loses_rows in .../review24c/logic/copy/tests/unit/logs/test_logic_repro.py prints: FLOCK CALLS [] RESULTS {'c': (2, ''), 'b': (2, '')} MODELS ['gpt-6'] (C's gpt-7 rows are lost).",
+      "repro": "chmod 0300 on the keep directory. Run B pauses after its re-read under the (absent) lock, run C runs to completion, then B finishes. The table holds only B's rows and both runs exit 2.",
+      "suggested_fix": "On a platform with fcntl, treat a failed open or flock of the table directory as a write error, or fall back to a lock file inside the directory. Do not proceed silently without a lock."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "logic-1",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "I reproduced this independently in /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24c/verify-logic/copy/tests/unit/logs/test_verify_logic.py::test_logic1, with output in .../verify-logic/out.txt. arci.__file__ pointed at the copy. In cli.py _write_outputs, the finally block runs locks.close() before the `if not succeeded: rmdir(created)` loop, so the window the finding describes exists. The only thing my hooks force is that A's rmdir happens after B has passed the fstat/stat check. With two runs, A fails, then B passes the identity check against a directory that A then removes. B exits 3 with the write error and does not recreate the directory, while record 0017 lines 517-518 say it creates the directory again. With three runs, A exits 3. C recreates kd, locks the new inode and writes its gpt-7 rows. B read the table while the directory was missing, then wrote into the recreated directory. Both B and C exit 2 with nothing on stderr, and the final table has 1 mention of gpt-6 and 0 of gpt-7, so C's rows are lost. That breaks the rule at line 501 that overlapping runs 'do not lose each other's rows'. It needs a failed write on a directory that run created plus a narrow race, so medium is right."
+    },
+    {
+     "id": "logic-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "I reproduced this with test_logic2 in the same file. `--json <home>/.realornoise/.realornoise-report.json --keep` returned (2, ''), the json file did not exist afterwards, and the directory held only days-1.json. The cleanup loop in cli.py deletes every regular file whose name starts with `.realornoise-` after a successful table write, including an output this run just installed. That makes the record's sentence 'Only the table's own temporary files carry the prefix `.realornoise-`' false in this case. It needs a user to choose that output name, so low."
+    },
+    {
+     "id": "logic-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "I reproduced this with test_logic3. On darwin, where fcntl exists, a kd with mode 0o300 makes os.open(O_RDONLY) fail with errno 13. _directory_lock swallows the OSError and still yields True, so flock is never called (the recorded flock list was empty). B paused after its in-lock re-read while C ran to completion. Both exited (2, ''), and the table holds only gpt-6, so C's gpt-7 rows are lost. The record allows running without a lock only 'Where the platform offers no such lock', and this platform does offer one. Even in that case the record says the overlapping run fails with the write error, not that both runs succeed. It needs an unusual directory mode, so low."
+    }
+   ]
+  },
+  {
+   "lens": "tests-docs",
+   "review": {
+    "summary": "I mutation-tested every rule from items 3 to 11 and the extra mutations requested for the tests-docs lens. Each one fails at least one test except six, all reported below as low. The six are: the table prefix for outputs that sit in the table directory, a device-blind identity check, the 8-round limit removed, the recreated directory not recorded for removal, rollback of newly created outputs, and two figure mentions the provenance test never checks. The privacy audit-hook test was not loosened. A temporary with either prefix in a directory where it was not requested still fails it. The new tests showed no flakiness: 5 full runs, 20 runs of the threaded tests, and 30 runs of logs2 plus the audit hook across 6 parallel processes, with no failure from the code (the only failure in the copy needs git and passes in the worktree). Running the code confirmed every new document sentence I checked: the temporary names, the cleanup scope, the lock, and the unlocked overlap. The two gate sentences in STATISTICS_LOGS.md are byte-identical to those in docs/results/logs-selfcheck.md, README names 2.4.0 everywhere, and no changed line has an em dash. None of the findings is a wrong result or data loss in the code.",
+    "checked": [
+     "Read the brief R3b-logs2-second-review-fixes.md and git diff 68ec006..5b37da5 (src, tests, docs)",
+     "Copied the worktree (no .venv/.git, plus plan/exec/scripts) to scratchpad/review24c/tests-docs/full; arci.__file__ printed from the copy",
+     "Mutation harness scratchpad/review24c/tests-docs/scripts/mutate.py; outputs in mut_A.txt, mut_B.txt, mut_C.txt, mut_DEFG.txt, mut_HI.txt",
+     "Item 1: prefix always .realornoise- -> fails test_report_moves_survive_another_runs_table_cleanup and the audit hook (both keep values)",
+     "A2: table prefix when the output is in the table directory -> NOT caught",
+     "B1 identity check removed, B4 one round only, B5 missing path counted as current, B2b device-only comparison -> each fails test_waiting_writer_relocks_removed_directory",
+     "B2 inode-only comparison -> NOT caught; B3 8-round limit removed (while True) -> NOT caught; B7 directory recreated in a later round not recorded in created -> NOT caught",
+     "C1 descriptor closed after flock, C2 LOCK_SH, C3 lock released before the moves, C4 lock released before the cleanup, C5 lock released before the re-read -> each fails test_exclusive_lock_is_held_through_cleanup",
+     "D1 placeholder-unlink loop removed -> fails test_failed_write_removes_new_targets[stage/move]",
+     "E1 unreadable table overwritten -> fails test_table_becoming_unreadable_keeps_its_exact_bytes",
+     "F1 rollback removed -> fails test_unlocked_cleanup_failure_rolls_back_all_outputs; F2 rollback no longer unlinks newly created installed outputs -> NOT caught by tests/unit/logs or tests/acceptance/test_logs.py (1566 passed)",
+     "G1 output temporaries placed in the table dir, G2 table prefix for outputs in keep mode, G3 table temporaries given the .out- prefix -> each fails the audit-hook test (keep=True); the audit hook is not loosened",
+     "H1 Assert node added to bench/selfcheck_logs.py -> fails test_selfcheck_has_no_assert_gates; H2 g_tail check rewritten as assert -> fails both the ast test and test_broken_gate_fails_quick_with_optimisation",
+     "I1 README langchain pin set back to 2.3.0 -> fails test_every_release_version_matches; I2 old gate sentence -> fails test_gate_descriptions_match_published_results",
+     "Doc provenance mutations (scripts/docmut.py): every seed and design change in STATISTICS_LOGS.md (including seed 18112185 inside parentheses after a semicolon), README.md and CHANGELOG.md fails; synthetic wrong-seed and wrong-design sentences in parentheses after a semicolon fail in all four documents; recipes line 300 seed and design changes pass",
+     "Paren-balance check of the prose in all four documents (balanced, so the new splitter is not disabled)",
+     "Flakiness: changed test files run 5 times (1 failure each time, git-dependent only, passes in the worktree with -B); 20 runs of the threaded tests; 30 runs in 6 parallel processes: no failures",
+     "Claims script scripts/claims.py: output temporaries are named .realornoise.out- in either directory and the table's .realornoise-; the cleanup removed only the regular .realornoise- file and left .realornoise.out-foo, a directory and a symlink; an unlocked overlapping --keep run gave exit 3, the table byte-identical, new outputs absent and no leftovers",
+     "README: --keep-dir implies --keep (cli.py:155), so 'Days are kept only with --keep' holds; every current-release mention says 2.4.0",
+     "diff of the gate sentences: STATISTICS_LOGS.md lines 528/540 identical to docs/results/logs-selfcheck.md",
+     "grep for em/en dashes in added doc lines: none",
+     "Worktree git status clean after all runs, HEAD 5b37da5"
+    ],
+    "findings": [
+     {
+      "id": "tests-docs-1",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "No test holds rule 1 for an output that lives in the table directory during a --keep run: with the mutation 'outputs get the table prefix when they are in the table directory', every test passes.",
+      "evidence": "In src/arci/logs/cli.py temporary_for, replacing the prefix line with `prefix = \".realornoise-\" if table_path is not None and target.parent == table_path.parent else \".realornoise.out-\"` gives rc=0 for test_logs2.py and test_audit_hook.py (scratchpad/review24c/tests-docs/mut_A.txt). The race test test_report_moves_survive_another_runs_table_cleanup writes into the table directory from a run without --keep (table_path is None). The audit-hook test puts its outputs in tmp_path, not in the table directory.",
+      "repro": "cd scratchpad/review24c/tests-docs/full; python scripts/mutate.py A2",
+      "suggested_fix": "Add a case where an unlocked --keep run (fcntl.flock raising) writes --json into the table directory while another --keep run cleans up, or add an audit-hook case with an output in the table directory that expects .realornoise.out-."
+     },
+     {
+      "id": "tests-docs-2",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "Two parts of the brief's item-2 rule have no test: the identity check may compare only the inode, and the 8-round limit may be removed, and every test still passes.",
+      "evidence": "Mutation B2 `current = locked.st_ino == actual.st_ino` and mutation B3 `for _ in range(8):` -> `while True:` both give rc=0 (mut_B.txt). By contrast, comparing only the device (B2b) does fail test_waiting_writer_relocks_removed_directory[True]. Brief item 2 requires 'device and inode' and 'at most 8 rounds, then treat it as a failed write'. A device-only change at the same path needs a different mount, an unusual set-up.",
+      "repro": "python scripts/mutate.py B2 B3",
+      "suggested_fix": "Add a test that patches os.stat or the lock to report a changed identity on every round and expects exit 3 with the write error after 8 rounds. Optionally patch os.stat to return the same inode with a different st_dev."
+     },
+     {
+      "id": "tests-docs-3",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "No test checks that a table directory recreated in a later locking round is removed again when the write then fails (brief item 2: 'recorded so that a failed write removes it again').",
+      "evidence": "Mutation B7 records created directories only in round 0 (`if _round == 0: created.append(directory)`). It gives rc=0 for test_logs2.py and test_audit_hook.py (mut_C.txt, first line). test_waiting_writer_relocks_removed_directory covers only the successful write.",
+      "repro": "python scripts/mutate.py B7",
+      "suggested_fix": "Extend test_waiting_writer_relocks_removed_directory[False] with a variant that also makes a later write fail (for example os.replace raising) and asserts that the recreated directory no longer exists."
+     },
+     {
+      "id": "tests-docs-4",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "The new sentence that a failed unlocked overlapping --keep run 'leaves the table and all requested outputs as they were' has no test for requested outputs that did not exist before. Rollback that keeps a newly created, already moved output is not caught by any logs test.",
+      "evidence": "Mutation F2 replaces `target.unlink()` in the rollback loop of _write_outputs with `pass`. tests/unit/logs plus tests/acceptance/test_logs.py then give '1566 passed, 3 skipped'. test_unlocked_cleanup_failure_rolls_back_all_outputs pre-creates all three outputs, and test_failed_write_removes_new_targets[move] fails at the first move, so nothing is installed. The current code is correct: scripts/claims.py S3 shows new outputs absent after exit 3.",
+      "repro": "Apply F2 in the copy and run pytest tests/unit/logs tests/acceptance/test_logs.py; or python scripts/mutate.py F2",
+      "suggested_fix": "Run test_unlocked_cleanup_failure_rolls_back_all_outputs a second time with outputs that do not exist yet (the table move is last, so the report moves have happened), and assert that none of them exists afterwards."
+     },
+     {
+      "id": "tests-docs-5",
+      "severity": "low",
+      "file": "tests/unit/docs/test_logs_docs.py",
+      "claim": "The provenance test covers docs/recipes/logs.md but checks no figure in it, so changing that document's seed or design still passes. One STATISTICS_LOGS.md design mention is also unchecked.",
+      "evidence": "scripts/docmut.py: in recipes/logs.md line 300 ('18.1% (362/2000, Wilson 95% interval [0.164743, 0.198480], seed 18112185), with 14 days after and 16 before'), changing seed 18112185 to 18112186 gives PASS, and changing the design 14/16 to 7/21 gives PASS. The figure is not in the 'n/N = rate [lo, hi]' form that FIGURE matches, and test_every_rate_figure_has_matching_source_row accepts checked == 0 for this document. In STATISTICS_LOGS.md line 663 ('535 of 20,000 at 14 days after against 16 before'), the design change also passes, because the literal check only covers the line-331 wording ('histories at').",
+      "repro": "cd scratchpad/review24c/tests-docs/full; PYTHONPATH=src:. python ../scripts/docmut.py",
+      "suggested_fix": "Match the recipe's '(n/N, Wilson 95% interval [lo, hi], seed S)' form, or require checked > 0 for every document. Add the line-663 wording to the literal checks."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "tests-docs-1",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced in my own copy (arci.__file__ printed from the copy). Mutation A (cli.py:378 gives the table prefix to any output in the table directory) leaves tests/unit/logs at 1341 passed, 3 skipped, rc=0. Script: scratchpad/review24c/verify-tests-docs/mut.py, output mutA.txt. Brief item 1 says outputs get .realornoise.out- 'in whatever directory they are', so this is a stated rule with no test. Low: test weakness only, the code is correct."
+    },
+    {
+     "id": "tests-docs-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Two mutations each leave tests/unit/logs at 1341 passed, rc=0 (verify-tests-docs/mutB.txt). B2 compares only st_ino at cli.py:350. B3 swaps range(8) at cli.py:387 for an endless iterator, so there is no round limit. Brief item 2 states both rules. Brief item 6 asks only for a test where the run succeeds, so the gap is test weakness. Low."
+    },
+    {
+     "id": "tests-docs-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Mutation B7 records created directories only in round 0, at cli.py:400. With it, tests/unit/logs still gives 1341 passed, rc=0 (mutB.txt). The cleanup at cli.py:477-482 depends on `created`, so a directory recreated in a later round and followed by a failed write would stay behind. No test catches this. Low."
+    },
+    {
+     "id": "tests-docs-4",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Mutation F2 turns the rollback `target.unlink()` at cli.py:460 into `pass`. tests/unit/logs plus tests/acceptance/test_logs.py then give 1566 passed, 3 skipped, rc=0 (verify-tests-docs/mutF.txt). So no test checks that a new output already moved into place is removed when the write fails. The code itself is correct by reading. Low."
+    },
+    {
+     "id": "tests-docs-5",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "verify-tests-docs/docmut.py makes three edits: the recipe seed 18112185 to 18112186 (docs/recipes/logs.md:300), the recipe design 14/16 to 7/21, and the STATISTICS_LOGS.md:663 design 14/16 to 7/21. Each leaves tests/unit/docs with exactly the same 5 failures as the unedited copy. Those 5 come from my copy having no git and some missing files (git ls-files, links, word count), not from the edits, so no extra test fails. test_logs_docs.py:456 lets the recipe pass with checked == 0. The literal check at :461 covers only the 'histories at' wording at line 331. Low."
+    }
+   ]
+  }
+ ]
+}

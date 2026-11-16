@@ -517,6 +517,17 @@ were. A run that waited for the lock checks, once it holds it, that the director
 still the one at the table directory's path. If an earlier run's failed write removed that
 directory in the meantime, the run creates the directory again and locks that one.
 
+**The order at the end of a run, and a directory that cannot be locked (added after the final
+check).** A run whose write fails removes the directories it created before it releases the
+lock, so a waiting run never passes its check on a directory that is about to go. It removes a
+directory only while the path still holds the directory it created (the same device and
+inode), and it goes on past a directory that is already gone, so a parent it created is still
+removed. A table directory that is gone when the run tries to open it for the lock is treated
+like one removed while waiting: the run creates it again. After 8 such rounds the write fails.
+If the table directory exists but cannot be opened for the lock, the write fails: the run goes
+on without a lock only where the lock call itself is not offered. The cleanup never removes a
+file that is one of this run's requested outputs, whatever its name.
+
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
 more than 33,554,432 bytes. Neither the number of settings nor the number of rows is capped, so
 a table of admitted rows can reach that size. The staged table is measured before anything is
