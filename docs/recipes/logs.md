@@ -229,11 +229,19 @@ The result still uses the table read at the start.
 After a successful write, leftover regular files whose names begin with `.realornoise-`
 are removed from the table directory while the lock is held. Output file names
 beginning with `.realornoise-`, compared after Unicode normalization (NFKC) and
-case folding, are refused with the general usage line and exit 3 before any read
-or write. Other names are left alone.
+case folding, including symbolic links that resolve to such names, are refused
+with the general usage line and exit 3 before any read or write. Other names are left alone.
 Other outputs use `.realornoise.out-` temporary names, which the table cleanup never
 removes. Without a lock, an overlapping `--keep` run can fail with the write error
 and leaves the table and all requested outputs as they were.
+
+A keyboard interrupt before the last move restores replaced files, removes new empty
+targets and ends with the write error and exit 3. After the last move the files are
+already written, and the run still ends with that error. An interrupt can leave a
+`.realornoise.out-` temporary file beside a report.
+A process killed outright restores nothing and can leave replaced files, empty new targets
+or temporary files.
+A `.realornoise.out-` file left beside a report may be deleted by hand.
 
 The retention promise assumes immutable records, no late backdated arrivals and whole-file
 deletion strictly after 720 hours. Each deleted day must have been captured whole before deletion, with successful captures

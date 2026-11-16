@@ -28,10 +28,18 @@
   directory is a write error; an unavailable lock module or failed lock call
   allows the write to proceed without a lock. The tool assumes no other program
   removes or replaces the directory during a run. Output names beginning with
-  `.realornoise-`, after NFKC normalization and case folding, are refused before
-  any read or write. Successful table writes remove regular files with that prefix
-  while holding the lock. Report temporary files use `.realornoise.out-`, so table
-  cleanup leaves another run's pending reports alone.
+  `.realornoise-`, after NFKC normalization and case folding, including symbolic
+  links that resolve to such names, are refused before any read or write.
+  Successful table writes remove regular files with that prefix while holding the
+  lock. Report temporary files use `.realornoise.out-`, so table cleanup leaves
+  another run's pending reports alone. A keyboard interrupt during writing ends
+  with the write error and exit 3. An interrupt during the same-file check removes
+  this run's new empty targets and preserves another writer's file. An interrupted
+  move restores old bytes and modes and removes new targets; after the last move
+  the files are already written. A second interrupt during restore can leave some
+  files replaced, and an interrupt can leave a report temporary file. A process
+  killed outright restores nothing and can leave replaced files, empty new targets
+  and temporary files. Report leftovers may be deleted by hand.
 - **Fixed:** equal numeric client-version tuples now use ascending text order in both
   the displayed list and record validation. With four equivalent spellings, the wrong
   three had been shown. A kept-table path below a regular file is now absent rather

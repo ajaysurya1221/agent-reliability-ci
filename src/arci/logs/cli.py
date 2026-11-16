@@ -88,6 +88,10 @@ def _output_key(path: Path) -> tuple[int, int, tuple[str, ...]]:
     return info.st_dev, info.st_ino, parts
 
 
+def _reserved_output(path: Path) -> bool:
+    return unicodedata.normalize("NFKC", path.name).casefold().startswith(".realornoise-")
+
+
 def _execute(
     argv: Sequence[str],
     *,
@@ -133,7 +137,7 @@ def _execute(
         or args.tool not in {"auto", "claude-code", "codex", "both"}
         or args.keep_dir == ""
         or any(
-            unicodedata.normalize("NFKC", Path(path).name).casefold().startswith(".realornoise-")
+            _reserved_output(Path(path))
             for path in (args.json, args.markdown, args.html)
             if path is not None
         )
@@ -175,6 +179,7 @@ def _execute(
             for path in (args.json, args.markdown, args.html)
             if path is not None
         ]
+        malformed = malformed or any(_reserved_output(path) for path in targets)
         checked = targets + ([table_path.resolve()] if keep else [])
         duplicate = len({_output_key(path) for path in checked}) != len(checked) or any(
             a.exists() and b.exists() and a.samefile(b)
@@ -404,12 +409,16 @@ def _write_outputs(
         checked: list[Path] = []
         for target, _ in outputs:
             if not target.exists():
-                fd = os.open(
-                    target,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                    0o600 if target == table_path else 0o666,
-                )
                 placeholders.add(target)
+                try:
+                    fd = os.open(
+                        target,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o600 if target == table_path else 0o666,
+                    )
+                except FileExistsError:
+                    placeholders.remove(target)
+                    raise
                 os.close(fd)
             else:
                 original.add(target)
@@ -435,11 +444,14 @@ def _write_outputs(
                 backups[target] = temporary_for(target)
                 shutil.copy2(target, backups[target])
         for target, _ in outputs:
-            os.replace(staged[target], target)
             installed.append(target)
+            os.replace(staged[target], target)
         succeeded = True
     except BaseException:
         for target in reversed(installed):
+            if staged[target].exists():
+                # The move never took effect: the target is as it was, nothing to restore.
+                continue
             try:
                 if target in backups:
                     os.replace(backups[target], target)

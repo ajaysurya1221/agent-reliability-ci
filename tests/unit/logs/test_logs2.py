@@ -1200,10 +1200,12 @@ def test_overlapping_writer_rows_survive_and_result_uses_initial_table(
 def test_success_cleans_only_regular_temporary_files(tmp_path: Path) -> None:
     history(tmp_path)
     path = store(tmp_path, ())
-    leftover = path.parent / ".realornoise-x"
+    leftover = path.parent / ".realornoise-leftover"
     leftover.write_text("old temporary")
     other = path.parent / "other"
     other.write_text("keep")
+    uppercase = path.parent / ".REALORNOISE-x"
+    uppercase.write_text("keep uppercase")
     directory = path.parent / ".realornoise-directory"
     directory.mkdir()
     link = path.parent / ".realornoise-link"
@@ -1211,6 +1213,7 @@ def test_success_cleans_only_regular_temporary_files(tmp_path: Path) -> None:
     invoke(tmp_path, "--keep")
     assert not leftover.exists()
     assert other.read_text() == "keep" and link.is_symlink() and directory.is_dir()
+    assert uppercase.read_text() == "keep uppercase"
 
 
 def test_unavailable_directory_lock_still_writes(
@@ -1447,6 +1450,8 @@ def test_table_becoming_unreadable_keeps_its_exact_bytes(
 ) -> None:
     history(tmp_path, days=1)
     table = store(tmp_path, (row(),))
+    leftover = table.parent / ".realornoise-x"
+    leftover.write_bytes(b"old temporary")
     read = kept.read
     changed = False
 
@@ -1461,6 +1466,7 @@ def test_table_becoming_unreadable_keeps_its_exact_bytes(
     monkeypatch.setattr(kept, "read", after_first_read)
     invoke(tmp_path, "--keep")
     assert changed and table.read_bytes() == b"{not json"
+    assert leftover.read_bytes() == b"old temporary"
 
 
 def test_directory_unopenable_is_write_error(tmp_path: Path) -> None:
@@ -1549,6 +1555,7 @@ def test_failed_keep_preserves_directories(
         directory.mkdir(parents=True)
         directory.parent.chmod(0o755)
         directory.chmod(0o755)
+        (directory / ".realornoise-x").write_bytes(b"old temporary")
     target = tmp_path / "report.json"
     target.write_text("original report")
     before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
@@ -1591,7 +1598,7 @@ def test_failed_keep_preserves_directories(
     assert set(tmp_path.rglob("*")) == before_paths | {directory.parent, directory}
     assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
     assert list(directory.parent.iterdir()) == [directory]
-    assert not list(directory.iterdir())
+    assert set(directory.iterdir()) == ({directory / ".realornoise-x"} if existing else set())
     for path in (directory.parent, directory):
         assert stat.S_IMODE(path.stat().st_mode) == (0o755 if existing else 0o700)
 
@@ -1822,3 +1829,213 @@ raise SystemExit(run(
         assert list(directory.iterdir()) == [directory / kept.FILENAME]
         assert list(directory.parent.iterdir()) == [directory]
         assert time.monotonic() < deadline, "process race exceeded 19 seconds"
+
+
+@pytest.mark.parametrize("existing", (False, True))
+@pytest.mark.parametrize("inside", (False, True))
+@pytest.mark.parametrize("keep_flag", (False, True))
+@pytest.mark.parametrize(
+    "name",
+    (
+        ".realornoise-x",
+        ".REALORNOISE-x",
+        "".join(chr(ord(c) + 0xFEE0) for c in ".realornoise-") + "x",
+    ),
+)
+def test_reserved_symlink_targets_read_and_write_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing: bool,
+    inside: bool,
+    keep_flag: bool,
+    name: str,
+) -> None:
+    history(tmp_path, days=1)
+    table = store(tmp_path, (row(),))
+    target = (table.parent if inside else tmp_path) / name
+    if existing:
+        target.write_bytes(b"unchanged target")
+        target.chmod(0o640)
+    link = tmp_path / "report.json"
+    link.symlink_to(target)
+    before_paths = set(tmp_path.rglob("*"))
+    before = {p: (p.read_bytes(), p.stat().st_mode) for p in before_paths if p.is_file()}
+    touched: list[object] = []
+
+    def forbidden(*args: object, **kwargs: object) -> Any:
+        touched.append(args)
+        raise AssertionError("usage error reached input or output")
+
+    monkeypatch.setattr(kept, "read", forbidden)
+    monkeypatch.setattr(cli.discover, "claude_files", forbidden)
+    monkeypatch.setattr(cli.discover, "codex_files", forbidden)
+    monkeypatch.setattr(cli, "_write_outputs", forbidden)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        ["--json", str(link), *(["--keep"] if keep_flag else [])],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert (code, output.getvalue(), error.getvalue()) == (3, "", report.USAGE_ERROR + "\n")
+    assert not touched
+    assert link.is_symlink() and link.readlink() == target
+    assert target.exists() == existing
+    assert set(tmp_path.rglob("*")) == before_paths
+    assert {p: (p.read_bytes(), p.stat().st_mode) for p in before_paths if p.is_file()} == before
+
+
+@pytest.mark.parametrize("existing", (False, True))
+@pytest.mark.parametrize("keep_flag", (False, True))
+def test_ordinary_symlink_output_is_written(
+    tmp_path: Path, existing: bool, keep_flag: bool
+) -> None:
+    history(tmp_path, days=1)
+    target = tmp_path / "ordinary.json"
+    if existing:
+        target.write_bytes(b"old report")
+    link = tmp_path / "result.json"
+    link.symlink_to(target)
+    record, _ = invoke(tmp_path, *(["--keep"] if keep_flag else []))
+    assert record.exit_code == 2
+    assert link.is_symlink() and link.readlink() == target
+    assert verify_seal(LogsDecision.model_validate_json(target.read_bytes()))
+
+
+@pytest.mark.parametrize("phase", ("before", "after", "exists"))
+def test_placeholder_open_interrupt_or_existing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    history(tmp_path, days=1)
+    target = tmp_path / "report.json"
+    real_open = os.open
+    called = False
+
+    def interrupted_open(path: Any, flags: int, mode: int = 0o777, **kwargs: Any) -> int:
+        nonlocal called
+        if Path(path) == target and flags & os.O_EXCL:
+            called = True
+            if phase == "exists":
+                target.write_bytes(b"other writer")
+                target.chmod(0o640)
+                return real_open(path, flags, mode, **kwargs)
+            if phase == "after":
+                descriptor = real_open(path, flags, mode, **kwargs)
+                os.close(descriptor)
+            raise KeyboardInterrupt
+        return real_open(path, flags, mode, **kwargs)
+
+    monkeypatch.setattr(os, "open", interrupted_open)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        ["--tool", "claude-code", "--claude-dir", str(tmp_path / "logs"), "--json", str(target)],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert called
+    assert (code, output.getvalue(), error.getvalue()) == (3, "", report.WRITE_ERROR + "\n")
+    if phase == "exists":
+        assert target.read_bytes() == b"other writer"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o640
+    else:
+        assert not target.exists()
+    assert not list(tmp_path.glob(".realornoise*"))
+
+
+@pytest.mark.parametrize("phase", ("before", "after"))
+@pytest.mark.parametrize("move_number", (1, 2, 4))
+@pytest.mark.parametrize("existing", ("all", "none", "mixed"))
+def test_interrupt_at_each_move_restores_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+    move_number: int,
+    existing: str,
+) -> None:
+    history(tmp_path, days=1)
+    table = tmp_path / "table" / kept.FILENAME
+    table.parent.mkdir()
+    targets = [tmp_path / "out.json", tmp_path / "out.md", tmp_path / "out.html", table]
+    old: dict[Path, tuple[bytes, int]] = {}
+    for index, target in enumerate(targets):
+        if existing == "all" or (existing == "mixed" and index % 2 == 0):
+            target.write_text(kept.serialize((row(),)) if target == table else f"old {index}")
+            target.chmod(0o640 + index)
+            old[target] = (target.read_bytes(), stat.S_IMODE(target.stat().st_mode))
+    real_replace = os.replace
+    calls = 0
+
+    def interrupted_move(source: Any, target: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == move_number and phase == "before":
+            raise KeyboardInterrupt
+        real_replace(source, target)
+        if calls == move_number and phase == "after":
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(os, "replace", interrupted_move)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        [
+            "--tool",
+            "claude-code",
+            "--claude-dir",
+            str(tmp_path / "logs"),
+            "--json",
+            str(targets[0]),
+            "--markdown",
+            str(targets[1]),
+            "--html",
+            str(targets[2]),
+            "--keep-dir",
+            str(table.parent),
+        ],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert calls >= move_number
+    assert (code, output.getvalue(), error.getvalue()) == (3, "", report.WRITE_ERROR + "\n")
+    for target in targets:
+        if target in old:
+            assert (target.read_bytes(), stat.S_IMODE(target.stat().st_mode)) == old[target]
+        else:
+            assert not target.exists()
+    assert not list(tmp_path.rglob(".realornoise*"))
+
+
+def test_reserved_directory_components_are_allowed(tmp_path: Path) -> None:
+    logs = history(tmp_path, days=1).parent
+    source = tmp_path / "input" / ".realornoise-x"
+    source.parent.mkdir()
+    logs.rename(source)
+    directory = tmp_path / "output" / ".realornoise-x"
+    record, _ = invoke(tmp_path, "--claude-dir", str(source), "--keep-dir", str(directory))
+    assert record.exit_code == 2
+    assert kept.read(directory / kept.FILENAME)[0] == "read"
+
+
+def test_new_keep_directories_have_exact_mode_under_umask(tmp_path: Path) -> None:
+    history(tmp_path, days=1)
+    directory = tmp_path / "parent" / "table"
+    previous = os.umask(0o100)
+    try:
+        record, _ = invoke(tmp_path, "--keep-dir", str(directory))
+        assert record.exit_code == 2
+        assert kept.read(directory / kept.FILENAME)[0] == "read"
+        for path in (directory.parent, directory):
+            assert stat.S_IMODE(path.stat().st_mode) == 0o700
+    finally:
+        os.umask(previous)
+        # Also allow fixture cleanup after the no-chmod mutation.
+        for path in (directory.parent, directory):
+            if path.exists():
+                path.chmod(0o700)
