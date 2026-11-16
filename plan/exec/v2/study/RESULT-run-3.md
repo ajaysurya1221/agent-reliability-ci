@@ -1,22 +1,28 @@
 # Result, run 3: BLOCK at round 2
 
-**Status of this file: draft.** The verdict, the counts and the four conditions below were
-checked by the orchestrator. An independent recount, an audit of the conditions and a
-sentence-by-sentence check were started and had not reported when this was committed
-(output expected in the session's task file `wwdtk1unu`). Astra has not yet been consulted
-on this write-up. Nothing here has been published outside this branch.
-
 Pre-registration: `PREREGISTRATION-run-3.md`, committed at `c217ae6` and pushed at
 2026-11-16 21:40:02 +05:30. The wrapper started 19 seconds later (21:40:21), the first
-trial after 21:40:24, and the run ended at 21:42:27. One start. Store:
+trial after 21:40:24, and the run ended at 21:42:27. These times come from the run log and
+the file system; the store holds no absolute time. One start. Store:
 `runs-run-3/order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504`.
 Log: `run-3.log`. Report as the tool renders it: `report-run-3.md`.
+
+Checked after the run by three agents working separately
+(`../reviews/R8-run3-result-verify-workflow.json`): a recount from the store by an agent
+that read no write-up (every count below came out the same), an audit of the registered
+conditions from the raw files (all hold; one erratum, below), and a sentence-by-sentence
+check of this file (its corrections are applied).
 
 ## Read this first: the roles are swapped
 
 The arm WITH the message is the baseline; run 2's set-up is the candidate. The tool
-printed "BLOCK, regression established". In this run that reads: **on these 8 cells, the
-message is worth more than 10 points of mean pass rate.**
+printed "VERDICT: BLOCK (exit 1)" with "reason: regression established". In this run that
+reads: **on these 8 cells, run 2's set-up passes less often than the set-up with the
+message, by more than 10 points of mean pass rate.** The registration's short form was
+"the message is worth more than 10 points on these 8 cells". Stated exactly: under its
+assumptions, the registered test supports a mean pass-rate advantage of more than 10
+percentage points on these eight selected cells, for this model, this prompt and this one
+wording. This is a threshold decision, not an estimate of the size.
 
 ## What the tool printed
 
@@ -33,9 +39,14 @@ errored pairs: 0; tolerance: 4
 candidate hard violations: 0
 ```
 
+These are its first ten lines. It also printed its condition for per-round seeds, "there
+is no guarantee averaged over seeds", "The bound covers statistical BLOCK only", and the
+two earlier runs; see `run-3.log`.
+
 It is a statistical BLOCK: no hard violation, no errored pair. Round 2 is the earliest
-round at which this rule can give any verdict on 8 cells. `arci gate` on the store
-recomputes the decision and reports "stored decision: MATCH".
+round at which this rule can give a statistical verdict (PASS or a statistical BLOCK) on 8
+cells; only an ERROR or a BLOCK forced by a hard violation can come at round 1. `arci gate`
+on the store recomputes the decision and reports "stored decision: MATCH".
 
 ## In plain numbers
 
@@ -59,31 +70,58 @@ All four hold.
    unchanged and published (`c217ae6`); 17 of 17 digests; the registered versions; the
    model id `c01efed5a364`.
 2. **Delivery.** The audit file has 16 lines with 16 distinct call ids, and the arm with
-   the message has `empty_result_delivered_ok` = 16.
+   the message has `empty_result_delivered_ok` = 16. The audit records replacements made
+   by the middleware, not what the model received; its lines cannot be tied to single
+   trials, so the matching counts are supporting evidence only.
 3. **Terminations.** All 32 trials have the termination `completed`: no crash, no
    time-out, no budget stop.
 4. **Identity and recomputation.** The store's manifest carries the expected experiment
    id, and `arci gate` reports that the recomputed decision matches the stored one.
 
-These checks do not establish the independence assumptions behind the 2.5% bound.
+These checks do not establish the independence assumptions behind the 2.5% bound, and they
+do not give a 2.5% error rate conditional on passing them.
+
+## Erratum to the pre-registration
+
+The pre-registration says of the smoke run: "The registered files are the files the smoke
+run used. Nothing was changed after it." That is not true of the wrapper `run-3.sh`. After
+the smoke run and before the registration commit the wrapper gained its start guards (the
+one-start marker, the checks that the registration is committed and published, the checks
+of the versions and of the model id, the stop on a failed warm-up call) and a check-only
+mode. The study folder itself (`agent.py`, the descriptor, the tasks, the tools, the
+check) was not changed after the smoke run, as far as file times show; git holds no state
+from the time of the smoke run. The registered digest of the wrapper is the digest of the
+version that ran.
+
+Also not in the registration's text, and done: one guard-only run of the wrapper
+(`run-3-check.log`) before the start; and the warm-up call outside the experiment was the
+prompt "Reply with the single word ok." sent with the command-line client and its default
+thinking mode.
 
 ## Registered counts (they decide nothing)
 
 Computed by `counts-run-3/count_a.py` and `count_b.py`; the two outputs are identical
-(`run-3-counts-a.json`, `run-3-counts-b.json`).
+(`run-3-counts-a.json`, `run-3-counts-b.json`), and the blind recount agrees.
 
 | Count | With the message | Run 2's set-up |
 |---|---|---|
 | Trials | 16 | 16 |
 | Passed | 15 | 2 |
+| Failed | 1 | 14 |
 | Errored | 0 | 0 |
 | Termination `completed` | 16 | 16 |
+| Ended on a budget or the time limit | 0 | 0 |
 | First call was not `lookup_order` | 9 | 11 |
 | Never called `lookup_order` | 0 | 1 |
+| Empty result delivered | 16 | 15 |
 | Empty result delivered, call successful | 16 | 15 |
 | Then read the order again | 16 (15 passed) | 2 (2 passed) |
 | Then did not read it again | 0 | 13 (0 passed) |
 | Trials with a tool error that was not injected | 9 (8 passed) | 14 (1 passed) |
+
+Fault accounting (the tool's report): the injected empty result fired in 16 of 16 trials
+of the arm with the message and in 15 of 16 trials of run 2's set-up; in the remaining
+trial (round 2, desk-06) the model made no tool call.
 
 Passes per task, with the message then without: desk-03 2 and 0; desk-06 2 and 0; desk-09
 2 and 1; desk-12 2 and 0; desk-15 2 and 0; desk-18 1 and 0; desk-21 2 and 0; desk-24 2
@@ -92,11 +130,17 @@ and 1 (2 trials per task and arm).
 ## What this supports
 
 On these 8 cells (the 8 stock-note tasks under the injected empty result), with this 4B
-model and this prompt, replacing the `null` of the empty lookup with the registered message
-raised the mean pass rate by more than 10 points. Under the rule's assumptions, the chance
-of this verdict when the true gain is 10 points or less is at most 2.5%; ARCI does not
-check those assumptions, and with per-round seeds the bound needs the null to hold in
-every round's scenario instances.
+model, this prompt and temperature 0.7, the registered test decided that the arm in which
+the `null` of the empty lookup is replaced by the registered message passes more often
+than the arm with `null`, by more than 10 points of mean pass rate over the 8 cells.
+
+Under the rule's assumptions (independent cells and rounds, the same law in every round,
+no effect of which arm runs first), the chance of a statistical BLOCK is at most 2.5% if,
+in every round, the mean gain over that round's scenario instances on these 8 cells is 10
+points or less. ARCI does not check those assumptions, and there is no guarantee averaged
+over seeds. This is a third campaign on related data, chosen after seeing runs 1 and 2;
+the bound applies to this registered experiment alone, and no error guarantee across the
+three campaigns is claimed.
 
 ## What it does not support
 
@@ -119,5 +163,5 @@ between, and the model then receives the order.
 
 ## Time
 
-2 minutes 3 seconds from the first trial to the end, one worker, no spend. About 4 seconds
-a trial.
+2 minutes 3 seconds from the start of the run to its end, one worker, local models only.
+The 32 trials took 122 seconds of trial time in all; the longest took 6.2 seconds.

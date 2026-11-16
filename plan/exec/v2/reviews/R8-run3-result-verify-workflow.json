@@ -1,0 +1,539 @@
+{
+ "recount": {
+  "items": [
+   {
+    "item": "Events embedded in trials.jsonl versus events.jsonl",
+    "verdict": "confirmed",
+    "evidence": "Own script: 457 lines in events.jsonl, 457 events embedded across the 32 trial records; after sorting by seq, the embedded list equals the events.jsonl list for all 32 trials (0 differ). Same set of 32 trial ids in both files; seq is contiguous 0..n-1 and in file order for every trial. Event kinds: trial_start 32, model_step 141, tool_start 110, tool_finish 110, agent_result 32, trial_end 32.",
+    "fix": "None needed."
+   },
+   {
+    "item": "Every trial has a pair; every round is complete",
+    "verdict": "confirmed",
+    "evidence": "32 trials form 16 pairs, each with exactly one baseline and one candidate trial and the same seed in both arms. 2 rounds (r000001, r000002), 8 pairs each, exactly the 8 manifest tasks x 1 condition (empty_result). trial_id = pair_id + arm, task_id and condition_id match the ids, variant equals the manifest label, experiment_id equals the manifest's in all 32. trials.jsonl is in round/task/arm order. 8 distinct seeds per round.",
+    "fix": "None needed."
+   },
+   {
+    "item": "Stored decision versus my recount and versus the tool's re-derivation",
+    "verdict": "confirmed",
+    "evidence": "decision.json: verdict BLOCK, exit_code 1, reason 'regression established', stopped_at_round 2, final counts minus 13 / zero 3 / plus 0 / errored 0, 16 pairs. My pair tally: only baseline 13, only candidate 0, both 2, neither 1 (zero = 3), errored 0. All 8 per-task cells in decision.json equal my per-task pass counts. 'arci gate' on my copy printed VERDICT: BLOCK (exit 1), baseline 15/16, candidate 2/16, 'stored decision: MATCH'; 'arci report' on the copy printed 'stored decision: match'. Neither command changed the copy (sha256 of the four files identical before and after) and the source store is byte-identical to the copy. decision.manifest_sha256 equals manifest.record_sha256; rule fields and prior_runs are the same in manifest and decision.",
+    "fix": "None needed."
+   },
+   {
+    "item": "Per-trial internal consistency (usage, recording, outcome)",
+    "verdict": "confirmed",
+    "evidence": "For all 32 trials: usage.tool_calls equals the number of tool_start events, usage.model_steps equals the number of model_step events, tool_start count equals tool_finish count, incomplete_calls is empty, the 'recording' list matches the tool_finish events one for one on call_id, tool, ok, injected_by, error_kind and value, outcome PASS coincides with contract.success true, and the trial_start payload (arm, seed, variant) matches the trial record. All 32 terminations are 'completed'; contract violations are empty everywhere.",
+    "fix": "None needed."
+   },
+   {
+    "item": "trial_end events carry at_ms 0.0",
+    "verdict": "unclear",
+    "evidence": "In all 32 trials the last event (kind trial_end, empty payload) has at_ms exactly 0.0, so at_ms goes backwards at the agent_result -> trial_end step (32 non-monotonic steps, all of that one kind). The same value is in both files, so it is not a difference between them and it changes no count (counts use seq). usage.wall_seconds exceeds the largest at_ms of each trial by 0.21 to 0.26 s. I did not read the code that writes trial_end, so I cannot say whether 0.0 is intended.",
+    "fix": "If a write-up uses at_ms for timing, use usage.wall_seconds or the agent_result timestamp, not trial_end."
+   },
+   {
+    "item": "decision.trials_sha256 is not the plain SHA-256 of trials.jsonl",
+    "verdict": "not-checkable",
+    "evidence": "sha256 of the trials.jsonl bytes is 2395d205f70d91256688fd5075cd5665d528d94d7549e69a0c5ab1f9db76c5a3; decision.json stores trials_sha256 da6c98e566e4d371f968cda0d7e63ab8a3f1ae7e05960a48e8f394351c1bf7c6. The seal is evidently computed another way (canonical form or over record hashes); the tool's gate accepted the store and reported the stored decision as MATCH. I did not read the hashing code and did not recompute record_sha256 or trials_sha256 myself.",
+    "fix": "A write-up should not describe trials_sha256 as the file's checksum unless the hashing rule is stated."
+   },
+   {
+    "item": "Audit file cannot be tied to trials from the store",
+    "verdict": "not-checkable",
+    "evidence": "run-3-audit.jsonl has 16 non-empty lines, 16 distinct tool_call_id values (UUIDs), every line with tool = lookup_order and only the keys tool and tool_call_id. The store's call ids are of the form c-0000 and no UUID appears there, so no line can be matched to a trial. 16 equals the baseline arm's empty_result_delivered count (one per baseline trial), but the store holds 49 lookup_order starts in total (baseline 32, candidate 17), so the audit covers a subset whose definition is not in the store or SPEC.md.",
+    "fix": "Any claim that the 16 audit lines are the 16 baseline deliveries of the empty-result text needs support from outside the store; I could not confirm it."
+   },
+   {
+    "item": "Candidate arm has 15, not 16, empty-result deliveries",
+    "verdict": "confirmed",
+    "evidence": "Trial r000002:desk-06:empty_result:candidate has no tool call at all (events: trial_start, model_step, agent_result, trial_end; the final output asks the user for the SKU). It is FAIL / completed. It is the one candidate trial counted in never_called_lookup_order and it is not counted in first_call_not_lookup_order, as SPEC.md defines. This is a property of the run, not an inconsistency.",
+    "fix": "None needed; a write-up should say 15 of 16 candidate trials received the empty result."
+   },
+   {
+    "item": "Empty manifest fields",
+    "verdict": "unclear",
+    "evidence": "manifest.json has created_at = \"\" and fixtures_sha256 = \"\"; mcp_server and both arms' command are null. Not an inconsistency between files; I cannot tell from the store whether empty values are expected for this suite type.",
+    "fix": "None, unless a write-up cites a creation time or fixture hash from the manifest: there is none."
+   }
+  ],
+  "numbers": "{\"experiment_id\":\"order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504\",\"suite_id\":\"order-desk-qwen3.5-4b-empty-lookup-text\",\"rule\":{\"alpha\":\"1/20\",\"delta\":\"1/10\",\"stakes\":[\"1/4\",\"1/2\"],\"max_rounds\":40,\"scenario_seeds\":\"per_round\",\"max_errored_pairs\":4,\"seed_derivation\":\"sha256-v1\",\"acknowledge_single_round\":false,\"budgets\":{\"max_tool_calls\":12,\"max_model_steps\":12,\"max_seconds\":120.0,\"grader_seconds\":20.0}},\"prior_runs\":[\"order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb\",\"order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb\"],\"tasks\":[\"desk-03\",\"desk-06\",\"desk-09\",\"desk-12\",\"desk-15\",\"desk-18\",\"desk-21\",\"desk-24\"],\"conditions\":[\"empty_result\"],\"arms\":{\"baseline\":{\"label\":\"with-empty-lookup-text\",\"candidate_id\":\"ollama:qwen3.5:4b-mlx-ctx32k+empty-lookup-text\",\"trials\":16,\"passed\":15,\"failed\":1,\"errored\":0,\"ended_on_budget_or_time\":0,\"by_termination\":{\"completed\":16},\"by_condition\":{\"empty_result\":{\"trials\":16,\"passed\":15}},\"by_task\":{\"desk-03\":{\"trials\":2,\"passed\":2},\"desk-06\":{\"trials\":2,\"passed\":2},\"desk-09\":{\"trials\":2,\"passed\":2},\"desk-12\":{\"trials\":2,\"passed\":2},\"desk-15\":{\"trials\":2,\"passed\":2},\"desk-18\":{\"trials\":2,\"passed\":1},\"desk-21\":{\"trials\":2,\"passed\":2},\"desk-24\":{\"trials\":2,\"passed\":2}},\"first_call_not_lookup_order\":9,\"never_called_lookup_order\":0,\"empty_result_delivered\":16,\"empty_result_delivered_ok\":16,\"after_empty_result\":{\"read_again\":{\"trials\":16,\"passed\":15},\"not_read_again\":{\"trials\":0,\"passed\":0}},\"uninjected_tool_error\":{\"trials\":9,\"passed\":8},\"trials_with_no_tool_call\":0,\"wall_seconds_total\":74.109,\"wall_seconds_max\":6.231,\"wall_recorded_trials\":16},\"candidate\":{\"label\":\"run-2-setup\",\"candidate_id\":\"ollama:qwen3.5:4b-mlx-ctx32k\",\"trials\":16,\"passed\":2,\"failed\":14,\"errored\":0,\"ended_on_budget_or_time\":0,\"by_termination\":{\"completed\":16},\"by_condition\":{\"empty_result\":{\"trials\":16,\"passed\":2}},\"by_task\":{\"desk-03\":{\"trials\":2,\"passed\":0},\"desk-06\":{\"trials\":2,\"passed\":0},\"desk-09\":{\"trials\":2,\"passed\":1},\"desk-12\":{\"trials\":2,\"passed\":0},\"desk-15\":{\"trials\":2,\"passed\":0},\"desk-18\":{\"trials\":2,\"passed\":0},\"desk-21\":{\"trials\":2,\"passed\":0},\"desk-24\":{\"trials\":2,\"passed\":1}},\"first_call_not_lookup_order\":11,\"never_called_lookup_order\":1,\"empty_result_delivered\":15,\"empty_result_delivered_ok\":15,\"after_empty_result\":{\"read_again\":{\"trials\":2,\"passed\":2},\"not_read_again\":{\"trials\":13,\"passed\":0}},\"uninjected_tool_error\":{\"trials\":14,\"passed\":1},\"trials_with_no_tool_call\":1,\"wall_seconds_total\":48.327,\"wall_seconds_max\":5.975,\"wall_recorded_trials\":16}},\"store\":{\"rounds\":2,\"pairs\":16,\"pairs_per_round\":{\"r000001\":8,\"r000002\":8},\"trials_lines\":32,\"events_lines\":457,\"embedded_events_total\":457,\"trials_with_embedded_event_diff\":0},\"pair_tally\":{\"only_baseline(with-empty-lookup-text)\":13,\"only_candidate(run-2-setup)\":0,\"both\":2,\"neither\":1,\"errored\":0},\"pair_tally_per_round\":{\"r000001\":{\"only_baseline\":6,\"only_candidate\":0,\"both\":1,\"neither\":1},\"r000002\":{\"only_baseline\":7,\"only_candidate\":0,\"both\":1,\"neither\":0}},\"pair_table_baseline/candidate\":{\"r000001\":{\"desk-03\":\"PASS/FAIL\",\"desk-06\":\"PASS/FAIL\",\"desk-09\":\"PASS/PASS\",\"desk-12\":\"PASS/FAIL\",\"desk-15\":\"PASS/FAIL\",\"desk-18\":\"FAIL/FAIL\",\"desk-21\":\"PASS/FAIL\",\"desk-24\":\"PASS/FAIL\"},\"r000002\":{\"desk-03\":\"PASS/FAIL\",\"desk-06\":\"PASS/FAIL\",\"desk-09\":\"PASS/FAIL\",\"desk-12\":\"PASS/FAIL\",\"desk-15\":\"PASS/FAIL\",\"desk-18\":\"PASS/FAIL\",\"desk-21\":\"PASS/FAIL\",\"desk-24\":\"PASS/PASS\"}},\"audit\":{\"lines\":16,\"distinct_tool_call_ids\":16,\"tools\":{\"lookup_order\":16}},\"decision_json\":{\"verdict\":\"BLOCK\",\"exit_code\":1,\"reasons\":[\"regression established\"],\"stopped_at_round\":2,\"threshold\":\"40/1\",\"n_cells\":8,\"history\":[{\"round\":1,\"pairs\":8,\"minus\":6,\"zero\":2,\"plus\":0,\"errored\":0,\"pass_wealth\":\"1.02706e-01\",\"block_wealth\":\"5.02474e+00\",\"verdict\":\"INCONCLUSIVE\"},{\"round\":2,\"pairs\":16,\"minus\":13,\"zero\":3,\"plus\":0,\"errored\":0,\"pass_wealth\":\"1.29680e-02\",\"block_wealth\":\"4.27909e+01\",\"verdict\":\"BLOCK\"}]},\"tool_rederivation_on_copy\":{\"gate\":\"VERDICT: BLOCK (exit 1); stored decision: MATCH\",\"report\":\"VERDICT: BLOCK (exit 1); stored decision: match\",\"copy_changed_by_tool\":false},\"notes\":{\"read_again_measured_from\":\"first injected lookup_order tool_finish; same result from the last one (one injection per trial)\",\"wall_seconds_source\":\"usage.wall_seconds per trial in trials.jsonl; no run-level wall time in the store\",\"scripts\":\"/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/run3-verify/recount-c7/mycount.py\"}}",
+  "not_checked": [
+   "Any write-up, plan, pre-registration, log, counts file or count script of run 3: not opened, as instructed, so nothing here is compared with them.",
+   "record_sha256 of each record and decision.trials_sha256: not recomputed by me (hashing code not read); only the tool's gate result on a copy (stored decision MATCH) stands behind them.",
+   "Which trials or calls the 16 audit lines belong to: the store has no matching ids.",
+   "Whether the arm labels and candidate_id strings correspond to what the agents really ran (model, prompt text, temperature): the store records only the names; the injected empty result appears as value null in both arms and the text handed to the model is not in the store.",
+   "Run-level wall time and time between trials: only per-trial usage.wall_seconds is recorded.",
+   "The wealth figures and the 40/1 threshold arithmetic: not recomputed by hand, only reproduced by 'arci gate' on a copy.",
+   "The two prior runs named in the manifest: their stores were not opened.",
+   "No model was called and nothing was re-run; the outcomes are taken as recorded."
+  ]
+ },
+ "conditions": {
+  "items": [
+   {
+    "item": "1. Registration commit",
+    "verdict": "confirmed",
+    "evidence": "PREREGISTRATION-run-3.md was added by c217ae63a4306c63fe050c6bd1d1e0f2e91c2931 (author and committer date 2026-11-16 21:39:59 +05:30 = 16:09:59Z; only commit touching any registered path). Local reflog of origin/v2/phase0: 'c217ae6 ... 2026-11-16 21:40:02 +0530: update by push'. All 19 registered paths (pre-registration, digest list, 17 listed files) exist in c217ae6; 'git diff c217ae6 -- <19 paths>' is empty for the working tree and for HEAD (60feff5, whose parent is c217ae6); 'git status --porcelain' on them is empty. SHA-256 of the 17 blobs taken from c217ae6 equals the digest list line for line. run-3.log line 3 'records commit' and line 18 'published branch commit' are both c217ae63a4306c63fe050c6bd1d1e0f2e91c2931; line 19 'registered files: committed, unchanged and published'.",
+    "fix": "None. Note only: commit and push times are local clock records; the remote's own push time was not queried (no network used)."
+   },
+   {
+    "item": "2. Timing: no run 3 trial before the push",
+    "verdict": "confirmed",
+    "evidence": "Push recorded 16:10:02Z (21:40:02 IST). run-3.log: 'start: 2026-11-16T16:10:21Z' (19 s after push), 'run start: 2026-11-16T16:10:24Z', 'run end: 2026-11-16T16:12:27Z'. The store holds no absolute time (manifest created_at is empty; events carry only at_ms relative to trial start), so the store itself cannot date the trials; file-system birth times do: marker and log 21:40:21, runs-run-3 and manifest.json 21:40:25, audit file 21:40:27, trials/events/decision 21:42:27 IST. Sum of the 32 trials' wall_seconds is 122.4 s against 123 s between run start and run end, so the trials fill that window. Supporting: run-3-check.log (16:10:08Z) shows the model loaded with 'UNTIL 5 seconds from now', which is exactly 5 minutes after the smoke run ended (16:05:14Z, '4 minutes from now'), and the real log's 'ollama ps before' at 16:10:21Z is empty: no model call reset the keep-alive timer between the smoke run and the real start. The only other folder with the run 3 suite name is an offline copy (offline:scripted, temperature 0, other hash 2abe1896...) in the scratchpad from 21:30:59, plus verifier copies made after the run.",
+    "fix": "None. If the result says the trials came after the push, say that this rests on the log and file-system times, not on times inside the store. The smoke run's 16 real-model trials (other suite id) did precede the registration, as the pre-registration says."
+   },
+   {
+    "item": "3. Digests",
+    "verdict": "confirmed",
+    "evidence": "'shasum -a 256 -c run-3-digests.sha256' run now: 17 of 17 OK, exit 0; the list has 17 lines. run-3.log has 17 lines ending ': OK' and no FAILED line (lines 21 to 37). The 17 blobs in commit c217ae6 hash to the same 17 values.",
+    "fix": "None."
+   },
+   {
+    "item": "4. One start",
+    "verdict": "confirmed",
+    "evidence": "runs-run-3 holds exactly one sub-folder (the registered experiment id); one run-3.log with one 'mode: real' header, one 'run start' and one 'run end'; one marker folder run-3-real.started, empty, birth 21:40:21 = the log's start second. Wrapper code (run-3.sh lines 55 to 64): in real mode 'mkdir \"$MARKER\"' must succeed or it exits 65, and it also exits 65 if the output folder, the audit file or the log exists; nothing in the script removes the marker. All four now exist, so a second real start is refused twice over. I did not run 'sh run-3.sh check': in check mode line 39 does 'rm -f run-3-check.log' before the refusal on the existing output folder, and that log is a tracked file committed in 60feff5, so the command would change the repository; further on it would also call 'ollama ps/list' and 'git ls-remote'. Limits: the marker is an empty folder, so git does not track it (it is absent from a fresh clone; there the committed store, audit file and log still trigger the refusal). That no earlier start was made and deleted cannot be proven from files; the keep-alive evidence in item 2 and the birth times speak against it.",
+    "fix": "Tell anyone re-checking not to run 'run-3.sh check' in this checkout: it deletes the committed run-3-check.log before it refuses. No change to the result."
+   },
+   {
+    "item": "5. Condition 2, delivery",
+    "verdict": "confirmed",
+    "evidence": "run-3-audit.jsonl: 16 non-empty lines, 16 distinct tool_call_id values, all tool 'lookup_order'; its SHA-256 bde0f7b2...0397c equals the 'audit sha256' line in the log, and the log says 'audit lines: 16'. Counted from events.jsonl (tool_finish, tool lookup_order, injected_by empty_result, ok true): baseline 16 (exactly one in each of the 16 baseline trials), candidate 15 (r000002:desk-06 candidate made no tool call). The same counts come from the trials' 'recording' fields and from 'arci report' fault accounting. 16 > 0 and 16 = 16. No audit id overlaps the smoke audit file. As registered, the audit ids are client UUIDs and cannot be tied to single trials (store call ids are c-000N).",
+    "fix": "None."
+   },
+   {
+    "item": "6. Condition 3, terminations",
+    "verdict": "confirmed",
+    "evidence": "trials.jsonl, 32 trials, 2 rounds x 8 tasks x 2 arms: baseline 16 'completed', candidate 16 'completed'. crash 0 in both arms; timeout + budget 0 in both arms, so 20 x 0 <= 16 holds. Usage is far from the budgets: at most 5 tool calls and 6 model steps (limit 12 each), longest trial 6.2 s (limit 120 s). No incomplete calls, no grader error. The 15 failures are all 'oracle rejected final state' with termination completed.",
+    "fix": "None."
+   },
+   {
+    "item": "7. Condition 4, identity and recomputation",
+    "verdict": "confirmed",
+    "evidence": "The id in the pre-registration, manifest.json experiment_id, the store folder name and the experiment_id of all 32 trials are the same string: order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504 (compared by program). Manifest rule equals the registered one: alpha 1/20, delta 1/10, stakes 1/4 and 1/2, max_rounds 40, max_errored_pairs 4, per_round seeds, budgets 12/12/120 s, 8 tasks desk-03..24, condition empty_result on lookup_order occurrence 0. 'python -m arci gate' on my copy (.../scratchpad/run3-verify/audit-x/store/) printed 'VERDICT: BLOCK (exit 1) ... stored decision: MATCH', exit 1; 'arci report' printed 'VERDICT: BLOCK (exit 1); stored decision: match'. The copy was byte-identical to the source before and after (diff -r), and the source store is unchanged against commit 60feff5.",
+    "fix": "None."
+   },
+   {
+    "item": "8. The BLOCK is statistical",
+    "verdict": "confirmed",
+    "evidence": "Log and gate: 'reason: regression established', 'counts: minus=13, zero=3, plus=0, errored=0', 'errored pairs: 0; tolerance: 4', 'candidate hard violations: 0', 'BLOCK wealth: 4.27909e+01; threshold: 40/1; crossed: True'. decision.json: candidate_hard_violations 0 in both rounds and in all 8 cells; round 1 INCONCLUSIVE (minus 6, zero 2), round 2 BLOCK. My own pairing of the 32 trials gives minus 13, zero 3 (2 both passed, 1 both failed), plus 0, errored 0; baseline 15/16, candidate 2/16. All 32 trials have an empty contract violations list. The wealth value itself was recomputed only by the tool (gate), not by a separate implementation.",
+    "fix": "None."
+   },
+   {
+    "item": "9. Anything not done as registered (warm-up, command, environment, versions, model id, one worker)",
+    "verdict": "confirmed",
+    "evidence": "Nothing found that departs from the registration. Warm-up: the wrapper sent one prompt through the CLI, 'ollama run qwen3.5:4b-mlx-ctx32k \"Reply with the single word ok.\"'; the log (lines 52 to 69) shows a thinking block and the answer 'ok', then 'run start'. It is one stateless request with no tools, no system prompt of the study and no task text; the trials send their full message list each time with reasoning off (agent.py), so the wrapper and agent code give no path for it to reach a trial's input. It ran before both arms; the first trial took 5.1 s, inside the 3.5 to 6.2 s range of the others. What the server keeps in memory between requests cannot be read from the files. The warm-up used the CLI's thinking mode; the registration fixed that a call is made, the digest-bound wrapper fixed its text. Command: wrapper line 176 runs 'caffeinate -dims $PYTHON -m arci run <folder>/arci.yaml --workers 1 --out <study>/runs-run-3', the registered command with absolute paths; the log does not echo the command line. One worker: besides the flag, trial wall times sum to 122.4 s in a 123 s window, and trials are stored strictly baseline then candidate per pair. Environment: logged variables are the three ARCI_QUICKSTART values (both ids ollama:qwen3.5:4b-mlx-ctx32k, temperature 0.7), both tracing switches false and the audit path; no OLLAMA_ or PYTHONPATH variable. Versions in the log: agent-reliability-ci 2.4.0, langchain 1.4.10, langchain-core 1.7.7, langgraph 1.2.20, langgraph-prebuilt 1.1.1, langchain-ollama 1.1.0, ollama 0.6.3, pydantic 2.14.3, Python 3.13.12, Ollama 0.32.14; the same dist-info folders are in the environment now, and all 85 files of the installed arci match its RECORD hashes (installer pip, no direct_url.json, so an index install; which index is not provable). Model: listed id c01efed5a364 before, 'ollama ps after' shows the same id, context 32768, 100% GPU. Manifest stores temperature 0.7 and reasoning false for both arms in every task. Machine now reports Apple M5 Pro, 24 GiB; AC power in the log. Three notes, none a breach: (a) a 'check' run at 16:10:08Z preceded the real start (run-3-check.log, committed); it calls no model and the keep-alive timer shows it did not touch the model; (b) the Ollama server version is logged but not enforced by the wrapper; (c) the environment sits in a /private/tmp scratchpad folder that a reboot can clear.",
+    "fix": "None required. Optional: one sentence in the result that the warm-up prompt was 'Reply with the single word ok.' sent with the CLI's default thinking mode, and that a guard-only check run preceded the start."
+   },
+   {
+    "item": "10. Smoke run: before registration, other suite id, registered files unchanged after it",
+    "verdict": "overstated",
+    "evidence": "Confirmed parts: run-3-smoke.log says 'mode: smoke', 'start: 2026-11-16T16:04:08Z', 'run end: 2026-11-16T16:05:14Z', 'records commit: af0b52f...' (the parent of the registration commit); the registration commit is 16:09:59Z, so the smoke run ended 4 min 45 s before it. Its store is order-desk-qwen3.5-4b-empty-lookup-text-smoke-not-evidence@857e1cc1... with alpha 1/2, delta 1/2, one round; 16 trials all completed, baseline 6/8, candidate 3/8, errored 0, 8 audit lines with 8 distinct ids, first trial 4.4 s, longest 6.2 s, 65 s in all: every smoke figure in the pre-registration matches. Smoke and real manifests have identical tasks, conditions, budgets and arm definitions; no seed is shared. The smoke log and smoke audit file are unchanged since c217ae6. Not supported: the pre-registration's sentence 'The registered files are the files the smoke run used. Nothing was changed after it.' is false for one of the 17 registered files, the wrapper run-3.sh. Its modification time is 21:39:45 IST, after the smoke run ended (21:35:14) and 14 s before the commit. The smoke log also lacks two lines the registered wrapper writes in every mode ('model id as listed: ...' and 'preflight: arci module ...'), and no run-3-smoke.started marker exists although the registered wrapper would create one and never remove it. So the smoke run used an earlier wrapper; the marker, the model-id check and the arci-module check were added afterwards (review R7 in the same commit asks for exactly these). For the other 16 files, modification times run from 21:06:05 to 21:33:58, all before the smoke start at 21:34:08, which is consistent with 'unchanged' but is weak evidence. Cannot be established: git has no smoke-time state (all registered files were first committed in c217ae6, after the smoke run, and smoke mode checks no digest), and nothing of the Python code is sealed in either store. The smoke store folder runs-run-3-smoke/ is untracked, so the smoke counts cited in the pre-registration are not reproducible from the published branch. The trial path of the wrapper (working folder, the five exported variables, the arci command) is the same in both logs; the real-mode guards and the warm-up were not exercised by the smoke run.",
+    "fix": "Do not edit the frozen pre-registration. Add an erratum to RESULT-run-3.md: 'The pre-registration says nothing was changed after the smoke run. That is not true of the wrapper run-3.sh: it was changed after the smoke run and before the registration commit (one-start marker, model-id check, arci-module check). The registered digest is of the changed wrapper, which is the one that ran. For the other 16 registered files only their modification times, all before the smoke run, support that they were unchanged; git cannot show it.' Consider committing runs-run-3-smoke/ so the cited smoke counts can be checked. This does not touch any of the four conditions."
+   }
+  ],
+  "numbers": "{\"registration_commit\":\"c217ae63a4306c63fe050c6bd1d1e0f2e91c2931\",\"commit_time\":\"2026-11-16T21:39:59+05:30\",\"push_time_local_reflog\":\"2026-11-16T21:40:02+05:30\",\"check_run_start_utc\":\"2026-11-16T16:10:08Z\",\"log_start_utc\":\"2026-11-16T16:10:21Z\",\"run_start_utc\":\"2026-11-16T16:10:24Z\",\"run_end_utc\":\"2026-11-16T16:12:27Z\",\"seconds_push_to_start\":19,\"registered_paths\":19,\"registered_paths_changed_since_commit\":0,\"digests_listed\":17,\"digests_ok_now\":17,\"digest_ok_lines_in_log\":17,\"stores_under_runs_run_3\":1,\"logs\":1,\"markers\":1,\"trials\":32,\"rounds\":2,\"pairs\":16,\"events\":457,\"baseline\":{\"trials\":16,\"passed\":15,\"completed\":16,\"crash\":0,\"timeout\":0,\"budget\":0,\"empty_result_delivered_ok\":16},\"candidate\":{\"trials\":16,\"passed\":2,\"completed\":16,\"crash\":0,\"timeout\":0,\"budget\":0,\"empty_result_delivered_ok\":15,\"no_tool_call_trials\":1},\"pair_counts\":{\"minus\":13,\"zero\":3,\"plus\":0,\"errored\":0,\"both_passed\":2,\"both_failed\":1},\"per_task_baseline_candidate\":{\"desk-03\":[2,0],\"desk-06\":[2,0],\"desk-09\":[2,1],\"desk-12\":[2,0],\"desk-15\":[2,0],\"desk-18\":[1,0],\"desk-21\":[2,0],\"desk-24\":[2,1]},\"audit\":{\"lines\":16,\"distinct_ids\":16,\"sha256\":\"bde0f7b2a563999aab885b0d9e271d02a3345a82fd7bd152e98cf7503af0397c\"},\"decision\":{\"verdict\":\"BLOCK\",\"exit\":1,\"reason\":\"regression established\",\"stopping_round\":2,\"candidate_hard_violations\":0,\"errored_pairs\":0,\"block_wealth\":\"4.27909e+01\",\"pass_wealth\":\"1.29680e-02\",\"threshold\":\"40/1\",\"round1\":{\"minus\":6,\"zero\":2,\"verdict\":\"INCONCLUSIVE\"}},\"gate_on_copy\":\"stored decision: MATCH, exit 1\",\"usage_max\":{\"tool_calls\":5,\"model_steps\":6,\"wall_seconds\":6.2},\"sum_wall_seconds\":122.4,\"window_seconds\":123,\"smoke\":{\"start_utc\":\"2026-11-16T16:04:08Z\",\"end_utc\":\"2026-11-16T16:05:14Z\",\"records_commit\":\"af0b52f\",\"trials\":16,\"baseline_passed\":6,\"candidate_passed\":3,\"audit_lines\":8,\"run_3_sh_mtime\":\"2026-11-16T21:39:45+05:30\",\"other_16_files_latest_mtime\":\"2026-11-16T21:33:58+05:30\"}}",
+  "not_checked": [
+   "The remote repository itself: no git ls-remote or fetch was run (no network), so 'pushed' rests on the local reflog time and on the 'published branch commit' line the wrapper wrote at the start.",
+   "'sh run-3.sh check' was not run: in this checkout it would delete the tracked file run-3-check.log before refusing, and it queries Ollama and the remote.",
+   "Whether an earlier real start was made and its marker, log and store deleted: no trace found, and the Ollama keep-alive timer in the check log speaks against any model call between the smoke run and the start, but absence cannot be proven from files.",
+   "What the Ollama server kept in memory after the warm-up call (for example a prompt cache); only the code path was read, the server was not queried.",
+   "The BLOCK wealth 42.79 was recomputed by arci gate only, not by an independent implementation; the seed derivation was not recomputed either.",
+   "That ARCI 2.4.0 in the environment came from PyPI: the files match the package's own RECORD and there is no direct_url.json, but the index used cannot be shown.",
+   "That the 16 registered files other than run-3.sh were byte-identical at smoke time: only modification times support it; git has no smoke-time state.",
+   "The independence and no-order-effect assumptions behind the 2.5% bound (trials are stored baseline first in every pair); the pre-registration says these are not checked.",
+   "Clock accuracy: all times are from one machine's local clock.",
+   "The claim in RESULT-run-3.md that round 2 is the earliest round at which this rule can give a verdict on 8 cells."
+  ]
+ },
+ "sentences": {
+  "items": [
+   {
+    "item": "L1 title: \"Result, run 3: BLOCK at round 2\"",
+    "verdict": "confirmed",
+    "evidence": "decision.json: verdict BLOCK, stopped_at_round 2, exit_code 1. My recount of trials.jsonl gives the same decision by exact rational arithmetic (BLOCK wealth 42.79097 >= 40 after round 2; 5.02 after round 1).",
+    "fix": ""
+   },
+   {
+    "item": "L3: \"Status of this file: draft.\"",
+    "verdict": "confirmed",
+    "evidence": "Commit 60feff5 message: \"raw outputs and a draft result file; independent check not finished\". File unchanged since that commit (git status clean for it).",
+    "fix": ""
+   },
+   {
+    "item": "L3-4: \"The verdict, the counts and the four conditions below were checked by the orchestrator.\"",
+    "verdict": "not-checkable",
+    "evidence": "A statement about the session's own process; no record of that check in the raw material apart from the two count files (written 21:42:55) and the report (21:43:11).",
+    "fix": "Once this check and the other two are in: \"The verdict, the counts and the four conditions were recounted from the store by three independent checks; see <record>.\""
+   },
+   {
+    "item": "L4-6: \"An independent recount, an audit of the conditions and a sentence-by-sentence check were started and had not reported when this was committed (output expected in the session's task file wwdtk1unu).\"",
+    "verdict": "not-checkable",
+    "evidence": "Consistent with the commit message of 60feff5; the task file is session state I cannot see. The sentence goes out of date when the checks report.",
+    "fix": "Replace with the outcome of the three checks and where their output is kept."
+   },
+   {
+    "item": "L6-7: \"Astra has not yet been consulted on this write-up.\"",
+    "verdict": "not-checkable",
+    "evidence": "plan/exec/v2/reviews/ has R7-run3-prereg-astra.md (21:39, on the registration) and no later Astra file; absence of a file is not proof.",
+    "fix": ""
+   },
+   {
+    "item": "L7: \"Nothing here has been published outside this branch.\"",
+    "verdict": "not-checkable",
+    "evidence": "Local reflog: 60feff5 was pushed to origin/v2/phase0 at 21:44:55 +05:30, so the draft is on the remote branch. Whether anything was posted elsewhere cannot be checked from here (no network use).",
+    "fix": "\"This draft is on the pushed branch v2/phase0 (60feff5) and has been posted nowhere else.\""
+   },
+   {
+    "item": "L9-10: \"Pre-registration: PREREGISTRATION-run-3.md, committed at c217ae6 and pushed at 2026-11-16 21:40:02 +05:30.\"",
+    "verdict": "confirmed",
+    "evidence": "git log: c217ae6 committed 2026-11-16 21:39:59 +0530. Local reflog of origin/v2/phase0: \"c217ae6 ... 21:40:02 +0530: update by push\". run-3.log: records commit and published branch commit both c217ae63.... git diff c217ae6 -- registered files: empty.",
+    "fix": ""
+   },
+   {
+    "item": "L10-11: \"The wrapper started 19 seconds later (21:40:21), the first trial after 21:40:24, and the run ended at 21:42:27.\"",
+    "verdict": "confirmed",
+    "evidence": "run-3.log: start 2026-11-16T16:10:21Z (=21:40:21 +05:30; 21:40:21 - 21:40:02 = 19 s), run start 16:10:24Z, run end 16:12:27Z. Marker folder run-3-real.started created 21:40:21; manifest.json created 21:40:25; audit file created 21:40:27; trials.jsonl and decision.json 21:42:27.",
+    "fix": ""
+   },
+   {
+    "item": "L11: \"One start.\"",
+    "verdict": "confirmed",
+    "evidence": "One marker folder (created 21:40:21), one log (created 21:40:21, the wrapper refuses if it exists), one store sub-folder, run-3-wrapper.out empty. File evidence only; run-3-check.log is the check mode, which starts nothing.",
+    "fix": ""
+   },
+   {
+    "item": "L11-12: \"Store: runs-run-3/order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2...\"",
+    "verdict": "confirmed",
+    "evidence": "Folder exists with manifest.json, trials.jsonl (32 lines), events.jsonl (457 lines), decision.json; name equals manifest experiment_id and the registered id.",
+    "fix": ""
+   },
+   {
+    "item": "L13: \"Log: run-3.log. Report as the tool renders it: report-run-3.md.\"",
+    "verdict": "confirmed",
+    "evidence": "arci report on my copy of the store (exit 1) is byte-identical to report-run-3.md (diff empty).",
+    "fix": ""
+   },
+   {
+    "item": "L17: \"The arm WITH the message is the baseline; run 2's set-up is the candidate.\"",
+    "verdict": "confirmed",
+    "evidence": "manifest.json: baseline label with-empty-lookup-text (agent:baseline), candidate label run-2-setup. agent.py: ExplainEmptyLookup only in the baseline list. run-3.log preflight: baseline middleware [..., 'ExplainEmptyLookup'], candidate without it.",
+    "fix": ""
+   },
+   {
+    "item": "L17-18: The tool printed \"BLOCK, regression established\".",
+    "verdict": "wrong",
+    "evidence": "Form only: that string is in neither run-3.log nor report-run-3.md. The tool printed \"VERDICT: BLOCK (exit 1)\" and, on the next line, \"reason: regression established\". The substance is right.",
+    "fix": "The tool printed \"VERDICT: BLOCK (exit 1)\" with \"reason: regression established\"."
+   },
+   {
+    "item": "L18-19: \"In this run that reads: on these 8 cells, the message is worth more than 10 points of mean pass rate.\" (bold)",
+    "verdict": "overstated",
+    "evidence": "Direction, margin and grid are right: STATISTICS_SUITE.md defines Delta = mean over cells of E[Y_candidate - Y_baseline]; a statistical BLOCK rejects Delta >= -1/10, i.e. with the roles swapped it rejects \"gain of the message arm <= 10 points\". It is also word for word the registration's plain-words reading, so it is no departure from the registration. But as a bare bold fact it drops three limits the contract and the registration attach: it is a decision with a false-BLOCK chance of at most 2.5% under unchecked assumptions, not an observation; with per_round seeds it concerns the scenario instances of the rounds (the null is \"gain <= 10 points in every round's instances\"); and it holds for this model, this prompt, this one wording. \"worth\" reads as a general value of the message and as a size.",
+    "fix": "In this run that reads: **on these 8 cells, run 2's set-up passes less often than the set-up with the message, by more than 10 points of mean pass rate** (the registration's plain words: the message is worth more than 10 points on these 8 cells). This is the test's decision under its assumptions, for this model, this prompt and this one wording; it is not a measured size."
+   },
+   {
+    "item": "L23-34 code block \"What the tool printed\" (10 lines: VERDICT, reason, stopping round 2, pairs 16 (32 trials), baseline 15/16, candidate 2/16, minus=13 zero=3 plus=0 errored=0, PASS wealth 1.29680e-02 not crossed, BLOCK wealth 4.27909e+01 crossed, errored pairs 0 tolerance 4, hard violations 0)",
+    "verdict": "confirmed",
+    "evidence": "All 10 lines are verbatim and contiguous in run-3.log and identical in my arci gate run on a copy. Recount from trials.jsonl: 16 pairs, 13 minus / 3 zero / 0 plus / 0 errored; baseline 15 PASS 1 FAIL, candidate 2 PASS 14 FAIL; exact wealth PASS 0.0129680527, BLOCK 42.7909669; threshold 2/alpha = 40; no contract violations in any trial.",
+    "fix": ""
+   },
+   {
+    "item": "OMISSION in \"What the tool printed\": the block stops before the tool's last four lines",
+    "verdict": "unclear",
+    "evidence": "After \"candidate hard violations: 0\" the tool also printed: the per_round guarantee line (\"...requires that in every round the suite mean over that round's scenario instances obey the relevant null...\"), \"ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.\", \"The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.\", and \"prior runs: ...\" (the two earlier campaigns). The heading says \"What the tool printed\" without saying it is an excerpt.",
+    "fix": "Add the four lines to the block, or put under it: \"(first 10 lines; the tool also printed its per_round condition, 'there is no guarantee averaged over seeds', 'The bound covers statistical BLOCK only', and the two prior runs: see run-3.log.)\""
+   },
+   {
+    "item": "L36: \"It is a statistical BLOCK: no hard violation, no errored pair.\"",
+    "verdict": "confirmed",
+    "evidence": "decision.json reasons [\"regression established\"], candidate_hard_violations 0 in both rounds, errored 0. Recount: no trial has outcome ERROR, no contract violation entry, no grader error.",
+    "fix": ""
+   },
+   {
+    "item": "L36-37: \"Round 2 is the earliest round at which this rule can give any verdict on 8 cells.\"",
+    "verdict": "overstated",
+    "evidence": "arci plan on a copy of the descriptor (registered env vars, no model): earliest_pass_round 2, earliest_block_round 2, never_differs_pass_round 10. My exact arithmetic agrees: after 8 pairs the largest possible BLOCK wealth is 9.99 and the largest PASS wealth 26.9, both under 40; all-minus BLOCK needs 13 pairs, all-plus PASS 9 pairs. But \"any verdict\" is too wide: by the contract's priority list an ERROR (more than 4 errored pairs) or a BLOCK forced by a candidate hard violation is given at the end of round 1; the registration itself says the run stops at the first round end that gives PASS, BLOCK or ERROR.",
+    "fix": "Round 2 is the earliest round at which this rule can give a statistical verdict (PASS or a statistical BLOCK) on 8 cells; only an ERROR or a BLOCK forced by a hard violation can come at round 1."
+   },
+   {
+    "item": "L37-38: \"arci gate on the store recomputes the decision and reports 'stored decision: MATCH'.\"",
+    "verdict": "confirmed",
+    "evidence": "arci gate (2.4.0, run3-env) on my copy of the store printed the same ten lines and \"stored decision: MATCH\", exit 1. The copy stayed identical to the original (diff -r empty).",
+    "fix": ""
+   },
+   {
+    "item": "Table \"In plain numbers\", row 1: With the message (baseline arm) | 16 | 15",
+    "verdict": "confirmed",
+    "evidence": "Recount: baseline arm 16 trials, 15 PASS, 1 FAIL (r000001 desk-18).",
+    "fix": ""
+   },
+   {
+    "item": "Table \"In plain numbers\", row 2: Run 2's set-up, null (candidate arm) | 16 | 2",
+    "verdict": "confirmed",
+    "evidence": "Recount: candidate arm 16 trials, 2 PASS (r000001 desk-09, r000002 desk-24), 14 FAIL.",
+    "fix": ""
+   },
+   {
+    "item": "L47-48: \"Of the 16 pairs: in 13 only the arm with the message passed; in 2 both passed; in 1 both failed; in none did only run 2's set-up pass.\"",
+    "verdict": "confirmed",
+    "evidence": "Recount by pair_id: 13 baseline-only, 2 both PASS (r1 desk-09, r2 desk-24), 1 both FAIL (r1 desk-18), 0 candidate-only. Round 1: 6/2/0; round 2: 7/1/0.",
+    "fix": ""
+   },
+   {
+    "item": "L50: \"The run stopped early, at its second look.\"",
+    "verdict": "confirmed",
+    "evidence": "stopped_at_round 2 of max_rounds 40; looks are at whole-round ends; history has two entries.",
+    "fix": ""
+   },
+   {
+    "item": "L50-51: \"15 of 16 and 2 of 16 are counts from a run that stopped as soon as the rule was met.\"",
+    "verdict": "confirmed",
+    "evidence": "Counts recounted; round 1 was INCONCLUSIVE, round 2 crossed.",
+    "fix": ""
+   },
+   {
+    "item": "L51-52: \"They are not estimates of the two pass rates, and no confidence interval is given for them.\"",
+    "verdict": "confirmed",
+    "evidence": "Matches the registration (\"reported as counts, without fixed-sample confidence intervals\"); no interval appears anywhere in the file.",
+    "fix": ""
+   },
+   {
+    "item": "L56: \"All four hold.\"",
+    "verdict": "confirmed",
+    "evidence": "Each of the four checked below against the log, the audit file, the store and my own gate run.",
+    "fix": ""
+   },
+   {
+    "item": "Condition 1: wrapper's checks passed: registration committed, unchanged and published (c217ae6); 17 of 17 digests; the registered versions; the model id c01efed5a364",
+    "verdict": "confirmed",
+    "evidence": "run-3.log: \"registered files: committed, unchanged and published\"; records commit = published branch commit = c217ae63...; 17 lines ending \": OK\" and run-3-digests.sha256 has 17 lines; preflight versions equal the registered list (agent-reliability-ci 2.4.0, langchain 1.4.10, langchain-core 1.7.7, langgraph 1.2.20, langgraph-prebuilt 1.1.1, langchain-ollama 1.1.0, ollama 0.6.3, pydantic 2.14.3, python 3.13.12; ollama 0.32.14 logged); \"model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364\".",
+    "fix": ""
+   },
+   {
+    "item": "Condition 2: \"The audit file has 16 lines with 16 distinct call ids, and the arm with the message has empty_result_delivered_ok = 16.\"",
+    "verdict": "confirmed",
+    "evidence": "run-3-audit.jsonl: 16 non-empty lines, 16 distinct tool_call_id, all tool lookup_order; sha256 equals the one in the log. Recount: baseline trials with an injected, successful lookup_order finish = 16. The registration's own caveat on this condition is left out (audit records replacements, not what the model received; lines cannot be tied to trials; supporting evidence only).",
+    "fix": "Append: \"The audit records replacements made by the middleware, not what the model received; its lines cannot be tied to single trials, and the agreement is supporting evidence only.\""
+   },
+   {
+    "item": "Condition 3: \"All 32 trials have the termination completed: no crash, no time-out, no budget stop.\"",
+    "verdict": "confirmed",
+    "evidence": "Recount: termination completed 16 + 16; no other value.",
+    "fix": ""
+   },
+   {
+    "item": "Condition 4: \"The store's manifest carries the expected experiment id, and arci gate reports that the recomputed decision matches the stored one.\"",
+    "verdict": "confirmed",
+    "evidence": "manifest experiment_id equals the id in the registration character for character; all 32 trials carry it; gate on my copy: \"stored decision: MATCH\".",
+    "fix": ""
+   },
+   {
+    "item": "L68: \"These checks do not establish the independence assumptions behind the 2.5% bound.\"",
+    "verdict": "overstated",
+    "evidence": "True as far as it goes, but the registration fixed a second half that is dropped here: \"and they do not give a 2.5% error rate conditional on passing them\". Without it a reader can take the four passed conditions plus the bound as a 2.5% rate for this checked run.",
+    "fix": "These checks do not establish the independence assumptions behind the 2.5% bound, and they do not give a 2.5% error rate conditional on passing them."
+   },
+   {
+    "item": "Heading: \"Registered counts (they decide nothing)\"",
+    "verdict": "confirmed",
+    "evidence": "Registration: \"The counts decide nothing.\"",
+    "fix": ""
+   },
+   {
+    "item": "L72-73: \"Computed by counts-run-3/count_a.py and count_b.py; the two outputs are identical (run-3-counts-a.json, run-3-counts-b.json).\"",
+    "verdict": "confirmed",
+    "evidence": "cmp of the two files: identical. I reran both scripts on my copy of the store with the audit file: each reproduces its stored output byte for byte. My own separate script gives the same numbers.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Trials | 16 | 16",
+    "verdict": "confirmed",
+    "evidence": "Recount 16 / 16.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Passed | 15 | 2",
+    "verdict": "confirmed",
+    "evidence": "Recount 15 / 2.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Errored | 0 | 0",
+    "verdict": "confirmed",
+    "evidence": "Recount: no ERROR outcome in either arm.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Termination completed | 16 | 16",
+    "verdict": "confirmed",
+    "evidence": "Recount 16 / 16.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: First call was not lookup_order | 9 | 11",
+    "verdict": "confirmed",
+    "evidence": "Recount: first tool_start names check_stock in 9 baseline and 11 candidate trials (the candidate trial with no tool call is not counted, as the definition says).",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Never called lookup_order | 0 | 1",
+    "verdict": "confirmed",
+    "evidence": "Recount: candidate r000002:desk-06 has one model step and no tool call at all.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Empty result delivered, call successful | 16 | 15",
+    "verdict": "confirmed",
+    "evidence": "Recount: injected lookup_order finish with ok=true in 16 baseline and 15 candidate trials (16 and 15 injections; none failed).",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Then read the order again | 16 (15 passed) | 2 (2 passed)",
+    "verdict": "confirmed",
+    "evidence": "Recount: a later lookup_order start in 16 baseline trials (15 PASS) and 2 candidate trials (2 PASS). In all 18 the second lookup succeeded and returned the order.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Then did not read it again | 0 | 13 (0 passed)",
+    "verdict": "confirmed",
+    "evidence": "Recount 0 / 13, none of the 13 passed.",
+    "fix": ""
+   },
+   {
+    "item": "Counts table: Trials with a tool error that was not injected | 9 (8 passed) | 14 (1 passed)",
+    "verdict": "confirmed",
+    "evidence": "Recount 9 (8 PASS) / 14 (1 PASS); every such failure is check_stock \"ValueError: unknown SKU\" (9 failures in baseline, 15 in candidate), as the tool's report table shows.",
+    "fix": ""
+   },
+   {
+    "item": "L88-90: passes per task: desk-03 2 and 0; desk-06 2 and 0; desk-09 2 and 1; desk-12 2 and 0; desk-15 2 and 0; desk-18 1 and 0; desk-21 2 and 0; desk-24 2 and 1 (2 trials per task and arm)",
+    "verdict": "confirmed",
+    "evidence": "Recount per task and arm gives exactly these 16 numbers; 2 trials per task and arm.",
+    "fix": ""
+   },
+   {
+    "item": "L94-96: \"On these 8 cells (the 8 stock-note tasks under the injected empty result), with this 4B model and this prompt, replacing the null of the empty lookup with the registered message raised the mean pass rate by more than 10 points.\"",
+    "verdict": "overstated",
+    "evidence": "Grid, model and direction are right (manifest: 8 tasks, all action stock_note, one condition empty_result on lookup_order occurrence 0; both arms ollama:qwen3.5:4b-mlx-ctx32k), and the registration allows \"this replacement message helped on these 8 cells\". But \"raised ... by more than 10 points\" is written as an observed fact. What the run gives is a statistical BLOCK: the test rejected \"gain 10 points or less\"; the qualifier only arrives in the next sentence. \"raised\" also sits oddly beside the bullet \"Nothing about ... cause\" a few lines below. Temperature 0.7 and the one wording are part of the scope and are not named.",
+    "fix": "On these 8 cells (the 8 stock-note tasks under the injected empty result), with this 4B model, this prompt and temperature 0.7, the registered test decided that the arm in which the `null` of the empty lookup is replaced by the registered message passes more often than the arm with `null`, by more than 10 points of mean pass rate over the 8 cells."
+   },
+   {
+    "item": "L96-99: \"Under the rule's assumptions, the chance of this verdict when the true gain is 10 points or less is at most 2.5%; ARCI does not check those assumptions, and with per-round seeds the bound needs the null to hold in every round's scenario instances.\"",
+    "verdict": "unclear",
+    "evidence": "Mostly what STATISTICS_SUITE.md guarantees: P(ever BLOCK-crossed | Delta >= -delta, manifest) <= alpha/2 = 2.5%; with the roles swapped Delta >= -1/10 is \"gain <= 10 points\" (equality included, as written); the bound covers a statistical BLOCK only, which line 36 establishes; and the contract's rule that a per_round guarantee carries the per-round condition in the same sentence is met. Three weak points. (1) \"the true gain\" presupposes one gain; in per_round mode the contract speaks of each round's suite mean over that round's scenario instances, and a gain averaged over seeds of 10 points or less does not give the bound. The last clause repairs this only if the reader connects the two. (2) \"the null to hold in every round's scenario instances\" drops \"the suite mean over\". (3) The contract and the registration both add \"there is no guarantee averaged over seeds\"; it is missing here. The assumptions are also not named (independent cells and rounds, same law each round, no arm-order effect).",
+    "fix": "Under the rule's assumptions (independent cells and rounds, the same law in every round, no effect of which arm runs first), the chance of a statistical BLOCK is at most 2.5% if, in every round, the mean gain over that round's scenario instances on these 8 cells is 10 points or less; ARCI does not check those assumptions, and there is no guarantee averaged over seeds."
+   },
+   {
+    "item": "OMISSION in \"What this supports\": the registration's sentence on the three campaigns",
+    "verdict": "overstated",
+    "evidence": "Registration: \"This is a third campaign on related data, chosen after seeing runs 1 and 2. The directional guarantee applies to this registered experiment under its assumptions; no error guarantee across the three campaigns is claimed.\" The tool's report says \"A new campaign does not reset the error budget\" and the tool printed the two prior runs. The write-up states the 2.5% bound with none of this (only that the cells were chosen from run 2's results).",
+    "fix": "Add after the 2.5% sentence: \"This is a third campaign on related data, chosen after seeing runs 1 and 2; the bound applies to this registered experiment alone, and no error guarantee across the three campaigns is claimed.\""
+   },
+   {
+    "item": "L103: \"Nothing about the 12B model or 'the gap': it was in neither arm.\"",
+    "verdict": "confirmed",
+    "evidence": "Manifest and log: both arms ollama:qwen3.5:4b-mlx-ctx32k. Same as the registration's bullet.",
+    "fix": ""
+   },
+   {
+    "item": "L104: \"Nothing about capability or cause, and not that naming the next step is what helped.\"",
+    "verdict": "confirmed",
+    "evidence": "The registration's bullet, word for word. Note the tension with \"raised\" in line 96; \"cause\" here means why the message works.",
+    "fix": "Optional: \"Nothing about capability or about why the message works, and not that naming the next step is what helped.\""
+   },
+   {
+    "item": "L105: \"The run compared one message with null.\"",
+    "verdict": "confirmed",
+    "evidence": "One baseline arm with one fixed text (preflight line in the log), one candidate arm; in 15 of 16 candidate trials the model was handed null, in one it made no call.",
+    "fix": ""
+   },
+   {
+    "item": "L105-106: \"A message of the same length that names no next step was not tested.\"",
+    "verdict": "confirmed",
+    "evidence": "The store holds two arms only; the registration says a control message was not part of the run.",
+    "fix": ""
+   },
+   {
+    "item": "L107: \"Nothing about the other 16 tasks, the other three conditions or the full suite.\"",
+    "verdict": "confirmed",
+    "evidence": "Run 1 and run 2 manifests: 24 tasks, 4 conditions (clean, tool_timeout, tool_error_once, empty_result); the 8 stock-note tasks there are exactly these 8. 24 - 8 = 16; 4 - 1 = 3.",
+    "fix": ""
+   },
+   {
+    "item": "L107-108: \"The 8 cells and the condition were chosen from run 2's results.\"",
+    "verdict": "confirmed",
+    "evidence": "Stated in the registration (\"Chosen from run 2's results ... the 8 tasks and the one condition\"). Not independently checkable beyond that.",
+    "fix": ""
+   },
+   {
+    "item": "L109: \"No statement about how large the gain is beyond 'more than 10 points on these cells'.\"",
+    "verdict": "confirmed",
+    "evidence": "The file gives no estimate, difference or interval; 15/16 and 2/16 are labelled as counts.",
+    "fix": ""
+   },
+   {
+    "item": "L110: \"No comparison with run 2's counts as an effect: other seeds, another release.\"",
+    "verdict": "confirmed",
+    "evidence": "The file compares no count with run 2. Other experiment id, hence other derived seeds; registration: run 2 used ARCI 2.0.0, run 3 2.4.0 (PREREGISTRATION-run-2.md line 34 agrees).",
+    "fix": ""
+   },
+   {
+    "item": "L111: \"The smoke run (6 of 8 and 3 of 8) is not evidence and is not pooled with this.\"",
+    "verdict": "confirmed",
+    "evidence": "runs-run-3-smoke store, my count: baseline 6 PASS of 8, candidate 3 PASS of 8; its own suite id \"...-smoke-not-evidence\". The run 3 store holds only rounds 1 and 2 of the registered id (32 trials).",
+    "fix": ""
+   },
+   {
+    "item": "L115: \"The code-retry variant.\" (not run)",
+    "verdict": "confirmed",
+    "evidence": "Registration says it is not run; one store, two arms, neither with a code retry (agent.py).",
+    "fix": ""
+   },
+   {
+    "item": "L115-118: \"A scripted test with no model (order-desk-empty-message/tests/test_code_retry_demo.py) shows how a code retry behaves: the empty lookup is followed by one more recorded lookup_order call with no model step between, and the model then receives the order.\"",
+    "verdict": "confirmed",
+    "evidence": "Read, not re-run. The test asserts: 2 recorded lookups per trial (first injected and null, second ok with a dict), the only event between the two lookup starts is the injected tool_finish, and the tool message the model sees equals the second result with a sku. Four stored summary.json files under _offline/ (written only after all asserts pass) say model_steps_between_lookups 0, model_receives_order true. The file's digest was OK in the log.",
+    "fix": ""
+   },
+   {
+    "item": "L122: \"2 minutes 3 seconds from the first trial to the end, one worker, no spend.\"",
+    "verdict": "confirmed",
+    "evidence": "Right to within a second, but the 123 s is the span between the wrapper's \"run start\" (16:10:24Z, before arci starts) and \"run end\" (16:12:27Z) stamps, not from the first trial. The 32 trials' recorded wall_seconds sum to 122.44 s. One worker: run-3.sh (digest OK) calls arci run with --workers 1. No spend: both arms are a local Ollama model; nothing in the records shows a paid call.",
+    "fix": "2 minutes 3 seconds from the start of `arci run` (21:40:24) to its end (21:42:27); the 32 trials' recorded times sum to 122 seconds. One worker, no spend."
+   },
+   {
+    "item": "L122-123: \"About 4 seconds a trial.\"",
+    "verdict": "confirmed",
+    "evidence": "Mean recorded wall time 3.83 s (123 s / 32 = 3.84); arm with the message 4.63 s, run 2's set-up 3.02 s; shortest 1.36 s, longest 6.23 s.",
+    "fix": ""
+   },
+   {
+    "item": "OMISSION: \"Fault accounting\" promised in the registration's \"What will be published\"",
+    "verdict": "unclear",
+    "evidence": "The write-up has no fault accounting of its own; it is only in the linked report-run-3.md (baseline 16 trials, 16 injections, 16 fired; candidate 16 trials, 15 injections, 15 fired). The reader has to infer it from the rows \"Never called lookup_order 0 | 1\" and \"Empty result delivered, call successful 16 | 15\". The SPEC counts failed (1 | 14), ended_on_budget_or_time (0 | 0) and empty_result_delivered (16 | 15) are also only in the two JSON files.",
+    "fix": "Add: \"Fault accounting (the tool's report): the injected empty result fired in 16 of 16 trials of the arm with the message and in 15 of 16 trials of run 2's set-up; in the remaining trial (round 2, desk-06) the model made no tool call. Failed: 1 and 14. Ended on budget or time: 0 and 0.\""
+   },
+   {
+    "item": "CHECK (d): anything the registration forbade",
+    "verdict": "confirmed",
+    "evidence": "No claim about the 12B model or the gap, about capability, about the other tasks, conditions or the full suite; no numeric comparison with run 2; no size of the gain beyond \"more than 10 points\"; smoke data named as not evidence and not pooled; no interval; the tool's reason line is given; the stopping round, per-arm counts and per-task counts are given. The departures are the dropped caveats listed above (conditional 2.5%, three campaigns, no guarantee averaged over seeds, audit caveat, fault accounting) and the bare-fact wording of \"worth\" and \"raised\".",
+    "fix": ""
+   }
+  ],
+  "numbers": "{\"store\":\"order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504\",\"trials\":32,\"events\":457,\"events_jsonl_equals_embedded\":true,\"pairs\":16,\"rounds\":{\"1\":{\"minus\":6,\"zero\":2,\"plus\":0,\"errored\":0,\"block_wealth\":5.02475,\"pass_wealth\":0.102706},\"2_cumulative\":{\"minus\":13,\"zero\":3,\"plus\":0,\"errored\":0,\"block_wealth\":42.790967,\"pass_wealth\":0.0129681}},\"threshold\":40,\"pair_split\":{\"baseline_only\":13,\"both_pass\":2,\"both_fail\":1,\"candidate_only\":0},\"baseline\":{\"trials\":16,\"passed\":15,\"failed\":1,\"errored\":0,\"completed\":16,\"first_call_not_lookup\":9,\"never_lookup\":0,\"delivered\":16,\"delivered_ok\":16,\"read_again\":[16,15],\"not_read_again\":[0,0],\"uninjected_error\":[9,8],\"violations\":0,\"mean_wall_s\":4.63},\"candidate\":{\"trials\":16,\"passed\":2,\"failed\":14,\"errored\":0,\"completed\":16,\"first_call_not_lookup\":11,\"never_lookup\":1,\"no_tool_call\":1,\"delivered\":15,\"delivered_ok\":15,\"read_again\":[2,2],\"not_read_again\":[13,0],\"uninjected_error\":[14,1],\"violations\":0,\"mean_wall_s\":3.02},\"per_task_pass_baseline_candidate\":{\"desk-03\":[2,0],\"desk-06\":[2,0],\"desk-09\":[2,1],\"desk-12\":[2,0],\"desk-15\":[2,0],\"desk-18\":[1,0],\"desk-21\":[2,0],\"desk-24\":[2,1]},\"audit\":{\"lines\":16,\"distinct_ids\":16},\"digests_ok\":17,\"planner\":{\"earliest_pass_round\":2,\"earliest_block_round\":2,\"never_differs_pass_round\":10,\"max_block_wealth_after_round_1\":9.987,\"max_pass_wealth_after_round_1\":26.917,\"min_pairs_all_minus_block\":13,\"min_pairs_all_plus_pass\":9},\"times_ist\":{\"commit_c217ae6\":\"21:39:59\",\"push\":\"21:40:02\",\"wrapper_start\":\"21:40:21\",\"run_start\":\"21:40:24\",\"manifest_written\":\"21:40:25\",\"run_end\":\"21:42:27\",\"span_s\":123,\"sum_trial_wall_s\":122.44,\"mean_trial_wall_s\":3.83},\"smoke\":{\"baseline\":[6,8],\"candidate\":[3,8]},\"gate_on_copy\":\"BLOCK exit 1, stored decision: MATCH\",\"report_on_copy\":\"byte-identical to report-run-3.md\",\"count_scripts_rerun\":\"both reproduce stored outputs; a equals b\"}",
+  "not_checked": [
+   "That the orchestrator checked the verdict, counts and conditions; the session task file wwdtk1unu; whether Astra was consulted on the write-up: session process, no record I can read.",
+   "\"Nothing here has been published outside this branch\": no network use; I only see that 60feff5 was pushed to origin/v2/phase0 at 21:44:55 +05:30. Whether the remote repository is public was not looked at.",
+   "The push time 21:40:02 rests on the local reflog of origin/v2/phase0 and on the wrapper's own ls-remote check in the log; the remote was not queried.",
+   "\"One start\" rests on file evidence (one marker folder, one log, one store); a start that left no file cannot be excluded from here.",
+   "The independence, same-law and no-arm-order assumptions behind the 2.5% bound: nothing in the records can establish them; both arms ran on one local server, one after the other.",
+   "That the two arms differed at run time only in the content of the one tool message: I read agent.py and the preflight lines; the reviewer's 800-request-body check was not repeated.",
+   "test_code_retry_demo.py was read and its stored summary.json files were read; it was not re-run.",
+   "The installed versions and the model id at run time: taken from run-3.log; the environment was not inspected again and Ollama was not queried.",
+   "\"No spend\": inferred from both arms being a local Ollama model.",
+   "STATISTICS_SUITE.md was read from the wt-v2-logs worktree, not from the installed 2.4.0 package; the tool's printed guarantee lines in the log match its wording.",
+   "Whether a hard-severity contract violation is possible at all under this manifest's contract (oracle only) was not worked out; the rule allows a hard-violation BLOCK at round 1 in general, and an ERROR at round 1 is possible with more than 4 errored pairs.",
+   "Out of scope but seen: plan/exec/v2/signals/SIGNALS.md line 79 says the run ran \"22 seconds after\" the push (run start 21:40:24), where the write-up says the wrapper started 19 seconds after (21:40:21); both are consistent with the log."
+  ]
+ }
+}

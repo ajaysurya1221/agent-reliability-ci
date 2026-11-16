@@ -3,43 +3,30 @@
 Post: https://dev.to/ajay_2112/i-tested-whether-a-4b-model-could-replace-a-12b-one-in-a-tool-using-agent-my-first-test-was-wrong-3jgf
 
 Comment (account "Agentic Affairs", a follow-up to the first reply; seen on the public page
-on 16 Nov 2026). It accepts the correction on 70 of 96 against 428 of 480, reads the compound
-case as "a decision difference, not a missing policy", and asks: "The code-retry variant is
-the test that would settle whether it's a capability gap — are you planning to run it, or is
-the next post going a different direction?"
+on 16 Nov 2026). It reads the compound case as "a decision difference, not a missing
+policy", and asks: "The code-retry variant is the test that would settle whether it's a
+capability gap — are you planning to run it, or is the next post going a different
+direction?"
 
-Sources: the run 2 store on `main`
-(`docs/results/order-desk-study/run-2/`), counted on 16 Nov 2026 by two agents working
-separately, neither of which read a write-up; both gave the same numbers. Under the
-injected empty result the candidate called `lookup_order` a second time in 87 of 120
-trials; 86 of those 87 passed (the other one used a malformed order id); none of the 33
-without a second lookup passed. The roadmap on `main` says nothing is scheduled. The
-second blog post (`docs/blog/2026-11-eval-noise.md`) is written and not yet published.
-
-One sentence is the maintainer's to settle before posting: whether the variant will be
-run. The text below says it is not scheduled. If it will be run, replace its third
-paragraph with the alternative given under the reply.
-
-Checked on 16 Nov 2026 by a third agent that counted every number again from the store and
-read the code. Its corrections are applied: "None of the other 33 passed" (one of the 33
-never called `lookup_order` at all); the conclusion no longer points at one step, because
-32 of the 33 trials without a second lookup are stock-note tasks and only 7 of the 86
-passes are, so the split is close to a split by task; the plan sentence has no "yet"; and
-the reply says what a code retry cannot show. The sentence about the next post holds only
-if the eval-noise post is the next one published.
+This version replaces the draft of 16 Nov ("not scheduled"), which was never posted: the
+maintainer approved a third run the same day and it has been run. Sources: the run 2 store
+(87 of 120, 86 of 87, 33) and `plan/exec/v2/study/RESULT-run-3.md` (run 3). Post it only
+after the run 3 write-up is on `main`, so that the link works.
 
 ---
 
-Yes, that is how I read it too: the same instruction, and a different decision.
+The records show different actions under the same instruction. They do not establish a capability gap.
 
-One more count from the run 2 records, since it bears on your question. Under the injected empty result the 4B read the order a second time in 87 of 120 trials, and 86 of those 87 passed. None of the other 33 passed. So in this run, 33 of the 34 failures under the empty result are trials with no second read. That does not show what those 33 would have done with the order: all but one of them are stock-note tasks, and only 7 of the 86 passes are. I chose this cut after seeing the data, so it is a description, not a test.
+One more count from the run 2 records. Under the injected empty result the 4B read the order a second time in 87 of 120 trials, and 86 of those 87 passed. None of the other 33 passed. I chose this cut after seeing the data, so it is a description, not a test.
 
-The code-retry variant is not scheduled. It would be the same change for both models: retry an empty lookup once in code. One limit of it: with the retry in code the model never sees the empty result, so it shows what happens when the decision is taken away from the model. If I run it, I will write the prediction down first, as for the first two runs, and post the result here.
+I did not run the code-retry variant. A code retry would test the whole system with the recovery handed to code. It would not isolate what the model decides, and it would not by itself make the task succeed. A scripted test with no model in the repository shows how such a retry behaves.
 
-The next post planned is on a different question: how often an unchanged agent looks worse on a small eval by chance alone.
+I ran the neighbouring test instead, where the model still has to decide but is told at the point of failure. Same 4B model in both arms, on the 8 stock-note tasks under the empty result. One arm gets the empty result as `null`, as in run 2. The other gets "lookup_order returned an empty result. Call lookup_order again with the same order_id." The rule and the message were registered before the first trial.
 
----
+Both arms already had "Retry an empty lookup once." in the system prompt. A small smoke run came before the registration; its trials are not counted.
 
-Alternative for the third paragraph, only if the maintainer has decided to run it:
+Result: 15 of 16 passed with the message, 2 of 16 without. The test stopped at round 2. Its verdict was BLOCK, and in this run BLOCK favours the message: I put the message arm in the baseline seat on purpose, because the test has no verdict for "better". Under the test's stated assumptions this supports an advantage of more than 10 points on these 8 tasks. It is a threshold decision, not a measured gain, and it says nothing about the full suite.
 
-I am going to run the code-retry variant. It is the same change for both models: retry an empty lookup once in code. One limit of it: with the retry in code the model never sees the empty result, so it shows what happens when the decision is taken away from the model. The prediction will be written down before the run, as for the first two, and I will post the result here.
+What it does not show: anything about the 12B model or a capability gap (it was in neither arm), or whether naming the next step is what helped (one wording, no control message). The 8 tasks were chosen from run 2's failures, and the run stopped early, so 15 and 2 are counts, not rates.
+
+Run 3, with its pre-registration and raw records: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md
