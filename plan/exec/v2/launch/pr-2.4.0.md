@@ -2,7 +2,9 @@
 
 Title: `v2.4.0: compare the setting you use now, and keep days beyond the vendor's retention`
 
-Compare link: https://github.com/ajaysurya1221/agent-reliability-ci/compare/main...v2/logs2
+Compare link (title filled in): https://github.com/ajaysurya1221/agent-reliability-ci/compare/main...v2/logs2?expand=1&title=v2.4.0%3A%20compare%20the%20setting%20you%20use%20now%2C%20and%20keep%20days%20beyond%20the%20vendor%27s%20retention
+
+Body alone: `plan/exec/v2/launch/pr-2.4.0-body.md`
 
 ---
 
@@ -67,6 +69,10 @@ still `CANNOT TELL`. No published evidence ties these measures to answer quality
   nowhere and removed nothing. Dispositions: decision D-22 on the records branch.
 - Both wheels built locally and run through the release smoke script on Python 3.11 and
   3.14, and through `uvx --python 3.14` (example, a refused name, `--keep`).
+- Hosted CI on the mirror branch `sprint/v2.4-logs2` at the same commit: 14 of 14 jobs
+  (Linux and macOS, Python 3.11 and 3.14, wheel smoke, adapters, the SciPy oracle),
+  CodeQL and the workflow audit, all green. Whole local suite: 5,147 passed, 21 skipped
+  (optional extras; each skipped group passes in its own environment).
 - Privacy tests: canary tokens, an audit hook (no socket, no subprocess, writes only to
   the paths given and, with `--keep`, the table directory), an import allow-list, a JSON
   walk scoped by field.
@@ -76,8 +82,9 @@ still `CANNOT TELL`. No published evidence ties these measures to answer quality
 - Windows.
 - A real history longer than a few weeks (the kept table is new; its promise is checked on
   generated histories only).
-- The new workflows (CodeQL, zizmor, the SciPy oracle job, the daily client-version check)
-  on `main`; they ran on the mirror branch only where noted in the checks below.
+- The daily client-version workflow has not run yet (it runs on a schedule or by hand).
+  CodeQL, the workflow audit and the SciPy oracle job ran once, green, on the mirror
+  branch `sprint/v2.4-logs2`; they have not run on `main`.
 - The directory lock on file systems without `flock` (the tool then goes on without it;
   two overlapping `--keep` runs can then fail with the write error).
 - A run interrupted from the keyboard during the write can leave a `.realornoise.out-`
