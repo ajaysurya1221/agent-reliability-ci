@@ -21,6 +21,8 @@ a model no longer in use. Claude Code also deletes session files after 30 days b
   `~/.realornoise/days-1.json`, so that days outlive the vendor's retention. It holds no
   log text, prompt or path. `--keep-dir DIR` moves it; `--ignore-kept` skips reading it.
   The promise holds for runs at most 29 days apart.
+- A failed `--keep` write leaves a table directory it created in place, empty. The tool
+  never removes a directory.
 - **`CANNOT TELL`** now shows the usable days so far and the earliest date a test is
   possible.
 - **The printed limit** states one measured figure: the largest wrong `REAL DROP` rate of
@@ -50,12 +52,21 @@ still `CANNOT TELL`. No published evidence ties these measures to answer quality
 - A spike had to pass first: with setting changes, wrong `REAL DROP` stayed at 287 to 380
   of 20,000 against a limit of 566.
 - Blind acceptance tests written from the records alone by an agent that did not see the
-  code: 225 cases, on Python 3.13 and 3.14. Their first run found two product defects,
+  code: 236 cases, on Python 3.13 and 3.14. Their first run found two product defects,
   both fixed.
 - Self-check: 32 of 32 gates, each gated cell at exactly 20,000 simulated histories, seed
   base 18112026, about 66 minutes. Every exact-margin cell also gates the moved measure's
   own finding (largest 466/20,000 against 566).
-- REVIEW-LINE
+- Five adversarial checks of the build, each finding reproduced by a second agent before
+  it counted: 15, 11, 12, 5 and 8 findings, none critical or high. None touched the
+  statistics, a published figure or the privacy rules. Four rounds found the same kind
+  of fault in the write path (a failing run removed a directory another run was about to
+  use), so the rule was dropped instead of patched again: the tool never removes a
+  directory, and output names that begin with `.realornoise-` are refused. After that,
+  about 900 groups of real overlapping processes (up to 12 at once) lost no row, hung
+  nowhere and removed nothing. Dispositions: decision D-22 on the records branch.
+- Both wheels built locally and run through the release smoke script on Python 3.11 and
+  3.14, and through `uvx --python 3.14` (example, a refused name, `--keep`).
 - Privacy tests: canary tokens, an audit hook (no socket, no subprocess, writes only to
   the paths given and, with `--keep`, the table directory), an import allow-list, a JSON
   walk scoped by field.
@@ -67,7 +78,10 @@ still `CANNOT TELL`. No published evidence ties these measures to answer quality
   generated histories only).
 - The new workflows (CodeQL, zizmor, the SciPy oracle job, the daily client-version check)
   on `main`; they ran on the mirror branch only where noted in the checks below.
-- The directory lock on file systems without `flock` (the tool then goes on without it).
+- The directory lock on file systems without `flock` (the tool then goes on without it;
+  two overlapping `--keep` runs can then fail with the write error).
+- A run interrupted from the keyboard during the write can leave a `.realornoise.out-`
+  temporary file beside a report. The record says so; no file is left half written.
 
 ## Re-freeze (record 0017)
 
