@@ -1,0 +1,430 @@
+{
+  "summary": "Three independent drafts of a short blog post about run 3, scored by two judges",
+  "agentCount": 5,
+  "logs": [
+    "3 of 3 drafts returned"
+  ],
+  "result": {
+    "drafts": [
+      {
+        "key": "readers-asked",
+        "title": "Two readers asked for one more test, so I ran it",
+        "subtitle": "One message at the empty lookup against the text null, with the same 4B model in both arms. What the test decided, and what it cannot say.",
+        "body_markdown": "After my first post, two readers asked for one more test. On dev.to, \"Agentic Affairs\" asked for a version in which the code retries the empty lookup. On Hashnode, \"Halfcycle\" suggested an error text that names the next step, and asked: \"Did you try varying the error wording?\" I had not.\n\nI ran the nearest variant I could defend, the message. I did not run the retry in code. If the code repeats the lookup, the model gets the order without doing anything, so the result would say little about the model. A scripted test with no model in the repository shows how such a retry behaves.\n\n## The set-up\n\n- The same model in both arms, qwen3.5 4B.\n- The 8 stock-note tasks under the injected empty result, chosen from run 2's failures.\n- Both arms had \"Retry an empty lookup once.\" in the system prompt.\n- One arm got the empty lookup as the text `null`, as in run 2. The other got: \"lookup_order returned an empty result. Call lookup_order again with the same order_id.\"\n\nThe test compares two arms, a baseline and a candidate. It says BLOCK when the candidate passes less often by more than 10 points. It has no verdict for \"better\". So I put the arm with the message in the baseline seat and run 2's set-up in the candidate seat. Here, BLOCK favours the message.\n\nThe rule and the message were pre-registered: pushed in a public commit before the first trial. This time I wrote no prediction first. A small smoke run came before the registration; its trials are not counted.\n\n## The result\n\nBLOCK at round 2, the earliest round at which this rule can give that verdict.\n\n- With the message: 15 of 16 passed.\n- With `null`: 2 of 16 passed.\n- Pairs: 13 where only the message arm passed, 2 where both passed, 1 where both failed, 0 where only the `null` arm passed.\n\nOn these 8 tasks under the empty result, with this 4B model, this prompt and this one wording, the registered test decided that the arm with the message passes more often, by more than 10 percentage points. That holds under the test's stated assumptions, which the tool does not check. It is a threshold decision, not a measured size. The run stopped early, so 15 and 2 are counts, not rates.\n\n## What it does not show\n\n- Whether naming the next step is what helped. I compared one message with `null`. No message without a next step was tested.\n- Anything about the 12B model.\n- Anything about the other 16 tasks, the other three conditions or the full suite.\n- An effect from setting these counts against run 2's: other seeds, another release.\n\n## Two mistakes in my registration, both published\n\n- It says nothing was changed after the smoke run. The start script gained its start checks after it.\n- It says 32 of run 2's 34 failures under the empty result were on these tasks. The store gives 33 of 34.\n\nNeither changes the tasks, the rule or the verdict.\n\n## Check it yourself\n\nThe harness is my own open-source tool, ARCI.\n\n- [Run 3 write-up, with the errata](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md#run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms)\n- [The pre-registration commit](https://github.com/ajaysurya1221/agent-reliability-ci/commit/c217ae6)\n- [The raw records of every trial](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/results/order-desk-study)\n- [The first post](https://realornoise.hashnode.dev/i-tested-whether-a-4b-model-could-replace-a-12b-one-in-a-tool-using-agent-my-first-test-was-wrong)\n- [Repository](https://github.com/ajaysurya1221/agent-reliability-ci)\n\nIf you have tried it: does a message that names no next step do as well?",
+        "body_word_count": 547,
+        "numbers_used": [
+          "4B (qwen3.5 4B, same model both arms): PREREGISTRATION-run-3.md lines 46, 52; order-desk-study.md Run 3 table line 26 (file line 140)",
+          "8 stock-note tasks: PREREGISTRATION-run-3.md lines 73-75; RESULT-run-3.md line 142",
+          "chosen from run 2's failures: PREREGISTRATION-run-3.md line 90; RESULT-run-3.md lines 161-162",
+          "\"Retry an empty lookup once.\": PREREGISTRATION-run-3.md line 53; order-desk-study.md Run 3 line 27",
+          "message text: PREREGISTRATION-run-3.md line 61",
+          "10 points / 10 percentage points margin: PREREGISTRATION-run-3.md lines 12-14, 76; RESULT-run-3.md lines 20-25",
+          "run 2 / runs 1 and 2 (no prediction this time): PREREGISTRATION-run-3.md lines 144-147; order-desk-study.md Run 3 table line 30",
+          "BLOCK at round 2: RESULT-run-3.md lines 30-32, 46-48",
+          "15 of 16 and 2 of 16: RESULT-run-3.md lines 34, 55-56",
+          "pairs 13 / 2 / 1 / 0 (and 16 pairs): RESULT-run-3.md lines 33, 58-59",
+          "12B model in neither arm: RESULT-run-3.md line 157",
+          "other 16 tasks, other three conditions: RESULT-run-3.md line 161; first post line 6 (24 tasks, clean plus three faults)",
+          "other seeds, another release: RESULT-run-3.md line 164; order-desk-study.md Run 3 lines 111-112",
+          "Erratum 1 (start script gained start checks after smoke run): RESULT-run-3.md lines 86-96",
+          "Erratum 2 (32 of 34 stated, store gives 33 of 34): RESULT-run-3.md lines 98-104; PREREGISTRATION-run-3.md lines 91-92",
+          "Two readers and Halfcycle quote \"Did you try varying the error wording?\": hashnode-reply-1.md lines 5-7; Agentic Affairs request: PREREGISTRATION-run-3.md lines 27-28; order-desk-study.md Run 3 lines 3-6",
+          "code-retry not run, scripted test with no model: RESULT-run-3.md lines 167-172; devto-reply-2.md line 23; order-desk-study.md Run 3 lines 146-149",
+          "smoke run not counted: PREREGISTRATION-run-3.md lines 136-142; devto-reply-2.md line 27"
+        ],
+        "doubts": [
+          "Word count 547 includes the ## headings and the closing question but not title, subtitle or link list; it sits near the 550 ceiling.",
+          "The Halfcycle paraphrase ('suggested an error text that names the next step') follows hashnode-reply-1.md; the pre-registration words that reader's question as about 'the gap', which the draft deliberately leaves out.",
+          "'the earliest round at which this rule can give that verdict' compresses RESULT-run-3.md line 47 (earliest round for PASS or a statistical BLOCK); 'statistical' was dropped to save explaining hard violations.",
+          "The 2.5% bound is omitted; the draft says only 'under the test's stated assumptions, which the tool does not check'.",
+          "The closing question compares a no-next-step message with the tested one; it is phrased as a question, not a claim, but a reviewer may want 'a message of the same length' as in the write-up."
+        ]
+      },
+      {
+        "key": "one-sentence",
+        "title": "I replaced one null with one sentence at my 4B agent's empty lookup",
+        "subtitle": "A third pre-registered run, asked for by two readers: what the test decided on 8 tasks, and what it does not show.",
+        "body_markdown": "In my last post, a 4B model in a small order-desk agent often stopped after an order lookup came back empty. This is what the model receives there:\n\n```\nnull\n```\n\n\"Agentic Affairs\" on dev.to asked for a retry of the empty lookup in code. \"Halfcycle\" on Hashnode asked whether an error text that names the next step would help, and whether I had varied the wording. So I ran a third test with this message instead:\n\n```\nlookup_order returned an empty result. Call lookup_order again with the same order_id.\n```\n\n## The set-up\n\n- One model in both arms: qwen3.5 4B, temperature 0.7, the same prompt and tools.\n- Both arms already had \"Retry an empty lookup once.\" in the system prompt. The only difference is that one tool message.\n- The 8 stock-note tasks, each with an empty result injected into the order lookup. I chose these tasks and this fault from run 2's failures.\n- Pre-registered: the rule and the message were published before the first trial.\n- No prediction this time. The first post had one before each run.\n\nThe test has three verdicts. PASS means the candidate (the arm under test) is not worse than the baseline (the reference) by more than 10 percentage points. BLOCK means it is worse by more than that. INCONCLUSIVE means it ran out of rounds. There is no verdict for \"better\". So the arm with the message took the baseline seat and run 2's set-up the candidate seat. Here, BLOCK favours the message.\n\n## The result\n\nBLOCK at round 2, the earliest possible round.\n\n- With the message: 15 of 16 passed.\n- With `null`: 2 of 16 passed.\n- In 13 of the 16 pairs only the arm with the message passed. In 2 both passed, in 1 both failed, and in none did only the `null` arm pass.\n\nOn these 8 tasks, with this 4B model, this prompt and this one wording, the test decided that the arm with the message passes more often by more than 10 percentage points, under the test's stated assumptions. That is a threshold decision, not a measured size. The run stopped early, so 15 and 2 are counts, not rates.\n\n## What it does not show\n\n- That naming the next step is what helped. I tested one wording against `null`, and no message without a next step.\n- Anything about the 12B model. It was in neither arm.\n- Anything about the other 16 tasks, the other fault conditions or the full suite.\n\nI did not run the retry in code: it hands the model the order, so the outcome is nearly fixed. A scripted test with no model, in the repository, shows how such a retry behaves.\n\n## Two mistakes in my registration\n\nA smoke run before the registration is not counted.\n\n1. The registration says nothing was changed after the smoke run. The start script was changed: it gained its start checks.\n2. It says 32 of the 4B's 34 failures under the empty result in run 2 were on these tasks. The store gives 33 of 34.\n\nBoth are published; neither changes the grid, the rule or the verdict.\n\nThe harness is my own open-source tool, ARCI.\n\n- [Run 3 write-up](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md#run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms)\n- [The pre-registration commit](https://github.com/ajaysurya1221/agent-reliability-ci/commit/c217ae6)\n- [Raw records of every trial](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/results/order-desk-study)\n- [The first post](https://realornoise.hashnode.dev/i-tested-whether-a-4b-model-could-replace-a-12b-one-in-a-tool-using-agent-my-first-test-was-wrong)\n- [Repository](https://github.com/ajaysurya1221/agent-reliability-ci)\n\nHas anyone tried a message that says only that the result was empty, with no next step?\n",
+        "body_word_count": 549,
+        "numbers_used": [
+          "4B (qwen3.5 4B): PREREGISTRATION-run-3.md line 46 and 52 (qwen3.5:4b-mlx); hashnode-post-1.md line 7",
+          "temperature 0.7: PREREGISTRATION-run-3.md line 52; order-desk-study.md Run 3 table line 27",
+          "8 stock-note tasks: PREREGISTRATION-run-3.md lines 73-75; RESULT-run-3.md line 142",
+          "chosen from run 2's failures: PREREGISTRATION-run-3.md lines 90-92; RESULT-run-3.md lines 161-162",
+          "no prediction this run: PREREGISTRATION-run-3.md lines 144-147; order-desk-study.md Run 3 table line 30",
+          "one prediction before each run in the first post: hashnode-post-1.md line 1",
+          "10 percentage points margin: RESULT-run-3.md lines 21-25; PREREGISTRATION-run-3.md line 76 (delta 1/10)",
+          "BLOCK at round 2, earliest round for a statistical verdict on 8 cells: RESULT-run-3.md lines 32 and 46-48; order-desk-study.md Run 3 lines 71-73",
+          "15 of 16 with the message, 2 of 16 without: RESULT-run-3.md lines 34 and 53-56",
+          "13 of 16 pairs only message arm passed, 2 both passed, 1 both failed, 0 only null arm: RESULT-run-3.md lines 58-59 (counts minus=13, zero=3, plus=0 at line 35)",
+          "12B in neither arm: RESULT-run-3.md line 157",
+          "other 16 tasks: RESULT-run-3.md line 161; order-desk-study.md Run 3 line 109 (24 tasks in hashnode-post-1.md line 5)",
+          "32 of 34 in the registration, 33 of 34 in the store: RESULT-run-3.md lines 98-103; PREREGISTRATION-run-3.md line 91-92",
+          "run 2 / third test numbering: order-desk-study.md Run 3 heading and lines 10-12; PREREGISTRATION-run-3.md line 25"
+        ],
+        "doubts": [
+          "The opening line says the 4B 'often stopped after an order lookup came back empty'. It rests on post 1 (21 of 26 in the compound case) and RESULT-run-3 erratum 2 (32 of the 34 empty-result failures did not read the order again). It gives no number. Check that 'often' is acceptable.",
+          "The smoke-run counts (6 of 8 and 3 of 8) are left out on purpose: the post says only that the smoke run is not counted. Add them back only with 'not evidence' next to them.",
+          "Halfcycle is quoted only by paraphrase, worded as in the task and hashnode-reply-1.md. The public write-up's paraphrase uses 'close the gap', and that phrase is avoided here.",
+          "'the earliest possible round' is short for 'the earliest round at which this rule can give a statistical verdict on 8 cells' (RESULT-run-3.md lines 46-48).",
+          "The 2.5% bound is left out. The post says 'under the test's stated assumptions' instead and does not say that the tool does not check them. Add that sentence if the bound is ever named.",
+          "The word count of 549 includes headings and the closing question. It leaves out the title, the subtitle, the link list and the code blocks. If headings are not counted, the body is about 535 words.",
+          "The draft says 'the same prompt and tools'. The registration also fixes reasoning off, the check and the budgets as the same in both arms. These are left out for length, and 'The only difference is that one tool message' covers them."
+        ]
+      },
+      {
+        "key": "what-block-means",
+        "title": "The verdict was BLOCK, and that was the good outcome",
+        "subtitle": "Two readers asked for a further test of my 4B agent. My test cannot say \"better\", so I swapped the roles.",
+        "body_markdown": "My last post tested a small local model, qwen3.5 4B, on order-desk tasks with tools. Two readers asked for more. \"Agentic Affairs\" on dev.to asked for a retry of the empty lookup in code. \"Halfcycle\" on Hashnode asked whether an error text that names the next step would help, and whether I had varied the wording. I tested the second idea.\n\n## The test cannot say \"better\"\n\nMy test compares two set-ups on the same tasks: a baseline (the current one) and a candidate (the proposed one). It has three verdicts. PASS: the candidate is not worse by more than 10 percentage points. BLOCK: it is worse by more than that. INCONCLUSIVE: it ran out of rounds.\n\nNone of these says \"better\". So I swapped the roles. The set-up with the new message took the baseline seat, the old set-up the candidate seat. BLOCK then means the old set-up does worse. Here, BLOCK was the good outcome for the message.\n\n## The set-up\n\nThe same 4B model in both arms, on 8 stock-note tasks with an injected fault: the order lookup comes back empty. I chose these tasks and this fault from the earlier run's failures.\n\n- One arm gets the text `null` for the empty result, as before.\n- The other gets: \"lookup_order returned an empty result. Call lookup_order again with the same order_id.\"\n- Both arms already had \"Retry an empty lookup once.\" in the system prompt.\n\nThe rule and the message were pre-registered: written down and pushed in a public commit before the first trial. Unlike the earlier runs, I wrote no prediction first. A small smoke run came before the registration; its trials are not counted.\n\n## The result\n\nBLOCK at round 2. 15 of 16 passed with the message, 2 of 16 without. In 13 of the 16 pairs only the arm with the message passed. In 2 both passed, in 1 both failed, and in none did only the arm without the message pass.\n\nUnder the test's stated assumptions, this supports one claim: on these 8 tasks, with this model, this prompt and this one wording, the arm with the message passes more often by more than 10 percentage points. It is a threshold decision, not a measured size. The run stopped early, so 15 and 2 are counts, not rates.\n\n## What it does not show\n\n- Whether naming the next step is what helped. I compared one wording with `null`, with no control message.\n- Anything about the 12B model. It was in neither arm.\n- Anything about the other 16 tasks, the other conditions or the full suite.\n\nI did not run the code-retry variant. A scripted test with no model in the repository shows how such a retry behaves.\n\n## Two published mistakes in my registration\n\nThe registration says nothing was changed after the smoke run, but the start script gained its start checks after it. It says 32 of the 4B's 34 earlier failures under the empty result were on these tasks; the records give 33 of 34. Neither changes the grid, the rule or the verdict.\n\n## Check it yourself\n\nThe harness is my own open-source tool, ARCI.\n\n- [Run 3 write-up](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md#run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms)\n- [The pre-registration commit](https://github.com/ajaysurya1221/agent-reliability-ci/commit/c217ae6)\n- [The raw records of every trial](https://github.com/ajaysurya1221/agent-reliability-ci/tree/main/docs/results/order-desk-study)\n- [The first post](https://realornoise.hashnode.dev/i-tested-whether-a-4b-model-could-replace-a-12b-one-in-a-tool-using-agent-my-first-test-was-wrong)\n- [Repository](https://github.com/ajaysurya1221/agent-reliability-ci)\n\nI have not tested a message that reports the empty lookup but names no next step. If you have tried one, did it do as well?",
+        "body_word_count": 546,
+        "numbers_used": [
+          "qwen3.5 4B / 4B: PREREGISTRATION-run-3.md line 46 and 52 (qwen3.5:4b-mlx); order-desk-study.md Run 3 table line 25-26",
+          "10 percentage points (margin): PREREGISTRATION-run-3.md lines 12-16 and 76 (delta 1/10); order-desk-study.md Run 3 line 29",
+          "8 stock-note tasks: PREREGISTRATION-run-3.md lines 73-75; RESULT-run-3.md line 142",
+          "chosen from the earlier run's failures: PREREGISTRATION-run-3.md lines 90-93; order-desk-study.md Run 3 line 28",
+          "Message text and 'Retry an empty lookup once.': PREREGISTRATION-run-3.md lines 53, 61; order-desk-study.md Run 3 lines 25 and 27",
+          "No prediction: PREREGISTRATION-run-3.md lines 144-147; order-desk-study.md Run 3 line 30; first post line 1 (prediction before each run)",
+          "Smoke run not counted: PREREGISTRATION-run-3.md lines 136-142; RESULT-run-3.md line 165",
+          "BLOCK at round 2: RESULT-run-3.md lines 30-32",
+          "15 of 16 and 2 of 16: RESULT-run-3.md lines 34, 55-56",
+          "13 / 2 / 1 / 0 pairs (of 16): RESULT-run-3.md lines 58-59; order-desk-study.md Run 3 line 34",
+          "other 16 tasks (24 minus 8): first post line 5 (24 tasks); RESULT-run-3.md line 161",
+          "12B in neither arm: RESULT-run-3.md line 157",
+          "Erratum 1 (start script gained start checks after smoke run): RESULT-run-3.md lines 86-96",
+          "Erratum 2: 32 of 34 registered, store gives 33 of 34: RESULT-run-3.md lines 98-103; PREREGISTRATION-run-3.md line 91",
+          "Code-retry not run, scripted test with no model: RESULT-run-3.md lines 167-172"
+        ],
+        "doubts": [
+          "Word count: about 546 words of body prose including heading words, excluding title, subtitle and link list; a plain wc on the whole body gives about 556 because it counts the '##' and bullet markers.",
+          "The 2.5% bound is left out on purpose; the post says only 'under the test's stated assumptions', as allowed.",
+          "Erratum 2 is shortened to 'the 4B's 34 earlier failures under the empty result'; the files say these were run 2's candidate failures under the empty result. The full wording (and that 32 is the count that did not read the order again) is in the linked write-up.",
+          "'Unlike the earlier runs, I wrote no prediction first' relies on the first post's line 1 ('the prediction written down before each run').",
+          "Halfcycle's question is paraphrased from hashnode-reply-1.md and the pre-registration; the pre-registration's wording mentions 'closes the gap', which was left out on purpose because of the no-gap rule.",
+          "I wrote my working copy to /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/body-angle-block.md. The scratchpad's body.md belongs to another parallel draft, and I did not change it."
+        ]
+      }
+    ],
+    "judges": [
+      {
+        "judge": "claims",
+        "ranking": [
+          "readers-asked",
+          "what-block-means",
+          "one-sentence"
+        ],
+        "per_draft": [
+          {
+            "key": "readers-asked",
+            "score_out_of_10": 8,
+            "rule_breaks": [
+              "\"It says 32 of run 2's 34 failures under the empty result were on these tasks.\" This is imprecise rather than a broken rule. The 34 failures are the 4B's (RESULT-run-3.md erratum 2: 'the candidate passed 7 of 40 on these cells, so 33 failed'). It should say 'the 4B's 34 failures in run 2', not 'run 2's 34 failures'.",
+              "\"The test compares two arms, a baseline and a candidate.\" This only partly meets the rule to explain 'baseline' and 'candidate' in a few words. It never says the baseline is the reference and the candidate is the set-up under test.",
+              "\"That holds under the test's stated assumptions, which the tool does not check.\" The caveat is correct. But 'That holds' can read as 'the advantage holds'. Safer: 'The test's error bound holds only under its stated assumptions, which the tool does not check.'"
+            ],
+            "best_parts": [
+              "Gives the real Halfcycle quote, \"Did you try varying the error wording?\", exactly as hashnode-reply-1.md has it, and answers it with 'I had not.'",
+              "It is the only draft that keeps the RESULT bullet 'No comparison with run 2's counts as an effect: other seeds, another release' (\"An effect from setting these counts against run 2's: other seeds, another release.\").",
+              "It is the only draft that says the tool does not check the assumptions, which matches RESULT 'ARCI does not check those assumptions'.",
+              "\"BLOCK at round 2, the earliest round at which this rule can give that verdict.\" This is accurate for a statistical BLOCK, as RESULT says.",
+              "Says pre-registered means 'pushed in a public commit before the first trial', which matches c217ae6 being pushed at 21:40:02 before the first trial at 21:40:24.",
+              "All counts check out against RESULT: 15/16, 2/16 and 13/2/1/0. Both errata are accurate. 'other three conditions' matches RESULT. 'chosen from run 2's failures' is present."
+            ],
+            "hard_to_follow": [
+              "\"I ran the nearest variant I could defend, the message.\" The phrase 'the message' comes before the reader knows what the message is.",
+              "The baseline and candidate explanation is thinner than in the other two drafts. A new reader may not see why BLOCK favours the message."
+            ],
+            "wrong_or_unsupported_numbers": [
+              "'run 2's 34 failures': these are the 4B's 34 failures (the right count, given loosely)."
+            ]
+          },
+          {
+            "key": "what-block-means",
+            "score_out_of_10": 7,
+            "rule_breaks": [
+              "TITLE \"The verdict was BLOCK, and that was the good outcome\". This is a value-laden hook close to sales wording. 'good outcome' presents the message as the winner before any limit is given.",
+              "\"BLOCK then means the old set-up does worse.\" This leaves out the threshold. It should say 'passes less often by more than 10 percentage points'. On its own, the sentence reads as a plain 'worse' verdict.",
+              "\"a baseline (the current one) and a candidate (the proposed one)\" is a fair general explanation. In this run, though, the baseline seat holds the new message, so the gloss briefly works against the swap the post explains next. That is a minor point of clarity, not a rule break."
+            ],
+            "best_parts": [
+              "The clearest explanation for a new reader: it lists the three verdicts, says none of them is 'better', then explains the swap ('So I swapped the roles.').",
+              "\"Unlike the earlier runs, I wrote no prediction first.\" A plain admission, as the brief asks.",
+              "\"Under the test's stated assumptions, this supports one claim: on these 8 tasks, with this model, this prompt and this one wording...\" It keeps the scope tight.",
+              "Says 'BLOCK at round 2' with no 'earliest' claim, so it cannot overstate.",
+              "The errata wording, \"32 of the 4B's 34 earlier failures ... the records give 33 of 34\", is precise.",
+              "Ends with a good open question: 'I have not tested a message that reports the empty lookup but names no next step. If you have tried one, did it do as well?'"
+            ],
+            "hard_to_follow": [
+              "The 'test cannot say better' section comes before the set-up, so the reader learns the role swap before knowing what the two arms are."
+            ],
+            "wrong_or_unsupported_numbers": []
+          },
+          {
+            "key": "one-sentence",
+            "score_out_of_10": 4,
+            "rule_breaks": [
+              "TITLE \"I replaced one null with one sentence at my 4B agent's empty lookup\". This is factually wrong. The registered message has two sentences: \"lookup_order returned an empty result. Call lookup_order again with the same order_id.\" The 'one null, one sentence' framing is also a hook that overstates how small the change was.",
+              "\"I did not run the retry in code: it hands the model the order, so the outcome is nearly fixed.\" This is unsupported and contradicts devto-reply-2.md, which says a code retry 'would not by itself make the task succeed'. RESULT only says that the model then receives the order.",
+              "\"BLOCK at round 2, the earliest possible round.\" This overstates. RESULT says round 2 is the earliest round for a statistical verdict, and 'only an ERROR or a BLOCK forced by a hard violation can come at round 1'.",
+              "\"In my last post, a 4B model in a small order-desk agent often stopped after an order lookup came back empty.\" 'often' is unsupported. In run 2 the 4B did not read the order again in 33 of 120 empty-result trials (devto-reply-2.md), and the first post does not make this claim."
+            ],
+            "best_parts": [
+              "Shows `null` and the full message in code blocks, which makes the comparison concrete.",
+              "\"One model in both arms: qwen3.5 4B, temperature 0.7, the same prompt and tools.\" and \"The only difference is that one tool message.\" Both are supported by the public write-up's 'same in both arms' row.",
+              "Defines PASS, BLOCK, INCONCLUSIVE, candidate ('the arm under test') and baseline ('the reference') cleanly.",
+              "\"Anything about the 12B model. It was in neither arm.\" This matches RESULT.",
+              "The errata wording \"the 4B's 34 failures under the empty result in run 2\" is precise."
+            ],
+            "hard_to_follow": [
+              "\"A smoke run before the registration is not counted.\" sits at the top of the mistakes section, so it reads as if the smoke run were one of the mistakes.",
+              "It does not say the rule and message went out in a pushed commit (it says 'published'), which is weaker than the other drafts."
+            ],
+            "wrong_or_unsupported_numbers": [
+              "'one sentence' (title): the message has two sentences.",
+              "'the earliest possible round': this is only the earliest round for a statistical verdict."
+            ]
+          }
+        ],
+        "grafts": [
+          "From one-sentence: show the two inputs as code blocks (`null` and the full message) in the set-up section of readers-asked.",
+          "From one-sentence: 'One model in both arms: qwen3.5 4B, temperature 0.7, the same prompt and tools.' and 'The only difference is that one tool message.' Both are supported by the public write-up's 'same in both arms' row.",
+          "From what-block-means or one-sentence: replace readers-asked's thin 'The test compares two arms, a baseline and a candidate. It says BLOCK when...' with the three-verdict explanation: candidate = the arm under test, baseline = the reference; PASS = not worse by more than 10 percentage points; BLOCK = worse by more than that; INCONCLUSIVE = ran out of rounds; no verdict says 'better'.",
+          "From one-sentence and what-block-means: 'Anything about the 12B model. It was in neither arm.' (adds the reason, as RESULT does).",
+          "From one-sentence and what-block-means: fix the erratum to 'the 4B's 34 failures under the empty result in run 2' instead of 'run 2's 34 failures'.",
+          "From what-block-means: 'Unlike the earlier runs, I wrote no prediction first.' This states the contrast with the first post more plainly than 'This time I wrote no prediction first.'",
+          "From what-block-means: the closing question that first states what was not tested, 'I have not tested a message that reports the empty lookup but names no next step. If you have tried one, did it do as well?'",
+          "In the winner, reword 'That holds under the test's stated assumptions, which the tool does not check.' to 'This decision rests on the test's stated assumptions, which the tool does not check.' so that it does not read as 'the advantage holds'."
+        ],
+        "missing_from_all": [
+          "None of the drafts says the bound applies to this third experiment alone and that no error guarantee across the three runs is claimed. RESULT states this. It is optional for a short post, but it is the honest caveat for a run chosen after seeing runs 1 and 2.",
+          "None of the drafts gives the smoke run's counts (6 of 8 and 3 of 8) with the statement that they are not evidence. Leaving them out is allowed and arguably safer.",
+          "None of the drafts mentions that the run was checked after the fact (a blind recount, the conditions audit and arci gate's 'stored decision: MATCH'). This fits the 'check it yourself' voice but is optional."
+        ],
+        "recommended_title": "Two readers asked for one more test, so I ran it"
+      },
+      {
+        "judge": "reader",
+        "ranking": [
+          "one-sentence",
+          "what-block-means",
+          "readers-asked"
+        ],
+        "per_draft": [
+          {
+            "key": "one-sentence",
+            "score_out_of_10": 8,
+            "rule_breaks": [
+              "None that are hard breaks. Borderline: \"a 4B model in a small order-desk agent often stopped after an order lookup came back empty\" is a summary of behaviour. It rests on the first post's 21 of 26 under one combination, so it is supported, but \"often\" is wider than that and could be cut to \"stopped\".",
+              "Jargon: \"The store gives 33 of 34.\" A new reader does not know what \"the store\" is.",
+              "Jargon: \"The start script was changed: it gained its start checks.\" This is opaque to an outsider.",
+              "\"arm\" is used from the set-up onward and never explained."
+            ],
+            "best_parts": [
+              "The opening shows the literal `null` and then the literal replacement message in code blocks. Within about 60 words a newcomer knows exactly what was swapped for what. It is the clearest hook of the three.",
+              "All three verdicts are defined in plain words, with baseline = \"the reference\" and candidate = \"the arm under test\", before the swap is explained. The swap then reads as logical, not confusing.",
+              "\"The only difference is that one tool message.\" This makes the comparison obvious.",
+              "\"Anything about the 12B model. It was in neither arm.\" This gives the reason as well as the limit.",
+              "The retry-in-code rationale is short and grounded in the pre-registration: \"it hands the model the order, so the outcome is nearly fixed\".",
+              "The closing question is concrete and is about the untested control."
+            ],
+            "hard_to_follow": [
+              "The result does not appear in the first 60 words. A busy reader learns what was tested but has to reach the second section to see 15 of 16 against 2 of 16.",
+              "\"A smoke run before the registration is not counted.\" This sits awkwardly as the lead line of the mistakes section, and \"smoke run\" is not explained.",
+              "\"the grid\" in \"neither changes the grid, the rule or the verdict\" is jargon. \"the rule\" means the decision rule, which is never said."
+            ],
+            "wrong_or_unsupported_numbers": []
+          },
+          {
+            "key": "what-block-means",
+            "score_out_of_10": 7,
+            "rule_breaks": [
+              "Loose wording: \"BLOCK then means the old set-up does worse.\" It drops \"by more than 10 percentage points\", so the bare sentence reads as a plain \"worse\" verdict. It should keep the threshold.",
+              "Title \"The verdict was BLOCK, and that was the good outcome\" is not a hard break, but \"good outcome\" leans evaluative and is mildly clickbait. It also makes BLOCK, the confusing part, the first thing a stranger meets.",
+              "Jargon: \"the start script gained its start checks\" is opaque to an outsider. \"the grid\" and \"the rule\" are not explained."
+            ],
+            "best_parts": [
+              "It gives the clearest explanation of the swapped roles: \"a baseline (the current one) and a candidate (the proposed one)\", then a section titled \"The test cannot say 'better'\".",
+              "\"I tested the second idea.\" This says plainly which reader request was taken up.",
+              "\"the records give 33 of 34\" is plainer than \"the store\".",
+              "The last line, \"I have not tested a message that reports the empty lookup but names no next step. If you have tried one, did it do as well?\", is honest about what was not tested.",
+              "The result is given as one compact paragraph."
+            ],
+            "hard_to_follow": [
+              "The swap is explained before the reader knows what the \"new message\" is, so \"the set-up with the new message\" lands before the message has been shown.",
+              "The first 60 words give neither what was swapped nor the result.",
+              "\"with no control message\" is mild jargon for a casual reader.",
+              "\"a further test\" in the subtitle and \"asked for more\" are vague. A reader must go deep to learn the actual variable."
+            ],
+            "wrong_or_unsupported_numbers": []
+          },
+          {
+            "key": "readers-asked",
+            "score_out_of_10": 6,
+            "rule_breaks": [
+              "Unclear limit: \"An effect from setting these counts against run 2's: other seeds, another release.\" The rule is respected, but the sentence is cryptic. \"other seeds, another release\" means nothing to a new reader.",
+              "\"baseline\" and \"candidate\" are named but not explained in words: \"The test compares two arms, a baseline and a candidate.\" The brief asks for a few-word explanation of each.",
+              "Only BLOCK is defined. PASS and INCONCLUSIVE are never mentioned, so the claim \"It has no verdict for 'better'\" has less to stand on.",
+              "Jargon: \"The store gives 33 of 34.\" and \"The start script gained its start checks after it.\""
+            ],
+            "best_parts": [
+              "It quotes Halfcycle's actual question, \"Did you try varying the error wording?\", which is verified in hashnode-reply-1.md. \"I had not.\" is a good, honest beat in the first post's voice.",
+              "The retry-in-code rationale is the most concrete of the three: \"If the code repeats the lookup, the model gets the order without doing anything, so the result would say little about the model.\"",
+              "\"the earliest round at which this rule can give that verdict\" is more precise than \"earliest possible round\".",
+              "It says explicitly that the bound \"holds under the test's stated assumptions, which the tool does not check\"."
+            ],
+            "hard_to_follow": [
+              "The first 60 words are only about who asked what. Neither what was swapped nor the result appears until well past that point.",
+              "\"I ran the nearest variant I could defend, the message.\" This mentions \"the message\" before any message has been introduced.",
+              "Its section on what the run does not show is the densest of the three, and its last bullet will lose a casual reader.",
+              "The ending, \"If you have tried it: does a message that names no next step do as well?\", has an unclear \"it\"."
+            ],
+            "wrong_or_unsupported_numbers": []
+          }
+        ],
+        "grafts": [
+          "Into the winner's opening, add one plain result line within the first 60 words. For example, after the two code blocks: \"With the message, 15 of 16 trials passed; with null, 2 of 16. Here is what that does and does not show.\" Keep it as counts, with no percentage.",
+          "From what-block-means, reuse the role glosses \"a baseline (the current one) and a candidate (the proposed one)\". They read better than \"the reference\" and \"the arm under test\".",
+          "From what-block-means, adapt \"BLOCK then means the old set-up does worse\", but add \"by more than 10 percentage points\" so it stays a threshold statement.",
+          "From readers-asked, add Halfcycle's verified quote \"Did you try varying the error wording?\" and the short \"I had not.\" beat. It is the first post's voice of owning things.",
+          "From readers-asked, borrow \"the model gets the order without doing anything\" as a plainer version of \"the outcome is nearly fixed\".",
+          "From readers-asked, use \"the earliest round at which this rule can give that verdict\" instead of \"the earliest possible round\".",
+          "From what-block-means, say \"the records give 33 of 34\" instead of \"the store gives\".",
+          "From what-block-means, use the ending \"I have not tested a message that reports the empty lookup but names no next step. If you have tried one, did it do as well?\" It is clearer than the winner's question, and the winner's question is also fine."
+        ],
+        "missing_from_all": [
+          "None of the drafts states the result (15 of 16 against 2 of 16, BLOCK favouring the message) within the first 60 words. A busy reader may leave before reaching it.",
+          "\"arm\" is never explained in any draft. Use \"side\" or \"set-up\", or gloss it once as \"each of the two set-ups being compared\".",
+          "\"the rule\" (meaning the registered decision rule) and \"the grid\" are not explained in any draft.",
+          "\"the start script gained its start checks\" is opaque in all three drafts. A plainer phrasing, if it matches the files, would be \"I added checks to the script that starts the run\".",
+          "None of the drafts says in a few words what \"passed\" means for a task, for example the agent completing the stock-note task correctly. A newcomer has to guess.",
+          "\"smoke run\" is not explained in any draft. Something like \"a small trial run to check the set-up\" would do."
+        ],
+        "recommended_title": "I replaced one null with one sentence at my 4B agent's empty lookup"
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Draft"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Judge"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "draft:readers-asked",
+      "phaseIndex": 1,
+      "phaseTitle": "Draft",
+      "agentId": "abcf87d884fda0c0f",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794865656675,
+      "queuedAt": 1794865656259,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Two readers asked for one more test, so I ran it",
+      "promptPreview": "You are drafting a SHORT blog post (350 to 550 words in the body, not counting the title, the subtitle and the link list) for a solo open-source maintainer. The maintainer will post it under their own name on Hashnode and dev.to. It is the follow-up to their first post. You only write a draft and return it; you edit no file and run no git command.\n\nREAD THESE FILES FIRST (read-only):\n1. /Users/aja…",
+      "promptFramed": true,
+      "lastProgressAt": 1794865897189,
+      "tokens": 96509,
+      "toolCalls": 11,
+      "durationMs": 240514,
+      "resultPreview": "{\"title\":\"Two readers asked for one more test, so I ran it\",\"subtitle\":\"One message at the empty lookup against the text null, with the same 4B model in both arms. What the test decided, and what it cannot say.\",\"body_markdown\":\"After my first post, two readers asked for one more test. On dev.to, \\\"Agentic Affairs\\\" asked for a version in which the code retries the empty lookup. On Hashnode, \\\"Hal…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "draft:one-sentence",
+      "phaseIndex": 1,
+      "phaseTitle": "Draft",
+      "agentId": "a72fa98449b1da90b",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794865656675,
+      "queuedAt": 1794865656259,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I replaced one null with one sentence at my 4B agent's empt…",
+      "promptPreview": "You are drafting a SHORT blog post (350 to 550 words in the body, not counting the title, the subtitle and the link list) for a solo open-source maintainer. The maintainer will post it under their own name on Hashnode and dev.to. It is the follow-up to their first post. You only write a draft and return it; you edit no file and run no git command.\n\nREAD THESE FILES FIRST (read-only):\n1. /Users/aja…",
+      "promptFramed": true,
+      "lastProgressAt": 1794865781060,
+      "tokens": 96197,
+      "toolCalls": 11,
+      "durationMs": 123325,
+      "resultPreview": "{\"title\":\"I replaced one null with one sentence at my 4B agent's empty lookup\",\"subtitle\":\"A third pre-registered run, asked for by two readers: what the test decided on 8 tasks, and what it does not show.\",\"body_markdown\":\"In my last post, a 4B model in a small order-desk agent often stopped after an order lookup came back empty. This is what the model receives there:\\n\\n```\\nnull\\n```\\n\\n\\\"Agent…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "draft:what-block-means",
+      "phaseIndex": 1,
+      "phaseTitle": "Draft",
+      "agentId": "ae51d8679287b8822",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794865656675,
+      "queuedAt": 1794865656259,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "The verdict was BLOCK, and that was the good outcome",
+      "promptPreview": "You are drafting a SHORT blog post (350 to 550 words in the body, not counting the title, the subtitle and the link list) for a solo open-source maintainer. The maintainer will post it under their own name on Hashnode and dev.to. It is the follow-up to their first post. You only write a draft and return it; you edit no file and run no git command.\n\nREAD THESE FILES FIRST (read-only):\n1. /Users/aja…",
+      "promptFramed": true,
+      "lastProgressAt": 1794865772075,
+      "tokens": 96145,
+      "toolCalls": 11,
+      "durationMs": 114337,
+      "resultPreview": "{\"title\":\"The verdict was BLOCK, and that was the good outcome\",\"subtitle\":\"Two readers asked for a further test of my 4B agent. My test cannot say \\\"better\\\", so I swapped the roles.\",\"body_markdown\":\"My last post tested a small local model, qwen3.5 4B, on order-desk tasks with tools. Two readers asked for more. \\\"Agentic Affairs\\\" on dev.to asked for a retry of the empty lookup in code. \\\"Halfcy…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "judge:claims",
+      "phaseIndex": 2,
+      "phaseTitle": "Judge",
+      "agentId": "a146df62789586444",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794865897202,
+      "queuedAt": 1794865897191,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Two readers asked for one more test, so I ran it",
+      "promptPreview": "You are a strict statistician and fact checker. For every sentence of every draft, ask: is it supported by RESULT-run-3.md, and does it break one of the hard rules? Check every number against the files yourself. A draft with one overstated sentence scores below a duller draft with none.\n\nThree drafts of the same short blog post follow. They were written under this brief; read the brief and the fil…",
+      "promptFramed": true,
+      "lastProgressAt": 1794865960199,
+      "tokens": 82610,
+      "toolCalls": 3,
+      "durationMs": 62997,
+      "resultPreview": "{\"ranking\":[\"readers-asked\",\"what-block-means\",\"one-sentence\"],\"per_draft\":[{\"key\":\"readers-asked\",\"score_out_of_10\":8,\"rule_breaks\":[\"\\\"It says 32 of run 2's 34 failures under the empty result were on these tasks.\\\" This is imprecise rather than a broken rule. The 34 failures are the 4B's (RESULT-run-3.md erratum 2: 'the candidate passed 7 of 40 on these cells, so 33 failed'). It should say 'the …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "judge:reader",
+      "phaseIndex": 2,
+      "phaseTitle": "Judge",
+      "agentId": "ae92a66b37aac399e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794865897202,
+      "queuedAt": 1794865897191,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I replaced one null with one sentence at my 4B agent's empt…",
+      "promptPreview": "You are a busy developer who uses coding agents and local models, who did NOT read the first post and has never heard of the tool. Judge: do I understand in the first 60 words what was tested and what came out; is the swapped-roles point clear or confusing; is anything jargon; would I read to the end; is the post honest without being so hedged that it says nothing. Also check the hard rules, but y…",
+      "promptFramed": true,
+      "lastProgressAt": 1794865949784,
+      "tokens": 74424,
+      "toolCalls": 4,
+      "durationMs": 51332,
+      "resultPreview": "{\"ranking\":[\"one-sentence\",\"what-block-means\",\"readers-asked\"],\"per_draft\":[{\"key\":\"one-sentence\",\"score_out_of_10\":8,\"rule_breaks\":[\"None that are hard breaks. Borderline: \\\"a 4B model in a small order-desk agent often stopped after an order lookup came back empty\\\" is a summary of behaviour. It rests on the first post's 21 of 26 under one combination, so it is supported, but \\\"often\\\" is wider t…"
+    }
+  ],
+  "totalTokens": 445885,
+  "totalToolCalls": 40
+}

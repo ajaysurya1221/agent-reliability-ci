@@ -1,0 +1,327 @@
+{
+  "summary": "Check the merged run 3 post: numbers from the store, claims sentence by sentence, a cold reader",
+  "agentCount": 3,
+  "logs": [],
+  "result": [
+    {
+      "check": "numbers",
+      "findings": [
+        {
+          "severity": "optional",
+          "sentence": "It has three verdicts. PASS: the candidate is not worse than the baseline by more than 10 percentage points. BLOCK: it is worse by more than that. INCONCLUSIVE: the rounds ran out. No verdict says \"better\".",
+          "problem": "The pre-registration (PREREGISTRATION-run-3.md, 'Read this first' list and the line 'The run stops at the first round end that gives PASS, BLOCK or ERROR') names a fourth outcome, ERROR (the error tolerance was exceeded, a record was invalid or a gate check failed). 'Three verdicts' is accurate only for statistical verdicts. It does not affect run 3, which ended BLOCK.",
+          "replacement": "It has three statistical verdicts, plus ERROR when the run itself breaks. PASS: the candidate is not worse than the baseline by more than 10 percentage points. BLOCK: it is worse by more than that. INCONCLUSIVE: the rounds ran out. No verdict says \"better\".",
+          "evidence": "PREREGISTRATION-run-3.md lines 15-19 (ERROR bullet) and the Grid and rule section ('PASS, BLOCK or ERROR')"
+        }
+      ],
+      "checked_ok": [
+        "Run 3 trials: 32 in all, 16 per arm (run-3 trials.jsonl, recounted with my own script)",
+        "With the message: 15 of 16 passed. Baseline arm, label 'with-empty-lookup-text', candidate_id ollama:qwen3.5:4b-mlx-ctx32k+empty-lookup-text (manifest.json, trials.jsonl)",
+        "With null: 2 of 16 passed. Candidate arm, label 'run-2-setup', candidate_id ollama:qwen3.5:4b-mlx-ctx32k (manifest.json, trials.jsonl)",
+        "Message side in the baseline seat, run 2's set-up in the candidate seat (run-3 manifest baseline/candidate)",
+        "Pairs: 13 only baseline passed, 2 both passed, 1 both failed, 0 only candidate passed (trials.jsonl); matches decision.json round 2 counts minus 13, zero 3, plus 0",
+        "BLOCK after 2 rounds: decision.json stopped_at_round 2, verdict BLOCK, reason 'regression established'; trials carry rounds r000001 and r000002, 16 trials each",
+        "16 pairs of trials: decision.json round 2 pairs 16",
+        "The run stopped early: max_rounds 40, stopped at round 2 (decision.json)",
+        "8 tasks: run-3 manifest has desk-03, 06, 09, 12, 15, 18, 21, 24, all action stock_note; one condition, empty_result on lookup_order at occurrence 0 ('the first order lookup')",
+        "Same model on both sides, qwen3.5 4B: both quickstart_settings use ollama:qwen3.5:4b-mlx-ctx32k (manifest); same prompt and tools per prereg 'The one difference between the arms'",
+        "10-point margin: delta 1/10 in manifest and decision.json; prereg 'margin delta 1/10'",
+        "Message text 'lookup_order returned an empty result. Call lookup_order again with the same order_id.' matches the prereg block quote and agent.py line 41 exactly",
+        "'Retry an empty lookup once.' is in the system prompt of both arms: prereg line 53 and agent.py line 108",
+        "Run 2 total 4B failures: 52 (run-2 trials.jsonl, candidate qwen3.5-4b, 428 PASS and 52 FAIL of 480)",
+        "Run 2 4B failures under empty_result: 34",
+        "Of those, 33 of 34 on the 8 stock-note tasks (one was on desk-10); so the erratum's '32 of 34 ... The records give 33 of 34' is correct, and the prereg's sentence (lines 91-92, '32 of its 34 failures under the empty result were on these tasks') is paraphrased fairly",
+        "Erratum 1: prereg lines 141-142 say 'The registered files are the files the smoke run used. Nothing was changed after it.'; RESULT-run-3.md erratum 1 says the wrapper run-3.sh gained start guards after the smoke run and before the registration commit. The post's wording is a fair summary",
+        "Two mistakes in the registration: RESULT-run-3.md has exactly two errata",
+        "Pre-registered and pushed before the first trial: prereg line 3 'Written and pushed on 2026-11-16 before any run 3 trial'; commit c217ae6 exists ('study: pre-register run 3 before any trial')",
+        "No prediction supplied: prereg 'Prediction' section says no maintainer prediction was supplied before registration",
+        "Smoke (trial) run came before registration and is not counted: prereg 'What was looked at before writing this' (separate suite id ...-smoke-not-evidence, 'Not evidence')",
+        "The first two runs each had a written prediction: hashnode-post-1.md line 1 ('prediction written down before each run'), line 12 (run 1: 'close enough'), line 22 (run 2: 'inconclusive')",
+        "'A trial passes when the order ends with the right stock note and no refund.': check.py for stock_note requires matching order_id, refunded_cents == 0 and notes == ['stock: <stock>'] where stock is the check_stock value (tools.py lines 25, 33-37, 56)",
+        "'the other 16 tasks, the other three conditions': run 2 manifest has 24 tasks and 4 conditions (clean, tool_timeout, tool_error_once, empty_result); 24 - 8 = 16, 4 - 1 = 3",
+        "'The seeds and the release of the tool differ': run 2 and run 3 trials share 0 seeds; prereg 'Software' says ARCI 2.4.0 for run 3, 2.0.0 for run 2",
+        "'Anything about the 12B model. It was on neither side.': no 12B id in run 3 manifest",
+        "Readers' names: 'Halfcycle' on Hashnode (hashnode-reply-1.md header), 'Agentic Affairs' on dev.to (devto-reply-2.md header)",
+        "Quotation 'Did you try varying the error wording?' matches hashnode-reply-1.md exactly",
+        "'proposed writing the next step into the error text' is fair: hashnode-reply-1.md says the comment 'proposes a third run with the next step written into the error text'",
+        "'asked whether I would run a variant in which the code retries an empty lookup' is fair: devto-reply-2.md quotes 'The code-retry variant is the test that would settle ... are you planning to run it'; prereg describes it as 'a variant in which the code retries an empty lookup'",
+        "'Two readers asked for one more test' is consistent with the prereg ('Two readers of the blog post asked for one')",
+        "'I did not run the retry in code' agrees with prereg ('The code-retry variant is not run')",
+        "'third experiment on related data, chosen after seeing the first two. I claim no error guarantee across the three.' matches the prereg wording",
+        "Threshold decision resting on assumptions the tool does not check: prereg 'ARCI does not check these assumptions'",
+        "'one wording' / no control message naming no next step: prereg 'One wording is tested' and the claims section",
+        "Two verdict-related numbers in the BLOCK reading ('more than 10 percentage points') match prereg's BLOCK definition (10 points of mean pass rate over the 8 cells)"
+      ],
+      "not_checked": [
+        "The external links (GitHub anchor, Hashnode URL) were not opened; no network was used. Commit c217ae6 was checked only in the local git log",
+        "Whether run 2's empty result reached the model as the literal text null was taken from the prereg and hashnode-reply-1.md; the store's tool_finish events record the injection but not the exact content sent to the model",
+        "Whether the injection hit the first lookup_order call was taken from the manifest fault spec (at_occurrence 0), not from every trial's events"
+      ]
+    },
+    {
+      "check": "claims",
+      "findings": [
+        {
+          "severity": "should-fix",
+          "sentence": "With the message, 15 of 16 trials passed. With `null`, 2 of 16. Here is what that does and does not show.",
+          "problem": "The lede puts the two counts side by side with no limit in the same paragraph. Many readers stop at the first paragraph, and 15/16 against 2/16 reads as a measured rate gap and a general effect. Nothing nearby says the run stopped early or that the 8 tasks and the fault were picked from where run 2 failed. A forward pointer alone does not fix that.",
+          "replacement": "With the message, 15 of 16 trials passed; with `null`, 2 of 16. These are counts from a run that stopped early, on 8 tasks I picked because the model failed there before, so they are not rates. Here is what the test decided, and what it does not show.",
+          "evidence": "RESULT-run-3.md l.61-63 (counts, not estimates); l.161-162 (cells chosen from run 2's results)"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "In this run, BLOCK means that the side with `null` passes less often than the side with the message, by more than 10 percentage points.",
+          "problem": "This states the verdict as a fact about the arms. BLOCK is a decision the test makes under assumptions it does not check. The sentence also leaves out what the 10 points measure (mean pass rate over the 8 cells).",
+          "replacement": "In this run, a BLOCK means the test decided that the side with `null` passes less often than the side with the message, by more than 10 percentage points of mean pass rate over the 8 tasks.",
+          "evidence": "RESULT-run-3.md l.142-145 ('the registered test decided ... by more than 10 points of mean pass rate over the 8 cells')"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "PASS: the candidate is not worse than the baseline by more than 10 percentage points. BLOCK: it is worse by more than that. INCONCLUSIVE: the rounds ran out.",
+          "problem": "The verdicts are worded as truths about the set-ups, not as decisions of the test. 'It has three verdicts' (the sentence before) is also not complete: there is a fourth verdict, ERROR, and a BLOCK can also be forced by a hard violation.",
+          "replacement": "PASS: the test decides that the candidate is not worse than the baseline by more than 10 percentage points. BLOCK: the test decides that it is worse by more than that. INCONCLUSIVE: the rounds ran out before either decision. (A fourth verdict, ERROR, means a check failed and nothing is concluded.)",
+          "evidence": "PREREGISTRATION-run-3.md l.12-23 (four verdicts, including ERROR; statistical BLOCK versus a BLOCK forced by a hard violation)"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "It tests the whole system with the recovery handed to code, and it does not isolate what the model decides.",
+          "problem": "'It' could refer to either test. Set against run 3, the sentence implies that run 3 does isolate what the model decides, which comes close to a capability claim the registration rules out. It is also not the registered reason. The registration says that with the retry in code the model is simply handed a working lookup, so the outcome is nearly fixed and says nothing about capability; RESULT notes a scripted test with no model shows how a code retry behaves.",
+          "replacement": "With the retry in code, the model is simply handed the order after the empty lookup, so the code nearly fixes the outcome; a scripted test with no model shows how that retry behaves.",
+          "evidence": "PREREGISTRATION-run-3.md l.32-36; RESULT-run-3.md l.167-172; l.158 ('Nothing about capability or cause')"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "Start checks were added to it after the trial run and before the registration.",
+          "problem": "This is incomplete next to the erratum. A check-only mode was also added. The post also implies, without the hedge RESULT uses, that nothing else changed. RESULT says the study folder was unchanged only 'as far as file times show', because git holds no state from the time of the smoke run.",
+          "replacement": "Start checks and a check-only mode were added to it after the trial run and before the registration. As far as file times show, the study's own files did not change after the trial run; git holds no record from that time.",
+          "evidence": "RESULT-run-3.md l.86-96 (Erratum 1)"
+        },
+        {
+          "severity": "optional",
+          "sentence": "Both are stated in the write-up. Neither changes the tasks, the rule or the verdict.",
+          "problem": "RESULT says this only of erratum 2 ('It does not change the grid, the rule or the verdict'). For erratum 1 it says only that the registered digest of the wrapper is that of the version that ran. As written, the post extends the 'no change' statement to erratum 1 more firmly than the source does.",
+          "replacement": "Both are stated in the write-up. The second does not change the tasks, the rule or the verdict; for the first, the registered digest of the script is that of the version that ran.",
+          "evidence": "RESULT-run-3.md l.95-96, l.102-103"
+        },
+        {
+          "severity": "optional",
+          "sentence": "I tried that idea at the empty lookup, because 34 of the 4B's 52 failures in run 2 were under that fault.",
+          "problem": "The numbers are correct and work as a reason for choosing the fault. 'I tried that idea' frames the run as a test of Halfcycle's idea in general (putting the next step in the error text), but the run tests only one wording against `null`. A later section says this, but this sentence sets up the reading.",
+          "replacement": "I tested one message of that kind at the empty lookup, because 34 of the 4B's 52 failures in run 2 were under that fault.",
+          "evidence": "RESULT-run-2.md l.24, l.68-76 (52 failures; empty_result 86 of 120, so 34 failed); PREREGISTRATION-run-3.md l.67-69 ('One wording is tested')"
+        },
+        {
+          "severity": "optional",
+          "sentence": "On these 8 tasks under the empty result, with this 4B model, this prompt and this one wording, the registered test decided that the side with the message passes more often, by more than 10 percentage points.",
+          "problem": "This is the allowed claim and its shape is right. It drops 'of mean pass rate (over the 8 tasks)', which is the quantity the margin applies to.",
+          "replacement": "On these 8 tasks under the empty result, with this 4B model, this prompt and this one wording, the registered test decided that the side with the message passes more often, by more than 10 percentage points of mean pass rate over the 8 tasks.",
+          "evidence": "RESULT-run-3.md l.142-145"
+        },
+        {
+          "severity": "optional",
+          "sentence": "If you have tried one, did it do as well?",
+          "problem": "'As well' assumes the message has a known level of performance and invites setting someone's results against the 15 of 16. That is a rate reading of a count from an early-stopped run, and a comparison across set-ups.",
+          "replacement": "If you have tried one, what did you see?",
+          "evidence": "RESULT-run-3.md l.61-63, l.163"
+        }
+      ],
+      "checked_ok": [
+        "Title 'I changed one tool message': accurate. Only the content of one tool message (the null after the first lookup) is replaced, and the registration says the difference between the arms is 'the content of that one message' (PREREGISTRATION-run-3.md l.63-65). The message having two sentences does not make 'one tool message' wrong.",
+        "Subtitle: same 4B on both sides, null against a short message, '8 tasks', 'what it cannot say'. No overstatement found.",
+        "'BLOCK after 2 rounds, which is 16 pairs of trials.' matches 'stopping round: 2' and 'pairs: 16 (32 trials)' (RESULT-run-3.md l.32-33). No finding.",
+        "15 of 16 and 2 of 16; 13 / 2 / 1 / 0 pair split: matches RESULT-run-3.md l.34-35, l.58-59",
+        "'34 of the 4B's 52 failures in run 2 were under that fault': 52 failures (RESULT-run-2.md l.24, l.68); empty_result 86 of 120 passed, so 34 failed (l.76)",
+        "Erratum 2, '33 of 34': matches RESULT-run-3.md l.98-101 (40-7=33)",
+        "'The decision rests on the test's stated assumptions, which the tool does not check. It is a threshold decision, not a measured size. ... 15 and 2 are counts, not rates.' meets the rules (RESULT l.147-150, l.61-63, l.163)",
+        "'What it does not show' bullets: naming the next step, 12B, other tasks, conditions and suite, no comparison with run 2's counts. All match RESULT 'What it does not support' and PREREGISTRATION 'What will not be claimed'.",
+        "'I claim no error guarantee across the three' matches RESULT l.151-153. The post states no numerical error bound, so the 'under the stated assumptions' rule is not triggered.",
+        "Pre-registration pushed before the first trial: pushed 21:40:02, first trial after 21:40:24 (RESULT l.3-5). No prediction (PREREGISTRATION l.144-147). Smoke trials not counted (RESULT l.165).",
+        "Same prompt, tools and model on both sides, and 'Retry an empty lookup once.' in both: PREREGISTRATION l.52-55",
+        "Message text matches PREREGISTRATION l.61",
+        "No sales wording or uniqueness claim found ('my own open-source tool, ARCI' is neutral)."
+      ],
+      "not_checked": [
+        "The pass criterion 'right stock note and no refund' against the study's check code",
+        "Whether the reader quotes and attributions (Agentic Affairs, Halfcycle) match the original comments",
+        "Whether the links resolve, and whether the anchor on main exists",
+        "The claim that this is the first post's follow-up and its link"
+      ]
+    },
+    {
+      "check": "cold-reader",
+      "findings": [
+        {
+          "severity": "should-fix",
+          "sentence": "In my last post a 4B local model ran a small order-desk agent. Two readers asked for one more test, and I ran one. When an order lookup comes back empty, one side gets what it got before, the text `null`. The other side gets a short message.",
+          "problem": "On first read, 'side' and 'what it got before' were unclear. I could not tell that 'side' means one of two set-ups run against each other, or that 'before' means run 2. The 12B model, which comes back later under 'What it does not show', is never introduced, so that bullet reads as unexplained.",
+          "replacement": "In my last post a 4B local model ran a small order-desk agent. Two readers asked for one more test, and I ran one. It runs the same 4B model in two set-ups, which I call sides. When an order lookup comes back empty, one side gets the text `null`, as in my last run. The other side gets a short message.",
+          "evidence": "post-run-3.md line 15; RESULT-run-3.md lines 18, 157"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "I tried that idea at the empty lookup, because 34 of the 4B's 52 failures in run 2 were under that fault.",
+          "problem": "'run 2' and 'fault' appear here before either is explained. A newcomer does not know that the harness injects faults or which runs are numbered.",
+          "replacement": "I tried that idea at the empty lookup. In run 2, the test in my last post, 34 of the 4B's 52 failures came when a lookup returned empty.",
+          "evidence": "post-run-3.md line 21"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "The 8 stock-note tasks, with an empty result injected into the first order lookup. I chose these tasks and this fault from run 2's failures.",
+          "problem": "'stock-note tasks' and 'injected' are not explained. A reader cannot tell that the harness, not the real tool, makes the first lookup return empty on purpose.",
+          "replacement": "8 tasks that should end with a stock note on the order. In each trial the harness makes the first order lookup return an empty result on purpose. I chose these tasks and this fault from run 2's failures.",
+          "evidence": "post-run-3.md line 26; RESULT-run-3.md line 142"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "INCONCLUSIVE: the rounds ran out.",
+          "problem": "'rounds' is used here before it is defined, and 'pairs' (line 53) is never defined. On first read I had to work out from '2 rounds, which is 16 pairs' and '8 tasks' that a round runs each task once on each side and that a pair is the two trials of one task in one round.",
+          "replacement": "INCONCLUSIVE: the last round ended with no decision. (A round runs every task once on each side. The two trials of one task in one round are a pair.)",
+          "evidence": "post-run-3.md lines 47, 53; RESULT-run-3.md lines 32-33"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "On these 8 tasks under the empty result, with this 4B model, this prompt and this one wording, the registered test decided that the side with the message passes more often, by more than 10 percentage points.",
+          "problem": "37 words, over the 30-word limit.",
+          "replacement": "The registered test decided that the side with the message passes more often, by more than 10 percentage points. That holds for these 8 tasks under the empty result, this 4B model, this prompt and this one wording.",
+          "evidence": "word count 37"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "The run stopped early, so 15 and 2 are counts, not rates.",
+          "problem": "On first read I was unsure why stopping early makes them 'not rates'. The sentence is too compressed for a newcomer.",
+          "replacement": "The run stopped after 2 rounds, as soon as it reached a verdict, so 15 of 16 and 2 of 16 are raw counts, not estimates of the two pass rates.",
+          "evidence": "post-run-3.md line 59; RESULT-run-3.md lines 61-63"
+        },
+        {
+          "severity": "optional",
+          "sentence": "The decision rests on the test's stated assumptions, which the tool does not check.",
+          "problem": "A newcomer does not know what these assumptions are or where they are stated, so the sentence tells them little. Either cut it or point to where the assumptions are listed. The pointer below adds no new fact.",
+          "replacement": "The decision rests on assumptions, listed in the write-up, that the tool does not check.",
+          "evidence": "post-run-3.md line 59; RESULT-run-3.md line 147"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "Anything about the other 16 tasks, the other three conditions or the full suite.",
+          "problem": "'conditions' and 'the full suite' are not explained anywhere in this post. A newcomer will not know that conditions are the other injected faults.",
+          "replacement": "Anything about the other 16 tasks, the other three injected faults or the full set of tests.",
+          "evidence": "post-run-3.md line 65; RESULT-run-3.md line 161"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "Anything from setting these counts against run 2's. The seeds and the release of the tool differ.",
+          "problem": "'release of the tool' comes before the tool is named (ARCI is named only at line 79), and 'seeds' is jargon to a newcomer.",
+          "replacement": "Anything from comparing these counts with run 2's. Run 2 used different random seeds and a different version of the test tool.",
+          "evidence": "post-run-3.md line 66; RESULT-run-3.md line 164"
+        },
+        {
+          "severity": "optional",
+          "sentence": "It says nothing was changed after the trial run. That is not true of the script that starts the run. Start checks were added to it after the trial run and before the registration.",
+          "problem": "'Start checks' is unexplained jargon.",
+          "replacement": "It says nothing was changed after the trial run. That is not true of the script that starts the run. Checks that run before the first trial were added to it after the trial run and before the registration.",
+          "evidence": "post-run-3.md line 72; RESULT-run-3.md lines 89-92"
+        },
+        {
+          "severity": "should-fix",
+          "sentence": "With the message, 15 of 16 trials passed. With `null`, 2 of 16.",
+          "problem": "Length: the body (from '---' up to '## Check it yourself', with headings and code blocks) is 731 words, well over the ~600 target. Cut candidates that lose nothing: this pair of sentences in the opening, because the same counts appear again under 'The result'; 'I had not.' (line 19); 'Both are stated in the write-up.' (line 75), since the first link already says 'with both errata'. Restating the result in the opening is a fair choice, so cutting the later bullets instead is also fine.",
+          "replacement": "Here is what came out, and what it does and does not show.",
+          "evidence": "wc -w body without link list = 731"
+        }
+      ],
+      "checked_ok": [
+        "FIRST READ: Tested: the same qwen3.5 4B model, prompt and tools on 8 order-desk tasks, with the harness forcing the first order lookup to return empty. One side got the bare text null (run 2's set-up). The other got a message telling it to call lookup_order again with the same order_id. 16 trials per side.",
+        "FIRST READ: Came out: with the message 15 of 16 passed, with null 2 of 16. In 13 pairs only the message side passed, in 2 both passed, in 1 both failed, and never did only the null side pass. Stopped after 2 rounds.",
+        "FIRST READ: Why BLOCK: the tool can only say 'not worse' (PASS) or 'worse by more than 10 points' (BLOCK), never 'better'. So the message side was put in the baseline seat and null in the candidate seat. BLOCK therefore means null is worse than the message by more than 10 percentage points, which is the same as saying the message helps by more than 10 points.",
+        "FIRST READ: Does not show: that naming the next step is what helped, anything about the 12B model (I did not know what the 12B was), other tasks or faults, or any comparison with run 2's counts. Also no error guarantee across the three experiments. Unsure on first read: what a round and a pair are, what 'conditions' and 'the full suite' mean, and why stopping early makes the counts 'not rates'.",
+        "Comparison with RESULT-run-3.md: my reading of the roles, the verdict meaning and the limits matched. The places where I was unsure are reported as findings.",
+        "15/16 vs 2/16, BLOCK at round 2, 16 pairs, split 13/2/1/0: match RESULT-run-3.md lines 32-35, 55-59 (minus=13, zero=3 = 2 both passed + 1 both failed).",
+        "Baseline = message side, candidate = null side: matches RESULT-run-3.md line 18.",
+        "'threshold decision, not a measured size': matches RESULT-run-3.md line 25.",
+        "Errata (the wrapper changed after the smoke run; 33 of 34, not 32 of 34): match RESULT-run-3.md lines 86-104, including 'does not change the grid, the rule or the verdict'.",
+        "Limits (12B on neither side, naming the next step not isolated, other 16 tasks and three conditions, no comparison with run 2 because seeds and release differ, no guarantee across three campaigns): match RESULT-run-3.md lines 151-164.",
+        "Code-retry variant not run: matches RESULT-run-3.md line 169.",
+        "Smoke-run trials not counted: matches RESULT-run-3.md line 165.",
+        "No em dashes and no exclamation marks in the post (grep). No hype words found.",
+        "Only one sentence in the body is over 30 words (the 37-word sentence reported)."
+      ],
+      "not_checked": [
+        "'34 of the 4B's 52 failures in run 2' and 'the other 16 tasks': not in RESULT-run-3.md. I did not open the run 2 store.",
+        "'Retry an empty lookup once.' in the system prompt, and the exact message text: not checked against the registration or agent files.",
+        "The reader names and quotes (Agentic Affairs, Halfcycle) and the link targets: not checked.",
+        "'Unlike the first two runs, I wrote no prediction first': not checked."
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "check:numbers",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a82e665772ac3c35e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794866061361,
+      "queuedAt": 1794866060978,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "The file /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/post-run-3.md holds a draft blog post (everything below the line \"---\"; the title and subtitle are just above it). A solo maintainer will post it under their own name. You are a checker. You edit no file and run no git command that changes state. Do not open anything under ~/.claude or ~/.codex. Report through the structured o…",
+      "promptFramed": true,
+      "lastProgressAt": 1794866135451,
+      "tokens": 91535,
+      "toolCalls": 9,
+      "durationMs": 74090,
+      "resultPreview": "{\"findings\":[{\"severity\":\"optional\",\"sentence\":\"It has three verdicts. PASS: the candidate is not worse than the baseline by more than 10 percentage points. BLOCK: it is worse by more than that. INCONCLUSIVE: the rounds ran out. No verdict says \\\"better\\\".\",\"problem\":\"The pre-registration (PREREGISTRATION-run-3.md, 'Read this first' list and the line 'The run stops at the first round end that give…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "check:claims",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a964de8a0ca2eb820",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794866061361,
+      "queuedAt": 1794866060978,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "The file /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/post-run-3.md holds a draft blog post (everything below the line \"---\"; the title and subtitle are just above it). A solo maintainer will post it under their own name. You are a checker. You edit no file and run no git command that changes state. Do not open anything under ~/.claude or ~/.codex. Report through the structured o…",
+      "promptFramed": true,
+      "lastProgressAt": 1794866135286,
+      "tokens": 82206,
+      "toolCalls": 5,
+      "durationMs": 73037,
+      "resultPreview": "{\"findings\":[{\"severity\":\"should-fix\",\"sentence\":\"With the message, 15 of 16 trials passed. With `null`, 2 of 16. Here is what that does and does not show.\",\"problem\":\"The lede puts the two counts side by side with no limit in the same paragraph. Many readers stop at the first paragraph, and 15/16 against 2/16 reads as a measured rate gap and a general effect. Nothing nearby says the run stopped e…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "check:cold-reader",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a1962db553c81d94f",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794866061361,
+      "queuedAt": 1794866060979,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "The file /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/post-run-3.md holds a draft blog post (everything below the line \"---\"; the title and subtitle are just above it). A solo maintainer will post it under their own name. You are a checker. You edit no file and run no git command that changes state. Do not open anything under ~/.claude or ~/.codex. Report through the structured o…",
+      "promptFramed": true,
+      "lastProgressAt": 1794866129564,
+      "tokens": 73341,
+      "toolCalls": 4,
+      "durationMs": 67313,
+      "resultPreview": "{\"findings\":[{\"severity\":\"should-fix\",\"sentence\":\"In my last post a 4B local model ran a small order-desk agent. Two readers asked for one more test, and I ran one. When an order lookup comes back empty, one side gets what it got before, the text `null`. The other side gets a short message.\",\"problem\":\"On first read, 'side' and 'what it got before' were unclear. I could not tell that 'side' means …"
+    }
+  ],
+  "totalTokens": 247082,
+  "totalToolCalls": 18
+}
