@@ -240,14 +240,17 @@ def test_no_private_string_in_any_returned_field(
 ) -> None:
     fixture = generate(tmp_path)
 
-    def inspect(value: object) -> None:
+    def inspect(value: object, field: str = "") -> None:
         if isinstance(value, dict):
-            for child in value.values():
-                inspect(child)
+            for key, child in value.items():
+                inspect(child, key)
         elif isinstance(value, (list, tuple)):
             for child in value:
-                inspect(child)
+                inspect(child, field)
         elif isinstance(value, str):
+            if field == "versions":
+                assert value == "2.1.325"
+                return
             assert value in {
                 "claude-code",
                 "codex",

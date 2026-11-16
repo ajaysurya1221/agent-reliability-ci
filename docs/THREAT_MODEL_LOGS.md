@@ -1,7 +1,8 @@
 # realornoise threat model
 
 `realornoise` and `arci logs` read local files. They do not run a model or a trial.
-This page covers the installed command. Installing it with uv or pip can use the network.
+This page covers the installed tool: it opens no connection and sends nothing.
+Installing it downloads the package. uvx also downloads Python 3.14 if it is missing.
 
 ## Reads and writes
 
@@ -17,6 +18,15 @@ directory and implies `--keep`. Writes are limited to files named by `--json`, `
 and `--html`, and with `--keep` the table directory, its missing parents and `days-1.json`.
 Temporary files beside the targets support rollback. New table directories use 0700;
 the table uses 0600. Existing directories keep their permissions.
+
+A table of 0 bytes is absent and a `--keep` run replaces it. An empty `--keep-dir`
+is refused with the general usage line and exit 3, before reading or writing anything.
+Placeholders used to check target names are removed before staging. With `--keep`, the
+writer locks the table directory, reads the table again, merges and writes it under that
+lock, so overlapping runs keep each other's rows. Where directory locking is unavailable,
+the run proceeds without it. The result still uses the table read at the start.
+After a successful write, leftover regular files whose names begin with `.realornoise-`
+are removed from the table directory while the lock is held; other names are left alone.
 
 The command opens no socket and starts no process. These checks hold that boundary:
 `tests/unit/logs/privacy/test_audit_hook.py::test_full_run_has_no_network_process_or_unrequested_write`
@@ -52,7 +62,8 @@ on PyPI too. See [Releasing](RELEASING.md#4-verify). Hashes check bytes, not beh
 The Claude Code plugin and Codex skill run one pinned command:
 `uvx --python 3.14 realornoise==2.4.0`. They do not pass `--keep`. The printed numbers and
 bounded names enter the assistant's conversation and go wherever that conversation goes.
-The command itself sends nothing.
+realornoise itself opens no connection and sends nothing. uvx downloads the package,
+and Python 3.14 if it is missing, to run it.
 
 ## Limits and reports
 

@@ -1,7 +1,8 @@
 # realornoise
 
 Reads the Claude Code and Codex session logs already on your disk and reports REAL DROP,
-NO DROP or CANNOT TELL for recorded measures. Sends nothing. Writes nothing unless asked.
+NO DROP or CANNOT TELL for recorded measures.
+The tool sends nothing; installing it downloads the package. Writes nothing unless asked.
 The output holds counts, rates, dates and the bounded model, effort and client-version names.
 Runs on Python 3.11 or newer. Compressed Codex logs are read only on Python 3.14;
 the output reports how many files were not read. To read compressed logs, run

@@ -1054,3 +1054,159 @@ def test_a_table_path_below_a_regular_file_is_absent(tmp_path: Path) -> None:
 
     (tmp_path / "blocked").write_text("not a directory", encoding="utf-8")
     assert kept.read(tmp_path / "blocked" / "in" / "days-1.json") == ("absent", ())
+
+
+@pytest.mark.parametrize("keep", (False, True))
+def test_empty_table_is_absent_and_can_be_replaced(tmp_path: Path, keep: bool) -> None:
+    history(tmp_path)
+    path = store(tmp_path, ())
+    path.write_bytes(b"")
+    record, output = invoke(tmp_path, *(["--keep"] if keep else []))
+    assert record.kept_table == "absent"
+    assert "The kept day table could not be read" not in output
+    assert kept.read(path)[0] == ("read" if keep else "absent")
+
+
+@pytest.mark.parametrize("args", (["--keep-dir", ""], ["--keep-dir="]))
+def test_empty_keep_dir_reads_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, args: list[str]
+) -> None:
+    def unexpected(*args: object, **kwargs: object) -> None:
+        pytest.fail("usage error reached input or output")
+
+    monkeypatch.setattr(kept, "read", unexpected)
+    monkeypatch.setattr(cli.discover, "claude_files", unexpected)
+    monkeypatch.setattr(cli.discover, "codex_files", unexpected)
+    monkeypatch.setattr(cli, "_write_outputs", unexpected)
+    output, error = io.StringIO(), io.StringIO()
+    assert cli.run(args, env={}, home=tmp_path, out=output, err=error) == 3
+    assert not output.getvalue() and error.getvalue() == report.USAGE_ERROR + "\n"
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("phase", ("stage", "move"))
+def test_failed_write_removes_new_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    targets = [tmp_path / "out.json", tmp_path / "out.md"]
+    table = tmp_path / "kept" / kept.FILENAME
+    history(tmp_path)
+
+    def fail(*args: object, **kwargs: object) -> None:
+        assert all(not p.exists() for p in [*targets, table])
+        raise OSError("injected")
+
+    monkeypatch.setattr(
+        Path if phase == "stage" else os, "write_text" if phase == "stage" else "replace", fail
+    )
+    output, error = io.StringIO(), io.StringIO()
+    assert (
+        cli.run(
+            [
+                "--tool",
+                "claude-code",
+                "--claude-dir",
+                str(tmp_path / "logs"),
+                "--json",
+                str(targets[0]),
+                "--markdown",
+                str(targets[1]),
+                "--keep-dir",
+                str(table.parent),
+            ],
+            now=NOW,
+            env={},
+            home=tmp_path,
+            out=output,
+            err=error,
+        )
+        == 3
+    )
+    assert not output.getvalue() and error.getvalue() == report.WRITE_ERROR + "\n"
+    assert all(not p.exists() for p in [*targets, table.parent])
+    assert not list(tmp_path.glob(".realornoise-*"))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="SIGKILL simulation needs POSIX")
+@pytest.mark.parametrize("phase", ("stage", "move"))
+def test_killed_writer_leaves_no_empty_targets(tmp_path: Path, phase: str) -> None:
+    import signal
+    import subprocess
+    import sys
+
+    script = """
+import os, signal, sys
+from pathlib import Path
+from arci.logs.cli import _write_outputs
+root = Path(sys.argv[1])
+targets = [root / 'out.json', root / 'out.md', root / 'kept' / 'days-1.json']
+def killed(*args, **kwargs):
+    os.kill(os.getpid(), signal.SIGKILL)
+if sys.argv[2] == 'stage':
+    Path.write_text = killed
+else:
+    os.replace = killed
+_write_outputs([(p, 'complete') for p in targets], table_path=targets[-1])
+"""
+    result = subprocess.run([sys.executable, "-c", script, str(tmp_path), phase], check=False)
+    assert result.returncode == -signal.SIGKILL
+    assert all(
+        not (tmp_path / name).exists() for name in ("out.json", "out.md", "kept/days-1.json")
+    )
+
+
+def test_overlapping_writer_rows_survive_and_result_uses_initial_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(tmp_path)
+    other_root = tmp_path / "other-run"
+    history(other_root, model="gpt-6")
+    path = tmp_path / ".realornoise" / kept.FILENAME
+    original_read = kept.read
+    paused = False
+
+    def read_with_pause(target: Path) -> tuple[kept.KeptState, tuple[kept.KeptRow, ...]]:
+        nonlocal paused
+        initial = original_read(target)
+        if not paused:
+            paused = True
+            # A complete second CLI run writes after the first read, before the first write.
+            invoke(other_root, "--keep-dir", str(path.parent))
+        return initial
+
+    monkeypatch.setattr(kept, "read", read_with_pause)
+    record, _ = invoke(tmp_path, "--keep")
+    assert record.kept_table == "absent"
+    state, rows = kept.read(path)
+    assert state == "read"
+    assert {r.model for r in rows} == {"gpt-5-sol", "gpt-6"}
+
+
+def test_success_cleans_only_regular_temporary_files(tmp_path: Path) -> None:
+    history(tmp_path)
+    path = store(tmp_path, ())
+    leftover = path.parent / ".realornoise-x"
+    leftover.write_text("old temporary")
+    other = path.parent / "other"
+    other.write_text("keep")
+    directory = path.parent / ".realornoise-directory"
+    directory.mkdir()
+    link = path.parent / ".realornoise-link"
+    link.symlink_to(other)
+    invoke(tmp_path, "--keep")
+    assert not leftover.exists()
+    assert other.read_text() == "keep" and link.is_symlink() and directory.is_dir()
+
+
+def test_unavailable_directory_lock_still_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path)
+
+    def unavailable(*args: object) -> None:
+        raise OSError("directory locks unavailable")
+
+    monkeypatch.setattr(fcntl, "flock", unavailable)
+    invoke(tmp_path, "--keep")
+    assert kept.read(tmp_path / ".realornoise" / kept.FILENAME)[0] == "read"

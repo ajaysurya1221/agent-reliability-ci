@@ -29,8 +29,9 @@ publisher is a maintainer action, not something this repository's tests establis
    its sole dependency `agent-reliability-ci==X.Y.Z`, and
    `packages/realornoise/src/realornoise/__init__.py`'s `__version__` to match.
    Also set `plugins/realornoise/.claude-plugin/plugin.json` (`version`) and
-   `CITATION.cff` (`version`) to `X.Y.Z`. These are the package metadata and dependency-pin
-   locations. Set the `uvx --python 3.14 realornoise==X.Y.Z` pins in
+   `CITATION.cff` (`version`) to `X.Y.Z`, with its top-level `date-released` set to the release date.
+   Update `README.md` current-release sentences, install version and Action pin.
+   These are the package metadata and dependency-pin locations. Set the `uvx --python 3.14 realornoise==X.Y.Z` pins in
    `plugins/realornoise/skills/realornoise/SKILL.md` (including `allowed-tools`) and
    `integrations/codex/skills/realornoise/SKILL.md`; keep their documented command in
    `integrations/codex/README.md`, `docs/recipes/logs.md` and `docs/THREAT_MODEL_LOGS.md`

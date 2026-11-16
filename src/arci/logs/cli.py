@@ -11,8 +11,8 @@ import stat
 import sys
 import tempfile
 import unicodedata
-from collections.abc import Mapping, Sequence
-from contextlib import suppress
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager, suppress
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import NoReturn, TextIO, cast
@@ -128,7 +128,11 @@ def _execute(
                     value = argv[i + 1]
                 if separator or value:
                     setattr(args, name[2:].replace("-", "_"), value)
-    malformed = malformed or args.tool not in {"auto", "claude-code", "codex", "both"}
+    malformed = (
+        malformed
+        or args.tool not in {"auto", "claude-code", "codex", "both"}
+        or args.keep_dir == ""
+    )
     if args.help and not malformed:
         out.write(parser.format_help())
         return 0
@@ -308,8 +312,8 @@ def _execute(
             table_path.resolve() if keep and newest and table_state != "unreadable" else None
         )
         if table_output is not None:
-            outputs.append((table_output, kept.serialize(kept.merge(stored, updates, newest))))
-        _write_outputs(outputs, table_path=table_output)
+            outputs.append((table_output, ""))
+        _write_outputs(outputs, table_path=table_output, table_updates=updates, newest=newest)
     except _UsageError:
         raise
     except BaseException:
@@ -318,7 +322,36 @@ def _execute(
     return decision.exit_code
 
 
-def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | None = None) -> None:
+@contextmanager
+def _directory_lock(directory: Path) -> Generator[None]:
+    """Lock the directory itself; unsupported platforms continue without a lock."""
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    descriptor: int | None = None
+    try:
+        try:
+            descriptor = os.open(directory, os.O_RDONLY)
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        except OSError:
+            if descriptor is not None:
+                os.close(descriptor)
+                descriptor = None
+        yield
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _write_outputs(
+    outputs: Sequence[tuple[Path, str]],
+    *,
+    table_path: Path | None = None,
+    table_updates: Sequence[kept.KeptRow] | None = None,
+    newest: Mapping[Tool, date] | None = None,
+) -> None:
     """Stage all output and backups before replacement; roll back on a failed move."""
     staged: dict[Path, Path] = {}
     backups: dict[Path, Path] = {}
@@ -328,6 +361,9 @@ def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | No
     keep: set[Path] = set()
     created: list[Path] = []
     succeeded = False
+    locks = ExitStack()
+    modes: dict[Path, int] = {}
+    original: set[Path] = set()
 
     def temporary_for(target: Path) -> Path:
         fd, name = tempfile.mkstemp(prefix=".realornoise-", dir=target.parent)
@@ -344,9 +380,25 @@ def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | No
                 missing.append(parent)
                 parent = parent.parent
             for directory in reversed(missing):
-                directory.mkdir(mode=0o700)
-                created.append(directory)
-                directory.chmod(0o700)
+                try:
+                    directory.mkdir(mode=0o700)
+                except FileExistsError:
+                    if not directory.is_dir():
+                        raise
+                else:
+                    created.append(directory)
+                    directory.chmod(0o700)
+            locks.enter_context(_directory_lock(table_path.parent))
+            if table_updates is not None:
+                state, latest = kept.read(table_path)
+                outputs = [(path, content) for path, content in outputs if path != table_path]
+                if state != "unreadable":
+                    outputs.append(
+                        (
+                            table_path,
+                            kept.serialize(kept.merge(latest, table_updates, dict(newest or {}))),
+                        )
+                    )
         checked: list[Path] = []
         for target, _ in outputs:
             if not target.exists():
@@ -357,11 +409,17 @@ def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | No
                 )
                 placeholders.add(target)
                 os.close(fd)
+            else:
+                original.add(target)
+            modes[target] = stat.S_IMODE(target.stat().st_mode)
             if any(target.samefile(other) for other in checked):
                 raise _UsageError(report.DUPLICATE_OUTPUT)
             checked.append(target)
+        for path in tuple(placeholders):
+            path.unlink()
+            placeholders.remove(path)
         for target, content in outputs:
-            if not target.is_file():
+            if target in original and not target.is_file():
                 raise OSError
             staged[target] = temporary_for(target)
             staged[target].write_text(content, encoding="utf-8")
@@ -369,9 +427,9 @@ def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | No
                 raise OSError
             os.chmod(
                 staged[target],
-                0o600 if target == table_path else stat.S_IMODE(target.stat().st_mode),
+                0o600 if target == table_path else modes[target],
             )
-            if target not in placeholders:
+            if target in original:
                 backups[target] = temporary_for(target)
                 shutil.copy2(target, backups[target])
         for target, _ in outputs:
@@ -393,6 +451,14 @@ def _write_outputs(outputs: Sequence[tuple[Path, str]], *, table_path: Path | No
         for path in (set(temporary) - keep) | (placeholders - set(installed)):
             with suppress(OSError):
                 path.unlink(missing_ok=True)
+        if succeeded and table_path is not None and table_path in installed:
+            with suppress(OSError):
+                for path in table_path.parent.iterdir():
+                    if path.name.startswith(".realornoise-"):
+                        with suppress(OSError):
+                            if stat.S_ISREG(path.lstat().st_mode):
+                                path.unlink()
+        locks.close()
         if not succeeded:
             for directory in reversed(created):
                 try:

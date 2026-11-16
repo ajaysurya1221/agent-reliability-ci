@@ -20,6 +20,7 @@ from contextlib import redirect_stdout
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from fractions import Fraction as F
+from functools import cache
 from itertools import combinations
 from pathlib import Path
 from statistics import NormalDist
@@ -33,6 +34,25 @@ DESIGNS = ((5, 10), (7, 21), (14, 16), (14, 42), (28, 84))
 START = datetime(2026, 1, 1, 12, tzinfo=UTC)
 SEED = 18112026
 LIMIT = F(283, 10000)
+
+
+class CheckFailure(RuntimeError):
+    """An explicit self-check failure, including under Python optimisation."""
+
+
+@cache
+def quick_limit(n: int) -> int:
+    """Smallest c with P(Binomial(n, 1/40) > c) <= 1/1000, exactly."""
+    if n < 0:
+        raise ValueError("negative history count")
+    mass = F(39, 40) ** n
+    cumulative = mass
+    for c in range(n + 1):
+        if 1 - cumulative <= F(1, 1000):
+            return c
+        mass *= F(n - c, (c + 1) * 39)
+        cumulative += mass
+    raise CheckFailure("binomial limit not found")
 
 
 def rate(k: int, n: int) -> str:
@@ -64,9 +84,11 @@ def exact(maximum: int) -> None:
             labels = list(combinations(range(size), m))
             us = [sum(j - i for i, j in enumerate(label)) for label in labels]
             for u in range(-1, m * (size - m) + 2):
-                assert rank_test.g_tail(size - m, m, u) == F(
-                    sum(score >= u for score in us), len(labels)
-                ), ("g_tail", size, m, u)
+                if not (
+                    rank_test.g_tail(size - m, m, u)
+                    == F(sum(score >= u for score in us), len(labels))
+                ):
+                    raise CheckFailure(("g_tail", size, m, u))
             for pattern in (list(range(size)), [i % 3 for i in range(size)], [0] * size):
                 ranks = [
                     2 + 2 * sum(x < v for x in pattern) + pattern.count(v) - 1 for v in pattern
@@ -78,12 +100,15 @@ def exact(maximum: int) -> None:
                     before = [v for i, v in enumerate(pattern) if i not in label]
                     after = [pattern[i] for i in label]
                     actual = rank_test.p_real(before, after)
-                    assert actual == expected[score], ("p_real", size, m, pattern, label)
+                    if not (actual == expected[score]):
+                        raise CheckFailure(("p_real", size, m, pattern, label))
                     real_reject += actual <= F(1, 120)
                     none_reject += rank_test.p_none(before, after) <= F(1, 40)
                     checked += 1
-                assert F(real_reject, len(labels)) <= F(1, 120)
-                assert F(none_reject, len(labels)) <= F(1, 40)
+                if not (F(real_reject, len(labels)) <= F(1, 120)):
+                    raise CheckFailure("F(real_reject, len(labels)) <= F(1, 120)")
+                if not (F(none_reject, len(labels)) <= F(1, 40)):
+                    raise CheckFailure("F(none_reject, len(labels)) <= F(1, 40)")
             marks = [[i in label for i in range(size)] for label in labels]
             runs = [sum(i == 0 or v != row[i - 1] for i, v in enumerate(row)) for row in marks]
             expected_runs = tails(runs)
@@ -93,9 +118,11 @@ def exact(maximum: int) -> None:
                 # Median-zero padding exposes every (a,b), including unbalanced marks.
                 values[size // 2 : size // 2] = [0] * (abs(2 * m - size) + 1)
                 actual = rank_test.p_streak(values)
-                assert actual == expected_runs[runs_count], ("p_streak", size, m, row)
+                if not (actual == expected_runs[runs_count]):
+                    raise CheckFailure(("p_streak", size, m, row))
                 rejected += actual <= F(1, 10)
-            assert F(rejected, len(labels)) <= F(1, 10)
+            if not (F(rejected, len(labels)) <= F(1, 10)):
+                raise CheckFailure("F(rejected, len(labels)) <= F(1, 10)")
     print(
         f"Exact enumeration: PASS; n+m <= {maximum}; {checked} rank labelings; "
         "distinct, three-level and equal ties; every runs (a,b) and every U threshold."
@@ -164,7 +191,8 @@ def history_days(
         value = base_values[i]
         if i >= n:
             moved = value * (1 - drop)
-            assert moved.denominator == 1
+            if not (moved.denominator == 1):
+                raise CheckFailure("moved.denominator == 1")
             value = int(moved)
         if shared:
             # Same oriented ranks, including no rounding ties: 10/(20+rank).
@@ -283,8 +311,12 @@ def simulate_streaks(
         for tally, result in zip(counts, results, strict=True):
             tally[0] += result == "REAL_DROP"
             tally[1] += result == "NO_DROP"
-        assert results[2] != "REAL_DROP" or results[:2] == ("REAL_DROP", "REAL_DROP")
-        assert results[2] != "NO_DROP" or results[:2] == ("NO_DROP", "NO_DROP")
+        if not (results[2] != "REAL_DROP" or results[:2] == ("REAL_DROP", "REAL_DROP")):
+            raise CheckFailure(
+                "results[2] != 'REAL_DROP' or results[:2] == ('REAL_DROP', 'REAL_DROP')"
+            )
+        if not (results[2] != "NO_DROP" or results[:2] == ("NO_DROP", "NO_DROP")):
+            raise CheckFailure("results[2] != 'NO_DROP' or results[:2] == ('NO_DROP', 'NO_DROP')")
     return tuple((real, none) for real, none in counts)
 
 
@@ -318,40 +350,6 @@ def without_streak(table: measures.ToolTable, decision: ToolDecision | None = No
     )
 
 
-def simulate(
-    m: int,
-    n: int,
-    sigma: float,
-    drop: F,
-    seed: int,
-    requested: int,
-    budget: float,
-    shared: bool = False,
-    rho: float = 0.0,
-    *,
-    gated: bool = False,
-) -> tuple[int, int, int, int, int]:
-    def trial(rng: random.Random) -> tuple[ToolDecision, str]:
-        table = streak_table(rng, m, n, sigma, drop, rho, shared)
-        assert table.model == "model-1" and table.other_settings == 1
-        assert all(len(row.before_days) == n and len(row.after_days) == m for row in table.measures)
-        decision = decide.decide_tool(table, ReaderCounters(files_read=1))
-        unguarded = without_streak(table) if rho else decision.result
-        return decision, unguarded
-
-    # The legacy budget argument is retained for callers; it cannot reduce a cell.
-    count = requested
-    rng = random.Random(seed)
-    real = none = raw_real = raw_none = 0
-    for _ in range(count):
-        decision, raw = trial(rng)
-        real += decision.result == "REAL_DROP"
-        none += decision.result == "NO_DROP"
-        raw_real += raw == "REAL_DROP"
-        raw_none += raw == "NO_DROP"
-    return real, none, raw_real, raw_none, count
-
-
 def usable_days() -> None:
     """Test the selected setting's exact 20-known/10-positive/10-edit boundaries."""
     for known, positive, edits_count in ((20, 10, 10), (19, 10, 10), (20, 9, 10), (20, 10, 9)):
@@ -371,23 +369,30 @@ def usable_days() -> None:
             5 if known >= 20 else 4,
             5 if edits_count >= 10 else 4,
         )
-        assert tuple(len(row.after_days) for row in decision.measures) == expected
-        assert (decision.result == "NO_DROP") == (expected == (5, 5, 5))
+        if not (tuple(len(row.after_days) for row in decision.measures) == expected):
+            raise CheckFailure(
+                "tuple((len(row.after_days) for row in decision.measures)) == expected"
+            )
+        if not ((decision.result == "NO_DROP") == (expected == (5, 5, 5))):
+            raise CheckFailure("(decision.result == 'NO_DROP') == (expected == (5, 5, 5))")
 
 
 def selection_demo() -> None:
     subsets = list(combinations(range(15), 5))
     pooled = [sum(21 if day in subset else 20 for day in range(15)) for subset in subsets]
-    assert set(pooled) == {305}
+    if not (set(pooled) == {305}):
+        raise CheckFailure("set(pooled) == {305}")
     # For every labeling, its matching subset is the unique maximum after-count model.
     masks = [sum(1 << day for day in subset) for subset in subsets]
     for expected, mask in enumerate(masks):
         winner = max(range(len(masks)), key=lambda j: (masks[j] & mask).bit_count())
-        assert winner == expected
+        if not (winner == expected):
+            raise CheckFailure("winner == expected")
         values = [100 if day in subsets[winner] else 200 for day in range(15)]
         after = [values[day] for day in subsets[expected]]
         before = [value for day, value in enumerate(values) if day not in subsets[expected]]
-        assert rank_test.p_real(before, after) == F(1, 3003)
+        if not (rank_test.p_real(before, after) == F(1, 3003)):
+            raise CheckFailure("rank_test.p_real(before, after) == F(1, 3003)")
     responses: list[Response] = []
     for model, subset in enumerate(subsets):
         for day in range(15):
@@ -400,7 +405,8 @@ def selection_demo() -> None:
     for n in (10, 9, 8):
         scores = [sum(21 if day in subset else 20 for day in range(n, 15)) for subset in subsets]
         winner = min(range(len(scores)), key=lambda j: (-scores[j], j))
-        assert table_of(result, n).model == f"model-{winner + 1}"
+        if not (table_of(result, n).model == f"model-{winner + 1}"):
+            raise CheckFailure("table_of(result, n).model == f'model-{winner + 1}'")
     print(
         "Demonstration outside A1 (arci-logs/2): 15 days / 3,003 models; "
         "day values are tied to response counts. After-count selection rejects in "
@@ -426,12 +432,14 @@ def usability_demo() -> None:
             edits.extend(results)
         result = read_result(responses, edits, 1)
         decision = decide.decide_tool(table_of(result, 84), result.counters)
-        assert (decision.result == "NO_DROP") == (high_after >= 5)
+        if not ((decision.result == "NO_DROP") == (high_after >= 5)):
+            raise CheckFailure("(decision.result == 'NO_DROP') == (high_after >= 5)")
         if decision.result == "NO_DROP":
             probability += F(
                 math.comb(49, high_after) * math.comb(49, 14 - high_after), math.comb(98, 14)
             )
-    assert probability > F(1, 40)
+    if not (probability > F(1, 40)):
+        raise CheckFailure("probability > F(1, 40)")
     print(
         f"Demonstration outside A4: 98 days, 49 low/49 high, exact 25% token move "
         f"and swapped 19/20-response usability; exact NO DROP probability "
@@ -466,6 +474,8 @@ class Counts:
     # A per-measure check admits any history with at least one unstopped measure.
     per_tested: int = 0
     choices: tuple[int, ...] = ()
+    moved_none: int = 0
+    moved_none_streak: int = 0
 
 
 MODELS = ("claude-opus-4", "claude-sonnet-4", "claude-haiku-4")
@@ -506,12 +516,14 @@ def setting_history(rng: random.Random, cell: Cell, index: int) -> ReadResult:
                 )
             if cell.mode == "new-model" and i < 5:
                 moved = F(115, 100) * value
-                assert moved.denominator == 1
+                if not (moved.denominator == 1):
+                    raise CheckFailure("moved.denominator == 1")
                 value = int(moved)
             if i >= cell.n:
                 if cell.mode == "reasoning_tokens":
                     moved = F(3, 4) * value
-                    assert moved.denominator == 1
+                    if not (moved.denominator == 1):
+                        raise CheckFailure("moved.denominator == 1")
                     value = int(moved)
                 elif cell.mode == "no_reasoning_share":
                     zero += known // 10
@@ -553,22 +565,43 @@ def setting_history(rng: random.Random, cell: Cell, index: int) -> ReadResult:
 
 def setting_counts(cell: Cell) -> Counts:
     rng = random.Random(cell.seed)
-    real = none = tested = 0
+    real = none = tested = moved_none = moved_none_streak = 0
     choices: Counter[str] = Counter()
     for index in range(cell.count):
         records = setting_history(rng, cell, index)
         table = table_of(records, 84)
-        assert table.model in MODELS[1:]
-        if cell.section != "assumptions":
-            assert all(
+        if table.model not in MODELS[1:]:
+            raise CheckFailure("table.model in MODELS[1:]")
+        if cell.section != "assumptions" and not (
+            all(
                 len(t.before_days) == cell.n and len(t.after_days) == cell.m for t in table.measures
+            )
+        ):
+            raise CheckFailure(
+                "all((len(t.before_days) == cell.n and len(t.after_days) == cell.m for "
             )
         choices[table.model] += 1
         decision = decide.decide_tool(table, records.counters)
         real += decision.result == "REAL_DROP"
         none += decision.result == "NO_DROP"
         tested += decision.reason != "streaky_days"
-    return Counts(cell.count, tested, real, none, choices=tuple(choices[model] for model in MODELS))
+        moved = any(
+            row.id
+            == (cell.mode if cell.section in ("settings", "competitive") else "reasoning_tokens")
+            and row.finding == "no_drop"
+            for row in decision.measures
+        )
+        moved_none += moved
+        moved_none_streak += moved and decision.reason == "streaky_days"
+    return Counts(
+        cell.count,
+        tested,
+        real,
+        none,
+        choices=tuple(choices[model] for model in MODELS),
+        moved_none=moved_none,
+        moved_none_streak=moved_none_streak,
+    )
 
 
 def dependent_table(rng: random.Random, cell: Cell) -> measures.ToolTable:
@@ -604,7 +637,9 @@ def dependent_table(rng: random.Random, cell: Cell) -> measures.ToolTable:
 
 def counted_histories(cell: Cell) -> Counts:
     rng = random.Random(cell.seed)
-    generated = tested = real = none = raw_real = raw_none = per_real = per_none = per_tested = 0
+    generated = tested = real = none = raw_real = raw_none = per_real = per_none = per_tested = (
+        moved_none
+    ) = moved_none_streak = 0
     while (tested if cell.section == "power" else generated) < cell.count:
         table = (
             dependent_table(rng, cell)
@@ -615,6 +650,14 @@ def counted_histories(cell: Cell) -> Counts:
         real += decision.result == "REAL_DROP"
         none += decision.result == "NO_DROP"
         tested += decision.reason != "streaky_days"
+        moved = any(
+            row.id
+            == (cell.mode if cell.section in ("settings", "competitive") else "reasoning_tokens")
+            and row.finding == "no_drop"
+            for row in decision.measures
+        )
+        moved_none += moved
+        moved_none_streak += moved and decision.reason == "streaky_days"
         generated += 1
         if cell.section in ("correlation", "cycles"):
             raw = without_streak(table, decision)
@@ -624,7 +667,19 @@ def counted_histories(cell: Cell) -> Counts:
             per_real += per == "REAL_DROP"
             per_none += per == "NO_DROP"
             per_tested += any(row.finding != "streaky" for row in decision.measures)
-    return Counts(generated, tested, real, none, raw_real, raw_none, per_real, per_none, per_tested)
+    return Counts(
+        generated,
+        tested,
+        real,
+        none,
+        raw_real,
+        raw_none,
+        per_real,
+        per_none,
+        per_tested,
+        moved_none=moved_none,
+        moved_none_streak=moved_none_streak,
+    )
 
 
 def cells(quick: bool = False) -> list[Cell]:
@@ -746,7 +801,8 @@ def retention_trial(seed: int, *, missing: bool = False, spanning: bool = False)
             if b.responses[0].tool == "claude-code"
             and b.last in (cutoff - timedelta(hours=6), cutoff + timedelta(hours=6))
         ]
-        assert len(pieces) == 2
+        if not (len(pieces) == 2):
+            raise CheckFailure("len(pieces) == 2")
         batches = [b for b in batches if b not in pieces]
         batches.append(
             Batch(
@@ -767,9 +823,14 @@ def retention_trial(seed: int, *, missing: bool = False, spanning: bool = False)
     for now in runs:
         old = [b for b in disk if b.last < now - timedelta(days=30)]
         disk = [b for b in disk if b.last >= now - timedelta(days=30)]
-        assert all(b.last < now - timedelta(days=30) for b in old)
-        if spanning and now == final:
-            assert any(min(r.when for r in b.responses) < cutoff < b.last for b in disk)
+        if not (all(b.last < now - timedelta(days=30) for b in old)):
+            raise CheckFailure("all((b.last < now - timedelta(days=30) for b in old))")
+        if (
+            spanning
+            and now == final
+            and not any(min(r.when for r in b.responses) < cutoff < b.last for b in disk)
+        ):
+            raise CheckFailure("boundary-spanning file missing")
         for tool in ("claude-code", "codex"):
 
             def records(
@@ -791,7 +852,10 @@ def retention_trial(seed: int, *, missing: bool = False, spanning: bool = False)
             all_records, live = records(batches), records(disk)
             expected = measures.build(all_records, utc_offset=zone, now=now, keep=True)
             actual = measures.build(live, utc_offset=zone, now=now, keep=True, kept_rows=stored)
-            assert expected.newest == actual.newest and expected.split_date == actual.split_date
+            if not (expected.newest == actual.newest and expected.split_date == actual.split_date):
+                raise CheckFailure(
+                    "expected.newest == actual.newest and expected.split_date == actual.spl"
+                )
             # Both runs use the same instant, offset and default options/window.
             clean = tuple(
                 replace(
@@ -806,28 +870,40 @@ def retention_trial(seed: int, *, missing: bool = False, spanning: bool = False)
             same = clean == expected.measures
             lost += not same
             if not missing:
-                assert same, ("kept day lists", seed, now, tool)
+                if not (same):
+                    raise CheckFailure(("kept day lists", seed, now, tool))
                 left = decide.decide_tool(actual, live.counters)
                 right = decide.decide_tool(expected, all_records.counters)
-                assert (left.result, left.reason) == (right.result, right.reason)
-                assert [(r.finding, r.p_real, r.p_none, r.p_streak) for r in left.measures] == [
-                    (r.finding, r.p_real, r.p_none, r.p_streak) for r in right.measures
-                ]
+                if not ((left.result, left.reason) == (right.result, right.reason)):
+                    raise CheckFailure("(left.result, left.reason) == (right.result, right.reason)")
+                if not (
+                    [(r.finding, r.p_real, r.p_none, r.p_streak) for r in left.measures]
+                    == [(r.finding, r.p_real, r.p_none, r.p_streak) for r in right.measures]
+                ):
+                    raise CheckFailure(
+                        "[(r.finding, r.p_real, r.p_none, r.p_streak) for r in left.measures] ="
+                    )
                 # Every newly deleted complete day was captured with all its counts.
                 newest = expected.newest
-                assert newest is not None
+                if not (newest is not None):
+                    raise CheckFailure("newest is not None")
                 for row in expected.write_rows:
-                    if date.fromisoformat(row.day) < (now - timedelta(days=30) + zone).date():
-                        assert captured[row.key] == row, ("not captured whole", seed, row.key)
+                    if (
+                        date.fromisoformat(row.day) < (now - timedelta(days=30) + zone).date()
+                        and captured[row.key] != row
+                    ):
+                        raise CheckFailure(("not captured whole", seed, row.key))
             comparisons += 1
-            assert expected.settings_not_kept == expected.days_not_kept == 0
-            assert actual.newest is not None
+            if not (expected.settings_not_kept == expected.days_not_kept == 0):
+                raise CheckFailure("expected.settings_not_kept == expected.days_not_kept == 0")
+            if not (actual.newest is not None):
+                raise CheckFailure("actual.newest is not None")
             stored = kept.merge(stored, actual.write_rows, {tool: actual.newest})
             for row in expected.write_rows:
                 if date.fromisoformat(row.day) < (now + zone).date():
                     captured[row.key] = row
-    if missing:
-        assert lost > 0, ("uncaptured-day control", seed)
+    if missing and lost <= 0:
+        raise CheckFailure(("uncaptured-day control", seed))
     return comparisons, lost
 
 
@@ -883,7 +959,8 @@ def header(section: str) -> None:
             "The competitive cell uses 40 known and 0..4 unknown responses per day for "
             "each rival. Old setting ends before adoption. All histories run production "
             "selection, reduction and decision. Null gates wrong REAL DROP; each "
-            "single-measure exact-margin cell gates wrong NO DROP at <= 566/20000.\n"
+            "single-measure exact-margin cell gates both tool NO DROP and the moved measure's "
+            "own no drop finding at <= 566/20000.\n"
         )
     if section == "assumptions":
         print(
@@ -937,6 +1014,7 @@ def header(section: str) -> None:
             "stopped",
             "REAL DROP (95% CI)",
             "NO DROP (95% CI)",
+            "moved measure no drop (95% CI)",
             "REAL DROP / tested (95% CI)",
             "NO DROP / tested (95% CI)",
             "choices old/current/rival",
@@ -983,6 +1061,9 @@ def print_cell(cell: Cell, counts: Counts, seconds: float) -> None:
             str(c.generated - c.tested),
             rate(c.real, c.generated),
             rate(c.none, c.generated),
+            rate(c.moved_none, c.generated)
+            if cell.drop and cell.section in ("null", "settings", "competitive")
+            else "n/a",
             rate(c.real, c.tested),
             rate(c.none, c.tested),
             "/".join(map(str, c.choices)) or "n/a",
@@ -1004,14 +1085,26 @@ def process_cell(item: tuple[int, bool]) -> tuple[Counts, float]:
     completed = subprocess.run(command, check=True, capture_output=True, text=True)
     # Child output has a fixed numeric protocol; reject missing or malformed fields.
     data: object = json.loads(completed.stdout)
-    assert isinstance(data, list) and len(data) == 2
+    if not (isinstance(data, list) and len(data) == 2):
+        raise CheckFailure("isinstance(data, list) and len(data) == 2")
     values, seconds = data
-    assert isinstance(values, list) and len(values) == 10
-    assert all(type(v) is int for v in values[:9])
+    if not (isinstance(values, list) and len(values) == 12):
+        raise CheckFailure("isinstance(values, list) and len(values) == 12")
+    if not (all(type(v) is int for v in values[:9])):
+        raise CheckFailure("all((type(v) is int for v in values[:9]))")
     choices = values[9]
-    assert isinstance(choices, list) and all(type(v) is int for v in choices)
-    assert isinstance(seconds, float)
-    return Counts(*values[:9], choices=tuple(choices)), seconds
+    if not (isinstance(choices, list) and all(type(v) is int for v in choices)):
+        raise CheckFailure("isinstance(choices, list) and all((type(v) is int for v in choices))")
+    if any(type(v) is not int for v in values[10:]):
+        raise CheckFailure("type(values[10]) is int")
+    if not (isinstance(seconds, float)):
+        raise CheckFailure("isinstance(seconds, float)")
+    return Counts(
+        *values[:9],
+        choices=tuple(choices),
+        moved_none=values[10],
+        moved_none_streak=values[11],
+    ), seconds
 
 
 def run_cells(
@@ -1033,9 +1126,12 @@ def run_cells(
 
 def gate_passes(cell: Cell, counts: Counts) -> bool:
     wrong = counts.none if cell.drop or cell.mode in MARGIN_MODES[1:] else counts.real
+    limit = quick_limit(cell.count) if cell.count < 20000 else int(LIMIT * cell.count)
     return (
         counts.generated == cell.count
-        and F(wrong, counts.generated) <= LIMIT
+        and counts.generated > 0
+        and wrong <= limit
+        and (not (cell.drop or cell.mode in MARGIN_MODES[1:]) or counts.moved_none <= limit)
         and (cell.section != "competitive" or all(v > 0 for v in counts.choices[1:]))
     )
 
@@ -1059,6 +1155,11 @@ def run(quick: bool, stamp: str, workers: int = 1) -> int:
         "Every table calls production decide_tool. Simulation gates check implementation; "
         "they do not prove assumptions about user logs. Quick mode is a smoke check only."
     )
+    if quick:
+        print(
+            "Quick rate gates are smoke checks and support no claim: limit(n) is the "
+            "smallest c with P(Binomial(n, 1/40) > c) <= 1/1000, computed with fractions."
+        )
     gates: list[tuple[str, bool]] = []
     exact(12 if quick else 14)
     gates.append(("exact enumeration and rejection levels", True))
@@ -1075,8 +1176,17 @@ def run(quick: bool, stamp: str, workers: int = 1) -> int:
         if cell.section in ("null", "settings", "competitive"):
             passed = gate_passes(cell, counts)
             name = f"{cell.section} {cell.mode} {cell.m}/{cell.n} drop={cell.drop} seed={cell.seed}"
+            if cell.count < 20000:
+                name += f" limit({cell.count})={quick_limit(cell.count)}"
             gates.append((name, passed))
             if not passed:
+                if cell.drop:
+                    print(
+                        f"Margin finding: {counts.moved_none}/{counts.generated}; "
+                        f"tool NO DROP: {counts.none}/{counts.generated}; "
+                        f"streak flagged among moved no drop: {counts.moved_none_streak}; "
+                        f"streak flagged overall: {counts.generated - counts.tested}."
+                    )
                 print(
                     "\nStopped at failed gate. Later cells were not run; "
                     "no threshold or seed changed."
@@ -1134,6 +1244,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         c.per_none,
                         c.per_tested,
                         c.choices,
+                        c.moved_none,
+                        c.moved_none_streak,
                     ],
                     perf_counter() - started,
                 ]
@@ -1146,8 +1258,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     with redirect_stdout(output):
         try:
             code = run(bool(args.quick), str(args.date or date(2026, 11, 16)), args.workers)
-        except AssertionError as exc:
-            print(f"\nGate summary: FAIL; assertion {exc}. Stopped; later checks not run.")
+        except CheckFailure as exc:
+            print(f"\nGate summary: FAIL; check {exc}. Stopped; later checks not run.")
             code = 1
     if not args.quick:
         target = Path(__file__).resolve().parents[1] / "docs/results/logs-selfcheck.md"

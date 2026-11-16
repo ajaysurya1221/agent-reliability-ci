@@ -98,6 +98,13 @@ for every measure. Existing `arci-logs/1` records stay readable through
 `arci.logs.schema.LogsDecisionV1`; they are not silently converted or reinterpreted.
 `LogsDecision` validates version 2. Choose the model by `schema_version`.
 
+In 2.4.0 the readers return client-version names and also return main-thread and
+sub-agent responses that lack a model or an effort. Those responses count only toward
+context counts and the version list, never toward responses or day values. The readers
+take model and effort names from the kept table so labels stay stable across runs.
+Context counts can therefore differ from those 2.3.0 printed for the same logs.
+2.4.0 follows the definition in the records.
+
 The optional kept table uses its own `schema` field, `realornoise-days/1`. Its strict row
 format, merge, pruning and retention rules are defined in record 0017 and
 [LOG_FORMATS.md](LOG_FORMATS.md#kept-day-table-realornoise-days1). It stores daily counts,

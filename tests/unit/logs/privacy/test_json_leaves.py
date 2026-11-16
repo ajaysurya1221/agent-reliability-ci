@@ -28,7 +28,6 @@ CLOSED = frozenset(
         "unreadable",
         "lower",
         "higher",
-        *EFFORTS,
         *get_args(Tool),
         *get_args(schema.Result),
         *get_args(schema.ReasonCode),
@@ -58,13 +57,15 @@ def model_name(value: str) -> bool:
 
 
 def allowed(value: str, field: str = "") -> bool:
-    if field == "client_versions_after_shown" and re.fullmatch(
-        r"[0-9]{1,5}(\.[0-9]{1,5}){1,3}", value
-    ):
-        return True
-    if value in CLOSED or value == __version__ or model_name(value):
-        return True
-    if re.fullmatch(r"(?:model|effort)-[1-9][0-9]*|[0-9a-f]{64}", value):
+    if field == "arci_version":
+        return value == __version__
+    if re.fullmatch(r"[0-9]{1,5}(\.[0-9]{1,5}){1,3}", value):
+        return field == "client_versions_after_shown"
+    if field == "model":
+        return model_name(value) or bool(re.fullmatch(r"model-[1-9][0-9]*", value))
+    if field == "effort":
+        return value in EFFORTS or bool(re.fullmatch(r"effort-[1-9][0-9]*", value))
+    if value in CLOSED or re.fullmatch(r"[0-9a-f]{64}", value):
         return True
     if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         return date.fromisoformat(value).isoformat() == value
@@ -96,6 +97,16 @@ def test_every_json_string_leaf(tmp_path: Path, model: str | None) -> None:
     assert run(argv, now=logs.now, env={}, home=tmp_path, out=out, err=err) in (0, 1, 2)
     assert not err.getvalue()
     leaves = walk(json.loads(target.read_text()))
-    assert leaves
+    assert any(
+        field == "client_versions_after_shown" and leaf == "2.1.325" for field, leaf in leaves
+    )
     for field, leaf in leaves:
         assert allowed(leaf, field), leaf
+
+
+@pytest.mark.parametrize(
+    "value", ("2.1.325", __version__, "gpt-6-astra", "high", "model-1", "effort-1")
+)
+def test_bounded_name_in_unrelated_field_is_refused(value: str) -> None:
+    leaves = walk({"reason": value})
+    assert leaves and not all(allowed(leaf, field) for field, leaf in leaves)

@@ -8,9 +8,16 @@
   and `--ignore-kept` skips reading it. Kept days are counted and marked in HTML.
 - **Changed:** the default model and effort now come from the most responses after the
   split, falling back to the whole window only when no candidate has an after-response.
+  In 2.4.0 the readers return client-version names and also return main-thread and
+  sub-agent responses that lack a model or an effort. Those responses count only toward
+  context counts and the version list, never toward responses or day values. The readers
+  take model and effort names from the kept table so labels stay stable across runs.
+  Context counts can therefore differ from those 2.3.0 printed for the same logs.
+  2.4.0 follows the definition in the records.
   Both skills run `uvx --python 3.14 realornoise==2.4.0` without keeping days. Version 1
-  log records remain readable. The printed limits now state the worst measured rate
-  across both dependence sections of the [self-check](docs/results/logs-selfcheck.md):
+  log records remain readable. The printed limits state the largest wrong REAL DROP rate
+  of the rule as built over all histories in the correlation, weekly-cycle and regime
+  cells of the [self-check](docs/results/logs-selfcheck.md):
   wrong REAL DROP 362/2000 = 0.181000 [0.164743, 0.198480] (18.1%, Wilson 95% interval),
   seed 18112185, regime-switching days with log SD 0.45, 14 days after and 16 before.
   Work in phases can break the bound; other patterns can give more.
@@ -19,7 +26,15 @@
   three had been shown. A kept-table path below a regular file is now absent rather
   than unreadable: `--keep` reports a write error instead of success without a write,
   and a read-only run no longer reports an unreadable table that never existed.
-  Both defects were found by the blind acceptance tests.
+  Both defects were found by the blind acceptance tests. Same-file placeholders are removed
+  before staging, so interruption during staging or replacement leaves no new empty target.
+  A zero-byte table is absent and can be replaced.
+  Overlapping writes merge under a directory lock where available; a successful write removes
+  leftover regular `.realornoise-` files. An empty `--keep-dir` is a usage error.
+  Margin self-checks also gate the moved measure's own finding. Gates remain active under
+  Python optimisation. Quick gates use exact binomial smoke limits and support no claim.
+  Privacy tests restrict bounded names and versions to their specified JSON fields.
+  Documentation corrects release metadata, reader changes and installation network use.
 - **Not in this release:** an unknown split date, repeated daily looks with a stated
   error rate, a replacement streak check, two-model comparisons, a range for the change,
   other coding agents, OpenTelemetry input, a public tracker, real-machine Windows
@@ -29,7 +44,7 @@
   release checks, compatibility and roadmap. The documented command requests Python
   3.14 for compressed Codex logs. Related tools are described without comparison claims.
 - **CI:** CodeQL (Python and Actions) and zizmor now scan every push to `main` and
-  `sprint/**` and every pull request, Dependabot opens one monthly grouped pull request for
+  `sprint/**` and every pull request to `main`, Dependabot opens one monthly grouped pull request for
   GitHub Actions versions, uv is installed from a hash-pinned requirements file in every
   workflow that can check out the repository first, and a new "oracle / SciPy" CI job checks
   the exact rank test against SciPy's own permutation and Mann-Whitney tests.

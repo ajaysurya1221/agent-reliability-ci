@@ -17,7 +17,7 @@ record how the model behaved each day. One command compares recent days with ear
 uvx --python 3.14 realornoise
 ```
 
-Python 3.14 reads compressed Codex logs; uv fetches that Python.
+Python 3.14 reads compressed Codex logs; uvx downloads it if missing.
 
 On the packaged example data (`uvx --python 3.14 realornoise --example`):
 
@@ -26,7 +26,7 @@ RESULT: REAL DROP
 reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-Nothing leaves your machine. The output holds counts, rates, dates and bounded model, effort
+The tool sends nothing; installing it downloads the package. The output holds counts, rates, dates and bounded model, effort
 and client-version names. It shows what your logs recorded, not why: your tasks, prompts and client
 may have changed too. With a short history the usual answer is `CANNOT TELL`.
 [How to read it](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md) ·
@@ -54,7 +54,7 @@ RESULT: REAL DROP
 reasoning tokens per response 986 (42)      529 (14)     -46%    real drop
 ```
 
-The output now states the worst wrong-REAL-DROP rate measured in the [self-check](docs/results/logs-selfcheck.md): 18.1%, at 14/16 after/before days in regimes (362/2000 = 0.181000 [0.164743, 0.198480], Wilson 95% interval, seed 18112185).
+The output states the largest wrong-REAL-DROP rate of the rule as built, over all histories, in the [self-check](docs/results/logs-selfcheck.md)'s correlation, weekly-cycle and regime cells: 18.1%, at 14/16 after/before days in regimes (362/2000 = 0.181000 [0.164743, 0.198480], Wilson 95% interval, seed 18112185).
 For AR(1) correlation 0.5 and log SD 0.45, the rule as built measured wrong REAL DROP at 0.092500, 0.036000 and 0.005000 for 5/10, 7/21 and 14/42 days (2000 histories each).
 Work in phases can break the bound; other patterns can give more. These logs cannot establish cause, answer quality or a model change.
 Claude Code: `/plugin marketplace add ajaysurya1221/agent-reliability-ci`, `/plugin install realornoise@agent-reliability-ci`, then `/realornoise:realornoise`.
@@ -591,15 +591,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v2.3.0`, the current release (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==2.3.0`). See
+This example pins `v2.4.0`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.4.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v2.3.0
+- uses: ajaysurya1221/agent-reliability-ci@v2.4.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -707,8 +707,8 @@ here claims adoption, performance or superiority.
 ## Roadmap
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need. What is not in 2.3.0 (stored log history,
-a scan over split dates, reading an Inspect `.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
+asks for it, or when a recorded run shows the need. What is not in 2.4.0
+(a scan over split dates, reading an Inspect `.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
 example with several faults in one condition, a second framework adapter, the v1 commands that
 do not yet accept suites) and the earlier candidate list (last revised for v0.8.0) are in
 [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
@@ -748,9 +748,9 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v2.3.0 is the current release. Install `agent-reliability-ci==2.3.0` from PyPI
+**Availability:** v2.4.0 is the current release. Install `agent-reliability-ci==2.4.0` from PyPI
 (`agent-reliability-ci[langchain]==2.3.0` for the LangChain adapter), use `uvx realornoise`,
-or use Action tag `v2.3.0`. The `realornoise` distribution pins the same main-package version.
+or use Action tag `v2.4.0`. The `realornoise` distribution pins the same main-package version.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds both distributions, tests their wheels on Ubuntu/macOS, and publishes the main

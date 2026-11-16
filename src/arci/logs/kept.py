@@ -91,6 +91,8 @@ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
             return "unreadable", ()
         with path.open("rb") as stream:
             raw = stream.read(MAX_BYTES + 1)
+        if not raw:
+            return "absent", ()
         if len(raw) > MAX_BYTES:
             return "unreadable", ()
         data: object = json.loads(raw.decode("utf-8"), object_pairs_hook=_object)

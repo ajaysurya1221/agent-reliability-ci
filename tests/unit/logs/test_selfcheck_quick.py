@@ -59,11 +59,15 @@ def test_unguarded_reuse_matches_full_recalculation() -> None:
 
 
 def test_gate_count_cannot_be_reduced_by_time_budget() -> None:
-    from fractions import Fraction
+    from dataclasses import replace
 
-    from bench.selfcheck_logs import simulate
+    from bench.selfcheck_logs import Cell, execute_cell, gate_passes
 
-    assert simulate(5, 10, 0.45, Fraction(), 17, 31, 0.000001, gated=True)[-1] == 31
+    cell = Cell("null", "independent", 5, 10, 17, 31)
+    counts = execute_cell(cell)
+    assert counts.generated == cell.count
+    assert gate_passes(cell, counts)
+    assert not gate_passes(cell, replace(counts, generated=cell.count - 1))
 
 
 @pytest.mark.parametrize("seed", range(17, 27))
@@ -188,6 +192,8 @@ def test_gate_uses_only_the_prespecified_direction_and_exact_bound() -> None:
     assert gate_passes(margin, Counts(20000, 20000, 19000, 566))
     assert not gate_passes(margin, Counts(20000, 20000, 0, 567))
     assert not gate_passes(null, Counts(19999, 19999, 0, 0))
+    assert gate_passes(margin, Counts(20000, 20000, 0, 0, moved_none=566))
+    assert not gate_passes(margin, Counts(20000, 20000, 0, 0, moved_none=567))
 
 
 def test_power_stops_at_tested_count() -> None:
@@ -248,3 +254,51 @@ def test_failed_gate_stops_before_next_cell(monkeypatch: pytest.MonkeyPatch) -> 
         monkeypatch.setattr(check, name, no_op)
     assert check.run(True, "2026-11-16") == 1
     assert seen == ["null"]
+
+
+@pytest.mark.parametrize("n", (1, 30, 300))
+def test_quick_limit_matches_independent_binomial_sum(n: int) -> None:
+    from fractions import Fraction
+    from math import comb
+
+    from bench.selfcheck_logs import quick_limit
+
+    def tail(c: int) -> Fraction:
+        return sum(
+            (Fraction(comb(n, k) * 39 ** (n - k), 40**n) for k in range(c + 1, n + 1)),
+            Fraction(),
+        )
+
+    limit = quick_limit(n)
+    assert tail(limit) <= Fraction(1, 1000)
+    assert limit == 0 or tail(limit - 1) > Fraction(1, 1000)
+
+
+def test_quick_with_optimisation() -> None:
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-O", "-m", "bench.selfcheck_logs", "--quick", "--workers", "1"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "16/16 passed; 0 failed" in result.stdout
+    assert "limit(30)=" in result.stdout and "limit(300)=" in result.stdout
+
+
+def test_wrong_share_margin_fails_quick_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fractions import Fraction
+
+    from arci.logs import decide
+    from bench.selfcheck_logs import cells, execute_cell, gate_passes
+
+    cell = next(
+        c for c in cells(True) if c.section == "competitive" and c.mode == "no_reasoning_share"
+    )
+    monkeypatch.setitem(decide.MARGINS, "no_reasoning_share", Fraction(9, 10))
+    counts = execute_cell(cell)
+    assert counts.moved_none > 4 and counts.none == 0
+    assert not gate_passes(cell, counts)

@@ -214,6 +214,15 @@ Kept days are counted in the output and drawn as open circles in HTML. Context a
 counts still come from logs alone. The table cannot advance the newest day or turn missing
 logs into a result. Invalid tables are not used; a `--keep` run does not overwrite one.
 
+A table of 0 bytes is absent and a `--keep` run replaces it. An empty `--keep-dir`
+is refused with the general usage line and exit 3, before reading or writing anything.
+Placeholders used to check target names are removed before staging. With `--keep`, the
+writer locks the table directory, reads the table again, merges and writes it under that
+lock, so overlapping runs keep each other's rows. Where directory locking is unavailable,
+the run proceeds without it. The result still uses the table read at the start.
+After a successful write, leftover regular files whose names begin with `.realornoise-`
+are removed from the table directory while the lock is held; other names are left alone.
+
 The retention promise assumes immutable records, no late backdated arrivals and whole-file
 deletion strictly after 720 hours. Each deleted day must have been captured whole before deletion, with successful captures
 at most 29 days apart. For admitted rows, retained and undeleted histories then give the

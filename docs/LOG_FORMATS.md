@@ -8,10 +8,14 @@ This describes the readers in [the repository](../src/arci/logs/), not a vendor 
 The [statistics](STATISTICS_LOGS.md) define the day table and comparison;
 [record 0017](design/0017-logs-2.md) defines the output record and fixed texts.
 
-In 2.4.0 the only reader change is client-version names. Each reader still returns a version
-identity per response. It now also returns the matching version string, or null for a name
-outside `^[0-9]{1,5}(\.[0-9]{1,5}){1,3}$`. Response assembly, duplicate handling, filtering,
-counts and unreadable-file rules are unchanged.
+In 2.4.0 the readers return client-version names and also return main-thread and
+sub-agent responses that lack a model or an effort. Those responses count only toward
+context counts and the version list, never toward responses or day values. The readers
+take model and effort names from the kept table so labels stay stable across runs.
+Context counts can therefore differ from those 2.3.0 printed for the same logs.
+2.4.0 follows the definition in the records.
+Each reader returns a version identity per response, with the matching version string
+or null for a name outside `^[0-9]{1,5}(\.[0-9]{1,5}){1,3}$`.
 
 ## Files and order
 

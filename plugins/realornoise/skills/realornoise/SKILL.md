@@ -6,8 +6,8 @@ allowed-tools: Bash(uvx --python 3.14 realornoise==2.4.0)
 ---
 
 The command below has already run on this machine. It read local session logs and printed
-counts, rates, dates and the bounded model, effort and client-version names. The command itself
-sent nothing anywhere. Its output is now part of this conversation, so what it printed is
+counts, rates, dates and the bounded model, effort and client-version names. realornoise itself opens no connection and sends nothing.
+uvx downloads the package, and Python 3.14 if missing, to run it. Its output is now part of this conversation, so what it printed is
 visible to this assistant and goes wherever this conversation goes.
 
 !`uvx --python 3.14 realornoise==2.4.0 2>&1 || true`

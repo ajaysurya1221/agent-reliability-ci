@@ -1,5 +1,6 @@
 """An audit hook observes a full CLI run; only explicitly requested writes pass."""
 
+import importlib.util
 import io
 import os
 import sys
@@ -18,6 +19,9 @@ _EVENTS: list[tuple[str, tuple[object, ...]]] = []
 def _audit(event: str, args: tuple[object, ...]) -> None:
     if _active:
         _EVENTS.append((event, args))
+        if event == "fcntl.flock" and isinstance(args[0], int):
+            info = os.fstat(args[0])
+            _EVENTS.append(("locked_inode", (info.st_dev, info.st_ino)))
 
 
 sys.addaudithook(_audit)
@@ -35,6 +39,9 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
     if keep:
         argv.append("--keep")
         targets.append(table_dir / "days-1.json")
+        table_dir.mkdir()
+        (table_dir / ".realornoise-leftover").write_text("old temporary")
+        (table_dir / "unrelated").write_text("keep")
     output, error = io.StringIO(), io.StringIO()
     _EVENTS.clear()
     _active = True
@@ -46,6 +53,8 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
     writes: set[Path] = set()
     placeholders: set[Path] = set()
     moved: set[Path] = set()
+    locked = False
+    removed: set[Path] = set()
     for event, args in _EVENTS:
         assert not event.startswith(("socket.", "os.exec", "os.posix_spawn")), event
         assert event not in {"subprocess.Popen", "os.system", "urllib.Request"}, event
@@ -72,6 +81,16 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
             assert Path(str(args[0])) in writes | ({table_dir} if keep else set())
         if event == "os.mkdir":
             assert keep and Path(str(args[0])) == table_dir
+        if event == "locked_inode":
+            info = table_dir.stat()
+            assert keep and args == (info.st_dev, info.st_ino)
+            locked = True
+        if event == "os.remove":
+            path = Path(str(args[0]))
+            assert path in placeholders | writes or (
+                keep and path.parent == table_dir and path.name.startswith(".realornoise-")
+            )
+            removed.add(path)
         if event == "os.rename":
             source, target, *_ = args
             assert isinstance(source, str) and isinstance(target, str)
@@ -80,3 +99,9 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
     assert moved == set(targets)
     assert placeholders == set(targets)
     assert all(not path.exists() for path in writes)
+    if keep:
+        if importlib.util.find_spec("fcntl") is not None:
+            assert locked
+        assert table_dir / ".realornoise-leftover" in removed
+        assert (table_dir / "unrelated").read_text() == "keep"
+        assert {p.name for p in table_dir.iterdir()} == {"days-1.json", "unrelated"}

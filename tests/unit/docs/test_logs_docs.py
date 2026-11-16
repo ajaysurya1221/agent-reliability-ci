@@ -360,3 +360,101 @@ def test_logs_threat_model_link_and_named_tests_exist() -> None:
         assert any(isinstance(node, ast.FunctionDef) and node.name == name for node in tree.body), (
             f"missing threat-model check: {path}::{name}"
         )
+
+
+FIGURE = re.compile(r"\d+/\d+ = \d+\.\d+ \[\d+\.\d+, \d+\.\d+\]")
+
+
+def selfcheck_rows(source: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    columns: list[str] = []
+    for line in source.splitlines():
+        if not line.startswith("|"):
+            columns = []
+            continue
+        values = [value.strip() for value in line.strip("|").split("|")]
+        if "seed" in values:
+            columns = values
+        elif columns and not all(set(value) <= {"-", ":"} for value in values):
+            rows.append(dict(zip(columns, values, strict=True)))
+    return rows
+
+
+def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
+    checked = 0
+    columns: list[str] = []
+    prose: list[str] = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            columns = []
+            prose.append(line)
+            continue
+        values = [value.strip() for value in line.strip("|").split("|")]
+        if "seed" in values:
+            columns = values
+        matches = FIGURE.findall(line)
+        if matches:
+            metadata = dict(zip(columns, values, strict=True)) if columns else {}
+            for figure in matches:
+                assert any(
+                    figure in row.values()
+                    and all(
+                        row.get(key) == metadata[key]
+                        for key in ("seed", "after/before")
+                        if key in metadata
+                    )
+                    for row in rows
+                ), (figure, metadata)
+                checked += 1
+    # Split independent clauses so each inline seed/design stays with its own figure.
+    normal = " ".join("\n".join(prose).split())
+    clauses = re.split(r"(?<=[.!?])\s+(?=[A-Z])|;\s+|,\s+and\s+|\band\s+(?=\d+/\d+ =)", normal)
+    for clause in clauses:
+        figures = list(FIGURE.finditer(clause))
+        seeds = re.findall(r"\bseed (\d+)\b", clause)
+        designs = re.findall(r"\b(\d+) days after (?:against|and) (\d+) before\b", clause)
+        for match in re.finditer(r"\b(\d+)/(\d+)\b", clause):
+            if re.search(r"\bdrop\s*$", clause[: match.start()]):
+                continue
+            if not any(figure.start() <= match.start() < figure.end() for figure in figures):
+                designs.append((match.group(1), match.group(2)))
+        for figure in figures:
+            candidates = [row for row in rows if figure.group() in row.values()]
+            if seeds:
+                assert len(set(seeds)) == 1, ("ambiguous seeds", clause)
+                candidates = [row for row in candidates if row["seed"] == seeds[0]]
+            if designs:
+                assert len(set(designs)) == 1, ("ambiguous designs", clause)
+                design = "/".join(designs[0])
+                candidates = [row for row in candidates if row.get("after/before") == design]
+            assert candidates, (figure.group(), clause)
+            checked += 1
+    return checked
+
+
+@pytest.mark.parametrize(
+    "document", ("docs/STATISTICS_LOGS.md", "README.md", "docs/recipes/logs.md", "CHANGELOG.md")
+)
+def test_every_rate_figure_has_matching_source_row(document: str) -> None:
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    assert rows
+    checked = assert_figures_sourced(read(document), rows)
+    assert checked > 0 or document == "docs/recipes/logs.md"
+    # The /plan/exec/... S0 spike report is not in this branch. Its historical
+    # 535 and 415 of 20,000 are checked only as literal text in the statistics doc.
+    if document == "docs/STATISTICS_LOGS.md":
+        text = " ".join(read(document).split())
+        assert "535 of 20,000 histories at 14 days after against 16 before" in text
+        assert "415 of 20,000 at 7 after against 21 before" in text
+        assert "S0 spike report, G2, seeds 17112040 and 17112041" in text
+
+
+@pytest.mark.parametrize(
+    "suffix", ("seed 19", "at 5/10", "(5/10)", "at 5 days after against 10 before")
+)
+def test_rate_provenance_rejects_wrong_seed_or_design(suffix: str) -> None:
+    figure = "1/2000 = 0.000500 [0.000088, 0.002827]"
+    rows = [{"seed": "17", "after/before": "14/16", "rate": figure}]
+    with pytest.raises(AssertionError):
+        assert_figures_sourced(figure + " " + suffix + ".", rows)
+    assert assert_figures_sourced(figure + " at 14/16 (seed 17).", rows) == 1

@@ -12,6 +12,7 @@ STDLIB = frozenset(
         "dataclasses",
         "datetime",
         "fractions",
+        "fcntl",
         "functools",
         "html",
         "importlib",

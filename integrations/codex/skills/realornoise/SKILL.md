@@ -8,7 +8,8 @@ Run this command in the shell, once, with no other arguments:
     uvx --python 3.14 realornoise==2.4.0
 
 It reads local session logs and prints counts, rates, dates and bounded model, effort
-and client-version names. The command itself sends nothing anywhere. Its output becomes part of
+and client-version names. realornoise itself opens no connection and sends nothing.
+uvx downloads the package, and Python 3.14 if missing, to run it. Its output becomes part of
 this conversation, so what it prints is visible to this assistant and goes wherever this
 conversation goes.
 
