@@ -1,0 +1,229 @@
+{
+ "results": [
+  {
+   "checker": "processes",
+   "review": {
+    "summary": "I tested commit d9d1066 with real separate processes, using adapted copies of lib.py, hooks.py and child.py. My copy of the code was imported (arci.__file__ pointed into review24e/processes/copy/src). No process hung and none had to be killed for the 60 second limit; the only kills were the deliberate SIGKILLs in scenario 5. I made no changes in the worktree: git status is clean and HEAD is still d9d1066.\n\nScenarios 1 to 8 found nothing wrong:\n- Every exit code was the run's own.\n- No rows were lost.\n- No directory was removed.\n- Every directory a run created had mode 0700, and an existing directory kept its mode.\n- No temporary file of either prefix was left after runs that ended normally.\n\nI found one defect. The reserved-name rule checks only the name typed on the command line, not the file the path points to. If the output path is a symlink to a `.realornoise-` name in the table directory, the run reports success and then its own cleanup deletes the file it just wrote.\n\nI also ran 10 code mutations against tests/unit/logs and tests/acceptance/test_logs.py (2 test files left out because they need files outside the copy). Tests caught the mutations that break a stated rule. Two survived, and neither is a finding:\n- Running the cleanup also after a failed write: the record only says when the cleanup runs, so this breaks no stated rule.\n- Dropping the chmod of a directory the run creates: with a normal umask, `mkdir(mode=0o700)` already gives 0700, so the result is the same.\n\nAll scripts and outputs are in /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/processes/.",
+    "checked": [
+     "(1) 2, 3, 6 and 12 --keep processes started together on a missing table directory, 2 and 3 levels deep, each with its own model, 30 repetitions each (120 groups): all exit codes matched each run's JSON, every model's rows were in the table, no file of either temporary prefix was left, and the created directories had mode 0700 and held only the next directory or the table (s123.py, s123.out).",
+     "(2) The same with 1, 2 and half of the runs failing, the failure kind rotating among --json into a missing directory, a staged table over a size limit patched to 10 bytes for the writer only, and an injected failure of the table move, 30 repetitions each (330 groups): every failing run exited 3 with only the write-error line and left its own --json byte for byte; the others kept all rows; the directories existed at the end with mode 0700 and held only the table; the missing --json directory was never created.",
+     "(3) All runs failing (n = 2, 3, 6, 12; 30 repetitions each): the directories existed, had mode 0700 and were empty; the parent directory kept mode 0755; nothing else was left.",
+     "(4) A scripted pause in one run after its mkdir of the parent (before its chmod), after its mkdir of the table directory, after flock, between the re-read and staging, before the first move, between the moves and during the cleanup, with 1 and 2 other runs (one of them failing in half the cases) started during the pause, 3 repetitions each (84 cases): all correct. The event logs show the other runs blocked in flock until the paused run's cleanup was done.",
+     "(5) SIGKILL of the paused run at each of the same 7 points, with one waiter started during the pause and a later run afterwards, the killed run's --json either in out/ or in the table directory, 3 repetitions each (42 cases): the waiter and the later run succeeded, the table was valid with both runs' rows, and every .realornoise- leftover was gone after the waiter's run. The killed run's .realornoise.out- backup stayed (in out/ in 3 cases, in the table directory in 3 cases), as the record allows: the cleanup removes only the table's prefix.",
+     "(6) --keep runs mixed with runs without --keep writing --json, --markdown and --html into the table directory, in the orders keep-first, plain-first and together, with the reports either new or already present, 30 repetitions per order (90 groups): all correct. In 15 of the 90 groups a plain run moved a file inside a --keep run's lock window, so the runs truly overlapped.",
+     "(7) Two --keep runs with --keep-dir spelled as a relative path, with .., through a symlink and in a different letter case (the volume is case-insensitive), the directory existing or not, 15 repetitions each (120 groups): rows of both runs were kept every time. My check of the directory name failed 7 times only because the other spelling (DATA) created the directory first; that is not a defect.",
+     "(8) Two --keep runs on a table that is mode 000, 0 bytes, or 33,554,433 bytes, 10 repetitions each: mode 000 and the oversized table were reported unreadable with F24, left unchanged and not written, and the exit codes were right; the 0-byte table was absent, F24 did not print, and both runs' rows were written.",
+     "Extra: --keep-dir naming a regular file, or a path under one, exits 3 with the write-error line, as item 33 requires.",
+     "Extra: a --json path that is a symlink to a .realornoise- name in the table directory: the requested output was deleted in all 3 variants (finding processes-1).",
+     "Mutations (mutate.py): a lock-open failure that goes on without the lock, a chmod of an existing directory, a cleanup over both prefixes, a FileExistsError that always raises, a lock taken on the wrong directory, the reserved-name check on --json only, a cleanup without the regular-file check, and the lock released before the cleanup were each caught by at least one test (the FileExistsError one only by the real-process test). The cleanup-after-failure and no-chmod mutations survived; neither breaks a stated rule."
+    ],
+    "findings": [
+     {
+      "id": "processes-1",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "The reserved-name check looks only at the last part of the path as typed (`Path(path).name`, cli.py lines 135-139). The file the run actually writes is the resolved path (`absolute(path).resolve()`, lines 173-177). So `--json out/report.json`, where report.json is a symlink to `<table dir>/.realornoise-report.json`, is accepted. A --keep run writes the report there and its own cleanup (lines 456-462) then unlinks it. The run exits 2 with no error, and the output it was asked for is gone. A later --keep run deletes the file in the same way if an earlier run without --keep wrote it. Record 0017 ('Directories are never removed, and reserved names') says 'Those names are reserved for the table's temporary files, so the cleanup can never remove a file that a run asked for.' That is not held when the path is a symlink. One run of this tool is enough: nothing else changes the directory during the run, and the symlink only has to exist beforehand.",
+      "evidence": "s9_symlink.py runs real processes against my copy of d9d1066. In all three variants the output file (named in the record 'a file that a run asked for') was deleted:\n- dangling symlink, one --keep run: exit 2, stderr empty, the report does not exist, the link does not resolve, the table directory holds only days-1.json.\n- symlink to an existing .realornoise-report.json, one --keep run: same result.\n- a run without --keep writes through the link (the target exists after it), then a later --keep run: the report is deleted.",
+      "repro": "/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python -B /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/processes/s9_symlink.py (in a shell: mkdir -p T; ln -s T/.realornoise-r.json r.json; realornoise --keep-dir T --json r.json; then T/.realornoise-r.json is gone)",
+      "suggested_fix": "Also apply the reserved-name test to the resolved targets (`targets` in _execute, before any read) and refuse those as malformed values. Add a test with a symlinked output path."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "processes-1",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced with my own script, which imports a copy of d9d1066 (arci.__file__ checked) and needs no timing hooks: /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/verify-processes/symlink.py. Each run was a single, plain, in-process run. (1) Dangling link out/report.json -> kd/.realornoise-report.json, one --keep-dir kd --json link run: exit 2, stderr empty, the target does not exist afterwards, the link does not resolve, and kd holds only days-1.json. (2) Same, with the target already present: same result, so the target is removed. (3) A run without --keep writes through the link (target exists), then a --keep-dir run removes it. Control: --json out/.realornoise-x.json is refused with exit 3 and the usage line, so the name check works only on the name as typed. Cause: cli.py lines 135-139 test Path(path).name. The run writes to absolute(path).resolve() (lines 173-177), and the --keep cleanup (lines 456-462) unlinks every regular file in the table directory whose name begins with .realornoise-. The record's sentence 'so the cleanup can never remove a file that a run asked for' is therefore false when the output path is a symlink. The record's one assumption covers the table directory being removed or replaced. It does not cover this case: the symlink sits outside the table directory and is created before the run. Severity stays low because the user must have created a symlink that points to a reserved name inside the table directory, which is unusual."
+    }
+   ]
+  },
+  {
+   "checker": "reasoning",
+   "review": {
+    "summary": "I reviewed d9d1066 (f2674d7..d9d1066) against record 0017 and found four defects, each shown with real runs through arci.logs.cli.run on synthetic logs. Several things hold as stated. Descriptors stay flat (4 before, 4 after) across 300 succeeding and 300 failing calls, and no lock is left held. No code in src/arci called rmdir, rmtree or removedirs during the unit-logs run (1369 passed; the 2 failures were record-text tests that needed docs/ in the copy). New directories get mode 0700 under umask 000, 022 and 077, and an existing directory keeps its mode. The mkdir loop's edge cases end sanely. The reserved-name refusal opens nothing and prints the general usage line for every spelling that folds to the prefix, including every APFS-equivalent spelling I tried. A --keep-dir named .realornoise-x is accepted, and its cleanup removes only regular files.\n\nThe defects:\n1. (medium) The reserved-name check reads the name as typed, but the write goes to the resolved path. A --json symlink that points into the table directory at a name beginning with `.realornoise-` gets its report written and then deleted by the cleanup, and the run still exits 2 with no error.\n2. (medium) A real Ctrl-C while the run checks targets can leave a 0-byte file at a target that did not exist, against the record's \"leaves no empty file at a target\".\n3. (medium) A real Ctrl-C during the moves or the cleanup prints \"Requested output could not be written.\" and exits 3, although outputs were already replaced, sometimes only some of them. It can also leave temporary files and leak descriptors.\n4. (low) Three record rules have no test that catches their mutation: the reserved-name rule applies to the three output options only; the cleanup runs only after a successful write; the cleanup prefix match is case-sensitive.\n\nAll scripts and outputs are under /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/reasoning/.",
+    "checked": [
+     "Imported code confirmed as copy: arci.__file__ = .../review24e/reasoning/copy/src/arci/__init__.py",
+     "Descriptor count: 300 successful --keep-dir+--json runs, then 300 failing runs (missing JSON parent dir / unwritable parent / unwritable existing table dir): open fds 4 -> 4 -> 4; all 300 failures exit 3 with the write-error line only; no table dir left locked (LOCK_NB succeeds on all); failed new dir stays empty with mode 0700 (t2_fds.py)",
+     "rmdir instrumentation (os.rmdir, Path.rmdir, shutil.rmtree, os.removedirs) over all of tests/unit/logs (1369 passed, 3 skipped; 2 record-text tests failed only because docs/ was not yet in the copy): 0 calls from src/arci (rmdirspy.py, rmlog.jsonl). Grep: the only rmtree in src/arci is runner.py, not on the logs path",
+     "umask 000/022/077: created parents and table dir are 0700, table 0600, new JSON gets 0666 & ~umask; an existing dir with mode 0751 keeps 0751, including when reused as the table dir (t4_mkdir.py)",
+     "mkdir loop: a regular-file component, and the file itself as --keep-dir, exit 3 write error; unwritable parent and an unwritable existing dir exit 3 write error; a symlink to a dir works (table written in the target); a dangling symlink resolves to the target, which is created; a symlink loop gives an unreadable table, so it is not written and the run exits 2 (pre-existing behaviour, not part of this change)",
+     "Reserved-name refusal: --json=.realornoise-a, ./.realornoise-a, sub/../.realornoise-a, a dir path with a trailing slash, a dir path without one, .REALORNOISE-x.md, a full-width dot (U+FF0E), long s (U+017F), a bare .realornoise-, .realornoise-x/. all exit 3 with the usage line and 0 calls to open/os.open; leading space, dotless i, dotted capital I and a combining-accent name are accepted. On APFS none of the accepted names refers to the same file as .realornoise-x, and every APFS-equivalent spelling tried is refused. Renaming onto an existing file with different letter case keeps the old on-disk name (t3_names.py)",
+     "--keep-dir named .realornoise-kd is accepted and writes days-1.json; a .realornoise-d directory with a file inside, in the table dir, is left alone by the cleanup",
+     "Symlinked output into the table dir: --json report.json (a symlink to tabledir/.realornoise-report) with --keep-dir exits 2 with no error, and the JSON is written and then removed by the cleanup; an existing pointed-to file is destroyed the same way; without --keep the file survives (t1_symlink.py) -> FINDING reasoning-1",
+     "Line-by-line KeyboardInterrupt via sys.settrace at every line hit in _directory_lock and _write_outputs (t5_interrupt.py): this localises the windows (after os.open at 412, after os.replace at 439, throughout the finally block, and the lock close at 347/348, which left the lock fd open and the directory still locked in the process)",
+     "Real asynchronous SIGINT from a timer thread at a random moment, 2 x 4000 runs (t6_sigint.py): seed 2 gives 69 runs with exit 3 and a 0-byte new.md; 53+100+28+70 with exit 3 and outputs changed (70 with r.json replaced and new.md absent, 53 the reverse); 211 with temporary files left; fd growth 322 -> FINDINGS reasoning-2 and reasoning-3",
+     "Mutation M8 (lock open failure ignored): caught by test_directory_unopenable_is_write_error",
+     "Mutation M15 (flock failure fails the run): caught by test_unavailable_directory_lock_still_writes",
+     "Mutation M17 (no lock): caught by test_audit_hook",
+     "Mutation M18 (check the resolved name): caught by test_malformed_output_path_is_fixed_write_error",
+     "Mutation M3 (reserved rule also applied to --keep-dir, --claude-dir, --codex-dir, --project): 1602 passed -> FINDING reasoning-4",
+     "Mutation M12 (cleanup also after a failed write): 1602 passed -> FINDING reasoning-4",
+     "Mutation M16 (case-insensitive cleanup prefix): 1602 passed -> FINDING reasoning-4",
+     "Order of errors: a reserved name together with a duplicate or a malformed --since prints those lines first; this ordering existed before the change and follows the code's existing handling of malformed values, so it is not reported"
+    ],
+    "findings": [
+     {
+      "id": "reasoning-1",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "The reserved-name check reads the output name as the user typed it, but the write goes to the resolved path. An output whose final component is a symlink to a `.realornoise-` name in the table directory is written and then deleted by the cleanup, and the run reports success. This breaks the record's sentence 'so the cleanup can never remove a file that a run asked for'.",
+      "evidence": "Line 136 checks `Path(path).name`, the name as typed. Lines 173-177 resolve the targets with `.resolve()`. Lines 456-462 unlink every regular file named `.realornoise-*` in the table directory after a successful table write. In the run, report.json is a symlink to <base>/table/.realornoise-report and the command is `--keep-dir <base>/table --json <base>/report.json`. Result: exit 2, empty stderr, the table dir lists only ['days-1.json'], and report.json no longer exists (the link dangles). In case 2 the pointed-to file already existed ('old') and was destroyed the same way. In case 3, without --keep, the file survives. Script: review24e/reasoning/t1_symlink.py.",
+      "repro": "WORK=$R/work PYTHONPATH=$R/copy/src .venv/bin/python $R/t1_symlink.py (R=.../scratchpad/review24e/reasoning). This is a single run, with no concurrency.",
+      "suggested_fix": "Apply the reserved-name test to the resolved target name as well, after resolution in _execute, or have the cleanup skip any path in `installed`/`staged`. Add a test with a symlinked output."
+     },
+     {
+      "id": "reasoning-2",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A Ctrl-C (SIGINT) during the same-file check can leave an empty file at a target path that did not exist before. The record says a run 'that is stopped while it stages or moves files leaves no empty file at a target' (acceptance item 76).",
+      "evidence": "Lines 407-412: `fd = os.open(target, O_CREAT|O_EXCL)` runs before `placeholders.add(target)`. A KeyboardInterrupt that CPython raises when that call returns leaves a created file that is in neither `placeholders` nor `temporary`, so the finally block does not remove it. The fd also leaks. In t6_sigint.py a timer thread sends a real os.kill(SIGINT) to the process at a random moment of each run; the tool's code is untouched. With seed 2, 69 of 4000 runs ended with exit 3, 'Requested output could not be written.', and new.md present with 0 bytes, where new.md did not exist before. The trace run (t5_interrupt.py) places the window at line 412.",
+      "repro": "WORK=$R/work PYTHONPATH=$R/copy/src .venv/bin/python $R/t6_sigint.py 4000 2. The interleaving is the user pressing Ctrl-C while the tool writes; SIGINT arrives asynchronously and Python raises KeyboardInterrupt at the next check after a call.",
+      "suggested_fix": "Record the target in `placeholders` before os.open (and ignore FileExistsError for it), or block SIGINT with signal.pthread_sigmask around the staging and move phase and re-raise the interrupt afterwards."
+     },
+     {
+      "id": "reasoning-3",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A Ctrl-C during the moves or the finally cleanup makes the run print 'Requested output could not be written.' and exit 3 although some or all requested files were already replaced. The all-or-none rule ('if any write fails, none of them is left changed and the run exits 3') does not hold, and the error text is false. Temporary files and descriptors are also left behind. A `.realornoise.out-` file in an output directory is never cleaned by a later run.",
+      "evidence": "Line 438 `os.replace(...)` runs before line 439 `installed.append(target)`, so an interrupt in between replaces the file without rollback. After `succeeded = True` (line 440), the finally block (lines 453-463) has KeyboardInterrupt-sensitive work; an interrupt there is turned into WRITE_ERROR by the `except BaseException` at lines 324-325, although every output is installed. In the real-SIGINT runs (t6_sigint.py, seed 2, 4000 runs), all with exit 3 and the write error: 100 had r.json replaced and new.md installed; 70 had r.json replaced and new.md absent (a partial set); 53 had new.md written and r.json unchanged; 28 had a `.realornoise.out-*` file left beside r.json; 211 had a `.realornoise-*` temp file left; fd growth was 322 over the runs. The settrace run (t5_interrupt.py) also shows the lock-close line: an interrupt at 347/348 left the directory fd open, so the directory stayed flock-ed within the process and a later run in the same process would block.",
+      "repro": "WORK=$R/work PYTHONPATH=$R/copy/src .venv/bin/python $R/t6_sigint.py 4000 2 (seed 1 gives similar counts). Same justification as reasoning-2: a real asynchronous SIGINT from the user, not a hook inside the tool's call stack.",
+      "suggested_fix": "Mask SIGINT/SIGTERM (signal.pthread_sigmask) from staging through cleanup and the lock release, then deliver a pending interrupt after the files are consistent. Treat an interrupt after `succeeded` as success for the files. Append to `installed` before os.replace and check whether the target was replaced on rollback."
+     },
+     {
+      "id": "reasoning-4",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "Three rules of the record can be broken without any test in tests/unit/logs or tests/acceptance/test_logs.py failing. (a) The reserved-name rule applies to --json, --markdown and --html only ('An output option ... whose file name begins with `.realornoise-`'). (b) The cleanup runs only 'after a successful write'. (c) The cleanup matches regular files whose names begin with exactly `.realornoise-`, not a case-folded form.",
+      "evidence": "mutate.py on the copy, running tests/unit/logs plus tests/acceptance/test_logs.py (the two record-text tests deselected because the copy lacked docs at first): M3 extends the check at line 137 to (args.json, args.markdown, args.html, args.keep_dir, args.claude_dir, args.codex_dir, args.project), so --keep-dir ~/.realornoise-x would be refused: 1602 passed. M12 changes line 456 to `if table_path is not None:`, so cleanup also runs after a failed write: 1602 passed. M16 changes line 459 to `path.name.casefold().startswith('.realornoise-')`, so it would delete a user's `.REALORNOISE-notes` file in the table dir: 1602 passed. For contrast, M8, M15, M17 and M18 are each caught.",
+      "repro": "cd $R && PY=.venv/bin/python .venv/bin/python mutate.py M3_reserved_also_keep_dir M12_cleanup_on_failure_too M16_cleanup_case_insensitive",
+      "suggested_fix": "Add tests: a --keep-dir (and --claude-dir) named `.realornoise-x` is accepted and written; a failed --keep write leaves a leftover `.realornoise-x` regular file in place; `.REALORNOISE-x` in the table dir survives a successful run."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "reasoning-1",
+     "verdict": "partly",
+     "severity": "low",
+     "note": "I reproduced this on my own copy of the code, with no change to the tool (verify-reasoning/v1.py). report.json is a symlink to <base>/t/.realornoise-x and the run is `--keep-dir <base>/t --json report.json`. It exits 2 with empty stderr, the directory then holds only days-1.json, and report.json no longer resolves. The same happens when the target file already existed ('old'). Without --keep the file survives. The check at cli.py:136 uses `Path(path).name` as typed, while the targets are resolved at 173-177 and the cleanup at 456-462 removes them. So the record's sentence 'the cleanup can never remove a file that a run asked for' is false as written. No timing or concurrency is involved. I rate it low, not medium: the user has to make an output link that points at a reserved temporary-file name inside the table directory, which is a contrived setup and not a plain run."
+    },
+    {
+     "id": "reasoning-2",
+     "verdict": "partly",
+     "severity": "low",
+     "note": "Reproduced with real asynchronous SIGINTs (verify-reasoning/v2.py, seed 7, 3000 runs). A separate killer thread calls os.kill(getpid(), SIGINT) after a random delay; nothing hooks into the tool. 63 runs ended with exit 3, 'Requested output could not be written.', and new.md at 0 bytes although it did not exist before. An instrumented copy (copy3, which only records the line of the caught exception) puts every such case at the os.open call of the same-file check, original lines 407-412, before placeholders.add. Item 76 as written ('a run whose write fails leaves no empty file at any target path that did not exist before') does not hold when the failure is a Ctrl-C. Two things overstate it. The record's paragraph on interrupted writes promises this only for a stop 'while it stages or moves files'; a stop during the check itself, by SIGKILL for example, leaves the file whatever the code does. And the window is a few microseconds that a Ctrl-C has to hit. The leaked descriptor does not matter: the process exits. Low."
+    },
+    {
+     "id": "reasoning-3",
+     "verdict": "partly",
+     "severity": "low",
+     "note": "Reproduced with the same real-SIGINT runs (v2.py and the instrumented v2t.py, 3000 runs each). Every outcome below ended with exit 3 and the write error. (a) At os.replace, original line 438, before installed.append: r.json was replaced while new.md was missing (18 instrumented runs, 52 in the plain run). Other cases left new.md written while r.json stayed unchanged, or left the table replaced while the other outputs stayed unchanged. So a requested file is left changed after a run that reported a write error. (b) At original lines 454-458, after succeeded=True: every output was installed, yet the run printed the write error (15 runs). (c) '.realornoise.out-*' temporary files were left beside r.json (about 40 runs). The lock-descriptor point is overstated: the CLI process exits, so a descriptor left open there does not block a later run. Every case needs a Ctrl-C (or another catchable signal) landing in a microsecond window. The record's all-or-none rule is written for failed writes, and no code can keep it under SIGKILL. Masking SIGINT would make it hold for Ctrl-C. A real but narrow gap: low, not medium."
+    },
+    {
+     "id": "reasoning-4",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "I wrote my own mutation driver (verify-reasoning/mut.py) on copy4, with docs, bench and the other needed folders, so nothing was deselected. It runs tests/unit/logs and tests/acceptance/test_logs.py. The unmutated base gives 1604 passed and 3 skipped. M3 (the reserved-name check extended to keep_dir, claude_dir and codex_dir): 1604 passed. M12 (cleanup with `if table_path is not None:`, so also after a failed write): 1604 passed. M16 (cleanup matches `path.name.casefold().startswith('.realornoise-')`): 1604 passed. M16 breaks item 76 ('a file with any other name is left as it was'), because it would delete a user's .REALORNOISE-notes. M3 makes a valid --keep-dir fail. M12 breaks the 'after a successful write' rule. A grep found no case-variant or keep-dir-reserved test elsewhere under tests/. This is a test weakness, so low."
+    }
+   ]
+  },
+  {
+   "checker": "tests-docs",
+   "review": {
+    "summary": "I made 22 mutants of src/arci/logs/cli.py, one at a time, in copies under /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/tests-docs/mut/. Each run printed arci.__file__ to confirm it imported the copy. I ran tests/unit/logs plus tests/acceptance/test_logs.py on each one. The unmutated baseline was 1604 passed and 3 skipped (scipy and two zstd cases).\n\nTests caught 18 of the 22 mutants. Four survived:\n- **Mutant 17** (cleanup after a failed table write): equivalent. The table is always moved last, so a run that installed the table has already succeeded.\n- **Mutant 05a** (mkdir with 0700 but no chmod afterwards): changes behaviour under umask 0100, and no test runs there.\n- **Mutant 17b** (cleanup after any failed write): changes behaviour, and no test catches it.\n- **Mutant 18** (cleanup in a successful run that wrote no table): changes behaviour only when the table becomes unreadable between the two reads, and no test catches it.\n\nThe real-process test passed 20 of 20 runs. Each call took 0.88 to 1.15 s, inside its own 19 s limit. It is skipped only where fcntl cannot be imported, which is right, and CI runs it on ubuntu. It catches unlocking before the moves and skipping the re-read. It does not catch removing the created table directory, but unit tests do.\n\nEvery changed sentence in CHANGELOG.md, docs/recipes/logs.md and docs/THREAT_MODEL_LOGS.md held when I ran the code. No changed line has an em dash or sales wording. No stale sentence remains in README.md, docs/ (outside docs/design/), packages/, plugins/ or integrations/. All five tests the threat model names still exist.\n\nItems 78 and 79 are each held by an acceptance test:\n- **Item 78:** test_a_failed_keep_write_leaves_a_new_table_directory_in_place catches mutants 01, 03 and 05b.\n- **Item 79:** test_an_output_name_starting_with_the_reserved_prefix_is_malformed catches mutants 11, 12 and 14.\n\nThe acceptance tests cannot see the \"reads nothing\" part of item 79, so mutant 15 passes them. The unit test test_reserved_output_names_read_and_write_nothing catches it.",
+    "checked": [
+     "Baseline on copy (PYTHONPATH=copy/src, arci.__file__ confirmed): tests/unit/logs + tests/acceptance/test_logs.py -> 1604 passed, 3 skipped (scipy, two zstd)",
+     "01 remove created table directory on failed write -> CAUGHT (test_transaction_rolls_back[report]; acceptance test_a_failed_keep_write_leaves_a_new_table_directory_in_place)",
+     "02 remove only the created parent(s) -> CAUGHT (test_transaction_rolls_back[directory]); not caught by acceptance alone",
+     "03 mkdir/chmod 0755 -> CAUGHT (test_keep_modes_paths_and_canonical_bytes; acceptance item 78 test)",
+     "04 chmod existing table directory to 0700 -> CAUGHT (test_keep_modes_paths_and_canonical_bytes; acceptance test_the_modes_of_the_table_and_its_directory)",
+     "05a skip chmod after mkdir(mode=0o700) -> SURVIVED (finding tests-docs-1)",
+     "05b mkdir() default mode, no chmod (umask decides) -> CAUGHT (test_keep_modes_paths_and_canonical_bytes; acceptance item 78 test)",
+     "06 release lock before the moves -> CAUGHT (test_exclusive_lock_is_held_through_cleanup[reread]; real-process test also fails 3/3)",
+     "07 release lock before the cleanup -> CAUGHT (test_exclusive_lock_is_held_through_cleanup[cleanup])",
+     "08 lock open failure goes on unlocked -> CAUGHT (test_directory_unopenable_is_write_error)",
+     "09 flock failure becomes write error -> CAUGHT (test_unavailable_directory_lock_still_writes)",
+     "10 fcntl missing becomes write error -> CAUGHT (test_platform_without_lock_module_never_opens_the_directory)",
+     "11 reserved-name check on --json only -> CAUGHT (unit and acceptance)",
+     "12 reserved-name check only for names in the table directory -> CAUGHT (acceptance test_an_output_name_starting_with_the_reserved_prefix_is_malformed)",
+     "13 no NFKC -> CAUGHT (unit fullwidth case); acceptance has no NFKC case (item 79 asks only for letter case)",
+     "14 no case folding -> CAUGHT (unit and acceptance [mixed-json])",
+     "15 reserved check moved after logs are read -> CAUGHT by unit test_reserved_output_names_read_and_write_nothing (forbids reads); acceptance tests pass because a process test cannot see reads",
+     "16a cleanup also rmtree's .realornoise- directories -> CAUGHT (test_success_cleans_only_regular_temporary_files)",
+     "16b cleanup also unlinks .realornoise- symlinks -> CAUGHT (same test)",
+     "16c cleanup also rmdir's empty .realornoise- directories -> CAUGHT (same test)",
+     "17 cleanup condition without 'succeeded' (table installed but run failed) -> SURVIVED but equivalent: the table is appended last to outputs and moved last, so 'table in installed' implies every move is done and succeeded=True on the next line; only an asynchronous exception between those two statements differs (checked with a run: same result as the original)",
+     "17b cleanup on any run with a table path, failed or not -> SURVIVED (finding tests-docs-2)",
+     "18 cleanup on successful run even when no table was installed -> SURVIVED (finding tests-docs-3)",
+     "19 output temporaries given the table prefix -> CAUGHT (test_full_run_has_no_network_process_or_unrequested_write[False])",
+     "20 re-read under lock skipped (read before locking) -> CAUGHT (unit; real-process test fails 3/3)",
+     "Real-process test test_real_process_writers_preserve_all_successful_rows x20 on unmutated copy: 20 passed, call time 0.88 to 1.15 s (session 1.03 to 1.38 s), no failure; skipped only via importorskip('fcntl') (Windows), CI runs it on ubuntu-latest for 3.11 and 3.14; children inherit PYTHONPATH and venv default imports worktree src",
+     "Real-process test vs mutants 01 and 02: passes 3/3 each (does not catch them; unit tests do)",
+     "Doc run 1: --keep-dir exist/a/b with blocked --json -> exit 3, write-error line, a and b 0700, b empty, existing parent keeps 0751: CHANGELOG/recipe/threat-model sentences true",
+     "Doc run 2: existing table dir 0755 -> stays 0755, table 0600: true",
+     "Doc run 3: table dir mode 0300 (not openable O_RDONLY) -> exit 3 write error: 'cannot be opened for the lock is a write error' true",
+     "Doc run 4: sys.modules['fcntl']=None -> exit 2, table read back: true",
+     "Doc run 5: fcntl.flock raising OSError -> exit 2, table written: true",
+     "Doc run 6: .realornoise-, .REALORNOISE-, fullwidth, and kelvin-sign names -> exit 3 usage line, nothing changed; .realornoise.json and realornoise-a.json accepted: true",
+     "Doc run 7: cleanup removes regular .realornoise- leftover, keeps .realornoise- dir, symlink, .realornoise.out- file and other names: true",
+     "Doc run 8: mkstemp prefixes observed .realornoise- (table) and .realornoise.out- (reports): true",
+     "Doc run 9: no rmdir/rmtree anywhere in src/arci/logs: 'the tool never removes a directory' true",
+     "Stale-sentence search (remove...directory, inode, retry, recreate, identity, requested outputs preserved) over README.md, docs/ (excl. design), packages/, plugins/, integrations/: no remaining sentence about the old behaviour",
+     "Threat model named tests: test_full_run_has_no_network_process_or_unrequested_write, test_import_allow_list, test_canaries, test_every_json_string_leaf, test_names_cannot_inject_markup_or_controls all exist",
+     "Record item 78 held by acceptance test_a_failed_keep_write_leaves_a_new_table_directory_in_place (fails under mutants 01, 03, 05b); item 79 held by test_an_output_name_starting_with_the_reserved_prefix_is_malformed and test_reserved_prefix_names_that_are_still_accepted (fail under 11, 12, 14)",
+     "Changed doc lines: no em or en dashes, no sales wording, no 'because' claims"
+    ],
+    "findings": [
+     {
+      "id": "tests-docs-1",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "No test fails when the chmod(0o700) after creating a table directory is dropped (mkdir(mode=0o700) kept). Record 'Writing': the directory is created with mode 0700. Under a umask that removes owner bits, this mutant gives the directory another mode, and the run then fails.",
+      "evidence": "Mutant 05a (directory.chmod(0o700) replaced by pass) passed the whole suite: 1604 passed, 3 skipped. Run under os.umask(0o100), --keep-dir <root>/a/t, script umask_check.py: original exits 2, a is 0o700, table written. Mutant exits 3 with 'Requested output could not be written.', and a is 0o600, so it cannot be traversed.",
+      "repro": "PYTHONPATH=<mut>/src:<copy> .venv/bin/python /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/tests-docs/umask_check.py <dir>",
+      "suggested_fix": "Add a unit test that sets os.umask(0o100) (restored in finally), runs --keep-dir into two new levels and asserts exit 2 and mode 0700 on both."
+     },
+     {
+      "id": "tests-docs-2",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "No test fails when the cleanup also runs after a failed write. The record, CHANGELOG and threat model all say leftover .realornoise- files are removed after a successful write. With this mutant, a run that fails with exit 3 still removes a leftover regular file from an existing table directory.",
+      "evidence": "Mutant 17b (condition 'if succeeded and table_path is not None and table_path in installed' changed to 'if table_path is not None') passed all 1604 tests. Script cleanup_check.py, case A: existing table dir holding .realornoise-leftover, --json naming a non-empty directory. Original: exit 3, leftover present True. Mutant: exit 3, leftover present False.",
+      "repro": "PYTHONPATH=<mut 17b>/src:<copy> .venv/bin/python /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/tests-docs/cleanup_check.py <dir>",
+      "suggested_fix": "Extend test_failed_keep_preserves_directories (existing=True) or the item 33 unit test: put a .realornoise- leftover in the table directory before the failing run and assert it is still there."
+     },
+     {
+      "id": "tests-docs-3",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "No test fails when the cleanup runs after a successful run that installed no table. This happens when the table reads as unreadable at the re-read under the lock: the run writes no table but still removes .realornoise- leftovers. CHANGELOG says only 'Successful table writes' do this. Runs of this tool alone cannot reach this state, because the table is replaced atomically and never written above the size limit. Another program changing the file between the two reads can.",
+      "evidence": "Mutant 18 (condition changed to 'if succeeded and table_path is not None') passed all 1604 tests. Script cleanup_check.py, case B: the second kept.read is injected to return ('unreadable', ()). Original: exit 2, no table, leftover present True. Mutant: exit 2, no table, leftover present False.",
+      "repro": "PYTHONPATH=<mut 18>/src:<copy> .venv/bin/python /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24e/tests-docs/cleanup_check.py <dir>",
+      "suggested_fix": "Add a unit test that makes the re-read under the lock return 'unreadable', with a leftover .realornoise- file present, and asserts the leftover stays and no table is written."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "tests-docs-1",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced on my own copies under review24e/verify-tests-docs/. Mutant m05a replaces `directory.chmod(0o700)` (cli.py:392) with `pass`. The full tests/ suite gave the same result as the unmutated copy: 5087 passed, 6 failed, 21 skipped, with an identical failure set. The 6 failures come from my copy and environment (docs word count, branch links, startup import timing, plugin marketplace path) and none is in the write path. The existing tests that check for 0700 run under umask 022, where mkdir(mode=0o700) already gives 0700. behave.py under umask 0o100 with --keep-dir <root>/a/t: the original exits 2 with no error, both directories are 0o700 and the table is written. The mutant exits 3 with 'Requested output could not be written.', and a is 0o600, so it cannot be traversed (EACCES). Under umask 077 both versions give 0700. This breaks the 'Writing' rule (directories are created with mode 0700) and record item 20, but only under an unusual umask, so it is a test weakness: low. No timing hook is involved."
+    },
+    {
+     "id": "tests-docs-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Mutant m17b changes the cleanup condition at cli.py:456 to `if table_path is not None:`. The full suite result matched the unmutated copy exactly, so the mutant is not detected. behave.py case A: an existing table directory holds .realornoise-leftover and --json names a non-empty directory. The original exits 3 with the write-error line and the leftover stays. The mutant also exits 3, but the leftover is removed. Record 'An interrupted write, and two runs at once' says the cleanup runs 'After a successful write, and while the lock is held', and CHANGELOG says 'Successful table writes remove'. A single plain run can reach this, but only a leftover file is lost, so this is a test weakness: low."
+    },
+    {
+     "id": "tests-docs-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Mutant m18 changes the condition at cli.py:456 to `if succeeded and table_path is not None:`. The full suite result matched the unmutated copy, so the mutant is not detected. behave.py case B makes the second kept.read return ('unreadable', ()). The original exits 2, writes no table and keeps the leftover. The mutant exits 2, writes no table and removes the leftover. This breaks the record's 'After a successful write' condition. Reachability is as the checker says. I also ran case C (behave_c.py): with a table that is already corrupt at the start, table_path is None (cli.py:317), so neither version reaches the cleanup. The state therefore needs another program to change the table between the two reads, and runs of this tool alone cannot cause it, because the table is replaced atomically and the size limit is checked on write. Low, as a test weakness only."
+    }
+   ]
+  }
+ ]
+}

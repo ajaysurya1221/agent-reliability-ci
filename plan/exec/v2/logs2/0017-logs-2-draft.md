@@ -529,8 +529,21 @@ call, or the call itself fails, the run goes on without a lock. The tool assumes
 program removes or replaces the table directory while a run is using it. An output option
 (`--json`, `--markdown`, `--html`) whose file name begins with `.realornoise-`, compared after
 Unicode normalization (NFKC) and without regard to letter case, is a malformed value: the
-general usage line, exit 3, nothing read and nothing written. Those names are reserved for the
-table's temporary files, so the cleanup can never remove a file that a run asked for.
+general usage line, exit 3, nothing read and nothing written. The test is made on the name as
+given and on the name of the file the path resolves to, so a symbolic link to such a name is
+refused too. Those names are reserved for the table's temporary files, so the cleanup can never
+remove a file that a run asked for.
+
+**A run that is interrupted or killed (added after the check of the simpler design).** An
+interrupt from the keyboard during the write ends the run with the write error and exit 3. If
+it arrives before the last file is moved into place, the run restores the files it had already
+replaced and removes an empty file it had made at a new target. If it arrives after the last
+move, the files are already written. A second interrupt during the restore can leave some
+files replaced. A process that is killed outright restores nothing: it can leave some files
+replaced, an empty file at a new target if it is killed during the same-file check, and a
+temporary file beside a report (its name begins with `.realornoise.out-`), which may be
+deleted by hand. In the table directory the next successful `--keep` run removes the table's
+leftovers. No requested file is ever left half written: each is moved into place whole.
 
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
 more than 33,554,432 bytes. Neither the number of settings nor the number of rows is capped, so
@@ -1205,4 +1218,6 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
     and every directory that existed before still exists with its mode.
 79. A `--json`, `--markdown` or `--html` path whose file name begins with `.realornoise-`, in
     any letter case, prints the general usage line, exits 3, and reads and writes nothing. The
-    names `.realornoise.json` and `realornoise-report.json` are accepted.
+    names `.realornoise.json` and `realornoise-report.json` are accepted. A path that is a
+    symbolic link to a file whose name begins with `.realornoise-` is refused in the same way,
+    and neither the link nor its target is changed.
