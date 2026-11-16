@@ -2,7 +2,10 @@
 
 These formats are not documented by their vendors as public interfaces and can change.
 The readers were checked against Claude Code client versions 2.1.309, 2.1.321 and 2.1.325
-and Codex CLI versions 0.154.0 and 0.167.0 on one machine.
+and Codex CLI versions 0.154.0, 0.167.0 and 0.169.0 on one machine.
+For 0.169.0 the check was one short session written for it (two responses): its record
+types and the fields the reader uses equal those of the 0.167.0 sessions, and the reader
+read it with no line lacking a field.
 `arci logs` is untested on Windows; Windows case rules are unchanged.
 This describes the readers in [the repository](../src/arci/logs/), not a vendor contract.
 The [statistics](STATISTICS_LOGS.md) define the day table and comparison;
@@ -98,7 +101,9 @@ so a result in a duplicate session can be unmatched when its response was alread
 Each line has `timestamp`, `type` and `payload`. The first line must be `session_meta`.
 Without that header the rest of the file is not read. Its payload supplies `id` (session
 identity), `cwd`, `cli_version` and `thread_source`. Exactly `"subagent"` means not the
-main thread; `"user"` or an absent value means main thread. With a project filter,
+main thread; `"user"`, an absent value or any other value means main thread. The 0.169.0
+source can save a side chat as its own file with `"tui_side_chat"`; no such file was seen,
+and the reader would count it as main thread. With a project filter,
 an outside or missing working directory stops reading after this line.
 
 `turn_context.payload.model` and `.effort` apply until the next `turn_context` line.
