@@ -1,0 +1,251 @@
+{
+ "sentences": {
+  "items": [
+   {
+    "item": "Run 3, first sentence: \"Two readers of the post about runs 1 and 2 asked what would deal with the failures that remained.\"",
+    "verdict": "overstated",
+    "evidence": "Neither record has that question. /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/devto-reply-2.md: \"Agentic Affairs\" asked whether the code-retry variant would be run (\"are you planning to run it\"). /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/hashnode-reply-1.md: \"Halfcycle\" proposed a run with the next step in the text and asked \"Did you try varying the error wording?\". The pre-registration says only \"Two readers of the blog post asked for one [a third run]\". The two sentences that follow (dev.to: retry in code; Hashnode: a message that names the next step) match the pre-registration's wording.",
+    "fix": "Replace the sentence with: \"Two readers of the post about runs 1 and 2 each asked about a further variant.\""
+   },
+   {
+    "item": "Registration bullet 3, the four conditions: \"...the message was delivered as often as the empty result reached the baseline arm (16 audit lines, 16 deliveries); no trial crashed or ran out of time or budget; the stored decision matches a recomputation.\"",
+    "verdict": "overstated",
+    "evidence": "Numbers are right (run-3-audit.jsonl: 16 lines, 16 distinct tool_call_id; my count from events.jsonl: 16 successful injected empty results in the baseline arm; 32 of 32 terminations \"completed\"; arci report on my copy: \"stored decision: match\"). But three parts are not what was registered: (1) the pre-registration says the audit \"records replacements made by the middleware, not what the model received\" and is \"supporting evidence only\", so \"the message was delivered\" claims more than the audit shows; (2) registered condition 3 is no crash and at most 1 trial in 20 per arm ending on time-out or budget, not zero; (3) condition 4 also requires the expected experiment id in the manifest (it is there: folder name, manifest and pre-registration carry the same id).",
+    "fix": "Replace the bullet with: \"- The registration fixed four conditions for reading the verdict as a statement about the message: the start checks passed (the registration published and unchanged, 17 file digests, the software versions, the model id); the middleware replaced the content as often as the empty result reached the baseline arm (16 audit lines with 16 distinct call ids, 16 empty results; the audit counts replacements, not what the model received, so it is supporting evidence only); no trial crashed, and none ran out of time or budget (the registration allowed at most one trial in 20 per arm); the store carries the registered experiment id and the stored decision matches a recomputation. All four hold. They do not establish the independence assumptions.\""
+   },
+   {
+    "item": "Registration bullet 6: \"Working records (pre-registration, result file with the erratum, digests, logs, count scripts, reviews) at commit d230ec0\" linked to .../tree/d230ec0/plan/exec/v2/study",
+    "verdict": "misread-risk",
+    "evidence": "git ls-tree d230ec0: plan/exec/v2/study/ holds PREREGISTRATION-run-3.md, RESULT-run-3.md, run-3-digests.sha256, run-3.log, run-3-check.log, run-3-smoke.log, counts-run-3/, run-3-counts-a.json and -b.json, and order-desk-empty-message/tests/test_code_retry_demo.py. The reviews (R4 to R9, among them R8-run3-result-verify-workflow.json) are in plan/exec/v2/reviews/, a sibling folder, so a reader who follows the link does not find them.",
+    "fix": "Replace the first sentence of the bullet with: \"Working records (pre-registration, result file with the erratum, digests, logs, count scripts) at commit [`d230ec0`](https://github.com/ajaysurya1221/agent-reliability-ci/tree/d230ec0/plan/exec/v2/study); the reviews are beside them in [`reviews/`](https://github.com/ajaysurya1221/agent-reliability-ci/tree/d230ec0/plan/exec/v2/reviews).\""
+   },
+   {
+    "item": "Counts table, row label: \"Had a tool failure with no injected fault | 9 (8 passed) | 14 (1 passed)\"",
+    "verdict": "misread-risk",
+    "evidence": "The numbers are right (my count: trials with a failed tool_finish that carries no injection marker: baseline 9, of which 8 passed; candidate 14, of which 1 passed; arci report \"Tool outcomes\" gives the same). But every run 3 trial is under the injected fault (the table above says it fired in 16 of 16 and 15 of 16), so \"with no injected fault\" reads as a contradiction. The result file's label is \"Trials with a tool error that was not injected\".",
+    "fix": "Replace the row with: \"| Had a tool failure that was not injected | 9 (8 passed) | 14 (1 passed) |\""
+   },
+   {
+    "item": "Counts table under the heading \"Counts (descriptive; registered in advance; they decide nothing)\": four registered counts are left out",
+    "verdict": "misread-risk",
+    "evidence": "The pre-registration says the counts defined in counts-run-3/SPEC.md are published. The public table omits failed, errored, ended_on_budget_or_time and empty_result_delivered_ok. They are in RESULT-run-3.md at d230ec0 and can be derived, so nothing is hidden, but the heading suggests the registered set. My counts from the store: failed 1 and 14; errored 0 and 0; termination other than completed 0 and 0; delivered with a successful call 16 and 15.",
+    "fix": "Add after the \"Passed\" row: \"| Failed | 1 | 14 |\" and \"| Errored | 0 | 0 |\"; add after the \"Termination `completed`\" row: \"| Ended on a budget or the time limit | 0 | 0 |\"; change \"| Empty result delivered | 16 | 15 |\" to \"| Empty result delivered (the call recorded as successful in each) | 16 | 15 |\"."
+   },
+   {
+    "item": "Unchanged sentences that now sit in a three-run document: heading \"## What the two runs do and do not show\", \"Neither run says anything about other tasks...\", and (introduction) \"The run stores and logs are kept by the maintainer and are not in the repository.\"",
+    "verdict": "misread-risk",
+    "evidence": "With run 3 in the same file, \"the two runs\" and \"Neither run\" no longer say which runs. Run 3's log and store are in the repository at d230ec0 (plan/exec/v2/study/run-3.log, runs-run-3/), so the stores-and-logs sentence is true only of runs 1 and 2 at the time of the first write-up. No file in the worktree links to the anchor #what-the-two-runs-do-and-do-not-show (grep found none), so the heading can change.",
+    "fix": "Heading: \"## What runs 1 and 2 do and do not show\". Sentence: \"Neither of these two runs says anything about other tasks, other prompts, or these models in general.\" Introduction: \"The stores and logs of runs 1 and 2 were at first kept by the maintainer and were not in the repository.\""
+   },
+   {
+    "item": "Tests: would a wrong number in the Run 3 table be caught? (tests/unit/docs/test_order_desk_stores.py)",
+    "verdict": "misread-risk",
+    "evidence": "Ran the given command: 8 passed in 0.87s (run-3 case of test_rederived_decision_matches_store, test_run_3_wealth_figures_match_doc, test_run_3_is_a_statistical_block_with_swapped_roles all pass). The test file reads the document in two places only, both for wealth. HELD AGAINST THE DOCUMENT TEXT: only the row \"Run 3 BLOCK wealth and PASS wealth (threshold 40) | 42.79 and 0.013\" (compared with the re-derived 4.27909e+01 and 1.29680e-02 at the displayed precision; the row label is matched literally). HELD AGAINST THE STORE ONLY, as constants written in the test, so a wrong figure in the document would NOT fail: verdict BLOCK, round 2, 16 pairs, 15 and 2 passes, pairs 13 / 3 / 0 and 0 errored, no hard violation, BLOCK crossed and PASS not, 32 trials, arm labels with-empty-lookup-text and run-2-setup, and (through equality with decision.json) the per-task cells. HELD BY NO TEST: fault fired 16 of 16 and 15 of 16, wall time 2 min 3 s, the whole Counts table (first call 9/11, never called 0/1, delivered 16/15, read again 16(15)/2(2), not again 0/13(0), uninjected failure 9(8)/14(1)), the per-task sentence, the rule row as text, 34 of 52, 2.5%, 19 seconds, 17 digests, 16 audit lines, smoke 6 of 8 and 3 of 8. All of these I confirmed by hand, but no test would notice a later edit.",
+    "fix": "Add a test that reads the document, for example: def test_run_3_table_matches_store(): text = STUDY_DOC.read_text(encoding=\"utf-8\"); d = _rederived_decision(RUN_3); b = sum(c.baseline_successes for c in d.cells); c_ = sum(c.candidate_successes for c in d.cells); n = sum(c.pairs for c in d.cells); k = d.history[-1].counts; assert f\"| Baseline (with the message) passed | {b} of {n} |\" in text; assert f\"| Candidate (run 2's set-up) passed | {c_} of {n} |\" in text; assert f\"| Pairs: only baseline passed / tie / only candidate passed | {k.minus} / {k.zero} / {k.plus} |\" in text; assert f\"statistical `BLOCK` at round {d.stopped_at_round}\" in text. Optionally a second test that recounts the Counts table rows from trials.jsonl."
+   },
+   {
+    "item": "Linked record, not the public text: PREREGISTRATION-run-3.md line 91-92, \"32 of its 34 failures under the empty result were on these tasks\"; public heading \"Registration, checks and one erratum\"",
+    "verdict": "wrong",
+    "evidence": "My count from the run 2 store (/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/docs/results/order-desk-study/run-2/...): candidate failures under empty_result 34; on the 8 stock-note tasks 33 (the other one is desk-10); this agrees with the same sentence's \"passed 7 of 40 on these cells\" (40 - 7 = 33). 32 is a different count: failures that received the empty result and never called lookup_order again. The public document does not repeat the number, and the rule and grid are unaffected, but it is a second inexact statement in the registration that the document says has one erratum. The pre-registration is a registered record and must not be edited.",
+    "fix": "Add a line to the erratum in RESULT-run-3.md and one bullet to the public section: \"- A second inexact number in the registration, which changes nothing in the rule or the grid: it says 32 of the 34 failures under the empty result in run 2 were on these 8 tasks. The store gives 33 (the candidate passed 7 of 40 on these cells). 32 is the number of those failures in which the model got the empty result and did not read the order again.\" Change the heading to \"### Registration, checks and errata\"."
+   },
+   {
+    "item": "State of the branch: order-desk-study/README.md says \"Three committed, byte-for-byte copies\"; study document says \"the sealed stores of all three runs are now committed\"",
+    "verdict": "misread-risk",
+    "evidence": "git status in /Users/ajay/Developer/.arci-worktrees/wt-v2-logs: the five files are modified and not committed (git log origin/main..HEAD is empty) and docs/results/order-desk-study/run-3/ is untracked (four files; git check-ignore says none is ignored). The copy itself is right: diff -r against /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/runs-run-3/ shows no difference and the four SHA-256 values are equal (decision ae4f5b6c..., events 86b91364..., manifest dffbb1da..., trials 2395d205...). If the store is left out of the commit, the test module fails at import, because `(run_dir,) = sorted(...glob(...))` for run-3 finds nothing.",
+    "fix": "Commit the four files under docs/results/order-desk-study/run-3/order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504/ in the same commit as the five modified files. No text change."
+   },
+   {
+    "item": "Summary: everything else new or changed is confirmed",
+    "verdict": "confirmed",
+    "evidence": "STORE (my own script on trials.jsonl and events.jsonl; events.jsonl equals the 457 embedded events): 32 trials, 2 rounds of 8 pairs; baseline 15 of 16, candidate 2 of 16; pairs 13 / 3 (2 both passed, 1 both failed) / 0; all 32 \"completed\"; first call not lookup_order 9 and 11; never called 0 and 1 (r000002 desk-06 candidate made no tool call); empty result delivered 16 and 15; read again 16 (15 passed) and 2 (2 passed); not again 0 and 13 (0 passed); per task 03 2/0, 06 2/0, 09 2/1, 12 2/0, 15 2/0, 18 1/0, 21 2/0, 24 2/1. Manifest: alpha 1/20, delta 1/10, stakes 1/4 and 1/2, 40 rounds, per_round, tolerance 4, both arms ollama:qwen3.5:4b-mlx-ctx32k, temperature 0.7, reasoning off, labels with-empty-lookup-text (baseline) and run-2-setup (candidate). DECISION: BLOCK, \"regression established\", round 2, 0 hard violations, 0 errored; wealth recomputed by hand with exact fractions: BLOCK 42.791, PASS 0.012968 (table: 42.79 and 0.013). Round 1 cannot decide: with 8 pairs the largest possible BLOCK wealth is 9.99 and PASS wealth 26.9, both under 40, so \"earliest round\" is right. arci report on my copy printed \"VERDICT: BLOCK (exit 1); stored decision: match\", exit 1, fault fired 16 of 16 and 15 of 16 (README wording exact). RUN 2: 34 of the candidate's 52 failures under empty_result, counted from the run 2 store; run 2's candidate id is the same model id as run 3's. LOG (grep -a on run-3.log): start 16:10:21Z, run start 16:10:24Z, run end 16:12:27Z (2 min 3 s); 17 digest lines OK; versions and model id c01efed5a364 as registered; ARCI 2.4.0; the message text exactly as in the table; --workers 1; audit lines 16. Push of c217ae6 in the local reflog of origin/v2/phase0 at 21:40:02 +05:30 = 16:10:02Z, 19 s before the wrapper start. run-3.sh takes a marker folder and exits 65 on a second start. Smoke: store and log give 16 trials, other suite id, alpha 1/2, delta 1/2, one round, 6 of 8 and 3 of 8, started 16:04:08Z before the registration commit; the smoke log has no guard lines, which fits the erratum. agent.py differs from run 2's only by the ExplainEmptyLookup middleware in the baseline arm (tools, check, configuration, register identical; prompt ends \"Retry an empty lookup once.\"). run-3-counts-a.json and -b.json are byte-identical and equal my counts; R8 records the blind recount. Run 2 used ARCI 2.0.0 (PREREGISTRATION-run-2.md). LINKS: c217ae6 and d230ec0 are commits; d230ec0 holds plan/exec/v2/study; the anchor #run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms equals the heading's GitHub slug; all relative links in the three documents and the three store paths in the README resolve. 2.5% SENTENCE against /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/docs/STATISTICS_SUITE.md: direction right (BLOCK null is Delta >= -delta, which with swapped roles is a mean gain of 10 points or less), alpha/2 = 2.5%, the per-round condition is in the same sentence as required for per_round seeds, \"statistical BLOCK only\", \"ARCI does not check\", \"no guarantee averaged over seeds\" and no bound across campaigns all match; the listed assumptions are those of the pre-registration (\"the same law in every round\" is more than per_round mode needs, which is not an error). PRE-REGISTRATION LIMITS: no claim about the 12B model, capability, cause, the other tasks or conditions, or the full suite; no size of the gain; counts given as counts with no percentage or interval; run 2 is used only as the reason for the grid, not as an effect; \"none was supplied\" for the prediction matches. CHANGELOG, docs/results/README.md and order-desk-study/README.md: every statement checked and right (the CHANGELOG's \"by more than 10 points on those cells\" is the registration's own short form; the exact form is \"of mean pass rate over the 8 cells\"). Neighbouring tests: tests/unit/docs and tests/unit/outcomes/test_export.py, 73 passed.",
+    "fix": "None."
+   }
+  ],
+  "not_checked": [
+   "Whether the links to github.com resolve for the public (commit/c217ae6, tree/d230ec0/plan/exec/v2/study): no network was used. Locally both ids are commits on origin/v2/phase0, and the reflog records both pushes.",
+   "The push time 21:40:02 +05:30 is the local reflog's clock, not the remote's.",
+   "The readers' original comments on dev.to and Hashnode: only the maintainer's records of them (launch/devto-reply-2.md, launch/hashnode-reply-1.md, signals/SIGNALS.md) and the pre-registration were read.",
+   "That the agents really ran what the labels say (model, prompt, temperature) and what the model received: the store holds names and the value null only; I read agent.py and the log's preflight lines, and called no model.",
+   "The record seals (record_sha256, trials_sha256) were checked only through the tool (arci report: match; the test's validate_seal), not by an implementation of my own.",
+   "\"arci gate\" was not run (only \"arci report\" on a copy was allowed); the result file's \"stored decision: MATCH\" from gate is taken from the records.",
+   "Process claims: that the two count scripts were written separately, that the blind recount agent read no write-up, and that the README's sha256sum check was made before committing. I confirmed only the outcomes (identical outputs, R8's record, byte-identical stores).",
+   "The erratum's statement that the wrapper gained its guards between the smoke run and the registration: supported by the smoke log having no guard lines and by RESULT-run-3.md; git holds no state from the time of the smoke run.",
+   "The independence, same-law and no-order-effect assumptions behind the 2.5% bound: not checkable from files, as the document itself says.",
+   "Unchanged sentences and numbers about runs 1 and 2 (apart from 34 of 52, the run 2 model id and the tests' figures) were not checked again.",
+   "Trial-time figures in RESULT-run-3.md (122 s in all, longest 6.2 s) are not in the public document and were not verified; my at_ms sums differ slightly because trial_end carries 0.0 and usage.wall_seconds was not used."
+  ]
+ },
+ "reader": {
+  "items": [
+   {
+    "item": "Q1. What was compared in run 3, and which arm did better (answered from the page alone)",
+    "verdict": "confirmed",
+    "evidence": "From the page: one model (the 4B) in both arms, on 8 cells (the 8 stock-note tasks under the injected empty lookup). One arm replaces the `null` of an empty `lookup_order` result with a message that says to call `lookup_order` again. The other arm is run 2's set-up, where the model gets `null`. The arm with the message did better: 15 of 16 against 2 of 16. I got this from lines 113-130 without help. RESULT-run-3.md says the same. I also ran `arci report` on a scratch copy of the committed run-3 store: BLOCK, stored decision: match, baseline 15, candidate 2, minus 13 / zero 3 / plus 0, BLOCK wealth 4.27909e+01, PASS wealth 1.29680e-02.",
+    "fix": "None needed for the content. See the items below for where a faster reader could still go wrong."
+   },
+   {
+    "item": "Q2. What BLOCK means in run 3, and whether it is the same as in run 1",
+    "verdict": "confirmed",
+    "evidence": "The page says it plainly at lines 115-117: `BLOCK` in run 3 means that the set-up without the message passes less often, by more than the margin, and it is not a second failure of the 4B against the 12B. In run 1 `BLOCK` meant the 4B candidate was worse than the 12B baseline. RESULT-run-3.md ('Read this first: the roles are swapped') agrees.",
+    "fix": "None for the bold paragraph itself. The verdict row and the intro paragraph need help; see the misread-risk items."
+   },
+   {
+    "item": "Q3. Does run 3 show the 4B is worse than, as good as, or better than the 12B",
+    "verdict": "confirmed",
+    "evidence": "None of the three. Lines 113-114 and 176: both arms use the 4B model; the 12B is in neither arm. RESULT-run-3.md line 147 says the same.",
+    "fix": "None."
+   },
+   {
+    "item": "Q4. Does run 3 show that telling the model the next step is what helped",
+    "verdict": "confirmed",
+    "evidence": "No. Lines 177-179: one message was compared with `null`; a message of the same length that names no next step was not tested. RESULT-run-3.md lines 148-150 say the same.",
+    "fix": "None."
+   },
+   {
+    "item": "Q5. How big is the improvement, according to the page",
+    "verdict": "misread-risk",
+    "evidence": "The page says only: more than 10 points of mean pass rate on these 8 cells; a threshold decision, not an estimate (lines 139-140, 151-152, 181). That matches the result file. Two readers can still go wrong. One works out 15/16 against 2/16 and reports '94% against 12%'. The other reads 'more than 10 points' as 'about 10 points'. Also 'points' is never said to be percentage points; the result file does say 'percentage points' once.",
+    "fix": "Add directly under the run 3 table, before 'What the verdict says': \"The verdict says that the gain is more than 10 percentage points on these 8 cells. It does not say how much more. The two counts, 15 of 16 and 2 of 16, come from 16 pairs in a run that stopped early. Do not quote them as pass rates.\" At the first use in line 8, write \"margin 10 percentage points of pass rate\"."
+   },
+   {
+    "item": "Q6. Wrong conclusion from the three verdict words, and whether the preventing sentence is early enough (intro paragraph, lines 10-13)",
+    "verdict": "misread-risk",
+    "evidence": "Verdict words alone read as BLOCK, INCONCLUSIVE, BLOCK under a title that asks whether a 4B model can replace a 12B one. A skimming reader concludes: the 4B failed twice. The intro paragraph (lines 10-13) is early (third paragraph) and says the verdict word means something else, but it does not say what it means and it does not say which arm did better. The reader has to reach line 113 for that. 'with and without a message at the point of failure, and its arm roles are swapped' needed two reads: what message, and swapped relative to what, are not said.",
+    "fix": "Replace lines 10-13 with: \"**Run 3 is a different comparison.** It does not compare the two models. Both arms use the 4B model. One arm gives the model a short message when an order lookup comes back empty. The other arm gives it `null`, as in run 2. The run uses 8 cells, chosen after run 2. The arm with the message passed more often. The tool prints this result as `BLOCK`, because the arm without the message is labelled the candidate. So `BLOCK` in run 3 does not mean that the 4B model failed again. Run 3 has its own section and its own table below: [Run 3](#run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms).\""
+   },
+   {
+    "item": "Title and first line frame all three runs as 4B against 12B",
+    "verdict": "misread-risk",
+    "evidence": "Line 1: 'can a 4B local model replace a 12B one?'. Line 3: 'Three pre-registered runs'. A visitor who follows a link that says 'Run 3' lands under a question that run 3 does not ask.",
+    "fix": "Replace line 3 with: \"Three pre-registered runs on one laptop with Ollama, one worker, no spend. Runs 1 and 2 ask the question in the title. Run 3 asks a different question, about the 4B model alone.\""
+   },
+   {
+    "item": "Verdict row of the run 3 table: statistical `BLOCK` ... (\"regression established\"; no hard violation, no errored pair)",
+    "verdict": "misread-risk",
+    "evidence": "Line 127 sits one row above 'Baseline (with the message) passed'. A reader who skipped the bold paragraph reads 'regression established' as 'the message made things worse'. 'statistical BLOCK', 'hard violation' and 'errored pair' are not explained anywhere on the page. The result file explains the first (lines 46-48: only an ERROR or a BLOCK forced by a hard violation can come at round 1) and docs/STATISTICS.md says BLOCK is 'worse than the baseline by more than delta, or broke a hard invariant'.",
+    "fix": "Replace the cell with: \"statistical `BLOCK` at round 2. The tool's reason line is \"regression established\". Here that means: the arm without the message did worse than the arm with it.\" Add under the table: \"A statistical `BLOCK` is a `BLOCK` that the test reached from the pass and fail counts. The tool can also give a `BLOCK` when one candidate trial breaks a hard rule (a hard violation). A pair with a trial that ended in an error is an errored pair. Neither happened in run 3.\""
+   },
+   {
+    "item": "Sentence read twice: \"The test has no verdict for 'better', so the arm with the change is the baseline and run 2's set-up is the candidate.\" (lines 114-115)",
+    "verdict": "misread-risk",
+    "evidence": "The page never says what PASS, BLOCK and INCONCLUSIVE mean, so the reason for the swap cannot be followed. docs/STATISTICS.md lines 109-111 give the meanings.",
+    "fix": "Replace with: \"The test has three verdicts. `PASS` says the candidate arm is not worse than the baseline arm by more than the margin. `BLOCK` says it is worse by more than the margin. `INCONCLUSIVE` says the rounds ran out first. No verdict says that an arm is better. So, to test whether the message helps, the arm with the message is set as the baseline and run 2's set-up is set as the candidate.\""
+   },
+   {
+    "item": "Run 3 is presented as the answer to two readers' questions, but it answers a narrower one",
+    "verdict": "misread-risk",
+    "evidence": "Lines 106-109: one reader asked for a retry in code; the other asked whether a message that names the next step would 'close the gap'. A reader expects run 3 to answer these. It tests neither the code retry nor the gap between the models, and it cannot say that naming the next step is what helped. The page says each of these, but only 70 to 100 lines later (176-179, 203-205).",
+    "fix": "Add after line 111: \"Run 3 answers a narrower question than either reader asked. It does not test a retry in code. It does not measure the gap between the two models. It tests one message against `null`, with the 4B model, on 8 cells.\""
+   },
+   {
+    "item": "Unexplained: 'wealth' and 'threshold 40'; alpha 1/20 against the 2.5% bound",
+    "verdict": "misread-risk",
+    "evidence": "Rows 37 and 131 give 'BLOCK wealth' and 'PASS wealth' with no meaning. Line 125 says alpha 1/20 (5%); line 143 says 'at most 2.5%'; nothing joins the two or the 40. The tool's report says 'directional error bounds are alpha/2' and 'threshold: 40/1'. Note: tests/unit/docs/test_order_desk_stores.py matches the two wealth row labels by regex, so the labels themselves must stay as they are.",
+    "fix": "Keep the row labels. Add under the run 3 table: \"Wealth is the test's running score for a verdict. There is one score for `BLOCK` and one for `PASS`. A score goes up when the pairs support that verdict. The test gives a verdict when its score is 40 or more at the end of a round. Alpha 1/20 is shared by the two verdicts, so each has a bound of 1/40, which is 2.5%. That is where the 40 comes from.\""
+   },
+   {
+    "item": "Sentences read twice: the assumptions paragraph and 'second look' (lines 142-152)",
+    "verdict": "misread-risk",
+    "evidence": "'the same law in every round' uses 'law' in the statistics sense. 'scenario instances' and 'campaign' are not explained. 'there is no guarantee averaged over seeds' cannot be understood from the page. 'The run stopped at its second look' uses 'look' as a term. The text is a near copy of the result file, so it is supported; it is only hard to read.",
+    "fix": "Replace 'the same law in every round' with \"each cell has the same chance of passing in every round\". Replace 'This is a third campaign on related data' with \"This is a third experiment on related data\". Replace the first sentence of lines 150-151 with: \"The test checks for a verdict at the end of each round. The run stopped after round 2. On 8 cells, round 2 is the first round at which this rule can give `PASS` or a statistical `BLOCK`.\" After 'no guarantee averaged over seeds' add: \"The seeds are fixed by the registered files. They are not a random sample.\""
+   },
+   {
+    "item": "Row 'Injected fault fired, baseline and candidate: 16 of 16 and 15 of 16' gives no reason for the 15",
+    "verdict": "misread-risk",
+    "evidence": "A reader asks whether a fault failed to inject, which would weaken the comparison. The result file explains it (lines 122-124): in the remaining trial (round 2, desk-06) the model made no tool call. The page has the matching count ('Never called lookup_order: 1') but does not join the two.",
+    "fix": "Add under the Counts table: \"The injected empty result fired in 15 of the 16 trials of run 2's set-up. In the other trial (round 2, desk-06) the model made no tool call, so there was no lookup to empty. That trial failed.\""
+   },
+   {
+    "item": "Condition 2 of the four conditions: 'the message was delivered as often as the empty result reached the baseline arm (16 audit lines, 16 deliveries)'",
+    "verdict": "overstated",
+    "evidence": "RESULT-run-3.md lines 72-75 adds a limit that the page drops: 'The audit records replacements made by the middleware, not what the model received; its lines cannot be tied to single trials, so the matching counts are supporting evidence only.' The page's 'the message was delivered' claims more than that.",
+    "fix": "Replace the clause with: \"the middleware replaced `null` with the message 16 times, and the empty result reached the arm with the message 16 times. The audit file records what the middleware wrote, not what the model received, and its lines cannot be matched to single trials. So the equal counts are supporting evidence only;\""
+   },
+   {
+    "item": "'All four hold. They do not establish the independence assumptions.' (line 198)",
+    "verdict": "overstated",
+    "evidence": "The result file (lines 81-82) says one thing more: the checks 'do not give a 2.5% error rate conditional on passing them'. The page drops it. Condition 4 on the page also drops the identity half (the store's manifest carries the expected experiment id).",
+    "fix": "Replace the last two sentences with: \"All four hold. They do not show that the independence assumptions are true. They also do not mean that the 2.5% bound holds for runs that pass these checks.\" In condition 4 write: \"the store carries the registered experiment id, and the stored decision matches a recomputation\"."
+   },
+   {
+    "item": "Erratum bullet: 'the start wrapper, which gained its guards between the smoke run and the registration' (lines 199-202)",
+    "verdict": "misread-risk",
+    "evidence": "'wrapper', 'guards' and 'gained its guards' are not plain. The page implies that everything else was unchanged. The result file is more careful (lines 91-93): the study folder was not changed after the smoke run 'as far as file times show; git holds no state from the time of the smoke run'. The page also leaves out the check-only mode, one guard-only run before the start, and the warm-up call; the page does point to the result file for the full text.",
+    "fix": "Replace the bullet with: \"Erratum: the registration says nothing was changed after the smoke run. That is not true of the wrapper, the script that starts the run. After the smoke run and before the registration, start checks were added to it: a marker that allows only one start, checks that the registration is committed and published, checks of the versions and the model id, a stop if the warm-up call fails, and a check-only mode. The other study files were not changed after the smoke run, as far as file times show. Git has no record from the time of the smoke run, so the history cannot prove this. The registered digest of the wrapper is the digest of the version that ran. The result file states this in full.\""
+   },
+   {
+    "item": "'Not run: the retry in code. With the retry in code the recovery is handed to code; the run would not isolate what the model decides. A scripted test with no model in the working records shows how such a retry behaves.' (lines 203-205)",
+    "verdict": "misread-risk",
+    "evidence": "Read twice. 'with no model in the working records' can be read as 'no model is in the working records'. The reason given is not in RESULT-run-3.md (it only says 'The code-retry variant' was not run). It is in PREREGISTRATION-run-3.md lines 32-34, in plainer words: the model is simply handed a working lookup, so the outcome is nearly fixed.",
+    "fix": "Replace with: \"Not run: the retry in code that \"Agentic Affairs\" asked for. If the code repeats the lookup, the model gets the order without doing anything. The result would be nearly fixed in advance and would say nothing about the model. The working records hold a scripted test, with no model, that shows how such a retry behaves.\""
+   },
+   {
+    "item": "'smoke run' is not explained (line 190)",
+    "verdict": "misread-risk",
+    "evidence": "The term is used three times with no meaning given. The facts in the bullet (16 trials, another suite id, another rule, 6 of 8 and 3 of 8) are confirmed in PREREGISTRATION-run-3.md lines 136-142; the result file confirms only the two counts.",
+    "fix": "Start the bullet with: \"A smoke run is a short trial run to check that the set-up works. One came before the registration and is disclosed in it: ...\""
+   },
+   {
+    "item": "Lines 21 and 23-25 contradict each other: 'The run stores and logs ... are not in the repository.' then 'Update: the sealed stores of all three runs are now committed'",
+    "verdict": "misread-risk",
+    "evidence": "Read twice. A reader who stops at line 21 thinks the raw records are not public, which is the opposite of what the incoming link promises. Also, at the time of my check, docs/results/order-desk-study/run-3/ is untracked in the worktree and the page edit is uncommitted, so 'now committed' is true only after the pending commit. The copy is byte-identical to the working store (diff -rq) and `arci report` on a scratch copy gives 'stored decision: match'.",
+    "fix": "Replace line 21 and the Update paragraph with: \"The sealed stores of all three runs are in the repository under [`order-desk-study/`](order-desk-study/README.md). A test re-derives each decision from the stored trials. The logs of runs 1 and 2 are kept by the maintainer and are not in the repository.\" Publish the page only together with the commit that adds run-3/."
+   },
+   {
+    "item": "Terms used without explanation: ARCI, cells, the four conditions, middleware, arm, pairs, round, sealed store, 2.1.0",
+    "verdict": "misread-risk",
+    "evidence": "'ARCI' first appears at line 145 with no introduction. 'cells' is only implied by '24 tasks by 4 conditions = 96 cells'. The four conditions are never listed; the page names 'clean', 'timeout' and 'empty result' in passing and later says 'the other three conditions'. The run-2 store has clean, tool_timeout, tool_error_once and empty_result. 'middleware' (lines 57, 121) is a LangChain term. 'Since 2.1.0' (line 89) does not say of what.",
+    "fix": "Add after line 8: \"The test tool is ARCI, the tool in this repository. A cell is one task under one condition. The four conditions are: clean (no fault), a tool timeout, a tool error once, and an empty result from the order lookup. In each round every cell is run once in each arm; the two trials of a cell are a pair.\" In line 121 write \"plus one middleware (code that sits between the model and the tools)\". In line 89 write \"Since ARCI 2.1.0\"."
+   },
+   {
+    "item": "Counts row 'Had a tool failure with no injected fault: 9 (8 passed) | 14 (1 passed)'",
+    "verdict": "misread-risk",
+    "evidence": "A reader can take 'tool failure' for a broken tool or a machine problem in 23 of 32 trials. The recomputed report shows that every uninjected failure in run 3 was a failed `check_stock` call (9 in 9 trials with the message; 15 in 14 trials without), and it says the record does not show why a call failed. The result file's label is 'Trials with a tool error that was not injected'.",
+    "fix": "Add under the Counts table: \"The tool failures with no injected fault were all `check_stock` calls that returned an error: in 9 trials with the message and in 14 without. The record does not show why a call failed.\""
+   },
+   {
+    "item": "Run 3 table rows 'Baseline arm' and 'Candidate arm'",
+    "verdict": "misread-risk",
+    "evidence": "The row named 'Baseline arm' holds the changed set-up. A reader who goes straight to the table reads 'baseline' as 'the old way'. The bold paragraph above warns about this, but tables are read first. The Counts table already uses the safer headers 'With the message' and 'Run 2's set-up'.",
+    "fix": "Rename the two rows to \"Baseline arm (with the message)\" and \"Candidate arm (run 2's set-up, no message)\". Rename the pairs row to \"Pairs: only the arm with the message passed / both the same / only run 2's set-up passed\" and give the cell as \"13 / 3 (2 both passed, 1 both failed) / 0\". Do not rename the wealth row; a test matches it."
+   },
+   {
+    "item": "Q8. Sales talk, or a claim of being first or best",
+    "verdict": "confirmed",
+    "evidence": "None found. 'no spend' is a fact about local models. The page reports a wrong prediction for run 1, a correction to run 1, a missing prediction for run 3, an erratum, and a long list of what run 3 does not show. The thanks paragraph names readers and claims nothing.",
+    "fix": "None."
+   },
+   {
+    "item": "Q9a. Numbers and statements on the page that the result file and the store support",
+    "verdict": "confirmed",
+    "evidence": "Checked against RESULT-run-3.md and against `arci report` on a scratch copy of the committed run-3 store: BLOCK at round 2, reason 'regression established', 16 pairs, 15/16 and 2/16, 13/3/0, wealth 42.79 and 0.013, threshold 40, no hard violation, no errored pair, fault fired 16 and 15, all per-task passes, every row of the Counts table, alpha 1/20, delta 1/10, max rounds 40, per_round seeds, wall time 2 min 3 s, registration at c217ae6 pushed 19 seconds before the wrapper started (times from the run log and file system, per the result file; not checked by me), two count scripts agree, blind recount agrees, 'What the verdict says' and 'What run 3 does not show' match the result file almost word for word. From PREREGISTRATION-run-3.md: no prediction was supplied, the message wording, the system prompt ending, the smoke-run details, ARCI 2.4.0 against 2.0.0, the two readers and their questions, 'not pooled'. From the run-2 store: 34 of the candidate's 52 failures were under the empty result, and 7 of 40 passed on the stock-note tasks. Commits c217ae6, d230ec0, d46367d, 8ff0c3a and 6fbdb1c exist locally; the tree at d230ec0 holds the pre-registration, result file, digests, run-3 log, count scripts and reviews.",
+    "fix": "None."
+   },
+   {
+    "item": "Q9b. The linked pre-registration states a run 2 figure that the store does not support",
+    "verdict": "wrong",
+    "evidence": "PREREGISTRATION-run-3.md lines 91-92: 'the candidate passed 7 of 40 on these cells, and 32 of its 34 failures under the empty result were on these tasks'. 7 of 40 passed means 33 failed. My count from the committed run-2 store: under empty_result the candidate failed 33 times on the 8 stock-note tasks and once on another task, so 33 of 34. The page itself is correct (34 of 52; 7 of 40) and does not repeat the 32. The registration is published and must not be edited. A careful reader who follows the link will see the mismatch.",
+    "fix": "Add a second erratum bullet to the page (and to the result file): \"Second erratum: the registration says that 32 of the candidate's 34 failures under the empty result in run 2 were on the 8 stock-note tasks. The store gives 33 of 34. This does not change the grid, the rule or the verdict.\""
+   },
+   {
+    "item": "Q9c. Things in the result file that the page leaves out and a careful reader does not strictly need",
+    "verdict": "confirmed",
+    "evidence": "Left out with little harm: 'no confidence interval is given' for the two counts; the registration's short form of the claim; the note that the store holds no absolute time; one guard-only run and the warm-up call (both covered by 'The result file states this in full'); errored-pair tolerance 4; 122 seconds of trial time. 'Two scripts written separately' is a little stronger than the result file, which says only that two scripts gave identical output.",
+    "fix": "Optional: after 'They are not estimates of the two pass rates' add \"No confidence interval is given for them.\""
+   }
+  ],
+  "not_checked": [
+   "Network: none of the GitHub links, the Reddit link, or the public visibility of commits c217ae6, d230ec0, d46367d, 8ff0c3a, 6fbdb1c was opened. I only confirmed that the commits exist in the local repository and that d230ec0 is on the local remote-tracking branch origin/v2/phase0.",
+   "The push time of c217ae6 (21:40:02) and the wrapper start time (21:40:21). I saw only the commit time 21:39:59 +05:30; the 19 seconds comes from the result file, which cites the run log and file system.",
+   "The reader questions attributed to \"Agentic Affairs\" (dev.to) and \"Halfcycle\" (Hashnode), and the Reddit users named in the thanks paragraph. The pre-registration repeats the first two; I did not see the original comments.",
+   "Runs 1 and 2 sections of the page (tables, the correction, the run 2 descriptive cuts) beyond three figures I recounted from the run-2 store (428 of 480 by condition, 34 of 52 under the empty result, 7 of 40 on stock-note tasks under the empty result).",
+   "tests/unit/docs/test_order_desk_stores.py was read with grep only (it lists run-3 with BLOCK, round 2, 16, 15, 2 and matches the two wealth row labels). I did not run pytest, so I did not confirm that the test passes, or that my proposed wording leaves every doc-bound test green.",
+   "The four registered conditions from raw files (17 digests, model id, 16 audit lines, terminations). I relied on the result file for these; I did not open run-3.log, run-3-audit.jsonl or the digests file.",
+   "Whether the wrapper refuses a second start, and what the scripted code-retry test does. I did not read run-3.sh or the test.",
+   "The claim that the system prompt, tools, check and budgets are the same in both arms. I saw it stated in the pre-registration but did not compare the two arm configurations.",
+   "The HTML reports linked from the runs 1 and 2 table, docs/PROVENANCE.md, and how the page renders on GitHub (the run 3 anchor was checked by rule only, not in a browser).",
+   "My plain-word description of 'wealth' (a running score that goes up when pairs support a verdict) is my own reading of the report and of how such tests usually work. The owner should check it against docs/STATISTICS_SUITE.md before using it."
+  ]
+ }
+}

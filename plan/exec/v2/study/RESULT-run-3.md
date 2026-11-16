@@ -10,7 +10,7 @@ Log: `run-3.log`. Report as the tool renders it: `report-run-3.md`.
 Checked after the run by three agents working separately
 (`../reviews/R8-run3-result-verify-workflow.json`): a recount from the store by an agent
 that read no write-up (every count below came out the same), an audit of the registered
-conditions from the raw files (all hold; one erratum, below), and a sentence-by-sentence
+conditions from the raw files (all hold; errata below), and a sentence-by-sentence
 check of this file (its corrections are applied).
 
 ## Read this first: the roles are swapped
@@ -81,7 +81,9 @@ All four hold.
 These checks do not establish the independence assumptions behind the 2.5% bound, and they
 do not give a 2.5% error rate conditional on passing them.
 
-## Erratum to the pre-registration
+## Errata to the pre-registration
+
+**1. The wrapper changed after the smoke run.**
 
 The pre-registration says of the smoke run: "The registered files are the files the smoke
 run used. Nothing was changed after it." That is not true of the wrapper `run-3.sh`. After
@@ -92,6 +94,14 @@ mode. The study folder itself (`agent.py`, the descriptor, the tasks, the tools,
 check) was not changed after the smoke run, as far as file times show; git holds no state
 from the time of the smoke run. The registered digest of the wrapper is the digest of the
 version that ran.
+
+**2. One number about run 2 is wrong.** The pre-registration says: "32 of its 34 failures
+under the empty result were on these tasks". Run 2's store gives 33 of 34 (the candidate
+passed 7 of 40 on these cells, so 33 failed; the 34th failure was on another task). 32 is
+the number of those failures in which the model got the empty result and did not read the
+order again. The plan the maintainer approved carried the same slip. It does not change
+the grid, the rule or the verdict. Found by the check of the public write-up
+(`../reviews/R10-run3-public-section-check-workflow.json`).
 
 Also not in the registration's text, and done: one guard-only run of the wrapper
 (`run-3-check.log`) before the start; and the warm-up call outside the experiment was the
