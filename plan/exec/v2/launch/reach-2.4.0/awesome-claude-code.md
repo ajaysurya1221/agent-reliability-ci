@@ -67,3 +67,19 @@ against using it as a promotion channel, and a review is best effort.
 
 The rendered form in a browser (only its template was read); how the list's bot checks the
 licence and the age.
+
+## Closed to new submissions for now (seen 2026-11-16)
+
+When the maintainer opened the form, GitHub answered: "An owner of this repository has
+limited the ability to create an issue to users that are collaborators on this
+repository." Checked the same day through the public API: the list received 24 issues on
+11 Nov and 25 on 12 Nov 2026, all from people who are not collaborators, and none since.
+So the owner limited issue creation on about 12 or 13 Nov. No notice about it was found in
+the contributing file, the pinned issues or the discussions. GitHub's limits of this kind
+end by themselves after the period the owner chose (one day to six months); the period is
+not public.
+
+What to do: nothing now. The list's rules allow the web form only (no pull request, no
+`gh`), so there is no other permitted route, and a discussion post would be the promotion
+the list warns against. Look again at each snapshot (19 Nov, 26 Nov, 12 Dec): when new
+issues from other people appear after 12 Nov, the form is open again.

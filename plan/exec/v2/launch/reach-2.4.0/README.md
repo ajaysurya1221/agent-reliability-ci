@@ -13,7 +13,7 @@ usage numbers.
 | 1 | Repository description, topics, Discussions | 30 seconds | `../repo-settings-2.4.0.md` | **done** 2026-11-16 (description set, four topics added, Discussions on; read back) |
 | 2 | Merge the plugin README and icon | a pull request from `v2/reach` | `pr-reach.md` | **done** 2026-11-16: pull request 28 merged as `c4fcb66` (the icon approved by the maintainer; a privacy page and listing links added after the directory's form was read) |
 | 3 | awesome-observability listing | click "Create pull request" | `awesome-observability.md` | **opened** 2026-11-16: pull request 223 at the list |
-| 4 | awesome-claude-code form | the maintainer writes the description themself | `awesome-claude-code.md` | facts ready |
+| 4 | awesome-claude-code form | the maintainer writes the description themself | `awesome-claude-code.md` | facts ready; **the list is closed to new issues since about 12 Nov 2026** (seen 2026-11-16); look again at each snapshot |
 | 5 | Anthropic plugin directory | step 2 merged; a paid claude.ai plan | `anthropic-directory.md` | **submitted** 2026-11-16, listed for Claude Code only. The first version (`c4fcb66`) was refused automatically (inline shell and `allowed-tools` only from verified organizations); the skill was rewritten as an instruction (pull request 29, `5c2971d`) and the directory is checking that version |
 | 6 | Blog post about the maintainer's own run | the maintainer's yes to post their numbers | private draft, not in this branch | draft ready |
 | 7 | OpenAI directory for the Codex skill | a manifest, an icon, a privacy page, a verified organization | `openai-codex.md` | not now |
