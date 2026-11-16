@@ -5290,6 +5290,50 @@ def test_an_output_name_starting_with_the_reserved_prefix_is_malformed(
     assert _listing(tmp_path) == before
 
 
+@pytest.mark.parametrize("shape", ["existing_target", "dangling", "ordinary_target"])
+def test_a_symbolic_link_to_a_reserved_name_is_refused_too(tmp_path: Path, shape: str) -> None:
+    """Item 79 (new sentence): the test is made on the name given and on the name of the file
+    the path resolves to, so a symbolic link whose target's name begins with `.realornoise-`
+    is refused in the same way as the plain name, whether its target exists or the link is
+    dangling, and neither the link nor its target is changed; a link to an ordinary name is
+    accepted and the report is written to its target."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    link = tmp_path / "report.json"
+    if shape == "existing_target":
+        real_target = tmp_path / ".realornoise-real.json"
+        real_target.write_text("untouched", encoding="utf-8")
+    elif shape == "dangling":
+        real_target = tmp_path / ".realornoise-missing.json"
+    else:
+        real_target = tmp_path / "ordinary.json"
+    link.symlink_to(real_target)
+    before_bytes = real_target.read_bytes() if real_target.exists() else None
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path, [*_args("claude-code", claude=root), "--json", str(link)]
+    )
+    if shape == "ordinary_target":
+        assert code == 1
+        assert failed == ""
+        assert link.is_symlink() and link.readlink() == real_target
+        assert real_target.is_file() and not real_target.is_symlink()
+        body = json.loads(real_target.read_text(encoding="utf-8"))
+        assert body["schema_version"] == "arci-logs/2"
+    else:
+        assert code == 3
+        assert printed == ""
+        assert failed.splitlines() == [USAGE_ERRORS["usage"]]
+        assert link.is_symlink() and link.readlink() == real_target
+        if shape == "existing_target":
+            assert real_target.read_bytes() == before_bytes
+        else:
+            assert not real_target.exists()
+        assert _listing(tmp_path) == before
+
+
 def test_reserved_prefix_names_that_are_still_accepted(tmp_path: Path) -> None:
     """Item 79: `.realornoise.json` and `realornoise-report.json` do not begin with
     `.realornoise-` and are accepted output names, read back with the written record."""

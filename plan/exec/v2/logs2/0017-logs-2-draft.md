@@ -538,11 +538,12 @@ remove a file that a run asked for.
 interrupt from the keyboard during the write ends the run with the write error and exit 3. If
 it arrives before the last file is moved into place, the run restores the files it had already
 replaced and removes an empty file it had made at a new target. If it arrives after the last
-move, the files are already written. A second interrupt during the restore can leave some
-files replaced. A process that is killed outright restores nothing: it can leave some files
-replaced, an empty file at a new target if it is killed during the same-file check, and a
-temporary file beside a report (its name begins with `.realornoise.out-`), which may be
-deleted by hand. In the table directory the next successful `--keep` run removes the table's
+move, the files are already written and the run still ends with that error. A second interrupt
+during the restore can leave some files replaced. An interrupt can also leave a temporary file
+beside a report (its name begins with `.realornoise.out-`), which may be deleted by hand. A
+process that is killed outright restores nothing: it can leave some files replaced, an empty
+file at a new target if it is killed during the same-file check, and such a temporary file.
+In the table directory the next successful `--keep` run removes the table's
 leftovers. No requested file is ever left half written: each is moved into place whole.
 
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
