@@ -4,8 +4,10 @@ realornoise reads the Claude Code and Codex session logs already on your compute
 tool it compares recent days with earlier days, for the model and effort you used most in
 the recent days, and answers REAL DROP, NO DROP or CANNOT TELL. It runs no model.
 
-This plugin adds one command to Claude Code. The command runs
-`uvx --python 3.14 realornoise==2.4.0` and shows what it prints, unchanged.
+This plugin adds one command to Claude Code. The command tells Claude to run
+`uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and to show what it
+prints, unchanged. Whether Claude Code asks you before that command runs depends on your
+permission mode and settings.
 
 ## Where it works
 
@@ -24,7 +26,10 @@ In Claude Code:
 
 ## How to use it
 
-Type the command yourself. Claude does not run it on its own.
+Type the command yourself. In Claude Code, Claude does not start it on its own. If Claude
+Code asks before running the shell command, check that it is the one above, then approve
+it. The command takes no options: if you type anything after its name, Claude is told to
+run nothing and to say so. For options such as `--example`, use a terminal.
 
 ```text
 /realornoise:realornoise
@@ -75,19 +80,24 @@ Details: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ST
   `$CLAUDE_CONFIG_DIR/projects`), and Codex `rollout-*.jsonl` and `.jsonl.zst` files below
   `~/.codex/sessions` and `~/.codex/archived_sessions` (or the same folders under
   `$CODEX_HOME`). These logs hold your conversations. The tool turns them into daily counts.
-- Runs: `uvx --python 3.14 realornoise==2.4.0`. The package itself opens no network
-  connection and starts no process.
+- Runs: `uvx --python 3.14 realornoise==2.4.0`, which Claude runs in the shell. This is an
+  instruction to Claude, not a lock. In a permission mode that asks, the prompt shows the
+  command before it runs. In one that does not ask (auto mode, an allow rule, a hook), the
+  transcript shows the command that ran. The package itself opens no network connection
+  and starts no process.
 - Fetches: `uvx` downloads the pinned package and the packages it depends on from the
   package index `uv` is set to use (PyPI by default). If Python 3.14 is not installed, `uv` also
   downloads a Python build from the python-build-standalone project
   (https://docs.astral.sh/uv/concepts/python-versions/).
-- Writes: realornoise writes no file here, because the plugin does not pass `--keep`. `uv`
-  keeps what it downloaded in its own cache until you clear it.
+- Writes: Claude is told to run the command with no options. Without an option
+  realornoise writes no file. `uv` keeps what it downloaded in its own cache until you
+  clear it.
 - Prints: counts, rates, dates, the UTC offset your computer uses for calendar days, the
   program version, a short digest of the daily counts, and model, effort and client-version
   names that pass fixed rules. Other model and effort names become opaque labels. Prompts,
-  answers, file paths and raw log lines are not printed. Through the plugin, any message
-  from `uvx` itself, such as a download line or an error, is shown too.
+  answers, file paths and raw log lines are not printed by realornoise. Through the plugin,
+  any message from `uvx` itself, such as a download line or an error, is shown too, and
+  such a message can show a path on your computer.
 - Sends: the plugin puts the printed output into this conversation. From there it goes
   wherever this conversation goes, like anything else you type. realornoise sends nothing
   itself.
@@ -100,6 +110,14 @@ Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/do
 
 - `uvx` not found: install uv from https://docs.astral.sh/uv/, or run
   `pip install agent-reliability-ci` and then `arci logs` in a terminal.
+- Claude Code marks the command as failed: the command exits with status 1 when a result
+  is REAL DROP and 2 when a result is CANNOT TELL. That is the result, not a failure.
+- Claude says that nothing ran: your permission mode, a deny rule or auto mode's
+  classifier refused the command.
+- The command runs by itself, with nothing shown first: a copy of plugin version 2.4.0
+  installed before the skill became an instruction to Claude keeps the earlier skill
+  until the plugin's version changes and you update the plugin. The earlier skill ran
+  the command itself when you typed it, with the command approved ahead of time.
 - ERROR for a tool: the tool found no logs, no readable file or no usable response for it on
   this computer. Results for the other tool can still appear.
 - To keep daily counts beyond the 30 days Claude Code keeps session files by default, run

@@ -297,12 +297,13 @@ In Claude Code:
 /realornoise:realornoise
 ```
 
-The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) runs `uvx --python 3.14 realornoise==2.4.0` and shows its output. Neither skill passes
+The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) tells Claude to run `uvx --python 3.14 realornoise==2.4.0` and to show its output.
+Whether Claude Code asks you first depends on your permission mode and settings. Neither skill asks for
 `--keep`; run that option yourself in a terminal when you want to store counts.
-The printed numbers then enter that assistant's conversation.
+Everything the command prints then enters that assistant's conversation.
 
 For Codex, copy [integrations/codex/skills/realornoise](../../integrations/codex/skills/realornoise/SKILL.md)
-into `~/.agents/skills/`, then invoke `$realornoise`. The printed numbers then enter that
+into `~/.agents/skills/`, then invoke `$realornoise`. Everything the command prints then enters that
 assistant's conversation. This differs from running the CLI in a terminal, which sends
 nothing itself.
 
