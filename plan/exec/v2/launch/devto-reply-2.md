@@ -17,8 +17,8 @@ without a second lookup passed. The roadmap on `main` says nothing is scheduled.
 second blog post (`docs/blog/2026-11-eval-noise.md`) is written and not yet published.
 
 One sentence is the maintainer's to settle before posting: whether the variant will be
-run. The text below says it is not scheduled. If it will be run, replace the paragraph
-marked [PLAN] with the alternative under the reply.
+run. The text below says it is not scheduled. If it will be run, replace its third
+paragraph with the alternative given under the reply.
 
 Checked on 16 Nov 2026 by a third agent that counted every number again from the store and
 read the code. Its corrections are applied: "None of the other 33 passed" (one of the 33
