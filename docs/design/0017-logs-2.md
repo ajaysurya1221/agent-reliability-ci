@@ -506,6 +506,17 @@ tool left in the table directory (regular files whose names begin with `.realorn
 removed. The run creates no file in the table directory other than the table and its own
 temporary file.
 
+**Whose temporary files the cleanup may remove (added after the second review).** Only the
+table's own temporary files carry the prefix `.realornoise-`. The temporary files of every
+other output begin with `.realornoise.out-`, in whatever directory they are, so the cleanup
+never removes a file that another run is still using for its other outputs. While the lock is
+held no other run can be writing the table, so every `.realornoise-` file found is a leftover.
+Where there is no lock, an overlapping `--keep` run can lose its temporary file to the cleanup:
+it then fails with the write error and leaves the table and every requested output as they
+were. A run that waited for the lock checks, once it holds it, that the directory it locked is
+still the one at the table directory's path. If an earlier run's failed write removed that
+directory in the meantime, the run creates the directory again and locks that one.
+
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
 more than 33,554,432 bytes. Neither the number of settings nor the number of rows is capped, so
 a table of admitted rows can reach that size. The staged table is measured before anything is
