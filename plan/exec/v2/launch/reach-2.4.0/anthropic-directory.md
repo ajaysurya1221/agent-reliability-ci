@@ -137,3 +137,36 @@ shell command, which the form's own scan lists as an accepted note and the READM
 If a reviewer reads that box literally, expect a question.
 
 Not verified: the result of the security scan and of the review; how long either takes.
+
+## Refused automatically, then changed (2026-11-16)
+
+About two minutes after the submission the status became "Needs changes": the security
+scan passed, and an automatic policy check refused version v2.4.0 at `c4fcb66` with two
+blocking findings:
+
+- "Inline shell snippets in skills and commands accepted only from Verified organizations";
+  the report says to rewrite each inline shell step as an instruction to Claude.
+- "allowed-tools entries beyond Read/Grep/Glob/LS accepted only from Verified
+  organizations"; the report says to cut each list to Read, Grep, Glob and LS.
+
+The same two points had been shown at validation as notes with the words "This isn't
+refused yet." They were refused. The report says "Verified means Anthropic knows your
+organization is a real company."
+
+What was changed (pull request 29, merged as `5c2971d`; tree equal to the reviewed head
+`287247b`; 19 checks passed and 1 was skipped on that head): the plugin's skill is now an
+instruction to Claude with no shell line of its own and no `allowed-tools`. It keeps
+`disable-model-invocation: true`. If anything is typed after the command name it tells
+Claude to run nothing. The documents say what follows: whether Claude Code asks before the
+command runs depends on the permission mode and settings (current versions start in auto
+mode, where a classifier reviews the command and no prompt appears); an instruction is not
+a lock; a copy of plugin version 2.4.0 installed earlier keeps the earlier skill until the
+version changes and the user updates. The pinned design records 0016 (decision 9) and 0017
+(decision 7, item 73) still hold. Two rounds of independent review (three reviewers, then
+two checkers); the second round found no high finding and its points are applied. Body of
+the pull request: `pr-skill-instruction-body.md`.
+
+Not verified: a real run of the new skill inside Claude Code (no session was started).
+
+The directory was asked to check for new commits; it detected v2.4.0 at `5c2971d` and
+started a new scan. The result is recorded in `plan/exec/v2/signals/SIGNALS.md`.
