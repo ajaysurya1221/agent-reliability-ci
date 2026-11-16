@@ -44,6 +44,21 @@ def test_plugin_manifest_matches_the_package() -> None:
         assert manifest[key]
 
 
+def test_plugin_manifest_links_point_at_files_in_this_repository() -> None:
+    """A directory shows these links; a wrong one sends a reader to another project's page."""
+    manifest = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    assert manifest["displayName"] == "realornoise"
+    assert manifest["supportUrl"] == manifest["repository"] + "/issues"
+    blob = manifest["repository"] + "/blob/main/"
+    for key in ("documentationUrl", "privacyPolicyUrl"):
+        assert manifest[key].startswith(blob), key
+        assert (ROOT / manifest[key].removeprefix(blob)).is_file(), key
+    assert manifest["privacyPolicyUrl"] in (PLUGIN / "README.md").read_text(encoding="utf-8")
+    privacy = (ROOT / "docs" / "PRIVACY.md").read_text(encoding="utf-8")
+    assert "opens no network connection" in privacy
+    assert "—" not in privacy
+
+
 def test_claude_skill_runs_only_the_fixed_command() -> None:
     meta = _frontmatter(CLAUDE_SKILL)
     assert meta["name"] == "realornoise"
@@ -98,7 +113,11 @@ def test_every_launcher_command_in_the_plugin_and_skill_is_pinned() -> None:
 
 def test_listing_icon_is_a_square_png_drawn_by_the_generator() -> None:
     """A plugin directory wants a square PNG, 512 to 2048 pixels a side, under 2 MB."""
-    icon = PLUGIN / ".claude-plugin" / "icon.png"
+    manifest = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    # The manifest names the icon; only the manifest belongs inside `.claude-plugin`.
+    assert manifest["icon"] == "./icon.png"
+    assert [path.name for path in (PLUGIN / ".claude-plugin").iterdir()] == ["plugin.json"]
+    icon = PLUGIN / manifest["icon"]
     data = icon.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR"
     width, height = struct.unpack(">II", data[16:24])

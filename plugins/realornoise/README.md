@@ -83,12 +83,16 @@ Details: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ST
   (https://docs.astral.sh/uv/concepts/python-versions/).
 - Writes: realornoise writes no file here, because the plugin does not pass `--keep`. `uv`
   keeps what it downloaded in its own cache until you clear it.
-- Prints: counts, rates, dates, and model, effort and client-version names that pass fixed
-  accepted lists. Other model and effort names become opaque labels. Prompts, answers, file
-  paths and raw log lines are not printed.
+- Prints: counts, rates, dates, the UTC offset your computer uses for calendar days, the
+  program version, a short digest of the daily counts, and model, effort and client-version
+  names that pass fixed rules. Other model and effort names become opaque labels. Prompts,
+  answers, file paths and raw log lines are not printed. Through the plugin, any message
+  from `uvx` itself, such as a download line or an error, is shown too.
 - Sends: the plugin puts the printed output into this conversation. From there it goes
   wherever this conversation goes, like anything else you type. realornoise sends nothing
   itself.
+
+Privacy: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/PRIVACY.md
 
 Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/THREAT_MODEL_LOGS.md
 
@@ -100,7 +104,8 @@ Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/do
   this computer. Results for the other tool can still appear.
 - To keep daily counts beyond the 30 days Claude Code keeps session files by default, run
   `uvx --python 3.14 realornoise==2.4.0 --keep` yourself in a terminal. It writes
-  `~/.realornoise/days-1.json`, which holds counts, dates and accepted names only.
+  `~/.realornoise/days-1.json`, which holds daily counts, dates, UTC offsets and accepted
+  model and effort names. It holds no prompts, answers, paths or client versions.
 
 Guide: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md
 

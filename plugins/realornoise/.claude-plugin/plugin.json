@@ -1,9 +1,15 @@
 {
   "name": "realornoise",
+  "displayName": "realornoise",
   "description": "Did your coding agent get worse? Runs realornoise on your local session logs and shows its output unchanged.",
   "version": "2.4.0",
   "author": { "name": "Ajay Surya Senthilrajan" },
   "homepage": "https://github.com/ajaysurya1221/agent-reliability-ci",
   "repository": "https://github.com/ajaysurya1221/agent-reliability-ci",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "icon": "./icon.png",
+  "keywords": ["claude-code", "codex", "session-logs", "statistics", "cli"],
+  "documentationUrl": "https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/logs.md",
+  "supportUrl": "https://github.com/ajaysurya1221/agent-reliability-ci/issues",
+  "privacyPolicyUrl": "https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/PRIVACY.md"
 }

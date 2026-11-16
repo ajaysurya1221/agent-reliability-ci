@@ -16,7 +16,7 @@ from pathlib import Path
 
 SIZE = 1024
 SAMPLES = 4  # sub-samples per pixel edge, for smooth dot edges
-TARGET = Path(__file__).resolve().parents[3] / "plugins/realornoise/.claude-plugin/icon.png"
+TARGET = Path(__file__).resolve().parents[3] / "plugins/realornoise/icon.png"
 
 GROUND = (0x0D, 0x11, 0x17)
 BEFORE = (0x6C, 0xB6, 0xFF)

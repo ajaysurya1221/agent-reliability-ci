@@ -7,9 +7,15 @@
   and sends, three uses, what the result means and what it cannot show. A plugin directory
   reads the README inside the plugin folder. Both skills now give the `--keep` command
   with the pinned version, so that every launcher command they show is pinned; tests hold
-  both. The plugin also has a listing icon (`.claude-plugin/icon.png`, drawn by
+  both. The plugin also has a listing icon (`icon.png`, named in its manifest, drawn by
   `docs/assets/src/make_plugin_icon.py` with the standard library; a test compares its
   pixels with the generator). No behaviour changes.
+- **Docs:** a privacy page for realornoise, the plugin and the skill (`docs/PRIVACY.md`):
+  what the tool reads, prints, writes and sends, what a download involves and what the
+  maintainer can see. The plugin manifest names it, the guide and the issue tracker
+  (`privacyPolicyUrl`, `documentationUrl`, `supportUrl`), and sets a display name and
+  keywords, because a plugin directory shows these; a test holds the links to files that
+  exist.
 
 ## v2.4.0 (2026-11-16)
 
