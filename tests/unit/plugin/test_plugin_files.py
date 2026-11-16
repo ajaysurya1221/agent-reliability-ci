@@ -1,4 +1,4 @@
-"""The Claude Code plugin and the Codex skill only run the command, and agree on names."""
+"""The Claude Code plugin and the Codex skill each name only the one command, and agree on names."""
 
 from __future__ import annotations
 
@@ -59,17 +59,32 @@ def test_plugin_manifest_links_point_at_files_in_this_repository() -> None:
     assert "—" not in privacy
 
 
-def test_claude_skill_runs_only_the_fixed_command() -> None:
+def test_claude_skill_names_only_the_fixed_command() -> None:
     meta = _frontmatter(CLAUDE_SKILL)
+    # Only the user starts it, and no tool is approved ahead of time (no `allowed-tools`).
+    assert set(meta) == {"name", "description", "disable-model-invocation"}
     assert meta["name"] == "realornoise"
     assert meta["disable-model-invocation"] == "true"
-    # The fixed command only: a wildcard would pre-approve any option, such as writing a file.
-    assert meta["allowed-tools"] == f"Bash(uvx --python 3.14 realornoise=={arci.__version__})"
-    assert "*" not in meta["allowed-tools"]
     body = CLAUDE_SKILL.read_text(encoding="utf-8")
-    commands = [line for line in body.splitlines() if line.startswith("!`")]
-    assert commands == [f"!`uvx --python 3.14 realornoise=={arci.__version__} 2>&1 || true`"]
-    assert "$ARGUMENTS" not in body
+    # No shell line that runs before the conversation, in any spelling, and no fenced block:
+    # the skill is an instruction to Claude.
+    assert "!" not in body and "```" not in body and "~~~" not in body and "\t" not in body
+    # No placeholder that would paste typed text into the instruction.
+    assert not re.search(r"\$(\d|ARGUMENTS|\{)", body)
+    command = f"uvx --python 3.14 realornoise=={arci.__version__}"
+    assert [line for line in body.splitlines() if line.startswith("    ")] == ["    " + command]
+    # The command appears twice: the line to run, and the `--keep` form the user may run.
+    assert re.findall(r"uvx --python[^\n`]*", body) == [command, command + " --keep"]
+    assert re.findall(r"(?<![-\w])--[a-z][a-z-]*", body) == ["--python", "--keep"] * 2
+    prose = " ".join(body.split())
+    for sentence in (
+        "made of this line and nothing else",
+        "Run no other command in this turn",
+        "do not pass it",
+        "Do not add `--keep`.",
+        "It is the result, not a failure of the command.",
+    ):
+        assert sentence in prose, sentence
     assert "visible to this assistant" in body
     assert "numbers only" not in body
 

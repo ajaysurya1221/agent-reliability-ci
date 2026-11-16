@@ -8,7 +8,7 @@
     {
       "name": "realornoise",
       "source": "./plugins/realornoise",
-      "description": "Did your coding agent get worse? Runs realornoise on your local session logs and shows its output unchanged."
+      "description": "Did your coding agent get worse? Tells Claude to run realornoise on your local session logs and to show its output unchanged."
     }
   ]
 }

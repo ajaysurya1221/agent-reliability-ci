@@ -79,8 +79,15 @@ its `SHA256SUMS` from the matching release workflow artifact, and run
 `shasum -a 256 -c SHA256SUMS` in each download directory. Check the version and attestations
 on PyPI too. See [Releasing](RELEASING.md#4-verify). Hashes check bytes, not behavior.
 
-The Claude Code plugin and Codex skill run one pinned command:
-`uvx --python 3.14 realornoise==2.4.0`. They do not pass `--keep`. The printed numbers and
+The Claude Code plugin and Codex skill each tell the assistant to run one pinned command,
+once and with nothing added: `uvx --python 3.14 realornoise==2.4.0`. They tell it not to
+add `--keep`. In Claude Code the plugin's skill starts only when the user types it; it
+approves no tool ahead of time and has no shell line of its own. Whether Claude Code asks
+before the command runs depends on the user's permission mode and settings. An instruction
+is not a control: the prompt, when there is one, and the transcript show the command. A
+copy of the plugin installed before 16 November 2026 keeps the earlier skill, which ran
+the command itself with the command approved ahead of time, until the plugin's version
+changes. The printed numbers and
 bounded names enter the assistant's conversation and go wherever that conversation goes.
 realornoise itself opens no connection and sends nothing. uvx downloads the package,
 and Python 3.14 if it is missing, to run it.

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Changed:** the Claude Code plugin's skill is now an instruction to Claude: run
+  `uvx --python 3.14 realornoise==2.4.0` once, with no other arguments, and show the
+  output unchanged. Before, the skill ran that line itself when the command was typed and
+  approved it ahead of time (`allowed-tools`). Now nothing is approved ahead of time:
+  whether Claude Code asks before the command runs depends on your permission mode and
+  settings. In Claude Code it still starts only when you type its command. The command
+  now exits 1 or 2 in Claude's shell tool for REAL DROP or CANNOT TELL, and the skill says
+  that this is the result. A copy installed before this change keeps the earlier skill
+  until the plugin's version changes. The reason: the report of Anthropic's plugin
+  directory on the first submission refused a skill with its own shell line, or with
+  `allowed-tools` beyond Read, Grep, Glob and LS, from an organization that is not
+  verified. The package is unchanged.
 - **Docs:** the Claude Code plugin folder has its own README
   (`plugins/realornoise/README.md`): what the plugin reads, runs, fetches, writes, prints
   and sends, three uses, what the result means and what it cannot show. A plugin directory
