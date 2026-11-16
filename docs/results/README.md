@@ -66,6 +66,6 @@ failure, and a write-up generated from the committed evidence:
 
 ## The order-desk study's raw stores
 
-The sealed suite stores behind [order-desk-study.md](order-desk-study.md), both runs, with
+The sealed suite stores behind [order-desk-study.md](order-desk-study.md), all three runs, with
 the exact command to re-derive each decision from a clone:
 [order-desk-study/README.md](order-desk-study/README.md).
