@@ -37,9 +37,10 @@ def test_version_tuple_compares_numerically() -> None:
 def test_highest_checked_parses_the_real_log_formats_doc() -> None:
     text = LOG_FORMATS.read_text(encoding="utf-8")
     checked_claude_code, checked_codex = HIGHEST_CHECKED(text)
-    # docs/LOG_FORMATS.md names 2.1.309, 2.1.321, 2.1.325 and 0.154.0, 0.167.0 on 16 Nov 2026.
+    # docs/LOG_FORMATS.md names 2.1.309, 2.1.321, 2.1.325 and 0.154.0, 0.167.0, 0.169.0
+    # (0.169.0 added on 16 Nov 2026, after one session of that client was read).
     assert checked_claude_code == "2.1.325"
-    assert checked_codex == "0.167.0"
+    assert checked_codex == "0.169.0"
 
 
 def test_prints_nothing_when_nothing_is_newer() -> None:

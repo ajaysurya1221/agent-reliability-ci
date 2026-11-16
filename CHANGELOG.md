@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Docs:** the Codex reader is checked against Codex CLI 0.169.0 (one short session;
+  record types and the fields the reader uses are the same as in 0.167.0).
+  `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than
+  `subagent` counts as main thread. No code change.
 - **Changed:** the Claude Code plugin's skill is now an instruction to Claude: run
   `uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and show the output
   unchanged. If anything is typed after the command name, it tells Claude to run nothing. Before, the skill ran that line itself when the command was typed and
