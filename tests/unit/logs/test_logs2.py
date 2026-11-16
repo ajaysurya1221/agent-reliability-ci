@@ -7,6 +7,7 @@ import json
 import os
 import random
 import stat
+import sys
 import threading
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -1217,6 +1218,30 @@ def test_unavailable_directory_lock_still_writes(
     assert kept.read(tmp_path / ".realornoise" / kept.FILENAME)[0] == "read"
 
 
+def test_platform_without_lock_module_never_opens_the_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Where fcntl does not exist (Windows), a directory cannot be opened either."""
+    history(tmp_path)
+    monkeypatch.setitem(sys.modules, "fcntl", None)
+    open_file = os.open
+
+    def no_directories(
+        path: str | os.PathLike[str],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if Path(path).is_dir():
+            raise PermissionError("a directory cannot be opened here")
+        return open_file(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "open", no_directories)
+    invoke(tmp_path, "--keep")
+    assert kept.read(tmp_path / ".realornoise" / kept.FILENAME)[0] == "read"
+
+
 def test_report_moves_survive_another_runs_table_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1263,17 +1288,19 @@ def test_report_moves_survive_another_runs_table_cleanup(
     assert not list(tmp_path.rglob(".realornoise[-.]*"))
 
 
+@pytest.mark.parametrize("existing", (False, True))
 def test_unlocked_cleanup_failure_rolls_back_all_outputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
 ) -> None:
     fcntl = pytest.importorskip("fcntl")
     history(tmp_path, days=1)
     invoke(tmp_path, "--keep")
     table = tmp_path / ".realornoise" / kept.FILENAME
     targets = [tmp_path / "report.json", tmp_path / "report.md", tmp_path / "report.html"]
-    for target in targets:
-        target.write_text("old " + target.name)
-    before = {p: p.read_bytes() for p in [table, *targets]}
+    if existing:
+        for target in targets:
+            target.write_text("old " + target.name)
+    before = {p: p.read_bytes() for p in [table, *targets] if p.exists()}
     move = os.replace
     removed = False
     other_codes: list[int] = []
@@ -1324,6 +1351,8 @@ def test_unlocked_cleanup_failure_rolls_back_all_outputs(
     assert removed and code == 3 and other_codes == [2]
     assert error.getvalue() == report.WRITE_ERROR + "\n" and not output.getvalue()
     assert {p: p.read_bytes() for p in before} == before
+    if not existing:
+        assert all(not target.exists() for target in targets)
     assert not list(tmp_path.rglob(".realornoise[-.]*"))
 
 
@@ -1462,3 +1491,322 @@ def test_table_becoming_unreadable_keeps_its_exact_bytes(
     monkeypatch.setattr(kept, "read", after_first_read)
     invoke(tmp_path, "--keep")
     assert changed and table.read_bytes() == b"{not json"
+
+
+def test_failed_creator_removes_directory_before_waiter_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    other = tmp_path / "other"
+    history(other, days=1, model="gpt-6")
+    directory = tmp_path / "kept"
+    table = directory / kept.FILENAME
+    locked, attempting, checked, removed = (threading.Event() for _ in range(4))
+    flock, close, read, rmdir = fcntl.flock, os.close, kept.read, Path.rmdir
+    first_thread: int | None = None
+    first_fd: int | None = None
+    reads: dict[int, int] = {}
+
+    def at_lock(fd: int, operation: int) -> None:
+        nonlocal first_fd
+        if threading.get_ident() == first_thread:
+            first_fd = fd
+        else:
+            attempting.set()
+        flock(fd, operation)
+
+    def at_read(path: Path) -> tuple[kept.KeptState, tuple[kept.KeptRow, ...]]:
+        tid = threading.get_ident()
+        reads[tid] = reads.get(tid, 0) + 1
+        if reads[tid] == 2:
+            if tid == first_thread:
+                locked.set()
+                assert attempting.wait(5)
+            else:
+                checked.set()
+                assert removed.wait(5)
+        return read(path)
+
+    def at_close(fd: int) -> None:
+        close(fd)
+        if threading.get_ident() == first_thread and fd == first_fd and not removed.is_set():
+            # If release happens first, let B pass its identity check before A removes it.
+            assert checked.wait(5)
+
+    def at_rmdir(path: Path) -> None:
+        rmdir(path)
+        if threading.get_ident() == first_thread and path == directory:
+            removed.set()
+
+    def first() -> tuple[int, str, str]:
+        nonlocal first_thread
+        first_thread = threading.get_ident()
+        output, error = io.StringIO(), io.StringIO()
+        code = cli.run(
+            [
+                "--tool",
+                "claude-code",
+                "--claude-dir",
+                str(tmp_path / "logs"),
+                "--keep-dir",
+                str(directory),
+                "--json",
+                str(tmp_path / "missing" / "a.json"),
+            ],
+            now=NOW,
+            env={},
+            home=tmp_path,
+            out=output,
+            err=error,
+        )
+        return code, output.getvalue(), error.getvalue()
+
+    monkeypatch.setattr(fcntl, "flock", at_lock)
+    monkeypatch.setattr(os, "close", at_close)
+    monkeypatch.setattr(kept, "read", at_read)
+    monkeypatch.setattr(Path, "rmdir", at_rmdir)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(first)
+        assert locked.wait(5)
+        b = pool.submit(invoke, other, "--keep-dir", str(directory))
+        assert a.result(timeout=10) == (3, "", report.WRITE_ERROR + "\n")
+        record, _ = b.result(timeout=10)
+    assert record.exit_code == 2 and directory.is_dir()
+    assert {r.model for r in kept.read(table)[1]} == {"gpt-6"}
+
+
+@pytest.mark.parametrize("change", ("recreated", "replaced", "missing"))
+def test_failed_write_removes_only_created_directory_identities(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    table = tmp_path / "new-parent" / "kept" / kept.FILENAME
+    flock, read = fcntl.flock, kept.read
+    locks = 0
+    held: list[int] = []
+
+    def at_lock(fd: int, operation: int) -> None:
+        nonlocal locks
+        flock(fd, operation)
+        locks += 1
+        if locks == 1 and change != "missing":
+            # Keep the removed inode alive across the retry, preventing inode reuse.
+            held.append(os.dup(fd))
+            old = table.parent.stat()
+            table.parent.rmdir()
+            if change == "replaced":
+                table.parent.mkdir()
+                assert table.parent.stat().st_ino != old.st_ino
+
+    def at_read(path: Path) -> tuple[kept.KeptState, tuple[kept.KeptRow, ...]]:
+        if change == "missing" and locks:
+            table.parent.rmdir()
+        return read(path)
+
+    monkeypatch.setattr(fcntl, "flock", at_lock)
+    monkeypatch.setattr(kept, "read", at_read)
+    try:
+        output, error = io.StringIO(), io.StringIO()
+        code = cli.run(
+            [
+                "--tool",
+                "claude-code",
+                "--claude-dir",
+                str(tmp_path / "logs"),
+                "--keep-dir",
+                str(table.parent),
+                "--json",
+                str(tmp_path / "missing" / "report.json"),
+            ],
+            now=NOW,
+            env={},
+            home=tmp_path,
+            out=output,
+            err=error,
+        )
+        assert code == 3 and not output.getvalue()
+        assert error.getvalue() == report.WRITE_ERROR + "\n"
+    finally:
+        for fd in held:
+            os.close(fd)
+    assert locks == (1 if change == "missing" else 2)
+    if change == "replaced":
+        assert table.parent.is_dir() and not list(table.parent.iterdir())
+    else:
+        assert not table.parent.exists() and not table.parent.parent.exists()
+
+
+@pytest.mark.parametrize("always_missing", (False, True))
+@pytest.mark.parametrize("open_error", (FileNotFoundError, NotADirectoryError))
+def test_directory_missing_at_open_retries_with_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    always_missing: bool,
+    open_error: type[OSError],
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    directory = tmp_path / ".realornoise"
+    open_file, flock = os.open, fcntl.flock
+    opens = 0
+    locks = 0
+
+    def at_open(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        nonlocal opens
+        if Path(path) == directory:
+            opens += 1
+            if always_missing or opens == 1:
+                directory.rmdir()
+                raise open_error("directory vanished")
+        return open_file(path, flags, *args, **kwargs)
+
+    def at_lock(fd: int, operation: int) -> None:
+        nonlocal locks
+        locks += 1
+        flock(fd, operation)
+
+    monkeypatch.setattr(os, "open", at_open)
+    monkeypatch.setattr(fcntl, "flock", at_lock)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        ["--tool", "claude-code", "--claude-dir", str(tmp_path / "logs"), "--keep"],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    if always_missing:
+        assert code == 3 and opens == 8 and locks == 0
+        assert not output.getvalue() and error.getvalue() == report.WRITE_ERROR + "\n"
+        assert not directory.exists()
+    else:
+        assert code == 2 and opens == 2 and locks == 1 and not error.getvalue()
+        assert kept.read(directory / kept.FILENAME)[0] == "read"
+
+
+def test_directory_unopenable_is_write_error(tmp_path: Path) -> None:
+    history(tmp_path, days=1)
+    directory = tmp_path / ".realornoise"
+    directory.mkdir(mode=0o300)
+    try:
+        try:
+            fd = os.open(directory, os.O_RDONLY)
+        except PermissionError:
+            pass
+        else:
+            os.close(fd)
+            pytest.skip("mode 0300 does not block this user's directory open")
+        output, error = io.StringIO(), io.StringIO()
+        target = tmp_path / "report.json"
+        code = cli.run(
+            [
+                "--tool",
+                "claude-code",
+                "--claude-dir",
+                str(tmp_path / "logs"),
+                "--keep",
+                "--json",
+                str(target),
+            ],
+            now=NOW,
+            env={},
+            home=tmp_path,
+            out=output,
+            err=error,
+        )
+        assert code == 3 and not output.getvalue()
+        assert error.getvalue() == report.WRITE_ERROR + "\n" and not target.exists()
+    finally:
+        directory.chmod(0o700)
+    assert not list(directory.iterdir())
+
+
+def test_cleanup_keeps_requested_temporary_named_report(tmp_path: Path) -> None:
+    history(tmp_path, days=1)
+    target = tmp_path / ".realornoise" / ".realornoise-report.json"
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        [
+            "--tool",
+            "claude-code",
+            "--claude-dir",
+            str(tmp_path / "logs"),
+            "--keep",
+            "--json",
+            str(target),
+        ],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert code == 2 and not error.getvalue()
+    record = LogsDecision.model_validate_json(target.read_text())
+    assert record.exit_code == code and verify_seal(record)
+
+
+def test_keep_report_staged_with_output_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(tmp_path, days=1)
+    table = tmp_path / "kept" / kept.FILENAME
+    target = table.parent / "report.json"
+    move = os.replace
+    prefixes: list[str] = []
+
+    def at_move(src: Any, dst: Any) -> None:
+        if Path(dst) == target:
+            prefixes.append(Path(src).name)
+        move(src, dst)
+
+    monkeypatch.setattr(os, "replace", at_move)
+    error = io.StringIO()
+    code = cli.run(
+        [
+            "--tool",
+            "claude-code",
+            "--claude-dir",
+            str(tmp_path / "logs"),
+            "--keep-dir",
+            str(table.parent),
+            "--json",
+            str(target),
+        ],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=io.StringIO(),
+        err=error,
+    )
+    assert code == 2 and not error.getvalue()
+    assert len(prefixes) == 1 and prefixes[0].startswith(".realornoise.out-")
+    assert verify_seal(LogsDecision.model_validate_json(target.read_text()))
+
+
+def test_directory_identity_checks_device_with_same_inode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("fcntl")
+    actual_stat = os.stat
+    calls = 0
+
+    def other_device(path: Any, *args: Any, **kwargs: Any) -> os.stat_result:
+        nonlocal calls
+        info = actual_stat(path, *args, **kwargs)
+        if Path(path) == tmp_path:
+            calls += 1
+            fields = list(info)
+            fields[2] = info.st_dev + 1
+            return os.stat_result(fields)
+        return info
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "stat", other_device)
+        # Directly observe the lock helper's boolean; the CLI consumes it in its retry loop.
+        with cli._directory_lock(tmp_path) as current:  # pyright: ignore[reportPrivateUsage]
+            assert not current
+    assert calls == 1

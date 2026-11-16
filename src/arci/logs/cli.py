@@ -328,17 +328,20 @@ def _directory_lock(directory: Path) -> Generator[bool]:
     try:
         import fcntl
     except ImportError:
+        # No lock call on this platform (Windows cannot even open a directory): go on unlocked.
         yield True
         return
-    descriptor: int | None = None
+    try:
+        descriptor: int | None = os.open(directory, os.O_RDONLY)
+    except (FileNotFoundError, NotADirectoryError):
+        yield False
+        return
     try:
         try:
-            descriptor = os.open(directory, os.O_RDONLY)
             fcntl.flock(descriptor, fcntl.LOCK_EX)
         except OSError:
-            if descriptor is not None:
-                os.close(descriptor)
-                descriptor = None
+            os.close(descriptor)
+            descriptor = None
         current = True
         if descriptor is not None:
             locked = os.fstat(descriptor)
@@ -368,7 +371,7 @@ def _write_outputs(
     temporary: list[Path] = []
     placeholders: set[Path] = set()
     keep: set[Path] = set()
-    created: list[Path] = []
+    created: dict[Path, tuple[int, int]] = {}
     succeeded = False
     locks = ExitStack()
     modes: dict[Path, int] = {}
@@ -397,7 +400,8 @@ def _write_outputs(
                         if not directory.is_dir():
                             raise
                     else:
-                        created.append(directory)
+                        info = directory.stat()
+                        created[directory] = (info.st_dev, info.st_ino)
                         directory.chmod(0o700)
                 if locks.enter_context(_directory_lock(table_path.parent)):
                     break
@@ -469,17 +473,22 @@ def _write_outputs(
         if succeeded and table_path is not None and table_path in installed:
             with suppress(OSError):
                 for path in table_path.parent.iterdir():
-                    if path.name.startswith(".realornoise-"):
+                    if path.name.startswith(".realornoise-") and path not in staged:
                         with suppress(OSError):
                             if stat.S_ISREG(path.lstat().st_mode):
                                 path.unlink()
-        locks.close()
         if not succeeded:
-            for directory in reversed(created):
+            for directory in sorted(created, key=lambda path: len(path.parts), reverse=True):
                 try:
+                    info = directory.stat()
+                    if (info.st_dev, info.st_ino) != created[directory]:
+                        break
                     directory.rmdir()
+                except FileNotFoundError:
+                    continue
                 except OSError:
                     break
+        locks.close()
 
 
 def run(

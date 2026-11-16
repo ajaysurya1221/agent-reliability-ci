@@ -23,7 +23,10 @@
   Work in phases can break the bound; other patterns can give more.
 - **Fixed:** report temporary files use their own names, so table cleanup does not
   remove another run's pending outputs. A waiting writer checks the locked directory
-  and recreates it if a failed writer removed it. Tests cover lock lifetime, rollback
+  and recreates it if a failed writer removed it, including when the lock open finds it
+  missing. Other lock-open errors fail the write. Failed writes remove created
+  directories before releasing the lock, check device and inode, and skip missing
+  directories. Cleanup preserves this run's requested outputs. Tests cover lock lifetime, rollback
   without a lock, unreadable tables, explicit gates under Python optimization and
   figure provenance. The README pins the LangChain extra to this release and states
   when days are kept; gate descriptions match the recorded self-check.

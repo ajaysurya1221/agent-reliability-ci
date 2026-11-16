@@ -408,6 +408,13 @@ def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
                 checked += 1
     # Split independent clauses so each inline seed/design stays with its own figure.
     normal = " ".join("\n".join(prose).split())
+    normal = re.sub(
+        r"(\d+)/(\d+), Wilson 95% interval (\[\d+\.\d+, \d+\.\d+\])",
+        lambda match: (
+            f"{match[1]}/{match[2]} = {Decimal(match[1]) / Decimal(match[2]):.6f} {match[3]}"
+        ),
+        normal,
+    )
     separators = re.finditer(
         r"(?<=[.!?])\s+(?=[A-Z])|;\s+|,\s+and\s+|\band\s+(?=\d+/\d+ =)", normal
     )
@@ -446,21 +453,69 @@ def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
     return checked
 
 
+def assert_document_figures_sourced(document: str, text: str, rows: list[dict[str, str]]) -> None:
+    assert assert_figures_sourced(text, rows) > 0
+    # The S0 spike report is absent from this branch. Check both historical mentions
+    # against the pinned counts, designs and attribution, not the current selfcheck.
+    if document == "docs/STATISTICS_LOGS.md":
+        normal = " ".join(text.split())
+        designs = re.findall(
+            r"535 of 20,000(?: histories)? at (\d+) days after against (\d+) before", normal
+        )
+        assert designs == [("14", "16"), ("14", "16")]
+        assert normal.count("415 of 20,000 at 7 after against 21 before") == 2
+        assert "S0 spike report, G2, seeds 17112040 and 17112041" in normal
+
+
 @pytest.mark.parametrize(
     "document", ("docs/STATISTICS_LOGS.md", "README.md", "docs/recipes/logs.md", "CHANGELOG.md")
 )
 def test_every_rate_figure_has_matching_source_row(document: str) -> None:
     rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
     assert rows
-    checked = assert_figures_sourced(read(document), rows)
-    assert checked > 0 or document == "docs/recipes/logs.md"
-    # The /plan/exec/... S0 spike report is not in this branch. Its historical
-    # 535 and 415 of 20,000 are checked only as literal text in the statistics doc.
-    if document == "docs/STATISTICS_LOGS.md":
-        text = " ".join(read(document).split())
-        assert "535 of 20,000 histories at 14 days after against 16 before" in text
-        assert "415 of 20,000 at 7 after against 21 before" in text
-        assert "S0 spike report, G2, seeds 17112040 and 17112041" in text
+    assert_document_figures_sourced(document, read(document), rows)
+
+
+@pytest.mark.parametrize(
+    "document", ("docs/STATISTICS_LOGS.md", "README.md", "docs/recipes/logs.md", "CHANGELOG.md")
+)
+def test_document_provenance_requires_a_figure(document: str) -> None:
+    text = FIGURE.sub("figure omitted", read(document))
+    text = re.sub(r"\d+/\d+, Wilson 95% interval\s+\[\d+\.\d+, \d+\.\d+\]", "figure omitted", text)
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    with pytest.raises(AssertionError):
+        assert_document_figures_sourced(document, text, rows)
+
+
+@pytest.mark.parametrize(
+    ("document", "original", "replacement"),
+    (
+        (
+            "docs/recipes/logs.md",
+            "seed 18112185), with 14 days after",
+            "seed 18112186), with 14 days after",
+        ),
+        (
+            "docs/recipes/logs.md",
+            "with 14 days after and 16 before in regimes",
+            "with 7 days after and 21 before in regimes",
+        ),
+        (
+            "docs/STATISTICS_LOGS.md",
+            "   14 days after against 16 before, and 415",
+            "   7 days after against 21 before, and 415",
+        ),
+    ),
+)
+def test_rate_provenance_rejects_final_review_edits(
+    document: str, original: str, replacement: str
+) -> None:
+    text = read(document)
+    assert text.count(original) == 1
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    assert_document_figures_sourced(document, text, rows)
+    with pytest.raises(AssertionError):
+        assert_document_figures_sourced(document, text.replace(original, replacement), rows)
 
 
 @pytest.mark.parametrize(
