@@ -357,3 +357,50 @@ unknown split date; repeated daily looks.
 
 Next: task B1 (the build, Codex) and task A1 (blind acceptance tests from the records
 alone, a separate agent) run at the same time on different files.
+
+## D-22: dispositions of the reviews of the 2.4.0 build; the tool never removes a directory (2026-11-16)
+
+The build of `arci-logs/2` went through five checks, each by independent agents, each
+finding reproduced by a second agent before it counted. Reports are in `reviews/`.
+
+| Check | File | Findings | Worst | Disposition |
+|---|---|---|---|---|
+| Adversarial review (6 areas) | `R3-logs2-adversarial-workflow.json` | 15; 14 confirmed | medium | all 14 fixed (brief R3a, 18 items); self-check re-run 32/32 |
+| Review of those fixes (4 areas) | `R3b-logs2-fixes-review-workflow.json` | 11; all confirmed | medium | all fixed (brief R3b) |
+| Final check of the write path (3 lenses) | `R3c-logs2-final-check-workflow.json` | 12; all confirmed; 10 distinct | medium | all fixed (brief R3c); one regression of the fix caught by the orchestrator (a platform without the lock module) |
+| Last check, real processes | `R3d-logs2-last-check-workflow.json` | 5; 4 confirmed, 1 allowed by the record | medium | design changed, see below (brief R3d) |
+
+None was critical or high. No finding touched the statistics, a published figure or the
+privacy rules: the reports and privacy areas came back with no defect in every round.
+
+**The decision.** Rounds two, three and four each found a new fault of one kind in
+`_write_outputs`: a failing run removed a directory that another run was about to use
+(the cleanup removing a live file; the lock released before the removal; a `mkdir` under
+a parent that had just been removed, 3 of 360 runs with real processes). Each fix added
+code, and the next round found the fault in the added code. The orchestrator had told the
+owner that one more medium finding in that code would end the patching. It came, so:
+
+1. **The tool never removes a directory.** A table directory a run created stays, empty,
+   when its write fails. This reverses the rule of record 0017 as first written (and of
+   the brief B1) that a failed write removes the directories it created.
+2. **The lock has no identity check and no retry.** With rule 1 neither is needed. If the
+   directory cannot be opened for the lock, the write fails; where the platform has no
+   lock call, or the call fails, the run goes on without a lock.
+3. **Output names that begin with `.realornoise-` are refused** (after NFKC and case
+   folding) as a malformed value. Those names are the table's temporary files, so the
+   cleanup cannot remove a file a run asked for, on any spelling of the path.
+4. The record states one assumption: no other program removes or replaces the table
+   directory while a run uses it.
+
+Record 0017 was amended four times in this phase, each time before the code (commits
+`d3e0697`, `5273fe1`, `4a0e1a3` and the amendment before `d9d1066` on `v2/logs2`); its
+acceptance items are now 79. The blind author updated the acceptance tests from the
+record alone each time (225, then 233 cases). `_directory_lock` went from 32 to 18 lines
+and `_write_outputs` from 132 to 113.
+
+**What the owner sees.** After a failed `--keep` run an empty `~/.realornoise/` may remain.
+Nothing else changes for a user.
+
+**Lesson for the next design.** A rule that sounds tidy ("a failed run leaves nothing
+behind") was the source of four rounds of concurrency faults. When two rounds of fixes
+land in the same few lines, question the rule before the third patch.
