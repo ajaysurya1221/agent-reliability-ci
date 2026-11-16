@@ -73,7 +73,8 @@ licence and the age.
 When the maintainer opened the form, GitHub answered: "An owner of this repository has
 limited the ability to create an issue to users that are collaborators on this
 repository." Checked the same day through the public API: the list received 24 issues on
-11 Nov and 25 on 12 Nov 2026, all from people who are not collaborators, and none since.
+11 Nov and 25 on 12 Nov 2026 (the newest eight are from people who are not collaborators;
+the rest were not checked one by one), and none since.
 So the owner limited issue creation on about 12 or 13 Nov. No notice about it was found in
 the contributing file, the pinned issues or the discussions. GitHub's limits of this kind
 end by themselves after the period the owner chose (one day to six months); the period is
