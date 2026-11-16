@@ -8,8 +8,9 @@ text and asks: "Did you try varying the error wording?"
 
 This version replaces the draft of 16 Nov ("I have not tested that"), which was never
 posted: the maintainer approved a third run the same day and it has been run. Sources: the
-run 2 store (108, 106, 52, 34, 32) and `plan/exec/v2/study/RESULT-run-3.md` (run 3). Post
-it only after the run 3 write-up is on `main`, so that the link works.
+run 2 store (108, 106, 52, 34, 32) and `plan/exec/v2/study/RESULT-run-3.md` (run 3). The
+run 3 write-up is on `main` since pull request 31 was merged (`dd380d8`, 17 Nov 2026), so
+the link works and the reply can be posted.
 
 ---
 
@@ -25,4 +26,4 @@ Result: 15 of 16 passed with the message, 2 of 16 without. The test stopped at r
 
 What it does not show: whether naming the next step is what helped, since I tested one wording against `null` and no control message. It says nothing about the 12B model. The 8 tasks were chosen from run 2's failures, and the run stopped early, so 15 and 2 are counts, not rates.
 
-Run 3, with its pre-registration and raw records: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md
+Run 3, with its pre-registration and raw records: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md#run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms
