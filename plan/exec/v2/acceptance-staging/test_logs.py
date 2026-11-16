@@ -4609,7 +4609,9 @@ def test_a_failure_while_a_staged_file_is_moved_leaves_everything_as_it_was(
     tmp_path: Path,
 ) -> None:
     """Item 65: a failure at the move, not only at directory creation, leaves every output and
-    the table as they were and removes every directory the run created."""
+    the table as they were. The tool removes no directory: a table directory the run created,
+    with any parent it created, stays in place and is empty (record 0017, "Directories are
+    never removed, and reserved names", changed after the last check)."""
     root = tmp_path / "claude"
     write_claude(root, _uniform(ALTERNATING, DROPPED))
     # A non-empty directory where the Markdown file should go: the move cannot replace it.
@@ -4636,10 +4638,13 @@ def test_a_failure_while_a_staged_file_is_moved_leaves_everything_as_it_was(
     assert code == 3
     assert printed == ""
     assert failed.splitlines() == [USAGE_ERRORS["unwritable"]]
-    # Nothing written, no temporary file left, and the directory the run created is gone.
-    assert _listing(tmp_path) == before
+    # Nothing written and no temporary file left, but the table directory this run created,
+    # and the parent it also created, stay in place, empty, with mode 0700.
+    assert _listing(tmp_path) - before == {"store", "store/deep"}
     assert not stored.exists()
-    assert not store.exists()
+    assert store.is_dir() and list(store.iterdir()) == []
+    assert stat.S_IMODE(store.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.parent.stat().st_mode) == 0o700
     assert (blocked / "keep.txt").read_text(encoding="utf-8") == "keep me"
 
 
@@ -5257,6 +5262,51 @@ def test_an_empty_keep_directory_is_a_malformed_value(
     assert _listing(tmp_path) == before
 
 
+@pytest.mark.parametrize("option", ["json", "markdown", "html"])
+@pytest.mark.parametrize("letters", ["lower", "mixed"])
+def test_an_output_name_starting_with_the_reserved_prefix_is_malformed(
+    tmp_path: Path, option: str, letters: str
+) -> None:
+    """Item 79: a `--json`, `--markdown` or `--html` path whose file name begins with
+    `.realornoise-`, in any letter case, prints the general usage line as the only line on
+    standard error, nothing on standard output, exits 3, and reads and writes nothing (those
+    names are reserved for the table's own temporary files; record 0017, "New in 0017" and
+    "Directories are never removed, and reserved names")."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    stem = ".realornoise-mine" if letters == "lower" else ".ReaLorNoise-Mine"
+    extension = "md" if option == "markdown" else option
+    target = tmp_path / f"{stem}.{extension}"
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path, [*_args("claude-code", claude=root), f"--{option}", str(target)]
+    )
+    assert code == 3
+    assert printed == ""
+    assert failed.splitlines() == [USAGE_ERRORS["usage"]]
+    assert not target.exists()
+    assert _listing(tmp_path) == before
+
+
+def test_reserved_prefix_names_that_are_still_accepted(tmp_path: Path) -> None:
+    """Item 79: `.realornoise.json` and `realornoise-report.json` do not begin with
+    `.realornoise-` and are accepted output names, read back with the written record."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    for name in (".realornoise.json", "realornoise-report.json"):
+        target = tmp_path / name
+        code, _printed, failed = _raw_run(
+            tmp_path, [*_args("claude-code", claude=root), "--json", str(target)]
+        )
+        assert code == 1
+        assert failed == ""
+        assert target.is_file()
+        body = json.loads(target.read_text(encoding="utf-8"))
+        assert body["schema_version"] == "arci-logs/2"
+
+
 def test_the_table_directory_holds_the_table_and_nothing_the_run_created(
     tmp_path: Path,
 ) -> None:
@@ -5489,8 +5539,11 @@ def test_a_failed_write_leaves_the_table_and_every_output_as_they_were(
 ) -> None:
     """Item 33: when the table write fails, or when a requested report cannot be written, the
     run prints `Requested output could not be written.` as the only line on standard error,
-    prints nothing on standard output, exits 3, and leaves every file as it was; a table
-    directory the run created is removed."""
+    prints nothing on standard output, exits 3, and leaves every file as it was. Neither shape
+    here lets the run create a fresh table directory (the "directory" shape fails before any
+    directory can be created at all, and the "report" shape's directory already existed), so
+    nothing on disk changes; item 78 covers a table directory the run did create staying in
+    place, empty, after such a failure."""
     root = tmp_path / "claude"
     write_claude(root, _uniform(ALTERNATING, DROPPED))
     (tmp_path / "home").mkdir(parents=True, exist_ok=True)
@@ -5525,6 +5578,40 @@ def test_a_failed_write_leaves_the_table_and_every_output_as_they_were(
         assert (tmp_path / "store" / TABLE_NAME).read_bytes() == stored
     else:
         assert not (tmp_path / "blocked" / "in").exists()
+
+
+def test_a_failed_keep_write_leaves_a_new_table_directory_in_place(tmp_path: Path) -> None:
+    """Item 78: the tool removes no directory. After a `--keep` run whose write fails, a table
+    directory that did not exist before the run exists and is empty, with any parents the run
+    created, and every directory that existed before still exists with its mode."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    # "existing" is here before the run; the table directory is two new levels below it.
+    existing = tmp_path / "existing"
+    existing.mkdir(mode=0o751)
+    store = existing / "fresh" / "deep"
+    # A non-empty directory where the JSON report should go: the move cannot replace it.
+    blocked = tmp_path / "report.json"
+    blocked.mkdir()
+    (blocked / "keep.txt").write_text("keep me", encoding="utf-8")
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path,
+        [*_args("claude-code", claude=root), "--json", str(blocked), "--keep-dir", str(store)],
+    )
+    assert code == 3
+    assert printed == ""
+    assert failed.splitlines() == [USAGE_ERRORS["unwritable"]]
+    # The two new levels stay in place, empty; the directory that existed before keeps its mode
+    # and nothing else on disk changes.
+    assert _listing(tmp_path) - before == {"existing/fresh", "existing/fresh/deep"}
+    assert stat.S_IMODE(existing.stat().st_mode) == 0o751
+    assert store.is_dir() and list(store.iterdir()) == []
+    assert stat.S_IMODE(store.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.parent.stat().st_mode) == 0o700
+    assert (blocked / "keep.txt").read_text(encoding="utf-8") == "keep me"
 
 
 def test_example_ignores_the_table_options(tmp_path: Path) -> None:
