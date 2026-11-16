@@ -1,0 +1,271 @@
+{
+ "results": [
+  {
+   "area": "write-path",
+   "review": {
+    "summary": "I found 2 defects in the write path. Both need two runs to overlap.\n\n- **write-path-1 (high):** after a successful --keep run, the cleanup deletes every regular file named .realornoise-* in the table directory. That includes files another running process is still using: its staged copies and its backups of the originals. The other process has written outputs into that directory without holding the lock, either because it runs without --keep or because its own table is in a different directory. It then fails, and it can be left having overwritten a file even though it reports that nothing was written.\n- **write-path-2 (low):** a second --keep run can be waiting on the lock for a table directory that the first run created. If the first run's write fails, its rollback removes that directory, and the waiting run then fails as well.\n\nThe rest of the area checked out: kills at six points, rollback of contents, modes and created directories, three overlapping runs, the 0-byte table, the empty --keep-dir value, the leftover-file cleanup, symlink and directory tables, duplicate output paths, no table directory touched without --keep, and the lock creating no file. The 15 new unit tests pass, and each one would fail if the fix it covers were removed. The one exception is that no test checks that the lock actually blocks a second process, which I confirmed by hand.",
+    "checked": [
+     "Read git diff d3e0697..68ec006 for src/arci/logs/cli.py, kept.py, tests/unit/logs/test_logs2.py, tests/unit/logs/privacy/test_audit_hook.py and tests/acceptance/test_logs.py; record 0017 lines 255-305 and 495-516; brief R3a items 1-5",
+     "t1.py: run without --keep, then with --keep (printed text identical, exit 2); 0-byte table without --keep is absent with no F24; table path is a directory (F24 printed, directory left alone); table path is a symlink to a table in another directory",
+     "t2.py: a symlinked table gets written through the link, the link survives, and the cleanup runs in the resolved directory",
+     "t3.py: three overlapping --keep runs in subprocesses (gpt-6, gpt-7, gpt-8; two paused after the first read): all three models end up in the table and no temporary files are left",
+     "t5.py part 1: a --keep run paused in os.replace while holding the lock really blocks a second --keep run (macOS flock on a directory descriptor works), and both runs' rows survive",
+     "t5.py part 2 and t6.py: a run without --keep that writes --json/--markdown into the table directory has its staged copy and backup deleted by a concurrent --keep run, so it exits 3 and r.json is left overwritten (finding 1)",
+     "t7.py: an injected os.replace failure at moves 1 to 4 restores originals byte for byte with modes 0640/0604, creates no new file, removes the created a/b/c directories, and exits 3 with the fixed line; a successful run keeps the modes, makes the table 0600 and creates directories as 0700",
+     "t8.py: table becomes mode 000 between the first read and the re-read (exit 2, table unchanged, not rewritten); two spellings of one output and --json equal to the table path both give DUPLICATE_OUTPUT; a missing output directory gives WRITE_ERROR and creates nothing; --keep-dir with --ignore-kept; no --keep with REALORNOISE_HOME set creates no directory",
+     "t9.py: SIGKILL during placeholder removal, staging, backup copy, the first move, the second move and the cleanup, with and without existing targets; no empty target is left once staging has begun, and temporary files are left only as the record allows",
+     "t10.py: a waiting --keep run fails after the first run's rollback removes the table directory it created (finding 2)",
+     "Searched the tests for lock coverage: only the audit hook (lock taken) and the lock-unavailable fallback test exist",
+     "pytest on the new write-path tests in test_logs2.py and test_audit_hook.py: 15 passed; git status of the worktree is clean"
+    ],
+    "findings": [
+     {
+      "id": "write-path-1",
+      "severity": "high",
+      "file": "src/arci/logs/cli.py",
+      "claim": "After a successful --keep write, the cleanup deletes every regular .realornoise-* file in the table directory. That includes the staged copies and backups of another run that is still writing there. The other run cannot hold the lock: it runs without --keep, it is a --keep run whose own table is elsewhere, or it is a --keep run that does not write the table. So the other run fails with a write error, and it can leave a requested output overwritten (its original lost) even though it prints that nothing was written. This breaks the rule that no requested file is left changed when a write fails. The record says the cleanup removes temporary files 'this tool left'; these were still in use.",
+      "evidence": "cli.py lines 454-460: `for path in table_path.parent.iterdir(): if path.name.startswith('.realornoise-') ... path.unlink()`. Non-table outputs stage with tempfile.mkstemp(prefix='.realornoise-', dir=target.parent) and take no lock. In t6.py, run X (no --keep, with --json kd/r.json and --markdown kd/r.md, both already present) is paused before its second os.replace; kd then holds X's three .realornoise-* files. A --keep-dir kd run then completes, after which kd lists only days-1.json, r.json and r.md. X prints {\"code\": 3, \"err\": \"Requested output could not be written.\\n\"}, yet r.json now starts with '{ \"arci_version\": \"2.4.0\"' instead of 'ORIGINAL JSON'; the backup is gone, so the original cannot be restored. t5.py shows the simpler case: X paused before its only move exits 3 because its staged file was deleted.",
+      "repro": "/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/write-path/t6.py (with child3.py, child.py, h.py); run with the worktree .venv/bin/python -B",
+      "suggested_fix": "Delete only temporary files that cannot belong to a live writer, for example ones older than a threshold or ones this run itself staged. Alternatively, have every run that writes into a directory take that directory's lock before staging there. Add a test where a run without --keep writes into the table directory concurrently."
+     },
+     {
+      "id": "write-path-2",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A --keep run that waits for the lock on a table directory created by an earlier, overlapping run fails if that earlier run's write fails. The earlier run's rollback (rmdir after locks.close()) removes the directory the waiting run already holds open. The waiting run then gets the lock on a deleted directory and its own write fails, although nothing stopped it from writing.",
+      "evidence": "cli.py: `created` directories are removed in the finally block after `locks.close()` (lines 461-467). A second run sees the directory exists, so it creates nothing, then blocks in flock on the directory descriptor. In t10.py, run A (new kd, os.replace pauses and then raises) and run B (--keep-dir kd, started while A holds the lock) give A {\"code\": 3, ...} and B {\"code\": 3, \"err\": \"Requested output could not be written.\\n\", \"reads\": 2}; afterwards kd does not exist.",
+      "repro": "/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/write-path/t10.py (with child4.py, child.py, h.py)",
+      "suggested_fix": "After taking the lock, check that the locked descriptor still refers to table_path.parent (compare fstat with stat of the path), and recreate the directory and lock it again if it does not; or do not remove a created directory while another process may be waiting on it."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "write-path-1",
+     "verdict": "partly",
+     "severity": "medium",
+     "note": "Reproduced independently (verify-write-path/main.py + x.py + h.py). Run X without --keep writes --json kd/r.json and --markdown kd/r.md, both already present, and pauses before its second os.replace. While it waits, kd holds X's three .realornoise-* files. A --keep-dir kd run then finishes, and its cleanup at cli.py:454-460 deletes all three. X then prints code 3 'Requested output could not be written.', yet r.json now holds new JSON ('{\"arci_version\": \"2.4.0\"...') and the original is gone because the backup was deleted. So the core is true: a failed write leaves a requested file changed. Why the severity is lowered: the cleanup by name prefix is exactly what record 0017 (lines 504-506, where the parenthetical defines the files to remove as regular files named .realornoise-*) and brief item 3 prescribe. The code does what the record says; the record's rule just has this side effect. Reaching it also takes a narrow, user-made race: another run writing extra outputs into the hidden table directory at the same moment. A stated rule (no requested file changed after a failed write) breaks in a reachable but unlikely case, so medium, not high."
+    },
+    {
+     "id": "write-path-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced independently (verify-write-path/main2.py + a.py + b.py). Run A creates new/kd, holds the lock, then fails os.replace. Run B starts with --keep-dir on the same kd and blocks in flock. A's finally block (cli.py:461-467) closes the lock and then rmdirs the directories it created. B then fails: both runs print code 3 'Requested output could not be written.', and afterwards neither kd nor its parent exists. B fails loudly and nothing is lost or wrongly reported, so low is right."
+    }
+   ]
+  },
+  {
+   "area": "self-check",
+   "review": {
+    "summary": "Self-check area (bench/selfcheck_logs.py, tests/unit/logs/test_selfcheck_quick.py, docs/results/logs-selfcheck.md) between d3e0697 and 68ec006: all seven requested points check out, with one low-severity test weakness. (1) No seed, generator, cell list, history count or full-mode threshold changed. The old gate `F(wrong, 20000) <= 283/10000` and the new `wrong <= int(LIMIT*20000) = 566` give the same result for every 20000-history cell. Apart from the new column, the seconds column and elapsed time, every figure in the results file is identical; the only other change is the new gate sentence in the two section headers. (2) The moved measure's own no-drop count is taken from the right measure and the `no_drop` finding. My separate recount matched the script on all 8 quick margin cells. Patching a margin in memory makes gates fail, and full mode allows 566 and fails at 567. (3) quick_limit gives the same answer as my own exact calculation for n = 30 (4), 300 (17), 1000 (42), 57, 0 and 1. (4) Under `python -O`, three deliberately broken checks (g_tail, kept.merge, decide_tool) each still stop the run with exit code 1. (5) A gated cell fails when generated is one less than requested, both in gate_passes and through run(). (6) The 32 gates in the results file are exactly the ones the script defines: 3 fixed, 20 null, 4 setting-change, 4 competitive and 1 counterexample gate. (7) The quick-mode header says the quick gates are smoke checks and support no claim, and each quick gate name shows its limit. The one weakness: the new `-O` test only checks that quick mode passes under optimisation, so it would still pass if gates went back to `assert` form, even with a broken gate (shown with a mutated copy). All 35 unit tests in the file pass on the worktree. I left no files in the worktree.",
+    "checked": [
+     "git diff d3e0697..68ec006 -- bench/selfcheck_logs.py tests/unit/logs/test_selfcheck_quick.py (read in full): cells() and the history generators (history_days, setting_history, streak_table) are unchanged apart from assert-to-raise rewrites; SEED and LIMIT unchanged; simulate() removed",
+     "Read bench/selfcheck_logs.py in the worktree: setting_history, setting_counts, counted_histories, cells, gate_passes, run, gate_summary, process_cell, run_cells, main; grep found no remaining assert or AssertionError",
+     "Read the brief R3a-logs2-review-fixes.md, items 6 to 9 and the addendum",
+     "Compared docs/results/logs-selfcheck.md at d3e0697 and 68ec006 with scratchpad/review24b/self-check/cmp.py, ignoring the new column and the seconds column: only the gate sentence in two headers and the elapsed time differ; worktree file is identical to 68ec006",
+     "Gate list in the results file (32 rows) checked against run(): 3 fixed + 20 null + 4 settings + 4 competitive + 1 counterexample",
+     "scratchpad/review24b/self-check/limit_check.py: my own exact calculation P(X>c) = (40^n - sum comb(n,k) 39^(n-k)) / 40^n agrees with quick_limit for n = 30 (4), 300 (17), 1000 (42), 57 (6), 0 and 1",
+     "scratchpad/review24b/self-check/recount.py: separate per-history recount of the moved measure's no_drop for all 8 quick drop cells matches c.moved_none exactly",
+     "scratchpad/review24b/self-check/mutate.py under python -O (output in mutate_out.txt): wrong margins for edit_failure_share, no_reasoning_share and reasoning_tokens make gates fail (one setting cell still passes because REAL DROP findings dominate); gate_passes on a 20000-history cell gives True at 566 and False at 567; run(True) with generated = count - 1 returns 1 with a FAIL row; a whole quick run with a wrong share margin stops with the 'Margin finding' line",
+     "scratchpad/review24b/self-check/broken_O.py under python -O: a broken g_tail, kept.merge or decide_tool each gives 'Gate summary: FAIL; check ...' and exit code 1",
+     "python -B -O -m bench.selfcheck_logs --quick --workers 1 on the worktree: 16/16 passed; header carries the smoke-check sentence and limit(30)=4 / limit(300)=17 beside each gate (scratchpad/review24b/self-check/quick_O.txt)",
+     "pytest -p no:cacheprovider -o addopts='' tests/unit/logs/test_selfcheck_quick.py on the worktree: 35 passed",
+     "Mutated copy scratchpad/review24b/self-check/mut (a broken check written back as an assert): test_quick_with_optimisation still passes and quick under -O reports 16/16",
+     "Full mode not run, as instructed"
+    ],
+    "findings": [
+     {
+      "id": "self-check-1",
+      "severity": "low",
+      "file": "tests/unit/logs/test_selfcheck_quick.py",
+      "claim": "The test added for brief item 7 (test_quick_with_optimisation) only checks that quick mode passes under python -O. It would still pass if any gate went back to assert form, even with a broken gate, so it does not show that the verdict is the same under -O.",
+      "evidence": "In /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/self-check/mut/bench/selfcheck_logs.py, line 383, the explicit check in selection_demo was replaced with `assert set(pooled) == {306}  # deliberately broken, assert form`. Without -O, quick mode raises AssertionError. With `PYTHONPATH=<mut> pytest tests/test_selfcheck_quick.py::test_quick_with_optimisation` the result is '1 passed', and `python -B -O -m bench.selfcheck_logs --quick` prints 'Gate summary: 16/16 passed; 0 failed.' The current code itself is correct: no asserts remain, and explicit checks broken in memory fail under -O (broken_O.py).",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/self-check/mut && PYTHONPATH=$PWD /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/pytest -p no:cacheprovider -o addopts='' -q tests/test_selfcheck_quick.py::test_quick_with_optimisation",
+      "suggested_fix": "Under -O, also run quick mode with one gate deliberately broken (for example, decide.decide_tool or a rank_test function patched through a small wrapper script) and check for exit code 1 and 'FAIL'. Alternatively, add a test that reads bench/selfcheck_logs.py with ast and finds no Assert nodes."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "self-check-1",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "I reproduced this on my own copy (/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/verify-self-check/mut). In bench/selfcheck_logs.py, at line 383 of my copy, I replaced the explicit check `if not (set(pooled) == {305}): raise CheckFailure` with `assert set(pooled) == {306}`. Without -O, quick mode raises AssertionError. With -O it prints 'Gate summary: 16/16 passed; 0 failed.', and tests/unit/logs/test_selfcheck_quick.py::test_quick_with_optimisation (lines 277-289) still reports '1 passed'. So the test cannot show that the verdict is the same under -O, which is the rule in brief item 7. The current code is correct: bench/selfcheck_logs.py has no assert statements. The brief also asked only for 'a test that runs the quick mode with optimisation on', and that test exists. This is a test weakness only, so low severity."
+    }
+   ]
+  },
+  {
+   "area": "documents",
+   "review": {
+    "summary": "Three defects found in the changed documents, none critical or high. Every k/n = p [lo, hi] figure in the 12 documents appears in the row of docs/results/logs-selfcheck.md it is cited from, with the named seed and design. Each figure's Wilson interval was also recomputed and matches. All 8 tables that docs/STATISTICS_LOGS.md copies from the results file match it row for row, and the 362/2000 worst-case figure really is the largest as-built rate in the cells it names. The wording required by brief items 10 to 16 is present. The write rules were run through the real CLI and behave as the documents say: a 0-byte table counts as absent and is replaced, an empty --keep-dir exits 3 with the usage line and touches nothing, leftover .realornoise- files are cleaned up, and the directory lock really blocks a second process. The recipe transcript is identical to the real --example output. Defects: (1) the README availability sentence still tells users to install the LangChain extra at 2.3.0, and the extended version test cannot catch it; (2) the README section \"What it does not do\" still lists stored history beyond log retention as missing, though 2.4.0 has the kept table; (3) the gate descriptions copied into STATISTICS_LOGS.md say margin cells gate only the tool's NO DROP, while the regenerated results file says they gate the moved measure's own finding too. No sales wording, uniqueness claim, cause claim or em dash appears in the changed lines. No document says the command as a whole sends nothing.",
+    "checked": [
+     "git diff d3e0697..68ec006 --stat and full diff of all 12 documents plus src/arci/logs/cli.py and kept.py (HEAD confirmed 68ec006)",
+     "Read brief R3a-logs2-review-fixes.md items 1-18 and addendum",
+     "scratchpad/review24b/documents/figs.py: extracted every k/n = p [lo, hi] figure from the 12 documents, located its rows in docs/results/logs-selfcheck.md, recomputed Wilson 95% intervals (all match); checked seed/design context of each (362/2000 seed 18112185 14/16 regime; 362/910; 215/2000 seed 18112140 5/10 rho 0.7; 539 and 424/20000 seeds 18112056/57; 1976/1814/1506 of 2000 seed 18112174)",
+     "Checked README 0.092500/0.036000/0.005000 (rho 0.5 rows), the 'exceeds 0.025' list and 'wrong NO DROP below 0.025' against the AR(1) rows; 362/2000 is the max as-built over rho>0 null rows and weekly/regime null rows",
+     "scratchpad/review24b/documents/tables.py: all 8 STATISTICS_LOGS tables taken from the results file match it row for row (0 missing, 0 extra)",
+     "Items 7/8 counts (466, 7, 254; 411, 4, 324 of 20000) are <= 0.0283",
+     "Brief items 10-16 wording verified in STATISTICS_LOGS, README, LOG_FORMATS, COMPATIBILITY, CHANGELOG, both SKILL.md, THREAT_MODEL_LOGS, packages README, CITATION.cff (date-released 2026-11-16), RELEASING step 1",
+     "Searched the documents for whole-command 'sends nothing' and 'nothing leaves' claims: none remain",
+     "Searched for 2.3.0 references and stored-history wording in README and docs; read the ROADMAP 2.4.0 and Next sections",
+     "Read the codeql.yml and workflow-audit.yml triggers: pull_request is limited to main, as CHANGELOG says",
+     "Verified readers take model and effort names from the kept table (cli.py:247-248, claude_code.py/codex.py:42-43)",
+     "scratchpad/review24b/documents/writes.py against the real cli.run with synth_logs: --keep-dir '' and --keep-dir= give exit 3 with the usage line, no output and no files; 0-byte table is absent with no F24, then --keep replaces it (0600); .realornoise-x and .realornoise-abc.tmp are removed after --keep while notes.txt and realornoise-y remain; a read-only run does not clean",
+     "Verified that a flock on a directory descriptor blocks a second process on this macOS (errno 35)",
+     "Ran pytest on tests/unit/logs/test_logs2.py write-rule tests (13 passed) and tests/unit/docs (52 passed)",
+     "Ran the recipe transcript (docs/recipes/logs.md lines 38-93) against main(['--example']) and against .venv/bin/arci logs --example: identical. The literal `python -m arci.logs.cli --example` prints nothing, because cli.py has no __main__ guard",
+     "Searched the changed lines for em dashes, sales wording, uniqueness and cause words: none",
+     "Read test_every_release_version_matches extension in tests/unit/packaging/test_review_fixes.py"
+    ],
+    "findings": [
+     {
+      "id": "documents-1",
+      "severity": "medium",
+      "file": "README.md",
+      "claim": "The Availability sentence names 2.4.0 as the current release but still pins the LangChain extra at 2.3.0, so brief item 11 (\"Availability ... name 2.4.0 ... ==2.4.0\") is only partly carried out, and the extended version test cannot catch it.",
+      "evidence": "README.md:751-752: \"Install `agent-reliability-ci==2.4.0` from PyPI (`agent-reliability-ci[langchain]==2.3.0` for the LangChain adapter)\". The diff changed lines 751 and 753 but left line 752. In tests/unit/packaging/test_review_fixes.py the new pattern r\"agent-reliability-ci==([0-9.]+)\" does not match `agent-reliability-ci[langchain]==2.3.0`, so test_every_release_version_matches passes. docs/RELEASING.md step 1 (changed in this diff) says to update the README \"install version\".",
+      "repro": "grep -n 'langchain\\]==' /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/README.md  -> 752: ...[langchain]==2.3.0...",
+      "suggested_fix": "Change it to `agent-reliability-ci[langchain]==2.4.0` and add the pattern r\"agent-reliability-ci(?:\\[[a-z]+\\])?==([0-9.]+)\" to the README version locations in the test."
+     },
+     {
+      "id": "documents-2",
+      "severity": "low",
+      "file": "README.md",
+      "claim": "The README section \"What it does not do\" still lists stored history beyond log retention as missing, but 2.4.0 keeps daily counts beyond vendor retention in the kept table.",
+      "evidence": "README.md:645-646: \"There is no scan over dates, comparison of two models, stored history beyond log retention, range for the change, ...\". docs/ROADMAP.md, Done in v2.4.0: \"can keep daily counts beyond vendor retention\". docs/recipes/logs.md and docs/STATISTICS_LOGS.md describe --keep restoring days whose files are gone. The task requires that no place still lists stored history as missing.",
+      "repro": "grep -n 'stored history' /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/README.md -> 646",
+      "suggested_fix": "Remove \"stored history beyond log retention\" from that list. Or say that only days captured with --keep while their files existed are kept."
+     },
+     {
+      "id": "documents-3",
+      "severity": "low",
+      "file": "docs/STATISTICS_LOGS.md",
+      "claim": "The gate descriptions copied from the self-check file were not updated. They say each margin cell gates only the tool's NO DROP. The regenerated results file, and items 7 and 8 of the same document, say both the tool's NO DROP and the moved measure's own no drop finding are gated.",
+      "evidence": "docs/STATISTICS_LOGS.md:528 and :540: \"each single-measure exact-margin cell gates wrong NO DROP at <= 566/20000.\" docs/results/logs-selfcheck.md:49 and :60: \"each single-measure exact-margin cell gates both tool NO DROP and the moved measure's own no drop finding at <= 566/20000.\" Every table row below these paragraphs matches the results file; only this sentence differs. Brief item 9 asks for every copy the new file changes to be updated.",
+      "repro": "grep -n 'gates wrong NO DROP at\\|gates both tool NO DROP' docs/STATISTICS_LOGS.md docs/results/logs-selfcheck.md",
+      "suggested_fix": "Copy the results-file sentence into lines 528 and 540."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "documents-1",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "Reproduced at 68ec006. README.md:751-752 reads 'Install `agent-reliability-ci==2.4.0` ... (`agent-reliability-ci[langchain]==2.3.0` for the LangChain adapter)'. The diff changed lines 751 and 753 but not 752. pyproject.toml defines `langchain` as an extra of the same distribution, so that command installs the 2.3.0 main package. Brief item 11 asks for the Availability section to name 2.4.0 (`==2.4.0`), so it is only partly done. In tests/unit/packaging/test_review_fixes.py:54-60 the pattern r\"agent-reliability-ci==([0-9.]+)\" cannot match the bracketed extra, so test_every_release_version_matches still passes with this stale pin."
+    },
+    {
+     "id": "documents-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "README.md:645-646 at 68ec006 still lists 'stored history beyond log retention' among the things the tool does not do. The same README at line 48 says '`--keep` saves daily counts beyond vendor retention', and recipes/logs.md:179 documents --keep, so the README contradicts itself. Brief item 11 says the README should 'no longer list stored log history as missing', and this occurrence was missed. The fix is wording only, so low."
+    },
+    {
+     "id": "documents-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "docs/STATISTICS_LOGS.md:528 and :540 at 68ec006 say 'each single-measure exact-margin cell gates wrong NO DROP at <= 566/20000'. docs/results/logs-selfcheck.md:49 and :60 say the cell 'gates both tool NO DROP and the moved measure's own no drop finding'. The tables beneath those sentences were updated with the new 'moved measure no drop' column, and the diff's items 7/8 text (line 446 of the STATISTICS_LOGS.md diff) describes both counts as gated. Only this copied sentence was not updated under brief item 9. It is incomplete and inconsistent rather than giving a wrong figure, so low."
+    }
+   ]
+  },
+  {
+   "area": "tests",
+   "review": {
+    "summary": "I ran the changed test files unmodified in the worktree: \"364 passed in 24.57s\". I then ran 45 mutations on a copy (harness /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests/mutate.py; outputs mutate*.out beside it). Two of these were broken: D8 and D12 did not match a unique string, so they never ran. Of the rest, the tests catch the following mutations: placeholders not removed (caught only by the simulated-kill test), a 0-byte table treated as unreadable, no re-read under the lock, no lock at all, no cleanup, cleanup of symlinks or of every file, a lock failure that aborts the write, an empty --keep-dir accepted, no gate on the moved measure, a gate that ignores `generated`, a wrong binomial limit, a wrong README pin, and doc seed or design changes in README, CHANGELOG and most STATISTICS_LOGS sentences. The privacy tests were not weakened. The field-scoped walk refuses a version-shaped string, the package version, a model name, an effort and the model-N/effort-N labels in an unrelated field; letting the version, model or effort branches through any field, or dropping the matching synthetic version, fails a test. test_records still refuses a private version string (a reader that keeps any version fails it). Adding \"fcntl\" to the import allow-list admits only fcntl, which can neither open a connection nor start a process. Five mutations that should be caught survive. All five are test weaknesses, rated low.",
+    "checked": [
+     "git diff d3e0697..68ec006 --stat; read the full diff of tests/unit, src/arci/logs/cli.py and kept.py, and the gate code of bench/selfcheck_logs.py (quick_limit, cells, gate_passes, run, main)",
+     "Read brief R3a-logs2-review-fixes.md (items 1-18 and the addendum) and record 0017, paragraph 'An interrupted write, and two runs at once', plus item 31 (unreadable table left byte for byte)",
+     "Unmodified run in the worktree: .venv/bin/pytest -p no:cacheprovider -o addopts='' -q on the 8 changed test files -> '364 passed in 24.57s'",
+     "Copied the worktree (no .venv/.git) to scratchpad/review24b/tests/base; ran mutants in scratchpad/review24b/tests/mut with PYTHONPATH=mut/src:mut, and checked that imports resolve to the copy",
+     "In the copy, deselected test_no_obsolete_branch_links_outside_frozen_files, which fails only because the copy has no git ('git ls-files' exit 128); it is unrelated to the change",
+     "Write-path mutations M1-M4 and M3a-M3k (outputs mutate2.out, mutate3.out, mutate5.out); the lock mutations were also run against tests/acceptance/test_logs.py",
+     "Self-check mutations M6, M7, M7b, M8, M9, M9b (mutate.out); M6b never ran because its pattern was not unique",
+     "README version-pin mutation M11",
+     "Document mutations D1-D17 on copies of README.md, CHANGELOG.md and docs/STATISTICS_LOGS.md (mutate4.out); debugged the D10/D11 survivors with scratchpad/review24b/tests/d10.py; scanned every cited figure for a seed lost to clause splitting with scratchpad/review24b/tests/sentences.py (one case)",
+     "Privacy mutations: P1 (the reader keeps any version string) is caught by test_records; T17a-T17d (version, model or effort allowed in any field; synthetic data without a matching version) are caught; T17e is an equivalent mutant because the package version is always version-shaped",
+     "Read test_imports.py permitted(): matches on the first name segment; 'fcntl' adds only the fcntl module (flock/ioctl/fcntl), so nothing that opens a socket or starts a process",
+     "Read the full body of test_audit_hook.py: the lock check compares the flock descriptor's inode to the table directory; os.remove is allowed only for placeholders, its own temporary files and '.realornoise-' files in the table directory"
+    ],
+    "findings": [
+     {
+      "id": "tests-1",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "No test checks that the directory lock is exclusive and is held from the re-read through the move and cleanup (item 3, record 0017). The lock can be released at once, made shared, released before the move, or released before the cleanup, and every changed test plus the acceptance file still passes.",
+      "evidence": "Four mutations of src/arci/logs/cli.py survive tests/acceptance/test_logs.py together with all 8 changed test files ('588 passed, 1 deselected'): M3c closes the descriptor right after fcntl.flock, so the lock is released before the re-read; M3d uses LOCK_SH instead of LOCK_EX; M3e calls locks.close() before the os.replace loop; M3i releases the lock before the .realornoise- cleanup. test_audit_hook only checks that one flock call hits the table directory's inode. test_overlapping_writer_rows_survive_and_result_uses_initial_table runs the second writer inside the first, unlocked kept.read, so the lock plays no part in that test. See scratchpad/review24b/tests/mutate3.out.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python mutate.py M3c M3d M3e M3i",
+      "suggested_fix": "Add a test in which a second writer (thread or subprocess) blocks on the same directory flock while the first writer is paused between its re-read under the lock and os.replace. Assert that the second writer cannot proceed until the first has moved its table and removed the leftovers, and that both writers' rows survive."
+     },
+     {
+      "id": "tests-2",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "The injected-failure test for item 1 cannot detect placeholders left at targets during staging or moving. Its check runs inside the patched function, and _write_outputs catches the AssertionError as a write failure (except BaseException), so the run still ends with WRITE_ERROR and exit 3.",
+      "evidence": "Mutation M1 removes the loop that unlinks placeholders before staging. test_failed_write_removes_new_targets (both phases) still passes: 'M1-injected only: SURVIVED | 2 passed'. Only the subprocess kill test catches it: 'M1-kill only: killed | FAILED ...test_killed_writer_leaves_no_empty_targets[stage]'. The check is the line `assert all(not p.exists() for p in [*targets, table])` inside fail(), and cli._write_outputs turns any BaseException into report.WRITE_ERROR. See scratchpad/review24b/tests/mutate5.out.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python mutate.py M1-",
+      "suggested_fix": "Inside fail(), record whether any target exists in a nonlocal list, then assert on that list after cli.run returns, instead of asserting inside the patched function."
+     },
+     {
+      "id": "tests-3",
+      "severity": "low",
+      "file": "tests/unit/logs/test_selfcheck_quick.py",
+      "claim": "test_quick_with_optimisation cannot detect a gate that has been turned back into an `assert` (item 7). It runs only seeds whose gates pass, and an `assert` that would pass gives the same output with or without -O.",
+      "evidence": "Mutation M7 restores `assert rank_test.g_tail(...) == F(...)` in exact() in place of the CheckFailure check. The whole of test_selfcheck_quick.py passes: 'M7 gate back to assert (g_tail): SURVIVED | 35 passed in 20.37s'. M7b, which turns the gate_passes result in run() into an assert, is caught, but only because test_failed_gate_stops_before_next_cell patches a failing gate. See scratchpad/review24b/tests/mutate.out.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python mutate.py M7",
+      "suggested_fix": "Add a static check that bench/selfcheck_logs.py contains no ast.Assert node, or run a forced-failing check under -O and assert a nonzero exit."
+     },
+     {
+      "id": "tests-4",
+      "severity": "low",
+      "file": "tests/unit/docs/test_logs_docs.py",
+      "claim": "The provenance test splits clauses at ';', which drops the seed of one sentence in docs/STATISTICS_LOGS.md. Its seed, or its seed and design together, can be changed and the test still passes, against item 18 ('where the sentence names a seed, the figure must be in the row with that seed').",
+      "evidence": "The sentence reads: \"The 2.4.0 self-check gives 362/2000 = 0.181000 [0.164743, 0.198480] at 14 days after against 16 before, for days in regimes (two states, ...; seed 18112185).\" The clause regex `;\\s+` (test_logs_docs.py, assert_figures_sourced) puts 'seed 18112185)' in its own clause, which has no figure. The same figure also sits in a 7/21 power row of logs-selfcheck.md (line 112, seed 18112084). So D11 (seed changed to 18112184) and D10 (design changed to 7 days after against 21 before) both pass the test ('SURVIVED | 30 passed'). scratchpad/review24b/tests/d10.py shows the split clauses. scratchpad/review24b/tests/sentences.py finds this as the only figure in the four documents whose sentence seed is lost.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python mutate.py D10 D11",
+      "suggested_fix": "Do not split at ';' inside parentheses, or take the seeds from the whole sentence when a clause has none."
+     },
+     {
+      "id": "tests-5",
+      "severity": "low",
+      "file": "tests/unit/logs/test_logs2.py",
+      "claim": "No test covers a table that becomes unreadable between the first read and the re-read under the lock. If the `state != \"unreadable\"` guard on the re-read is removed, the code overwrites that table with only this run's rows, against the rule that an unreadable table is left byte for byte (record 0017 item 31), and no test fails.",
+      "evidence": "Mutation M3k changes `if state != \"unreadable\":` in _write_outputs to `if True:`. All 8 changed test files plus tests/acceptance/test_logs.py still pass: 'M3k ...: SURVIVED | 588 passed, 1 deselected'. See scratchpad/review24b/tests/mutate3.out.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24b/tests && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python mutate.py M3k",
+      "suggested_fix": "Add a variant of the overlapping-writer test in which the injected pause writes invalid JSON to the table. Assert that the file is byte for byte unchanged after the --keep run."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "tests-1",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced independently on an archive of 68ec006 (verify-tests/mut.py, output verify-tests/mut.out). The run covered all of tests/unit/logs plus tests/acceptance/test_logs.py, which is wider than the reviewer's set. Four lock mutations of cli.py _directory_lock/_write_outputs all survive with 1556 passed, 3 skipped: closing the descriptor right after flock, LOCK_SH in place of LOCK_EX, locks.close() before the os.replace loop, and locks.close() before the .realornoise- cleanup. Brief item 3 asks only for the injected-pause test and the leftover-file test. So this is a test weakness and the code does not break the rule. Low is right."
+    },
+    {
+     "id": "tests-2",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Removing the placeholder-unlink loop (cli.py lines 418-420) survives test_failed_write_removes_new_targets[stage,move] (2 passed). The assert inside fail() raises AssertionError, and _write_outputs/_execute turn that into WRITE_ERROR, exit 3. After the run the placeholders are cleaned up anyway, so the later checks pass too. Across the full logs suite the same mutation is caught only by test_killed_writer_leaves_no_empty_targets[stage] and [move]. The rule is still tested, and the injected-failure half of item 1 is weak. Low."
+    },
+    {
+     "id": "tests-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Putting back `assert rank_test.g_tail(...) == F(...)` in exact() (bench/selfcheck_logs.py lines 87-91) leaves test_selfcheck_quick.py at 35 passed. That includes test_quick_with_optimisation, which runs only seeds whose gates pass, so a passing assert has the same result with or without -O. The code itself does carry out item 7. Only the test that is meant to guard it is weak. Low."
+    },
+    {
+     "id": "tests-4",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced by calling assert_figures_sourced from the test module on edited copies of docs/STATISTICS_LOGS.md (verify-tests/t4.py). Three edits each still return 759 checked figures with no assertion: seed 18112185 changed to 18112184; the design changed to '7 days after against 21 before'; and both changed together to 7/21 with seed 18112084. The cause is the split at ';\\s+', which moves 'seed 18112185)' into a clause of its own, while 362/2000 = 0.181000 [...] also appears in the 7/21 power row with seed 18112084. As a control, writing ', seed 18112184' in place of '; seed 18112184' is caught. Item 18's per-sentence seed rule is not held for this sentence. The document as published is correct, so this is a test weakness. Low."
+    },
+    {
+     "id": "tests-5",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Changing `if state != \"unreadable\":` (cli.py line 395) to `if True:` survives all of tests/unit/logs plus acceptance (1556 passed). I wrote a probe (verify-tests/t5_test.py) whose injected pause writes '{not json' to the table between the first read and the re-read. On the original code it passes and the table is left byte for byte. On the mutant it fails because the table is overwritten. The code is correct and the case is untested. Low."
+    }
+   ]
+  }
+ ]
+}
