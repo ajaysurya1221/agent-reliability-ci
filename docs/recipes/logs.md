@@ -222,6 +222,9 @@ lock, so overlapping runs keep each other's rows. Where directory locking is una
 the run proceeds without it. The result still uses the table read at the start.
 After a successful write, leftover regular files whose names begin with `.realornoise-`
 are removed from the table directory while the lock is held; other names are left alone.
+Other outputs use `.realornoise.out-` temporary names, which the table cleanup never
+removes. Without a lock, an overlapping `--keep` run can fail with the write error
+and leaves the table and all requested outputs as they were.
 
 The retention promise assumes immutable records, no late backdated arrivals and whole-file
 deletion strictly after 720 hours. Each deleted day must have been captured whole before deletion, with successful captures

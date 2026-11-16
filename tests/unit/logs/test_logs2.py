@@ -7,7 +7,9 @@ import json
 import os
 import random
 import stat
+import threading
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -462,7 +464,7 @@ def test_transaction_rolls_back(
     assert stat.S_IMODE((tmp_path / "out.json").stat().st_mode) == 0o640
     assert not directory.exists()
     assert not directory.parent.exists()
-    assert not list(tmp_path.glob(".realornoise-*"))
+    assert not list(tmp_path.glob(".realornoise[-.]*"))
 
 
 @pytest.mark.parametrize("difference", [-1, 0, 1])
@@ -990,7 +992,7 @@ def test_existing_table_and_report_rollback(
     )
     assert code == 3 and err.getvalue() == report.WRITE_ERROR + "\n" and not out.getvalue()
     assert target.read_text() == "old report" and path.read_bytes() == original
-    assert not list(tmp_path.rglob(".realornoise-*"))
+    assert not list(tmp_path.rglob(".realornoise[-.]*"))
 
 
 def test_session_spanning_deleted_and_retained_days(tmp_path: Path) -> None:
@@ -1092,8 +1094,10 @@ def test_failed_write_removes_new_targets(
     table = tmp_path / "kept" / kept.FILENAME
     history(tmp_path)
 
+    targets_seen: list[bool] = []
+
     def fail(*args: object, **kwargs: object) -> None:
-        assert all(not p.exists() for p in [*targets, table])
+        targets_seen.append(any(p.exists() for p in [*targets, table]))
         raise OSError("injected")
 
     monkeypatch.setattr(
@@ -1123,8 +1127,9 @@ def test_failed_write_removes_new_targets(
         == 3
     )
     assert not output.getvalue() and error.getvalue() == report.WRITE_ERROR + "\n"
+    assert targets_seen and not any(targets_seen)
     assert all(not p.exists() for p in [*targets, table.parent])
-    assert not list(tmp_path.glob(".realornoise-*"))
+    assert not list(tmp_path.glob(".realornoise[-.]*"))
 
 
 @pytest.mark.skipif(os.name != "posix", reason="SIGKILL simulation needs POSIX")
@@ -1210,3 +1215,250 @@ def test_unavailable_directory_lock_still_writes(
     monkeypatch.setattr(fcntl, "flock", unavailable)
     invoke(tmp_path, "--keep")
     assert kept.read(tmp_path / ".realornoise" / kept.FILENAME)[0] == "read"
+
+
+def test_report_moves_survive_another_runs_table_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(tmp_path, days=1)
+    other = tmp_path / "other"
+    history(other, days=1, model="gpt-6")
+    table = store(tmp_path, ())
+    targets = [table.parent / "report.json", table.parent / "report.md"]
+    for target in targets:
+        target.write_text("old report")
+    move = os.replace
+    paused = False
+
+    def between_moves(src: Any, dst: Any) -> None:
+        nonlocal paused
+        if Path(dst) == targets[1] and not paused:
+            paused = True
+            invoke(other, "--keep-dir", str(table.parent))
+        move(src, dst)
+
+    monkeypatch.setattr(os, "replace", between_moves)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        [
+            "--tool",
+            "claude-code",
+            "--claude-dir",
+            str(tmp_path / "logs"),
+            "--json",
+            str(targets[0]),
+            "--markdown",
+            str(targets[1]),
+        ],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert paused and code == 2 and not error.getvalue()
+    record = LogsDecision.model_validate_json(targets[0].read_text())
+    assert verify_seal(record) and record.exit_code == code
+    assert targets[1].read_text() == report.render_markdown(record)
+    assert not list(tmp_path.rglob(".realornoise[-.]*"))
+
+
+def test_unlocked_cleanup_failure_rolls_back_all_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    invoke(tmp_path, "--keep")
+    table = tmp_path / ".realornoise" / kept.FILENAME
+    targets = [tmp_path / "report.json", tmp_path / "report.md", tmp_path / "report.html"]
+    for target in targets:
+        target.write_text("old " + target.name)
+    before = {p: p.read_bytes() for p in [table, *targets]}
+    move = os.replace
+    removed = False
+    other_codes: list[int] = []
+
+    def unavailable(*args: object) -> None:
+        raise OSError("directory lock unavailable")
+
+    def cleanup_before_table_move(src: Any, dst: Any) -> None:
+        nonlocal removed
+        if Path(dst) == table and not removed:
+            removed = True
+            # A complete unlocked writer cleans the first writer's table stage and backup.
+            other_codes.append(
+                cli.run(
+                    ["--tool", "claude-code", "--claude-dir", str(tmp_path / "logs"), "--keep"],
+                    now=NOW,
+                    env={},
+                    home=tmp_path,
+                    out=io.StringIO(),
+                    err=io.StringIO(),
+                )
+            )
+        move(src, dst)
+
+    monkeypatch.setattr(fcntl, "flock", unavailable)
+    monkeypatch.setattr(os, "replace", cleanup_before_table_move)
+    output, error = io.StringIO(), io.StringIO()
+    code = cli.run(
+        [
+            "--tool",
+            "claude-code",
+            "--claude-dir",
+            str(tmp_path / "logs"),
+            "--keep",
+            "--json",
+            str(targets[0]),
+            "--markdown",
+            str(targets[1]),
+            "--html",
+            str(targets[2]),
+        ],
+        now=NOW,
+        env={},
+        home=tmp_path,
+        out=output,
+        err=error,
+    )
+    assert removed and code == 3 and other_codes == [2]
+    assert error.getvalue() == report.WRITE_ERROR + "\n" and not output.getvalue()
+    assert {p: p.read_bytes() for p in before} == before
+    assert not list(tmp_path.rglob(".realornoise[-.]*"))
+
+
+@pytest.mark.parametrize("phase", ("reread", "move", "cleanup"))
+def test_exclusive_lock_is_held_through_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    other = tmp_path / "other"
+    history(other, days=1, model="gpt-6")
+    table = store(tmp_path, ())
+    (table.parent / ".realornoise-leftover").write_text("leftover")
+    paused, resume, attempting, acquired = (threading.Event() for _ in range(4))
+    read, move, iterdir, flock = kept.read, os.replace, Path.iterdir, fcntl.flock
+    first_thread: int | None = None
+    second_thread: int | None = None
+    reads = 0
+
+    def pause() -> None:
+        paused.set()
+        if not resume.wait(5):
+            raise RuntimeError("writer was not resumed")
+
+    def at_read(path: Path) -> tuple[kept.KeptState, tuple[kept.KeptRow, ...]]:
+        nonlocal reads
+        result = read(path)
+        if threading.get_ident() == first_thread and path == table:
+            reads += 1
+            if reads == 2 and phase == "reread":
+                pause()
+        return result
+
+    def at_move(src: Any, dst: Any) -> None:
+        if threading.get_ident() == first_thread and Path(dst) == table and phase == "move":
+            pause()
+        move(src, dst)
+
+    def at_cleanup(path: Path) -> Any:
+        if threading.get_ident() == first_thread and path == table.parent and phase == "cleanup":
+            pause()
+        return iterdir(path)
+
+    def at_lock(fd: int, operation: int) -> None:
+        if threading.get_ident() == second_thread:
+            attempting.set()
+        flock(fd, operation)
+        if threading.get_ident() == second_thread:
+            acquired.set()
+
+    def first() -> tuple[LogsDecision, str]:
+        nonlocal first_thread
+        first_thread = threading.get_ident()
+        return invoke(tmp_path, "--keep")
+
+    def second() -> tuple[LogsDecision, str]:
+        nonlocal second_thread
+        second_thread = threading.get_ident()
+        return invoke(other, "--keep-dir", str(table.parent))
+
+    monkeypatch.setattr(kept, "read", at_read)
+    monkeypatch.setattr(os, "replace", at_move)
+    monkeypatch.setattr(Path, "iterdir", at_cleanup)
+    monkeypatch.setattr(fcntl, "flock", at_lock)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(first)
+        try:
+            assert paused.wait(5), "first writer did not reach pause"
+            b = pool.submit(second)
+            assert attempting.wait(5), "second writer did not attempt lock"
+            assert not acquired.wait(0.2), "second writer passed the held lock"
+        finally:
+            resume.set()
+        a.result(timeout=5)
+        b.result(timeout=5)
+    assert acquired.is_set()
+    assert {r.model for r in kept.read(table)[1]} == {"gpt-5-sol", "gpt-6"}
+    assert not list(table.parent.glob(".realornoise[-.]*"))
+
+
+@pytest.mark.parametrize("replacement", (False, True))
+def test_waiting_writer_relocks_removed_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: bool
+) -> None:
+    fcntl = pytest.importorskip("fcntl")
+    history(tmp_path, days=1)
+    directory = tmp_path / ".realornoise"
+    directory.mkdir()
+    descriptor = os.open(directory, os.O_RDONLY)
+    fcntl.flock(descriptor, fcntl.LOCK_EX)
+    flock = fcntl.flock
+    attempting = threading.Event()
+    locked_inodes: list[tuple[int, int]] = []
+
+    def at_lock(fd: int, operation: int) -> None:
+        attempting.set()
+        flock(fd, operation)
+        info = os.fstat(fd)
+        locked_inodes.append((info.st_dev, info.st_ino))
+
+    monkeypatch.setattr(fcntl, "flock", at_lock)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(invoke, tmp_path, "--keep")
+        try:
+            assert attempting.wait(5)
+            directory.rmdir()
+            if replacement:
+                directory.mkdir(mode=0o700)
+        finally:
+            os.close(descriptor)
+        writer.result(timeout=5)
+    info = directory.stat()
+    assert len(locked_inodes) == 2
+    assert locked_inodes[0] != locked_inodes[1] == (info.st_dev, info.st_ino)
+    assert {r.model for r in kept.read(directory / kept.FILENAME)[1]} == {"gpt-5-sol"}
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert not list(directory.glob(".realornoise[-.]*"))
+
+
+def test_table_becoming_unreadable_keeps_its_exact_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(tmp_path, days=1)
+    table = store(tmp_path, (row(),))
+    read = kept.read
+    changed = False
+
+    def after_first_read(path: Path) -> tuple[kept.KeptState, tuple[kept.KeptRow, ...]]:
+        nonlocal changed
+        result = read(path)
+        if path == table and not changed:
+            changed = True
+            table.write_bytes(b"{not json")
+        return result
+
+    monkeypatch.setattr(kept, "read", after_first_read)
+    invoke(tmp_path, "--keep")
+    assert changed and table.read_bytes() == b"{not json"

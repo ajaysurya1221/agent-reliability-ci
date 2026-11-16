@@ -408,7 +408,18 @@ def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
                 checked += 1
     # Split independent clauses so each inline seed/design stays with its own figure.
     normal = " ".join("\n".join(prose).split())
-    clauses = re.split(r"(?<=[.!?])\s+(?=[A-Z])|;\s+|,\s+and\s+|\band\s+(?=\d+/\d+ =)", normal)
+    separators = re.finditer(
+        r"(?<=[.!?])\s+(?=[A-Z])|;\s+|,\s+and\s+|\band\s+(?=\d+/\d+ =)", normal
+    )
+    clauses: list[str] = []
+    start = 0
+    for separator in separators:
+        prefix = normal[: separator.start()]
+        if prefix.count("(") != prefix.count(")"):
+            continue
+        clauses.append(normal[start : separator.start()])
+        start = separator.end()
+    clauses.append(normal[start:])
     for clause in clauses:
         figures = list(FIGURE.finditer(clause))
         seeds = re.findall(r"\bseed (\d+)\b", clause)
@@ -420,6 +431,9 @@ def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
                 designs.append((match.group(1), match.group(2)))
         for figure in figures:
             candidates = [row for row in rows if figure.group() in row.values()]
+            # Equal figures can occur in different generators; retain named context.
+            if re.search(r"\b(?:regimes|regime-switching)\b", clause):
+                candidates = [row for row in candidates if row.get("generator") == "regime"]
             if seeds:
                 assert len(set(seeds)) == 1, ("ambiguous seeds", clause)
                 candidates = [row for row in candidates if row["seed"] == seeds[0]]
@@ -458,3 +472,36 @@ def test_rate_provenance_rejects_wrong_seed_or_design(suffix: str) -> None:
     with pytest.raises(AssertionError):
         assert_figures_sourced(figure + " " + suffix + ".", rows)
     assert assert_figures_sourced(figure + " at 14/16 (seed 17).", rows) == 1
+
+
+@pytest.mark.parametrize("edit", ("seed", "design", "both", "both-other-row"))
+def test_rate_provenance_rejects_edited_published_copies(edit: str) -> None:
+    text = read("docs/STATISTICS_LOGS.md")
+    edited = text
+    if edit in ("seed", "both", "both-other-row"):
+        seed = "18112084" if edit == "both-other-row" else "18112184"
+        edited = edited.replace("seed 18112185)", f"seed {seed})", 1)
+    if edit in ("design", "both", "both-other-row"):
+        edited = re.sub(
+            r"0\.198480\] at 14 days after(\s+)against 16 before",
+            r"0.198480] at 7 days after\1against 21 before",
+            edited,
+            count=1,
+        )
+    assert edited != text
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    with pytest.raises(AssertionError):
+        assert_figures_sourced(edited, rows)
+
+
+def test_gate_descriptions_match_published_results() -> None:
+    results = read("docs/results/logs-selfcheck.md")
+    statistics = read("docs/STATISTICS_LOGS.md")
+    for heading in ("Setting changes (gate)", "Competitive setting choice (gate)"):
+        source = section(results, heading).strip().splitlines()[0]
+        actual = next(
+            line
+            for line in section(statistics, heading).splitlines()
+            if "each single-measure exact-margin cell" in line
+        )
+        assert actual == source

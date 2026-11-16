@@ -73,9 +73,12 @@ def test_full_run_has_no_network_process_or_unrequested_write(tmp_path: Path, ke
                     assert not flags & (os.O_TRUNC | os.O_APPEND)
                     placeholders.add(path)
                     continue
-                assert path.parent in (
-                    {tmp_path, table_dir} if keep else {tmp_path}
-                ) and path.name.startswith(".realornoise-"), path
+                assert (
+                    path.parent in {target.parent for target in targets[:3]}
+                    and path.name.startswith(".realornoise.out-")
+                ) or (
+                    keep and path.parent == table_dir and path.name.startswith(".realornoise-")
+                ), path
                 writes.add(path)
         if event == "os.chmod":
             assert Path(str(args[0])) in writes | ({table_dir} if keep else set())

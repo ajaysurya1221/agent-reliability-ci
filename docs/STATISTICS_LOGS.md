@@ -525,7 +525,7 @@ These are synthetic daily medians. The response records encode each median with
 half the positive counts at 1 and half at twice the median minus 1. This keeps
 the reference value at 1 under every exact-margin move.
 
-14/16 days; independent day values given all response counts. Known counts 20/40/60/80/100; shares on a tenths grid; edits denominator 100. The competitive cell uses 40 known and 0..4 unknown responses per day for each rival. Old setting ends before adoption. All histories run production selection, reduction and decision. Null gates wrong REAL DROP; each single-measure exact-margin cell gates wrong NO DROP at <= 566/20000.
+14/16 days; independent day values given all response counts. Known counts 20/40/60/80/100; shares on a tenths grid; edits denominator 100. The competitive cell uses 40 known and 0..4 unknown responses per day for each rival. Old setting ends before adoption. All histories run production selection, reduction and decision. Null gates wrong REAL DROP; each single-measure exact-margin cell gates both tool NO DROP and the moved measure's own no drop finding at <= 566/20000.
 
 | after/before | scenario | log SD | drop | seed | requested | generated | tested | stopped | REAL DROP (95% CI) | NO DROP (95% CI) | moved measure no drop (95% CI) | REAL DROP / tested (95% CI) | NO DROP / tested (95% CI) | choices old/current/rival | seconds |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -537,7 +537,7 @@ the reference value at 1 under every exact-margin move.
 
 ### Competitive setting choice (gate)
 
-14/16 days; independent day values given all response counts. Known counts 20/40/60/80/100; shares on a tenths grid; edits denominator 100. The competitive cell uses 40 known and 0..4 unknown responses per day for each rival. Old setting ends before adoption. All histories run production selection, reduction and decision. Null gates wrong REAL DROP; each single-measure exact-margin cell gates wrong NO DROP at <= 566/20000.
+14/16 days; independent day values given all response counts. Known counts 20/40/60/80/100; shares on a tenths grid; edits denominator 100. The competitive cell uses 40 known and 0..4 unknown responses per day for each rival. Old setting ends before adoption. All histories run production selection, reduction and decision. Null gates wrong REAL DROP; each single-measure exact-margin cell gates both tool NO DROP and the moved measure's own no drop finding at <= 566/20000.
 
 | after/before | scenario | log SD | drop | seed | requested | generated | tested | stopped | REAL DROP (95% CI) | NO DROP (95% CI) | moved measure no drop (95% CI) | REAL DROP / tested (95% CI) | NO DROP / tested (95% CI) | choices old/current/rival | seconds |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

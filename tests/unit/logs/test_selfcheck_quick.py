@@ -302,3 +302,34 @@ def test_wrong_share_margin_fails_quick_gate(monkeypatch: pytest.MonkeyPatch) ->
     counts = execute_cell(cell)
     assert counts.moved_none > 4 and counts.none == 0
     assert not gate_passes(cell, counts)
+
+
+def test_selfcheck_has_no_assert_gates() -> None:
+    import ast
+    from pathlib import Path
+
+    from bench import selfcheck_logs
+
+    tree = ast.parse(Path(selfcheck_logs.__file__).read_text())
+    assert not any(isinstance(node, ast.Assert) for node in ast.walk(tree))
+
+
+def test_broken_gate_fails_quick_with_optimisation() -> None:
+    import subprocess
+    import sys
+
+    wrapper = """
+from fractions import Fraction
+from bench import selfcheck_logs
+selfcheck_logs.rank_test.g_tail = lambda *args: Fraction(-1)
+raise SystemExit(selfcheck_logs.main(['--quick', '--workers', '1']))
+"""
+    result = subprocess.run(
+        [sys.executable, "-O", "-c", wrapper],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "Gate summary: FAIL; check ('g_tail'" in result.stdout

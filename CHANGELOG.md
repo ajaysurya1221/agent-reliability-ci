@@ -21,6 +21,12 @@
   wrong REAL DROP 362/2000 = 0.181000 [0.164743, 0.198480] (18.1%, Wilson 95% interval),
   seed 18112185, regime-switching days with log SD 0.45, 14 days after and 16 before.
   Work in phases can break the bound; other patterns can give more.
+- **Fixed:** report temporary files use their own names, so table cleanup does not
+  remove another run's pending outputs. A waiting writer checks the locked directory
+  and recreates it if a failed writer removed it. Tests cover lock lifetime, rollback
+  without a lock, unreadable tables, explicit gates under Python optimization and
+  figure provenance. The README pins the LangChain extra to this release and states
+  when days are kept; gate descriptions match the recorded self-check.
 - **Fixed:** equal numeric client-version tuples now use ascending text order in both
   the displayed list and record validation. With four equivalent spellings, the wrong
   three had been shown. A kept-table path below a regular file is now absent rather

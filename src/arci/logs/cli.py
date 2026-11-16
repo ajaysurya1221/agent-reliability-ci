@@ -323,12 +323,12 @@ def _execute(
 
 
 @contextmanager
-def _directory_lock(directory: Path) -> Generator[None]:
+def _directory_lock(directory: Path) -> Generator[bool]:
     """Lock the directory itself; unsupported platforms continue without a lock."""
     try:
         import fcntl
     except ImportError:
-        yield
+        yield True
         return
     descriptor: int | None = None
     try:
@@ -339,7 +339,16 @@ def _directory_lock(directory: Path) -> Generator[None]:
             if descriptor is not None:
                 os.close(descriptor)
                 descriptor = None
-        yield
+        current = True
+        if descriptor is not None:
+            locked = os.fstat(descriptor)
+            try:
+                actual = os.stat(directory)
+            except FileNotFoundError:
+                current = False
+            else:
+                current = (locked.st_dev, locked.st_ino) == (actual.st_dev, actual.st_ino)
+        yield current
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -366,7 +375,8 @@ def _write_outputs(
     original: set[Path] = set()
 
     def temporary_for(target: Path) -> Path:
-        fd, name = tempfile.mkstemp(prefix=".realornoise-", dir=target.parent)
+        prefix = ".realornoise-" if target == table_path else ".realornoise.out-"
+        fd, name = tempfile.mkstemp(prefix=prefix, dir=target.parent)
         path = Path(name)
         temporary.append(path)
         os.close(fd)
@@ -374,21 +384,26 @@ def _write_outputs(
 
     try:
         if table_path is not None:
-            missing: list[Path] = []
-            parent = table_path.parent
-            while not parent.exists():
-                missing.append(parent)
-                parent = parent.parent
-            for directory in reversed(missing):
-                try:
-                    directory.mkdir(mode=0o700)
-                except FileExistsError:
-                    if not directory.is_dir():
-                        raise
-                else:
-                    created.append(directory)
-                    directory.chmod(0o700)
-            locks.enter_context(_directory_lock(table_path.parent))
+            for _ in range(8):
+                missing: list[Path] = []
+                parent = table_path.parent
+                while not parent.exists():
+                    missing.append(parent)
+                    parent = parent.parent
+                for directory in reversed(missing):
+                    try:
+                        directory.mkdir(mode=0o700)
+                    except FileExistsError:
+                        if not directory.is_dir():
+                            raise
+                    else:
+                        created.append(directory)
+                        directory.chmod(0o700)
+                if locks.enter_context(_directory_lock(table_path.parent)):
+                    break
+                locks.close()
+            else:
+                raise OSError("table directory changed while locking")
             if table_updates is not None:
                 state, latest = kept.read(table_path)
                 outputs = [(path, content) for path, content in outputs if path != table_path]

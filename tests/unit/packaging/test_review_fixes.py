@@ -55,7 +55,7 @@ def test_every_release_version_matches() -> None:
         r"v([0-9.]+) is the current release",
         r"pins `v([0-9.]+)`, the current release",
         r"agent-reliability-ci@v([0-9.]+)",
-        r"agent-reliability-ci==([0-9.]+)",
+        r"agent-reliability-ci(?:\[[^\]]+\])?==([0-9.]+)",
     ):
         found = re.findall(pattern, readme)
         assert found and all(version == __version__ for version in found), pattern
