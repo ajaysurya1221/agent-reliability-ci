@@ -26,9 +26,14 @@ Acceptance items covered elsewhere, with the reason:
   bound" reads from `docs/results/logs-selfcheck.md`): a document test. This file holds the
   words around the three values, the shape of the rate, that the two day counts are whole
   numbers of days, and that F10, the footer and the unescaped HTML page carry the same three.
-- 72 (the self-check file's cells): `bench/selfcheck_logs.py` and its own test.
+- 72 (the self-check file's cells, as amended after the adversarial review: the measure's own
+  `no drop` rate in a margin cell, and gates that are explicit checks): `bench/selfcheck_logs.py`
+  and its own test.
 - 73 (the documented command, the pinned version, both distributions): the packaging and
   document tests.
+- 77 (two `--keep` runs that overlap keep the rows of both): the record gives it to a unit test
+  with an injected pause between the first read and the write, since an acceptance test cannot
+  time two processes.
 - 42, in part: the result of this version equals 2.3.0's for runs whose effective inputs do not
   differ. Nothing in this suite can run 2.3.0, so only the mapping from result to exit code,
   the result names and the unchanged reason texts are held here.
@@ -5181,6 +5186,141 @@ def test_a_faulty_table_is_not_used_at_all(tmp_path: Path, shape: str) -> None:
     for place in (outcome.out, outcome.err):
         assert str(path) not in place
         assert "days-1.json" not in place
+
+
+# --- the rules added after the adversarial review --------------------------------------------
+# Record 0017, "An interrupted write, and two runs at once", the `--keep-dir` option rule, and
+# acceptance items 74 to 76.
+
+
+def test_a_table_of_zero_bytes_is_absent(tmp_path: Path) -> None:
+    """Item 74: a table file of 0 bytes is not a table but `absent`: F24 does not print,
+    `kept_table` is `absent`, and a `--keep` run writes a valid table in its place."""
+    logs = _uniform(ALTERNATING, DROPPED)
+    store = tmp_path / "store"
+    store.mkdir(parents=True)
+    path = store / TABLE_NAME
+    path.write_bytes(b"")
+    assert path.stat().st_size == 0
+
+    # Without `--keep` the empty file is read as absent, and the result is the one with no table.
+    plain, _ = _kept_run(tmp_path / "plain", logs, None, store=store, stem="plain")
+    assert plain.body is not None
+    assert plain.body["kept_table"] == "absent"
+    assert F24 not in plain.lines
+    assert "The kept day table could not be read" not in plain.out
+    _check(plain, "claude-code", logs)
+    assert plain.tool()["kept_days_before"] == 0
+    assert path.stat().st_size == 0
+
+    # With `--keep` a valid table takes its place.
+    kept, _ = _kept_run(tmp_path / "keep", logs, None, extra=("--keep",), store=store, stem="keep")
+    assert kept.body is not None
+    assert kept.body["kept_table"] == "absent"
+    assert kept.body["keep"] is True
+    assert F24 not in kept.lines
+    rows = _rows(path)
+    assert {row["day"] for row in rows} == {day.isoformat() for day in (*BEFORE_DAYS, *AFTER_DAYS)}
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_an_empty_keep_directory_is_a_malformed_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 75: an empty value for `--keep-dir` prints the general usage line, exits 3, and
+    reads and writes nothing; no file appears in the current directory."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    store = tmp_path / "store"
+    one = _kept_from_day("claude-code", BEFORE_DAYS[0], Day(counts=(300,) * 25))
+    write_kept(store / TABLE_NAME, [one])
+    stored = (store / TABLE_NAME).read_bytes()
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path,
+        [*_args("claude-code", claude=root), "--keep-dir", ""],
+        env={"REALORNOISE_HOME": str(store)},
+    )
+    assert code == 3
+    assert printed == ""
+    # A malformed value prints the general usage line, not a sentence of its own.
+    assert failed.splitlines() == [USAGE_ERRORS["usage"]]
+    # Nothing read and nothing written: the stored table stands and no file appears anywhere,
+    # the current directory included.
+    assert (store / TABLE_NAME).read_bytes() == stored
+    assert _listing(work) == set()
+    assert _listing(tmp_path) == before
+
+
+def test_the_table_directory_holds_the_table_and_nothing_the_run_created(
+    tmp_path: Path,
+) -> None:
+    """Item 76: after a successful `--keep` run the table directory holds the table and no other
+    file the run created; a leftover regular file whose name begins with `.realornoise-` is gone,
+    and a file with any other name is left as it was."""
+    logs = _uniform(ALTERNATING, DROPPED)
+    store = tmp_path / "store"
+    store.mkdir(parents=True)
+    leftover = store / ".realornoise-tmp-9f3c"
+    leftover.write_text("half a table", encoding="utf-8")
+    keeper = store / "notes.txt"
+    keeper.write_text("mine", encoding="utf-8")
+    # A name that begins with the tool's own prefix without the dash, and a directory that does
+    # begin with it: neither is a regular file of that name, so both stay.
+    near = store / ".realornoise.keep"
+    near.write_text("also mine", encoding="utf-8")
+    folder = store / ".realornoise-dir"
+    folder.mkdir()
+
+    outcome, path = _kept_run(tmp_path, logs, None, extra=("--keep",), store=store)
+    assert outcome.code == 1
+    assert path.is_file()
+    _rows(path)
+    assert not leftover.exists()
+    assert keeper.read_text(encoding="utf-8") == "mine"
+    assert near.read_text(encoding="utf-8") == "also mine"
+    assert folder.is_dir()
+    # The run left no temporary file of its own and created nothing else here.
+    assert _listing(store) == {TABLE_NAME, "notes.txt", ".realornoise.keep", ".realornoise-dir"}
+
+
+def test_a_failed_write_leaves_no_empty_file_at_a_target(tmp_path: Path) -> None:
+    """Item 76: the same-file check may create empty files at target paths that do not exist
+    yet and removes them again before anything is staged, so a run whose write fails leaves no
+    empty file at a target path that did not exist before."""
+    root = tmp_path / "claude"
+    write_claude(root, _uniform(ALTERNATING, DROPPED))
+    # A regular file where the table's parent directory would go, so the table write fails.
+    (tmp_path / "blocked").write_text("not a directory", encoding="utf-8")
+    targets = [tmp_path / "a.json", tmp_path / "b.md", tmp_path / "c.html"]
+    (tmp_path / "home").mkdir(parents=True, exist_ok=True)
+    before = _listing(tmp_path)
+
+    code, printed, failed = _raw_run(
+        tmp_path,
+        [
+            *_args("claude-code", claude=root),
+            "--json",
+            str(targets[0]),
+            "--markdown",
+            str(targets[1]),
+            "--html",
+            str(targets[2]),
+            "--keep-dir",
+            str(tmp_path / "blocked" / "in"),
+        ],
+    )
+    assert code == 3
+    assert printed == ""
+    assert failed.splitlines() == [USAGE_ERRORS["unwritable"]]
+    assert all(not target.exists() for target in targets), "an empty file was left at a target"
+    assert not (tmp_path / "blocked" / "in").exists()
+    assert _listing(tmp_path) == before
 
 
 def test_keep_with_project_is_a_usage_error(tmp_path: Path) -> None:
