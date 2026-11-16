@@ -37,7 +37,8 @@ The first runs of 2.3.0 on a whole machine gave `CANNOT TELL` for a reason the t
 - `arci verdict` and `arci run` are unchanged and remain the stronger evidence.
 
 ### Fixed
-- Two defects found by the blind acceptance tests (the order of equal client versions; a table path below a regular file), and the write-path defects found by two adversarial reviews (an interrupted write, two runs at once, a table of 0 bytes).
+- Two defects found by the blind acceptance tests (the order of equal client versions; a table path below a regular file).
+- The write path, after five adversarial checks: two `--keep` runs at once keep each other's rows; a table of 0 bytes is replaced; an interrupted write leaves no file half written. The tool never removes a directory, and a report name that begins with `.realornoise-` is refused.
 
 ### Limits
 - It shows what your logs recorded, not why. It cannot show a cause, answer quality or a change to a model: your tasks, prompts, projects and client changed too. No published evidence ties these measures to answer quality.
@@ -48,4 +49,7 @@ The first runs of 2.3.0 on a whole machine gave `CANNOT TELL` for a reason the t
 Recipe: [docs/recipes/logs.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2.4.0/docs/recipes/logs.md) · Statistics and limits: [docs/STATISTICS_LOGS.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2.4.0/docs/STATISTICS_LOGS.md) · Design record: [0017](https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2.4.0/docs/design/0017-logs-2.md) · PyPI: [realornoise](https://pypi.org/project/realornoise/2.4.0/), [agent-reliability-ci](https://pypi.org/project/agent-reliability-ci/2.4.0/)
 
 SHA-256 of the files on PyPI:
-- HASHES-AFTER-PUBLISH
+- `dabfd522edf9597465f62fbe3e816c0adaf7a7d7efaab705787118ae26626e0d` (agent-reliability-ci wheel)
+- `b15f23a27e599f26c570e3c286c2afff6419a3a234b0eedae28f703b9c27744d` (agent-reliability-ci sdist)
+- `03a1473138eb66551c9ecc96af95bf3098f454b804aaa78fd8a2fca0098d4103` (realornoise wheel)
+- `fcafcdfdbf882e54ffdda7f3674024cfde4abe5f40388098ce1f02755f72692e` (realornoise sdist)
