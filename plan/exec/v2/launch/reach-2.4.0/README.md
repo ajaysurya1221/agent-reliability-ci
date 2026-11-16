@@ -8,7 +8,7 @@ request (item 3), as for the earlier listings.
 | # | Step | Needs | File | State |
 |---|---|---|---|---|
 | 1 | Repository description, topics, Discussions | 30 seconds | `../repo-settings-2.4.0.md` | ready |
-| 2 | Merge the plugin README and icon | a pull request from `v2/reach` | `pr-reach.md` | ready |
+| 2 | Merge the plugin README and icon | a pull request from `v2/reach` | `pr-reach.md` | ready; the maintainer approved the icon as drawn on 2026-11-16 |
 | 3 | awesome-observability listing | click "Create pull request" | `awesome-observability.md` | branch pushed to the fork |
 | 4 | awesome-claude-code form | the maintainer writes the description themself | `awesome-claude-code.md` | facts ready |
 | 5 | Anthropic plugin directory | step 2 merged; a paid claude.ai plan | `anthropic-directory.md` | text ready |
