@@ -1,0 +1,35 @@
+suite_id: order-desk-qwen3.5-4b-empty-lookup-text
+tasks: tasks.jsonl
+toolset: agent:toolset
+oracle: check:check
+baseline:
+  label: with-empty-lookup-text
+  agent: agent:baseline
+  candidate_id: ollama:qwen3.5:4b-mlx-ctx32k+empty-lookup-text
+candidate:
+  label: run-2-setup
+  agent: agent:candidate
+  candidate_id: ollama:qwen3.5:4b-mlx-ctx32k
+conditions:
+- id: empty_result
+  faults:
+  - name: empty_result
+    tool: lookup_order
+    occurrence: 0
+rule:
+  alpha: 1/20
+  delta: 1/10
+  stakes:
+  - 1/4
+  - 1/2
+  max_rounds: 40
+  max_errored_pairs: 4
+  scenario_seeds: per_round
+budgets:
+  max_tool_calls: 12
+  max_model_steps: 12
+  max_seconds: 120
+  grader_seconds: 20
+prior_runs:
+- order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb
+- order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb
