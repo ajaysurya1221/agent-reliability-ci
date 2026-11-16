@@ -133,14 +133,14 @@ raised, and nothing in this record departs from it.
   malformed value, a malformed `--since` date, two output options naming the same file and the
   two conflicts of `--keep`; the rest need the logs. The ruling fixes the two phases; this list
   assigns the errors to them.
-- Rollback stops at the first directory it did not create or that is not empty, so a directory
-  that already existed is never removed.
+- The tool never removes a directory. A table directory a run created stays, empty, when its
+  write fails (changed after the last check; see "Directories are never removed").
 - F24 says only that the table was not used, and the record says why: without `--keep` an output
   option may name the table's path, and the report is then written over it.
 - The rows written, and the counts `settings_not_kept` and `days_not_kept`, cover every kept
   setting and day from `N-180` to `N`, whatever `--model`, `--effort` and `--since` say.
 - The table's path joins the same-file check only when `--keep` or `--keep-dir` is given. A
-  table directory the run created is removed again if any write fails. `kept_table` is `absent`
+  table directory the run created stays, empty, if any write fails. `kept_table` is `absent`
   only when the path does not exist; any other failure to open is `unreadable`.
 - `--help` is listed in the synopsis; its text is not a fixed text.
 
@@ -274,6 +274,9 @@ New in 0017:
 - `--keep-dir DIR` chooses the table's directory and implies `--keep`. `DIR` is made absolute
   against the current directory and `~` is expanded, as for `--project`. An empty `DIR` is a malformed
   value: the general usage line, exit 3, nothing read and nothing written.
+- An output option whose file name begins with `.realornoise-` (in any letter case) is a
+  malformed value: the general usage line, exit 3, nothing read and nothing written. Those names
+  are reserved for the table's temporary files.
 - `--ignore-kept` reads no kept table, so the result uses no kept row. It may not be combined
   with `--keep` or `--keep-dir`.
 
@@ -483,9 +486,9 @@ other bits. Keys sorted, no indent, UTF-8, a final newline. The write joins the 
 of 0016: it is staged with the other requested files; if any write fails, none of them is left
 changed and the run exits 3 with
 `Requested output could not be written.` as the only line on standard error and nothing on
-standard output. **Rollback** then removes every directory this run created, the missing parents
-included, deepest first, and stops at the first directory that is not empty or that the run did
-not create. A directory that already existed is never removed and keeps its mode. A failure
+standard output. **Rollback** restores every file and removes no directory: the table directory is
+created before any file is staged, and one this run created, with any parents it created, stays
+in place and is empty. A directory that already existed keeps its mode. A failure
 while a staged file is being moved into place rolls back the same way. The
 table's path joins the same-file check only when `--keep` or `--keep-dir` is given: an output
 option that names the table is then `Two output options name the same file.` `kept_table` is
@@ -513,27 +516,28 @@ never removes a file that another run is still using for its other outputs. Whil
 held no other run can be writing the table, so every `.realornoise-` file found is a leftover.
 Where there is no lock, an overlapping `--keep` run can lose its temporary file to the cleanup:
 it then fails with the write error and leaves the table and every requested output as they
-were. A run that waited for the lock checks, once it holds it, that the directory it locked is
-still the one at the table directory's path. If an earlier run's failed write removed that
-directory in the meantime, the run creates the directory again and locks that one.
+were.
 
-**The order at the end of a run, and a directory that cannot be locked (added after the final
-check).** A run whose write fails removes the directories it created before it releases the
-lock, so a waiting run never passes its check on a directory that is about to go. It removes a
-directory only while the path still holds the directory it created (the same device and
-inode), and it goes on past a directory that is already gone, so a parent it created is still
-removed. A table directory that is gone when the run tries to open it for the lock is treated
-like one removed while waiting: the run creates it again. After 8 such rounds the write fails.
-If the table directory exists but cannot be opened for the lock, the write fails: the run goes
-on without a lock only where the lock call itself is not offered. The cleanup never removes a
-file that is one of this run's requested outputs, whatever its name.
+**Directories are never removed, and reserved names (decided after the last check; this
+replaces the earlier rule that a failed write removes the directories it created).** Three
+rounds of review each found a new fault of one kind: a failing run removed a directory that
+another run was about to use. The tool therefore never removes a directory. A run that holds
+the lock on the table directory then holds it on the directory every other run sees; no check
+of the directory's identity and no second attempt is needed, and none is made. If the table
+directory cannot be opened for the lock, the write fails. Where the platform has no such lock
+call, or the call itself fails, the run goes on without a lock. The tool assumes that no other
+program removes or replaces the table directory while a run is using it. An output option
+(`--json`, `--markdown`, `--html`) whose file name begins with `.realornoise-`, compared after
+Unicode normalization (NFKC) and without regard to letter case, is a malformed value: the
+general usage line, exit 3, nothing read and nothing written. Those names are reserved for the
+table's temporary files, so the cleanup can never remove a file that a run asked for.
 
 **One size limit.** The reader's limit and the writer's are the same number: 32 MiB, read as
 more than 33,554,432 bytes. Neither the number of settings nor the number of rows is capped, so
 a table of admitted rows can reach that size. The staged table is measured before anything is
 moved into place. A staged table larger than the limit is a write error for the whole run: it is
 treated like any other failed write, so nothing is written, every requested output file and the
-stored table stay as they were, a table directory the run created is removed again, and the run
+stored table stay as they were, a table directory the run created stays, empty, and the run
 prints `Requested output could not be written.` as the only line on standard error and exits 3.
 The run therefore never leaves behind a table its own reader would refuse.
 
@@ -992,9 +996,9 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
 33. When the table write fails (for example, its directory cannot be created), the run prints
     `Requested output could not be written.` as the only line on standard error, prints nothing
     on standard output, exits 3, and leaves every requested output file and the table as they
-    were; a table directory the run created is removed. With `--keep --json FILE` and a JSON
-    target that cannot be written, the table is unchanged and no table directory is left
-    behind.
+    were; a table directory the run created stays and is empty. With `--keep --json FILE` and a
+    JSON target that cannot be written, the table is unchanged; a table directory that did not
+    exist before the run exists afterwards and is empty.
 34. With `--keep` or `--keep-dir`, a `--json`, `--markdown` or `--html` path that names the table
     file is `Two output options name the same file.`; without any of those three flags the same
     path is not an error and the report file is written there. One case has no `--keep`, an
@@ -1060,8 +1064,8 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
     33,554,431 bytes and one of exactly 33,554,432 bytes are written and are read by the next
     run; a staged table of 33,554,433 bytes prints
     `Requested output could not be written.` as the only line on standard error, writes nothing,
-    leaves the stored table and every requested output file as they were, removes every directory
-    the run created, and exits 3.
+    leaves the stored table and every requested output file as they were, removes no directory
+    (one the run created stays, empty), and exits 3.
 54. The new client-version exception holds only under `client_versions_after_shown`: the JSON
     walk accepts a version-shaped string there and nowhere else, so the canary `9.8.7654321`, and
     a version that occurs only before the split, appear in no output. The categories 0016 already
@@ -1128,7 +1132,7 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
     error prints even when a log-dependent error would also apply; `--html` naming the table
     file is the same-file error, as is another spelling of that path; and a failure while a
     staged file is moved into place, not only at directory creation, leaves every output and the
-    table as they were and removes every directory the run created.
+    table as they were; a table directory the run created stays, empty.
 
 **Record validation and rendering.**
 
@@ -1193,3 +1197,12 @@ items are grouped: 1 to 55 as before, then the groups of the confirmation pass.
 77. Two `--keep` runs that overlap keep the rows of both: the second writer merges with the
     table the first one wrote (a unit test with an injected pause between the first read and the
     write holds this; an acceptance test cannot time two processes).
+
+**After the last check.**
+
+78. The tool removes no directory. After a `--keep` run whose write fails, a table directory
+    that did not exist before the run exists and is empty, with any parents the run created,
+    and every directory that existed before still exists with its mode.
+79. A `--json`, `--markdown` or `--html` path whose file name begins with `.realornoise-`, in
+    any letter case, prints the general usage line, exits 3, and reads and writes nothing. The
+    names `.realornoise.json` and `realornoise-report.json` are accepted.

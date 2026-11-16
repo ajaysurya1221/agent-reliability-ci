@@ -1,0 +1,131 @@
+{
+ "results": [
+  {
+   "checker": "processes",
+   "review": {
+    "summary": "I ran each scenario as real separate processes, each a `python child.py` calling arci.logs.cli.run on synthetic logs, against a copy of commit f2674d7. The driver checked that arci was imported from the copy. Pauses were injected through a hooks module that only waits on files and never raises inside the tool. All scripts and outputs are under /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/processes/ (lib.py, hooks.py, child.py, s12.py, s3.py, race_mkdir.py, s4.py, s5.py, s7.py, s7b.py). Each process had a 60 s limit; no process hung and none had to be killed. Three defects showed up in runs. (1) Medium: a run that should succeed fails with the write error when a failing run's Rollback removes a parent directory between this run's existence walk and its mkdir. mkdir then raises FileNotFoundError (or EINVAL on macOS), and the code tolerates only FileExistsError. It occurred unscripted in 3 of 360 overlapping runs, and a scripted run reproduces it every time. (2) Low: when overlapping runs that all fail split the work of creating the directories, one creating the parent and another the table directory, the parent is left behind. Each run follows its own Rollback rule, but the combined result is not \"nothing is left\". This happened in 39 of 40 chain runs. (3) Low: a --keep run's cleanup deletes any requested output whose name starts with `.realornoise-` in the table directory. That includes another run's finished report, which reported success. If the cleanup lands at the right moment, it also removes that run's same-file-check placeholder, and that run then fails with the write error.",
+    "checked": [
+     "Scenario 1: 2, 3 and 6 --keep processes started together (barrier) on a missing parent and table directory, each with its own model, 20 reps each (60 runs): all exit codes matched each run's own --json exit_code, every model's rows were in the table, no temporary file was left, no hang.",
+     "Scenario 2: the same with 1 or 2 runs failing (--json into a missing directory), 20 reps per combination (100 runs; 2 processes with 1 failing, 3 with 1 or 2, 6 with 1 or 2): every failing run exited 3, changed nothing and created no missing directory; the table directory existed whenever some run succeeded; no temporary files were left. In 3 of these runs a non-failing run exited 3 with mkdir raising FileNotFoundError or OSError EINVAL on the table directory: finding processes-1.",
+     "Scenario 3: a failing creator (it created both the parent and the table directory), paused once at each of after mkdir, after flock, before rmdir of the table directory, between the two rmdirs, and after the last rmdir before unlock, each with 1 and with 2 waiters started during the pause: all waiters succeeded with their rows kept, the creator exited 3, no temporary files were left, no hang.",
+     "Scenario 3, scripted race: creator paused between rmdir(table dir) and rmdir(parent); a second run started and paused just before its mkdir(table dir), after its walk had seen the parent exist; then the creator was released and finished, then the second run was released. The second run exited 3 with FileNotFoundError from mkdir, and nothing was left (processes-1). The control case, with the creator paused after both rmdirs, succeeded.",
+     "Scenario 4 chain: A creates and fails while holding the lock, B (failing) waits, C waits; B either free-running or held on its second-round lock; 20 reps each. With C succeeding: C succeeded and kept its rows in 40 of 40 runs. With C failing as well: in 39 of 40 runs, home/parent (0700, empty) was left behind after all three runs failed. The event log shows B created parent and C created kd; B's rmdir(parent) hit ENOTEMPTY and C removed only kd (processes-2).",
+     "Scenario 5: a waiter W, scripted through 8 failing creators that each created and removed the table directory under W's wait, hit the 8-round limit. W exited 3 with the fixed error, its pre-existing --json was unchanged, the parent W created was removed, each creator removed only its own directory, nothing was left, no hang.",
+     "Scenario 6: SIGKILL of the lock holder at each of the 5 pause points with one waiter: the waiter succeeded with its rows every time, no temporary file was left, no hang (the killed run's own directories stay, as expected after SIGKILL).",
+     "Scenario 7: 3 --keep runs plus 3 runs without --keep started together, the latter writing --json, --markdown and --html into the existing table directory (including .realornoise-report.json and .realornoise-x.md), 20 reps: all runs exited normally, all --keep rows survived, no temporary file was left, and other outputs survived. In all 20 runs, the outputs named .realornoise-* had been deleted although their runs reported success (processes-3). Run in sequence, a --keep run also deletes an earlier run's .realornoise-report.json.",
+     "Scenario 7, scripted: a run without --keep paused right after creating its empty placeholder kd/.realornoise-report.json; a --keep run ran to completion and deleted the placeholder; the first run, when released, exited 3 with FileNotFoundError when removing its placeholder (processes-3).",
+     "Hang check: every process in every scenario had a 60 s limit; HUNG was empty in every scenario."
+    ],
+    "findings": [
+     {
+      "id": "processes-1",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A --keep run that should succeed fails with the write error when another run's Rollback removes a missing parent between this run's walk (`while not parent.exists()`) and its `directory.mkdir`. mkdir then raises FileNotFoundError (or OSError EINVAL on macOS), but only FileExistsError is tolerated (lines 393-401). The record says a run whose table directory was removed by an earlier run's failed write creates it again; here the run fails instead.",
+      "evidence": "Unscripted, no pauses: 6 or 3 --keep processes started together on a missing home/parent/kd, with 1 or 2 of them failing (--json into a missing directory). A run that should succeed exited 3 in 3 of 360 runs (s12-n3-f1-r8, s12-n6-f2-r3, s12-n6-f2-r6), with traces `FileNotFoundError: ... home/parent/kd` and `OSError: [Errno 22] Invalid argument: ... home/parent/kd` from Path.mkdir. Scripted (race_mkdir.py): creator A paused after rmdir(kd) and before rmdir(parent); run C paused before mkdir(kd), its walk having found parent present; A then finished, so parent was gone; C, when released, exited 3, `Requested output could not be written.`, trace FileNotFoundError on mkdir(kd), and no table was written. This interleaving happens with real processes: the failing creator's two rmdir calls run with no lock protecting the walk of a run that has not reached the lock yet, which is exactly what the unscripted runs hit.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/processes && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python -B race_mkdir.py (deterministic); s12.py 20 (random, about 1%)",
+      "suggested_fix": "In the creation loop, treat FileNotFoundError (and EINVAL) from mkdir as \"the walk is stale\" and start the round again (counting toward the 8-round limit), rather than failing the write."
+     },
+     {
+      "id": "processes-2",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "When overlapping runs that all fail split the creation of the missing directories (B creates the parent, C creates the table directory), the parent is left behind after every run has failed. B's rmdir(parent) meets ENOTEMPTY because C's kd is inside, and C removes only kd, since it did not create the parent (lines 480-490). Each run holds the per-run Rollback rule as written, but the combined outcome leaves a 0700 directory that runs of this tool created after none of them wrote anything. This is low because the record's per-run rule is held: it is a gap in the rule, not a breach of it.",
+      "evidence": "s4.py, chain A (creates parent and kd, fails), B (fails), C (fails): in 39 of 40 runs home/parent remained empty and the table directory was absent. The event log of s4-cf1-bh0-r0 reads: `A rmdir kd removed`, `A rmdir parent removed`, `B mkdir parent created`, `p0 mkdir kd created`, `B mkdir kd -> FileExistsError`, `B rmdir parent -> OSError`, `p0 rmdir kd removed`. This happens with plain overlapping runs: when A releases the lock, both waiters see a stale lock at nearly the same moment and walk and create together.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/processes && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python -B s4.py 20 (see the c_fails=True lines)",
+      "suggested_fix": "Either state in the record that an empty parent may remain when runs that all fail split the creation, or, after removing its own deepest directory, retry the remove of a parent it did not create only if that parent is empty and was created by a run of this tool (this would need a marker). The first option is simpler."
+     },
+     {
+      "id": "processes-3",
+      "severity": "low",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A successful --keep run's cleanup (lines 473-479) deletes every regular file in the table directory whose name starts with `.realornoise-`, including another run's requested output (for example `--json <tabledir>/.realornoise-report.json`) after that run has reported success. If it runs at the right moment, it also deletes the other run's empty same-file-check placeholder, and that run then fails with the write error at `path.unlink()` (line 438), though nothing else prevented its write. The record protects only \"this run's requested outputs\" and defines leftovers by name, so this follows from its wording; it is low because the user must choose the tool's reserved prefix inside the table directory.",
+      "evidence": "s7.py, 20 runs of 3 --keep runs plus 3 runs without --keep started together: in every run, n1 (`--json kd/.realornoise-report.json`) and n2 (`--markdown kd/.realornoise-x.md`) exited 2 with no error, yet their files were gone afterwards. Sequential control: after n1 alone the file exists; after one --keep run it is gone. s7b.py, scripted: n1 paused right after its placeholder was created (no assertion in the hook); a --keep run completed and the placeholder disappeared; n1, when released, exited 3, `Requested output could not be written.`, trace FileNotFoundError on the placeholder unlink. The interleaving needs only two runs of this tool: the non-keep run takes no lock and its placeholder exists while the --keep run cleans up under its own lock.",
+      "repro": "cd /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/processes && /Users/ajay/Developer/.arci-worktrees/wt-v2-logs/.venv/bin/python -B s7.py 20; ... -B s7b.py",
+      "suggested_fix": "Match only the exact shape mkstemp produces for the table (`.realornoise-` plus the random suffix, with no extension), or refuse output names in the table directory that start with `.realornoise-`; tolerate FileNotFoundError when removing a placeholder."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "processes-1",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "Reproduced two ways, using only wait-style pauses that never raise. (1) Scripted, /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/verify-processes/p1.py. A is a failing --keep-dir run that created home/parent/kd; it pauses just after rmdir(kd), while parent still exists. C then walks and finds only kd missing, and pauses before mkdir(kd). A finishes and removes parent. When C is released it exits 3 with 'Requested output could not be written.' and FileNotFoundError on mkdir(.../parent/kd); no table and no c.json are written. Control: the same C run alone exits 2 and writes the table. (2) Unscripted with no pauses, stress.py 40: runs of 6 (2 failing) and 3 (1 failing) start together on a missing home/parent/kd. 2 of 240 runs that should have succeeded exited 3, both with 'OSError: [Errno 22] Invalid argument: .../parent/kd' from mkdir. Cause is at cli.py 396-401: only FileExistsError is tolerated, and the walk at 393 is not under any lock. Only runs of this tool are involved. The record's Writing paragraph (missing parents are created) and its 'creates it again' rule say this run should succeed."
+    },
+    {
+     "id": "processes-2",
+     "verdict": "refuted",
+     "severity": "low",
+     "note": "The outcome is real, but the record allows it. Reproduced with p2b.py: B creates parent and pauses before mkdir(kd). C, which also fails, creates kd and pauses before opening kd for the lock. B resumes (mkdir kd gives FileExistsError), locks, fails, and its rmdir(parent) fails because the directory is not empty. C then fails and removes only kd. The result is an empty home/parent after every run failed. In the other order (p2.py, where C locks first) B re-walks under the lock, creates kd itself and removes both directories, so nothing is left. Record line 486-488 says Rollback 'stops at the first directory that is not empty or that the run did not create', and each run follows that rule. The checker itself says no rule is broken. The task counts only directories left 'against the Rollback rule', so this is not a defect against the record as written."
+    },
+    {
+     "id": "processes-3",
+     "verdict": "confirmed",
+     "severity": "low",
+     "note": "Reproduced with p3.py. (a) Sequential: a run without --keep writes --json kd/.realornoise-report.json and exits 2 with the file present. A later --keep-dir kd run exits 2, and the file is gone. (b) Scripted with a wait-only pause: N pauses right after the O_EXCL placeholder for kd/.realornoise-report.json is created. A --keep-dir kd run completes and removes the placeholder. N, when released, exits 3 with 'Requested output could not be written.' and FileNotFoundError at the placeholder unlink (cli.py 438). Control: N with the same pause and no --keep run exits 2 and writes the file. Low, because the user must name an output in the table directory with the tool's reserved prefix. Part (a) follows the record's name-based definition of leftovers (lines 504-505 and 513). Part (b) is a failed run that nothing in the record allows."
+    }
+   ]
+  },
+  {
+   "checker": "reasoning",
+   "review": {
+    "summary": "I read _directory_lock and _write_outputs line by line against the diff 5b37da5..f2674d7 and record 0017, then ran 18 scenarios through arci.logs.cli.run on synthetic logs, using a copy of the code (arci.__file__ confirmed as the copy). Most of the code holds up. No descriptors leak: 4 before and 4 after 200 failing and 200 succeeding runs. Locks are released after a KeyboardInterrupt at flock, at fstat, after the lock, and at a move. An unopenable directory (mode 0o300), the 8-round limit and an uncreatable top-level directory each end with exit 3, the fixed write-error line and nothing on standard output. A not-current first round closes its descriptor before the next round. Symlinked, relative and '..' spellings are safe. Two defects showed up in runs. (1) The cleanup's `path not in staged` test compares path spellings. On macOS it removes a requested output named `.realornoise-*` in the table directory when the run spells that directory with a different case or Unicode form than the output path, or spells the file in a different case from an existing file. The run then reports success (exit 2) and the output is gone. (2) A run that sees a missing table directory under an existing parent fails with the write error if another run's rollback removes that parent before the mkdir. Path.mkdir raises FileNotFoundError, which the round loop does not retry. The record says the run creates the directory again.",
+    "checked": [
+     "200 failing (--json into a missing dir, new --keep-dir each) then 200 succeeding --keep runs: open descriptors 4/4/4; every failing run's created kN directory removed (only the successful 'k' left)",
+     "--keep-dir root/keep with --json root/Keep/.realornoise-report.json (case differs, APFS): exit 2, no error, JSON file gone -> finding reasoning-1",
+     "--keep-dir in NFD spelling, --json in NFC spelling, name .realornoise-report.json: exit 2, JSON file gone -> finding reasoning-1",
+     "existing keep/.realornoise-report.json, --json keep/.realornoise-REPORT.json: exit 2, the keep directory holds only the table, the requested output is gone -> finding reasoning-1",
+     "same spelling control (--json keep/.realornoise-report.json): exit 2, JSON kept (fix 4 holds for an identical spelling)",
+     "--json through a symlinked dir plus '..' into the table directory: exit 2, JSON kept",
+     "table directory = current directory, relative --keep-dir . and relative --json .realornoise-r.json: exit 2, table and JSON both present",
+     "--keep-dir /rsn-not-creatable/sub (top level, cannot create): exit 3, fixed write-error line, empty stdout",
+     "table directory with mode 0o300: exit 3, write-error line, empty stdout, no JSON, directory left empty",
+     "os.open of the table directory raising FileNotFoundError on every round: exactly 8 opens, exit 3, write-error line, created directory removed, no JSON",
+     "first identity check not current then current: descriptor count 5 at each check (round 1 descriptor closed before round 2), 4 afterwards, run succeeds with table written",
+     "KeyboardInterrupt from flock: exit 3, existing output unchanged, created n1/n2 removed, descriptors 4->4, lock free afterwards",
+     "KeyboardInterrupt from fstat inside the lock: exit 3, outputs unchanged, dirs removed, descriptors unchanged",
+     "KeyboardInterrupt from kept.read after the lock: exit 3, outputs unchanged, dirs removed, lock free",
+     "KeyboardInterrupt at the second os.replace: exit 3, old.json restored, new.html absent, dirs removed",
+     "failed restore (os.replace patched to fail from the 2nd call on): exit 3, backup kept as .realornoise.out-*, as the code intends; the cause is the patch, so this is not reported",
+     "mkdir race: parent 'a' exists, 'a/b' missing, then 'a' removed (another run's rollback) just before mkdir('a/b'): exit 3, write error, no table -> finding reasoning-2",
+     "read-through: temporary prefix uses target == table_path (both resolved), so outputs in the table directory get .realornoise.out-; the ExitStack can be reused after close(); created is a dict keyed by path, and rollback is deepest first with identity checks; no defect run"
+    ],
+    "findings": [
+     {
+      "id": "reasoning-1",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "After a successful --keep write, the cleanup removes a requested output whose name starts with `.realornoise-`. This happens when the table directory or the file is spelled differently from what iterdir returns: different case, or NFC against NFD, on macOS's default case-insensitive and normalization-insensitive volume. The run reports success and the requested file is gone. This breaks the record's rule: 'The cleanup never removes a file that is one of this run's requested outputs, whatever its name.'",
+      "evidence": "Line 476 tests `path not in staged`, which compares Path spellings. Path.resolve() does not fold case or Unicode form. iterdir() yields table_path.parent spelled as given in --keep-dir, while the staged key carries the --json spelling. Runs: (a) mkdir root/Keep; run --keep-dir root/keep --json root/Keep/.realornoise-report.json gives exit 2 with empty stderr, and the JSON file no longer exists. (b) An NFD --keep-dir with an NFC --json gives exit 2 and the JSON is gone. (c) With keep/.realornoise-report.json already present, --json keep/.realornoise-REPORT.json gives exit 2. Afterwards the directory holds only days-1.json, so both the old file and the requested output are lost. Control: the identical spelling keeps the file. This needs an unusual output name plus a spelling mismatch in a single run, so it is not high.",
+      "repro": "/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/reasoning/s1.py (scenarios 2, 2b) and s2.py (scenario A); run from the copy directory with PYTHONPATH=<copy>/src:<copy>",
+      "suggested_fix": "Skip a cleanup candidate when it is the same file as any staged target. Compare with os.path.samestat or (st_dev, st_ino) of the installed targets, taken after the moves, instead of comparing path spellings."
+     },
+     {
+      "id": "reasoning-2",
+      "severity": "medium",
+      "file": "src/arci/logs/cli.py",
+      "claim": "A --keep run fails with the write error when another run's rollback removes the table directory's parent between this run's exists() walk and its mkdir. Path.mkdir then raises FileNotFoundError. Only FileExistsError is handled (lines 397-401), so the error escapes the 8-round loop instead of starting another round. The record says that a run whose table directory was removed by an earlier run's failed write creates the directory again.",
+      "evidence": "The run in s1.py scenario 7 sets up the moment between run A's rmdir('a/b') and rmdir('a'). Both happen under A's lock, before A releases it, as required by fix 1. Run C has no lock yet: it sees 'a/b' missing and 'a' existing, then 'a' is removed and C's mkdir('a/b') runs. Result: exit 3, 'Requested output could not be written.', no table. Nothing prevented the write: a new round would have created both directories. With real processes this happens when run A fails after creating a/ and a/b/ and run C starts its directory walk inside A's two-rmdir window. The window is small, but only runs of this tool are involved. The hook in my script only removes the directory and never raises inside the tool's call stack. The fault is not new in this diff; the same except clause existed before.",
+      "repro": "/private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/reasoning/s1.py scenario 7",
+      "suggested_fix": "Treat FileNotFoundError from mkdir like a not-current lock: leave the inner loop and start the next of the 8 rounds."
+     }
+    ]
+   },
+   "verdicts": [
+    {
+     "id": "reasoning-1",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "I reproduced this with my own script, /private/tmp/claude-501/-Users-ajay-Developer-agent-reliability-ci/39ca2335-7a5a-47d9-a374-69d92a47e1d0/scratchpad/review24d/verify-reasoning/v.py, on a case-insensitive APFS directory, importing my copy of the code. In scenario A, root/Keep exists and the run uses --keep-dir root/keep --json root/Keep/.realornoise-report.json. It exits 2 with nothing on stderr, the JSON is gone, and the directory holds only days-1.json. Scenario B (NFD --keep-dir against an NFC --json) gives the same result: exit 2, JSON gone. In scenario D, keep/.realornoise-report.json already exists and the run passes --json keep/.realornoise-REPORT.json; it exits 2 and the directory is left with only days-1.json. Two controls keep the file: the same spelling with the .realornoise- name, and a case mismatch with an ordinary name. The cause is line 476, `path not in staged`, which compares the spelling iterdir returns with the spelling given in --json. There is no timing hook and no second run. The record says the cleanup never removes a requested output, whatever its name, so the code breaks that rule. It needs both an unusual output name and a spelling mismatch, so medium rather than high."
+    },
+    {
+     "id": "reasoning-2",
+     "verdict": "confirmed",
+     "severity": "medium",
+     "note": "I reproduced this in scenario E of my own script, v.py. I wrapped Path.mkdir so that, the first time it is called for a/b, it removes a and then calls the real mkdir. The wrapper never raises. The run exits 3 with 'Requested output could not be written.', and neither the table nor r.json exists. The control without the race (E0) exits 2 and writes the table. Lines 397-401 catch only FileExistsError, so the FileNotFoundError from mkdir escapes the 8-round loop and ends as the write error. This can happen with real processes and only this tool. Run A created a/ and a/b/, its write failed, and its rollback removes a/b and then a while it holds the lock on a/b. Run C does its exists() walk and mkdir before it takes any lock, so C can see a/b missing and a present just before A removes a. The record says a run whose table directory was removed by an earlier run's failed write creates it again; this run fails although nothing prevented the write. The window is narrow and the code predates this diff, but it sits inside _write_outputs, which is under review. Medium, because only overlapping runs of this tool are needed."
+    }
+   ]
+  }
+ ]
+}
