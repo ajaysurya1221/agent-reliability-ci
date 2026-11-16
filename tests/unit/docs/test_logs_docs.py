@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import io
 import re
 import subprocess
@@ -22,9 +23,10 @@ NEW_DOCS = (
     "docs/design/0016-logs.md",
     "docs/LOG_FORMATS.md",
     "docs/recipes/logs.md",
+    "docs/THREAT_MODEL_LOGS.md",
 )
 README_SECTIONS = (
-    "New in 2.3: a result from logs you already have",
+    "New in 2.4: compare the setting you use now",
     "Controlled trials: arci run",
     "Related tools",
 )
@@ -121,21 +123,80 @@ def test_percentages_have_a_source() -> None:
 def test_published_selfcheck_tables_are_copied_without_rounding() -> None:
     source = read("docs/results/logs-selfcheck.md")
     text = section(read("docs/STATISTICS_LOGS.md"), "What the method cannot see")
-    for heading in ("Power (report only)", "Days that come in streaks (report only)"):
+    for heading in (
+        "Power (report only)",
+        "Days that come in streaks (report only)",
+        "Null and exact reasoning-margin boundary",
+        "Setting changes (gate)",
+        "Competitive setting choice (gate)",
+        "Assumption failures (report only)",
+        "Weekly cycles and regime switches (report only)",
+        "Kept-table checks",
+    ):
         for line in section(source, heading).splitlines():
             if line.startswith("|"):
                 assert line in text, f"missing or changed measured row: {line}"
     # README rates must keep the design, variant and count used by these source rows.
     summary = section(read("README.md"), README_SECTIONS[0])
-    for design, rate in (("5/10", "0.080500"), ("7/21", "0.035500"), ("14/42", "0.002500")):
+    for design in ("5/10", "7/21", "14/42"):
         rows = [
             line
             for line in section(source, "Days that come in streaks (report only)").splitlines()
             if line.startswith(f"| {design} | 0.5 | 0.45 | 0 | wrong REAL DROP |")
         ]
-        assert len(rows) == 1 and f"= {rate} " in rows[0].split("|")[10]
-        assert rate in summary and design in summary
+        assert len(rows) == 1
+        match = re.search(r"= ([0-9.]+) ", rows[0].split("|")[10])
+        assert match is not None
+        assert match.group(1) in summary and design in summary
     assert "2000 histories each" in summary and "rule as built" in summary
+
+
+def measured_rows(text: str, heading: str) -> list[dict[str, str]]:
+    lines = [line for line in section(text, heading).splitlines() if line.startswith("|")]
+    columns = [cell.strip() for cell in lines[0].strip("|").split("|")]
+    return [
+        dict(zip(columns, (cell.strip() for cell in line.strip("|").split("|")), strict=True))
+        for line in lines[2:]
+    ]
+
+
+def test_logs2_run_counts_and_conditional_rates() -> None:
+    source = read("docs/results/logs-selfcheck.md")
+    assert "seed base: 18112026" in source and "method: arci-logs/2" in source
+    for heading in ("Setting changes (gate)", "Competitive setting choice (gate)"):
+        rows = measured_rows(source, heading)
+        assert {row["scenario"] for row in rows} == {
+            "null",
+            "reasoning_tokens",
+            "no_reasoning_share",
+            "edit_failure_share",
+        }
+        for row in rows:
+            assert row["requested"] == row["generated"] == "20000"
+            column = "REAL DROP (95% CI)" if row["scenario"] == "null" else "NO DROP (95% CI)"
+            count = int(row[column].split("/", 1)[0])
+            assert count <= 566
+            if heading.startswith("Competitive"):
+                assert all(int(n) > 0 for n in row["choices old/current/rival"].split("/")[1:])
+    for row in measured_rows(source, "Power (report only)"):
+        assert row["requested"] == row["tested"] == "2000"
+        assert int(row["generated"]) == int(row["tested"]) + int(row["stopped"])
+    for heading in (
+        "Days that come in streaks (report only)",
+        "Weekly cycles and regime switches (report only)",
+    ):
+        for row in measured_rows(source, heading):
+            for prefix, column in (
+                ("per-measure", "per-measure check (95% CI)"),
+                ("as-built", "as built (95% CI)"),
+            ):
+                numerator = row[column].split("/", 1)[0]
+                denominator = row[prefix + " passed"]
+                assert row[prefix + " conditional (95% CI)"].startswith(
+                    f"{numerator}/{denominator} = "
+                )
+    assert "Demonstration outside A1 (arci-logs/2):" in source
+    assert "Gate summary: 32/32 passed; 0 failed." in source
 
 
 def test_example_output_is_real_and_labelled(tmp_path: Path) -> None:
@@ -146,8 +207,7 @@ def test_example_output_is_real_and_labelled(tmp_path: Path) -> None:
     recipe = read("docs/recipes/logs.md")
     captured = re.search(r"```text\n(realornoise .*?)```", recipe, re.DOTALL)
     assert captured is not None
-    # A release bump changes only the banner; the captured pre-release banner is labelled.
-    assert captured.group(1).splitlines()[1:] == output.splitlines()[1:]
+    assert captured.group(1) == output
     assert "Example data, generated. Not anyone's logs." in captured.group(1)
     row = next(line for line in output.splitlines() if line.startswith("reasoning tokens"))
     readme = read("README.md")
@@ -220,3 +280,283 @@ def test_records_drop_superseded_sentences(document: str) -> None:
         "and the production decision rule.",
     ):
         assert old not in text
+
+
+def worst_measured_row(text: str) -> dict[str, str]:
+    candidates: list[tuple[Decimal, dict[str, str]]] = []
+    headings = (
+        "Days that come in streaks (report only)",
+        "Weekly cycles and regime switches (report only)",
+    )
+    for heading in sorted(headings, key=lambda name: text.index("## " + name + "\n")):
+        for row in measured_rows(text, heading):
+            if row["drop"] != "0" or row["metric"] != "wrong REAL DROP":
+                continue
+            if heading == headings[0] and Decimal(row["rho"]) <= 0:
+                continue
+            match = re.search(r"= ([0-9.]+) ", row["as built (95% CI)"])
+            assert match is not None
+            candidates.append((Decimal(match.group(1)), row))
+    # max retains the first matching row in file order on a tie.
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def test_logs2_printed_rates_match_selfcheck() -> None:
+    from arci.logs import report
+
+    row = worst_measured_row(read("docs/results/logs-selfcheck.md"))
+    proportion = Decimal(row["as built (95% CI)"].split("= ")[1].split()[0])
+    expected = format(proportion * 100, "f").rstrip("0").rstrip(".")
+    after, before = map(int, row["after/before"].split("/"))
+    assert (
+        expected,
+        after,
+        before,
+    ) == (report.RATE_MAX, report.RATE_MAX_AFTER, report.RATE_MAX_BEFORE)
+    limits = " ".join(report.limits_text().split())
+    assert f"up to {expected}%, with {after} days after the split and {before} before" in limits
+    footer = report.MD_LIMITS.format(
+        digest="0" * 12,
+        rate_max=report.RATE_MAX,
+        worst_after=report.RATE_MAX_AFTER,
+        worst_before=report.RATE_MAX_BEFORE,
+    )
+    assert f"up to {expected}% ({after} days after, {before} before)" in footer
+
+
+@pytest.mark.parametrize("weekly_first", [False, True])
+def test_bound_source_filters_columns_and_keeps_first_tie(weekly_first: bool) -> None:
+    header = (
+        "| after/before | rho | drop | metric | as built (95% CI) | "
+        "as-built conditional (95% CI) |\n|---|---|---|---|---|---|\n"
+    )
+    streaks = (
+        "## Days that come in streaks (report only)\n"
+        + header
+        + (
+            "| 1/1 | 0 | 0 | wrong REAL DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 2/2 | 0.5 | 1/4 | wrong REAL DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 3/3 | 0.5 | 0 | wrong NO DROP | 9/10 = 0.9 [0, 1] | 1 |\n"
+            "| 5/10 | 0.5 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n"
+            "| 7/21 | 0.7 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n"
+        )
+    )
+    weekly = (
+        "## Weekly cycles and regime switches (report only)\n"
+        + header
+        + ("| 14/16 | 0 | 0 | wrong REAL DROP | 2/10 = 0.2 [0, 1] | 1 |\n")
+    )
+    text = weekly + "\n" + streaks if weekly_first else streaks + "\n" + weekly
+    assert worst_measured_row(text)["after/before"] == ("14/16" if weekly_first else "5/10")
+
+
+def test_logs_threat_model_link_and_named_tests_exist() -> None:
+    assert "[realornoise threat model](docs/THREAT_MODEL_LOGS.md)" in read("SECURITY.md")
+    text = read("docs/THREAT_MODEL_LOGS.md")
+    references = re.findall(r"`(tests/[^`\s]+\.py)::(test_\w+)`", text)
+    assert references
+    for path, name in references:
+        tree = ast.parse(read(path))
+        assert any(isinstance(node, ast.FunctionDef) and node.name == name for node in tree.body), (
+            f"missing threat-model check: {path}::{name}"
+        )
+
+
+FIGURE = re.compile(r"\d+/\d+ = \d+\.\d+ \[\d+\.\d+, \d+\.\d+\]")
+
+
+def selfcheck_rows(source: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    columns: list[str] = []
+    for line in source.splitlines():
+        if not line.startswith("|"):
+            columns = []
+            continue
+        values = [value.strip() for value in line.strip("|").split("|")]
+        if "seed" in values:
+            columns = values
+        elif columns and not all(set(value) <= {"-", ":"} for value in values):
+            rows.append(dict(zip(columns, values, strict=True)))
+    return rows
+
+
+def assert_figures_sourced(text: str, rows: list[dict[str, str]]) -> int:
+    checked = 0
+    columns: list[str] = []
+    prose: list[str] = []
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            columns = []
+            prose.append(line)
+            continue
+        values = [value.strip() for value in line.strip("|").split("|")]
+        if "seed" in values:
+            columns = values
+        matches = FIGURE.findall(line)
+        if matches:
+            metadata = dict(zip(columns, values, strict=True)) if columns else {}
+            for figure in matches:
+                assert any(
+                    figure in row.values()
+                    and all(
+                        row.get(key) == metadata[key]
+                        for key in ("seed", "after/before")
+                        if key in metadata
+                    )
+                    for row in rows
+                ), (figure, metadata)
+                checked += 1
+    # Split independent clauses so each inline seed/design stays with its own figure.
+    normal = " ".join("\n".join(prose).split())
+    normal = re.sub(
+        r"(\d+)/(\d+), Wilson 95% interval (\[\d+\.\d+, \d+\.\d+\])",
+        lambda match: (
+            f"{match[1]}/{match[2]} = {Decimal(match[1]) / Decimal(match[2]):.6f} {match[3]}"
+        ),
+        normal,
+    )
+    separators = re.finditer(
+        r"(?<=[.!?])\s+(?=[A-Z])|;\s+|,\s+and\s+|\band\s+(?=\d+/\d+ =)", normal
+    )
+    clauses: list[str] = []
+    start = 0
+    for separator in separators:
+        prefix = normal[: separator.start()]
+        if prefix.count("(") != prefix.count(")"):
+            continue
+        clauses.append(normal[start : separator.start()])
+        start = separator.end()
+    clauses.append(normal[start:])
+    for clause in clauses:
+        figures = list(FIGURE.finditer(clause))
+        seeds = re.findall(r"\bseed (\d+)\b", clause)
+        designs = re.findall(r"\b(\d+) days after (?:against|and) (\d+) before\b", clause)
+        for match in re.finditer(r"\b(\d+)/(\d+)\b", clause):
+            if re.search(r"\bdrop\s*$", clause[: match.start()]):
+                continue
+            if not any(figure.start() <= match.start() < figure.end() for figure in figures):
+                designs.append((match.group(1), match.group(2)))
+        for figure in figures:
+            candidates = [row for row in rows if figure.group() in row.values()]
+            # Equal figures can occur in different generators; retain named context.
+            if re.search(r"\b(?:regimes|regime-switching)\b", clause):
+                candidates = [row for row in candidates if row.get("generator") == "regime"]
+            if seeds:
+                assert len(set(seeds)) == 1, ("ambiguous seeds", clause)
+                candidates = [row for row in candidates if row["seed"] == seeds[0]]
+            if designs:
+                assert len(set(designs)) == 1, ("ambiguous designs", clause)
+                design = "/".join(designs[0])
+                candidates = [row for row in candidates if row.get("after/before") == design]
+            assert candidates, (figure.group(), clause)
+            checked += 1
+    return checked
+
+
+def assert_document_figures_sourced(document: str, text: str, rows: list[dict[str, str]]) -> None:
+    assert assert_figures_sourced(text, rows) > 0
+    # The S0 spike report is absent from this branch. Check both historical mentions
+    # against the pinned counts, designs and attribution, not the current selfcheck.
+    if document == "docs/STATISTICS_LOGS.md":
+        normal = " ".join(text.split())
+        designs = re.findall(
+            r"535 of 20,000(?: histories)? at (\d+) days after against (\d+) before", normal
+        )
+        assert designs == [("14", "16"), ("14", "16")]
+        assert normal.count("415 of 20,000 at 7 after against 21 before") == 2
+        assert "S0 spike report, G2, seeds 17112040 and 17112041" in normal
+
+
+@pytest.mark.parametrize(
+    "document", ("docs/STATISTICS_LOGS.md", "README.md", "docs/recipes/logs.md", "CHANGELOG.md")
+)
+def test_every_rate_figure_has_matching_source_row(document: str) -> None:
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    assert rows
+    assert_document_figures_sourced(document, read(document), rows)
+
+
+@pytest.mark.parametrize(
+    "document", ("docs/STATISTICS_LOGS.md", "README.md", "docs/recipes/logs.md", "CHANGELOG.md")
+)
+def test_document_provenance_requires_a_figure(document: str) -> None:
+    text = FIGURE.sub("figure omitted", read(document))
+    text = re.sub(r"\d+/\d+, Wilson 95% interval\s+\[\d+\.\d+, \d+\.\d+\]", "figure omitted", text)
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    with pytest.raises(AssertionError):
+        assert_document_figures_sourced(document, text, rows)
+
+
+@pytest.mark.parametrize(
+    ("document", "original", "replacement"),
+    (
+        (
+            "docs/recipes/logs.md",
+            "seed 18112185), with 14 days after",
+            "seed 18112186), with 14 days after",
+        ),
+        (
+            "docs/recipes/logs.md",
+            "with 14 days after and 16 before in regimes",
+            "with 7 days after and 21 before in regimes",
+        ),
+        (
+            "docs/STATISTICS_LOGS.md",
+            "   14 days after against 16 before, and 415",
+            "   7 days after against 21 before, and 415",
+        ),
+    ),
+)
+def test_rate_provenance_rejects_final_review_edits(
+    document: str, original: str, replacement: str
+) -> None:
+    text = read(document)
+    assert text.count(original) == 1
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    assert_document_figures_sourced(document, text, rows)
+    with pytest.raises(AssertionError):
+        assert_document_figures_sourced(document, text.replace(original, replacement), rows)
+
+
+@pytest.mark.parametrize(
+    "suffix", ("seed 19", "at 5/10", "(5/10)", "at 5 days after against 10 before")
+)
+def test_rate_provenance_rejects_wrong_seed_or_design(suffix: str) -> None:
+    figure = "1/2000 = 0.000500 [0.000088, 0.002827]"
+    rows = [{"seed": "17", "after/before": "14/16", "rate": figure}]
+    with pytest.raises(AssertionError):
+        assert_figures_sourced(figure + " " + suffix + ".", rows)
+    assert assert_figures_sourced(figure + " at 14/16 (seed 17).", rows) == 1
+
+
+@pytest.mark.parametrize("edit", ("seed", "design", "both", "both-other-row"))
+def test_rate_provenance_rejects_edited_published_copies(edit: str) -> None:
+    text = read("docs/STATISTICS_LOGS.md")
+    edited = text
+    if edit in ("seed", "both", "both-other-row"):
+        seed = "18112084" if edit == "both-other-row" else "18112184"
+        edited = edited.replace("seed 18112185)", f"seed {seed})", 1)
+    if edit in ("design", "both", "both-other-row"):
+        edited = re.sub(
+            r"0\.198480\] at 14 days after(\s+)against 16 before",
+            r"0.198480] at 7 days after\1against 21 before",
+            edited,
+            count=1,
+        )
+    assert edited != text
+    rows = selfcheck_rows(read("docs/results/logs-selfcheck.md"))
+    with pytest.raises(AssertionError):
+        assert_figures_sourced(edited, rows)
+
+
+def test_gate_descriptions_match_published_results() -> None:
+    results = read("docs/results/logs-selfcheck.md")
+    statistics = read("docs/STATISTICS_LOGS.md")
+    for heading in ("Setting changes (gate)", "Competitive setting choice (gate)"):
+        source = section(results, heading).strip().splitlines()[0]
+        actual = next(
+            line
+            for line in section(statistics, heading).splitlines()
+            if "each single-measure exact-margin cell" in line
+        )
+        assert actual == source

@@ -46,11 +46,11 @@ def test_claude_skill_runs_only_the_fixed_command() -> None:
     assert meta["name"] == "realornoise"
     assert meta["disable-model-invocation"] == "true"
     # The fixed command only: a wildcard would pre-approve any option, such as writing a file.
-    assert meta["allowed-tools"] == "Bash(uvx realornoise)"
+    assert meta["allowed-tools"] == f"Bash(uvx --python 3.14 realornoise=={arci.__version__})"
     assert "*" not in meta["allowed-tools"]
     body = CLAUDE_SKILL.read_text(encoding="utf-8")
     commands = [line for line in body.splitlines() if line.startswith("!`")]
-    assert commands == ["!`uvx realornoise 2>&1 || true`"]
+    assert commands == [f"!`uvx --python 3.14 realornoise=={arci.__version__} 2>&1 || true`"]
     assert "$ARGUMENTS" not in body
     assert "visible to this assistant" in body
     assert "numbers only" not in body
@@ -61,7 +61,7 @@ def test_codex_skill_names_the_same_command() -> None:
     assert set(meta) == {"name", "description"}
     assert meta["name"] == "realornoise"
     body = CODEX_SKILL.read_text(encoding="utf-8")
-    assert "    uvx realornoise\n" in body
+    assert f"    uvx --python 3.14 realornoise=={arci.__version__}\n" in body
     assert "visible to this assistant" in body
 
 

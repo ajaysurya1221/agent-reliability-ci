@@ -23,22 +23,32 @@ from .records import (
     render_model,
     string_of,
     time_of,
+    version_name,
     without_timezone,
 )
 
 _USED = frozenset({"session_meta", "turn_context", "event_msg"})
 
 
-def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadResult:
+def read(
+    paths: Sequence[Path],
+    *,
+    project: Path | None,
+    now: datetime,
+    model_names: Sequence[str] = (),
+    effort_names: Sequence[str] = (),
+) -> ReadResult:
     counts = ReaderCounters()
-    models: dict[str, int] = {}
-    efforts: dict[str, int] = {}
+    models: dict[str, int] = {name: i for i, name in enumerate(sorted(set(model_names)))}
+    efforts: dict[str, int] = {name: i for i, name in enumerate(sorted(set(effort_names)))}
     versions: dict[str | None, int] = {}
     workdirs: dict[str | None, int] = {}
     responses: list[Response] = []
+    unconfigured: list[Response] = []
     seen: set[tuple[str, datetime, str]] = set()
     latest_main_response: datetime | None = None
     for path in paths:
+        file_unconfigured: list[Response] = []
         saved_counts = counts
         counts = replace(counts)
         saved_models, saved_efforts = models.copy(), efforts.copy()
@@ -135,6 +145,11 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
                     effort = string_of(context.get("effort")) if context is not None else None
                     if not model or not effort:
                         counts.responses_without_setting += 1
+                        file_unconfigured.append(
+                            Response(
+                                "codex", when, -1, -1, main, None, version_id, workdir_id, inside
+                            )
+                        )
                         continue
                     reasoning = reasoning_of(
                         object_of(info.get("last_token_usage")).get("reasoning_output_tokens")
@@ -164,6 +179,7 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
             versions, workdirs = saved_versions, saved_workdirs
             latest_main_response = saved_latest
             continue
+        unconfigured.extend(file_unconfigured)
         responses.extend(pending)
         seen.update(file_seen)
     return WindowReadResult(
@@ -176,4 +192,6 @@ def read(paths: Sequence[Path], *, project: Path | None, now: datetime) -> ReadR
         tuple(efforts[effort] for effort in sorted(efforts)),
         counts,
         latest_main_response,
+        versions=tuple(version_name(version) for version in versions),
+        unconfigured_responses=tuple(unconfigured),
     )

@@ -12,7 +12,7 @@ def decision() -> LogsDecision:
     data = sample()
     return seal(
         {
-            "schema_version": "arci-logs/1",
+            "schema_version": "arci-logs/2",
             "arci_version": "2.3.0",
             "example": True,
             "utc_offset_minutes": 0,
@@ -150,7 +150,9 @@ def test_json_contains_only_renderable_values() -> None:
     from arci.logs.records import EFFORTS, render_model
 
     names = {
-        "arci-logs/1",
+        "arci-logs/2",
+        "not_read",
+        "logs",
         "claude-code",
         "codex",
         "REAL_DROP",
@@ -242,7 +244,7 @@ def test_period_context_and_scalar_validation() -> None:
             ContextCounts.model_validate({**context.model_dump(), field: value})
     actual = decision()
     for field, value in (
-        ("schema_version", "arci-logs/2"),
+        ("schema_version", "arci-logs/1"),
         ("seal", "CANARY"),
         ("utc_offset_minutes", 1440),
         ("example", 1),

@@ -40,6 +40,26 @@ def test_every_release_version_matches() -> None:
         for p in tomllib.loads((ROOT / "uv.lock").read_text())["package"]
         if p["name"] == "agent-reliability-ci"
     )
+    for relative in (
+        "plugins/realornoise/skills/realornoise/SKILL.md",
+        "integrations/codex/skills/realornoise/SKILL.md",
+    ):
+        pins = re.findall(
+            r"uvx --python 3\.14 realornoise==([0-9.]+)", (ROOT / relative).read_text()
+        )
+        assert pins, relative
+        assert all(pin == __version__ for pin in pins), relative
+        versions[relative] = pins[0]
+    readme = (ROOT / "README.md").read_text()
+    for pattern in (
+        r"v([0-9.]+) is the current release",
+        r"pins `v([0-9.]+)`, the current release",
+        r"agent-reliability-ci@v([0-9.]+)",
+        r"agent-reliability-ci(?:\[[^\]]+\])?==([0-9.]+)",
+    ):
+        found = re.findall(pattern, readme)
+        assert found and all(version == __version__ for version in found), pattern
+    versions["README.md"] = __version__
     assert {path: value for path, value in versions.items() if value != __version__} == {}
     documented = (ROOT / "docs/RELEASING.md").read_text()
     assert all(path.removesuffix(" dependency") in documented for path in versions)

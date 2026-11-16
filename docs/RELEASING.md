@@ -29,8 +29,13 @@ publisher is a maintainer action, not something this repository's tests establis
    its sole dependency `agent-reliability-ci==X.Y.Z`, and
    `packages/realornoise/src/realornoise/__init__.py`'s `__version__` to match.
    Also set `plugins/realornoise/.claude-plugin/plugin.json` (`version`) and
-   `CITATION.cff` (`version`) to `X.Y.Z`. These are the package metadata and dependency-pin
-   locations; `uv.lock` also contains the main package version and is regenerated below.
+   `CITATION.cff` (`version`) to `X.Y.Z`, with its top-level `date-released` set to the release date.
+   Update `README.md` current-release sentences, install version and Action pin.
+   These are the package metadata and dependency-pin locations. Set the `uvx --python 3.14 realornoise==X.Y.Z` pins in
+   `plugins/realornoise/skills/realornoise/SKILL.md` (including `allowed-tools`) and
+   `integrations/codex/skills/realornoise/SKILL.md`; keep their documented command in
+   `integrations/codex/README.md`, `docs/recipes/logs.md` and `docs/THREAT_MODEL_LOGS.md`
+   in agreement. `uv.lock` also contains the main package version and is regenerated below.
    `tests/unit/packaging/test_review_fixes.py::test_every_release_version_matches` checks
    every location against `arci.__version__`. Log snapshots normalize the header version;
    a version bump does not regenerate them. The five HTML goldens under
@@ -49,13 +54,27 @@ publisher is a maintainer action, not something this repository's tests establis
    versions must not change, `uv lock --check` must pass, and the design record says what moved.
 3. Move the CHANGELOG `Unreleased` entries under `vX.Y.Z (YYYY-MM-DD)`.
 4. Recompute `FROZEN.sha256` for the files the bump touched (`pyproject.toml`, `uv.lock`, the new
-   design record) and check that every other hash is unchanged. For the 2.3.0 release,
-   record 0016 also re-freezes `AGENTS.md` and newly pins `docs/design/0016-logs.md`,
-   `docs/STATISTICS_LOGS.md`, `src/arci/logs/schema.py` and `tests/acceptance/test_logs.py`.
+   design record) and check that every other hash is unchanged. For 2.4.0,
+   record 0017 re-freezes exactly `docs/STATISTICS_LOGS.md`, `src/arci/logs/schema.py`,
+   `tests/acceptance/test_logs.py`, `pyproject.toml` and `uv.lock`, and newly pins
+   `docs/design/0017-logs-2.md`. Record 0016 stays pinned and unchanged; every other
+   hash stays as it is.
    Only the release orchestrator may change these frozen files or their hashes:
    `shasum -a 256 -c FROZEN.sha256`.
 5. Commit on `main` (for example `release: vX.Y.Z`) and wait for CI to be green, including the
-   `wheel-smoke` jobs.
+   `wheel-smoke` jobs and `oracle / SciPy` on that commit. In `.github/workflows/ci.yml`,
+   the oracle job installs `constraints/oracle.txt` with hashes on top of the locked
+   environment, runs `tests/unit/logs/test_oracle_scipy.py`, and fails on a skipped module.
+   SciPy is a test oracle, not a runtime dependency.
+
+Check locations added for 2.4.0: `.github/workflows/codeql.yml` scans Python and Actions;
+`.github/workflows/workflow-audit.yml` runs zizmor; `.github/workflows/client-versions.yml`
+compares npm client versions daily with the checked versions in `docs/LOG_FORMATS.md` and
+maintains one open issue when a newer version appears. That issue is a request to check
+formats, not evidence of compatibility. `.github/dependabot.yml` groups monthly Actions
+updates. Workflows install uv from `.github/requirements/uv.txt` with required hashes
+where checkout is available first. Inspect these checks along with CI and release smoke
+results; a successful local check does not establish a successful hosted run.
 
 ## 2. Tag
 
@@ -109,7 +128,7 @@ how many files were not read. `uvx --python 3.14 realornoise` reads compressed l
 ```sh
 uvx --from agent-reliability-ci==X.Y.Z arci demo
 uvx --from agent-reliability-ci==X.Y.Z arci logs --example
-uvx --from realornoise==X.Y.Z realornoise --example
+uvx --python 3.14 realornoise==X.Y.Z --example
 ```
 
 The demo must exit 0 and print `All six steps held.` Both example commands must exit 1 and

@@ -50,10 +50,12 @@ def _chart(measure: MeasureDecision, split_date: str) -> str:
                 f"<title>{period} median {_text(median)}</title></line>"
             )
     for day in days:
+        fill = "none" if day.source == "kept" else "currentColor"
         parts.append(
             f'<circle cx="{x(date.fromisoformat(day.day).toordinal())}" '
-            f'cy="{y(day.value)}" r="3" fill="currentColor">'
-            f"<title>{_text(day.day)} · value {_text(day.value)} · count {day.count}</title>"
+            f'cy="{y(day.value)}" r="3" fill="{fill}" stroke="currentColor">'
+            f"<title>{_text(day.day)} · value {_text(day.value)} · count {day.count}"
+            f" · source {day.source}</title>"
             "</circle>"
         )
     parts.extend(
@@ -91,12 +93,17 @@ def _tool(tool: ToolDecision, decision: LogsDecision, directory_tools: Collectio
     parts.extend(
         [
             f'<p class="verdict">{_text(report.F4[tool.result])}</p>',
-            _p(reason_text(tool, directory_given=tool.tool in directory_tools)),
+            _p(
+                " ".join(
+                    reason_text(tool, directory_given=tool.tool in directory_tools).splitlines()
+                )
+            ),
         ]
     )
     if tool.model is not None:
         parts.extend(
             [
+                *(_p(" ".join(line.splitlines())) for line in report.short_history(tool)),
                 _table(
                     "Recorded measures",
                     report.F6_HEADERS,
@@ -107,6 +114,7 @@ def _tool(tool: ToolDecision, decision: LogsDecision, directory_tools: Collectio
                 ),
                 _p(report.F7_HEADER),
                 _p(context_text(tool)),
+                *(_p(line) for line in report.client_versions(tool)),
             ]
         )
         tested = [m for m in tool.measures if m.p_streak is not None]
@@ -119,6 +127,7 @@ def _tool(tool: ToolDecision, decision: LogsDecision, directory_tools: Collectio
                     )
                 )
             )
+    parts.extend(_p(line) for line in report.kept_days(tool, decision))
     parts.extend(_p(notice) for notice in notices(tool))
     if tool.model is not None:
         assert tool.split_date is not None and tool.day_table_sha256 is not None
@@ -140,8 +149,10 @@ def render_html(decision: LogsDecision, *, directory_tools: Collection[Tool] = (
     ]
     if decision.example:
         parts.append(_p(report.F13))
+    if decision.kept_table == "unreadable":
+        parts.append(_p(report.F24))
     parts.extend(_tool(tool, decision, directory_tools) for tool in decision.tools)
     if any(tool.result != "ERROR" for tool in decision.tools):
-        parts.append(_p(" ".join(report.F10.splitlines())))
+        parts.append(_p(" ".join(report.limits_text().splitlines())))
     parts.extend([_p(report.F12), _p(report.EXIT.format(code=decision.exit_code))])
     return "".join([*parts, "</main></body></html>\n"])

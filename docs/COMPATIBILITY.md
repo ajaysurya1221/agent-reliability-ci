@@ -86,3 +86,33 @@ are listed in [LOG_FORMATS.md](LOG_FORMATS.md); future formats can need reader c
 Windows is untested for `arci logs`. A record seal checks consistency, not authenticity
 or the truth of the statistical assumptions. The general presentation disclaimer above
 does not remove the fixed-text commitment within this method version.
+
+## Session logs in 2.4.0
+
+2.4.0 writes `arci-logs/2`. [Record 0017](design/0017-logs-2.md) fixes its fields,
+selection rule, tests, exits and texts. The default setting is selected by after-period
+response counts, falling back to the whole window only when no candidate has an after
+response. The record adds short-history dates, bounded client versions, keep options and
+day sources. The result names and exit codes above are unchanged. One day uses one source
+for every measure. Existing `arci-logs/1` records stay readable through
+`arci.logs.schema.LogsDecisionV1`; they are not silently converted or reinterpreted.
+`LogsDecision` validates version 2. Choose the model by `schema_version`.
+
+In 2.4.0 the readers return client-version names and also return main-thread and
+sub-agent responses that lack a model or an effort. Those responses count only toward
+context counts and the version list, never toward responses or day values. The readers
+take model and effort names from the kept table so labels stay stable across runs.
+Context counts can therefore differ from those 2.3.0 printed for the same logs.
+2.4.0 follows the definition in the records.
+
+The optional kept table uses its own `schema` field, `realornoise-days/1`. Its strict row
+format, merge, pruning and retention rules are defined in record 0017 and
+[LOG_FORMATS.md](LOG_FORMATS.md#kept-day-table-realornoise-days1). It stores daily counts,
+dates and accepted setting names. A malformed or unknown table is left unused, not
+migrated or overwritten. It has no authentication; editing its counts can change a result.
+The retention promise requires whole-day captures at most 29 days apart under the stated
+file-deletion assumptions. It does not recover days that were never captured whole.
+
+The 2.4.0 change leaves controlled-trial and imported-outcome contracts unchanged. Vendor
+log formats, an error rate for repeated daily looks, and assumptions about a user's task
+mix are not compatibility promises.

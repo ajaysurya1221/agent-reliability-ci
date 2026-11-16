@@ -49,8 +49,9 @@ F5 = {
     "not_enough_evidence": "The days are too few or too variable to tell a shift from noise.",
     "too_few_days": "Too few usable days for every measure (5 needed after the split, 10 before).",
     "streaky_days": (
-        "Your earlier days come in streaks in a recorded measure, so this "
-        "comparison cannot tell a streak from a drop."
+        "The streak check flagged a recorded measure: its earlier days crossed "
+        "their middle few times.\n"
+        "No result is given here. A flag does not establish that your days depend on each other."
     ),
     "no_usable_setting": "No model and effort setting has a response in the window.",
     "no_logs": (
@@ -66,6 +67,8 @@ F5_DIRECTORY = (
     "No session logs found for {Tool} under the directory given with {flag}. "
     "Or try: realornoise --example"
 )
+KEEP_PROJECT = "--keep cannot be used with --project."
+IGNORE_KEEP = "--ignore-kept cannot be used with --keep."
 DUPLICATE_OUTPUT = "Two output options name the same file."
 SINCE_DATE = "--since needs a date as YYYY-MM-DD."
 SINCE_EARLY = "--since can be at most 83 days before the newest day in the logs."
@@ -96,25 +99,39 @@ F8 = "Streak check: {k} of {K} tested measures were not flagged."
 F9 = "Compressed Codex files not read (Python 3.14 is needed): {k}. The result uses the rest."
 F9_ERROR = "Compressed Codex files not read (Python 3.14 is needed): {k}."
 F9_NEXT = "To read them: uvx --python 3.14 realornoise"
+# Maximum as-built null rate across both dependence sections of the self-check.
+# Regime switching, 14/16 days, seed 18112185: 362/2000 = 0.181000.
+RATE_MAX = "18.1"
+RATE_MAX_AFTER = 14
+RATE_MAX_BEFORE = 16
 F10 = (
-    "This shows what your logs recorded. It does not establish answer quality, "
-    "a cause, or a change\n"
+    "This shows what your logs recorded. It does not establish answer quality, a "
+    "cause, or a change\n"
     "to the model: your tasks, prompts, projects or client version may have changed.\n"
-    "For each tool above and one comparison: if nothing shifted, REAL DROP "
-    "appears at most 2.5% of the\n"
-    "time; if a measure moved toward worse by its margin or more, NO DROP "
-    "appears at most 2.5% of the\n"
-    "time. Both hold only if: (1) the days in this window are interchangeable "
-    "when nothing changes;\n"
-    "(2) any date, model, effort or project you gave was not chosen from these logs; (3) a change\n"
-    "moves every day alike, by an amount the measure can take; (4) a change leaves the same days,\n"
-    "setting, reference value and earlier-day values in use. None of these is "
-    "checked, and the streak\n"
-    "check does not prove them. Running this again and again until a result "
-    "appears is not covered.\n"
-    "Exact statement: docs/STATISTICS_LOGS.md in the repository."
+    "For each tool above and one comparison, if (1) the days in this window are "
+    "interchangeable when\n"
+    "nothing changes, whatever their number of responses, and (2) to (4) below hold, "
+    "then REAL DROP\n"
+    "appears at most 2.5% of the time if nothing shifted, and NO DROP at most 2.5% "
+    "of the time if a\n"
+    "measure moved toward worse by its margin or more. When days resemble their "
+    "neighbours or work comes\n"
+    "in phases, (1) fails: in the cases it tested, the self-check measured wrong "
+    "REAL DROP up to\n"
+    "{rate_max}%, with {worst_after} days after the split and {worst_before} before; "
+    "other patterns can\n"
+    "give more. The conditions (2) to (4) are: (2) any date, model, effort or "
+    "project you gave was not\n"
+    "chosen from these logs; (3) a change moves every day alike, by an amount the "
+    "measure can take; (4) a\n"
+    "change leaves the same days, setting, reference value and earlier-day values in "
+    "use. None of these\n"
+    "is checked, and the streak check does not prove them. Running this again and "
+    "again until a result\n"
+    "appears is not covered. Exact statement: docs/STATISTICS_LOGS.md in the "
+    "repository."
 )
-F11 = "method arci-logs/1 · exact rank tests · no random numbers · day-table digest {digest}"
+F11 = "method arci-logs/2 · exact rank tests · no random numbers · day-table digest {digest}"
 F12 = (
     "Share: --markdown FILE · --html FILE · --json FILE      Stronger evidence: "
     "arci verdict, arci run"
@@ -125,6 +142,27 @@ F15 = "Lines that lacked a needed field, left out: {k}."
 F16 = "Records stamped later than now, left out: {k}."
 F17 = "Files that could not be read: {k}. The result uses the rest."
 F17_ERROR = "Files that could not be read: {k}."
+F18 = (
+    "This setting: first response in the window {first} · days with a response {b"
+    "} before, {a} after"
+)
+F19 = (
+    "Earliest test date if this setting is used every day after {last}: {date} (b"
+    "est case).\nIt also needs each such day usable for a measure and the earlier "
+    "days still on disk or kept."
+)
+F20 = (
+    "Claude Code deletes session files after 30 days by default (setting cleanupP"
+    "eriodDays).\nWith --keep, each day's counts are kept for later runs, for sett"
+    "ings shown by name."
+)
+F21 = "Days from the kept table: {b} before, {a} after."
+F22 = "Settings not kept, since a name is outside the accepted lists: {k}."
+F23 = "Days not kept, since they hold more than 5,000 distinct reasoning counts: {k}."
+F24 = "The kept day table could not be read or is not valid. It was not used."
+F25 = "Kept rows stored under another UTC offset, not used: {k}."
+F26 = "Client versions after the split: {versions}"
+
 MD_CLOSING = {
     "REAL_DROP": (
         "One person's logs. Evidence of movement toward worse in a recorded "
@@ -137,13 +175,16 @@ MD_CLOSING = {
     "CANNOT_TELL": "One person's logs. Not enough to tell a shift from noise.",
 }
 MD_LIMITS = (
-    "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for "
-    "this tool and one comparison, only under unchecked assumptions (days in the window "
-    "interchangeable; no date, model, effort or project chosen from these logs; "
-    "a uniform shift the "
-    "measure can take; the same days, setting, reference value and earlier-day values in use). "
-    "Repeated checking until a result appears is not covered. arci-logs/1, digest {digest}. "
-    "Yours: uvx realornoise"
+    "Wrong REAL DROP and wrong NO DROP are each at most 2.5% for this tool and one "
+    "comparison, if the days in the window are interchangeable when nothing changes "
+    "and the assumptions below hold; when days resemble their neighbours or work "
+    "comes in phases the self-check measured wrong REAL DROP up to {rate_max}% "
+    "({worst_after} days after, {worst_before} before) in its tested cases. "
+    "Assumptions, unchecked: no date, model, effort or project chosen from these "
+    "logs; a uniform shift the measure can take; the same days, setting, reference "
+    "value and earlier-day values in use. Repeated checking until a result appears "
+    "is not covered. arci-logs/2, digest {digest}. Yours: uvx --python 3.14 "
+    "realornoise"
 )
 TOOL_NAMES = {"claude-code": "Claude Code", "codex": "Codex"}
 DEFAULTS = {
@@ -303,14 +344,57 @@ def notices(tool: ToolDecision) -> list[str]:
             (F15, c.lines_lacking_field),
             (F16, c.records_in_future),
             (F17, c.files_unreadable),
+            (F22, tool.settings_not_kept),
+            (F23, tool.days_not_kept),
+            (F25, tool.kept_rows_other_offset),
         )
         if count
     ]
 
 
+def limits_text() -> str:
+    return F10.format(rate_max=RATE_MAX, worst_after=RATE_MAX_AFTER, worst_before=RATE_MAX_BEFORE)
+
+
+def short_history(tool: ToolDecision) -> list[str]:
+    if tool.reason != "too_few_days":
+        return []
+    lines = [
+        F18.format(
+            first=tool.first_response_day, b=tool.response_days_before, a=tool.response_days_after
+        )
+    ]
+    if tool.earliest_test_date is not None:
+        assert tool.after is not None
+        lines.append(F19.format(last=tool.after.last_day, date=tool.earliest_test_date))
+    if tool.tool == "claude-code":
+        lines.append(F20)
+    return lines
+
+
+def client_versions(tool: ToolDecision) -> list[str]:
+    context = tool.context
+    if context is None or not context.client_versions_after_shown:
+        return []
+    versions = ", ".join(context.client_versions_after_shown)
+    if context.client_versions_after_more:
+        versions += f" +{context.client_versions_after_more} more"
+    return [F26.format(versions=versions)]
+
+
+def kept_days(tool: ToolDecision, decision: LogsDecision) -> list[str]:
+    return (
+        [F21.format(b=tool.kept_days_before, a=tool.kept_days_after)]
+        if tool.model is not None and decision.kept_table == "read"
+        else []
+    )
+
+
 def render_text(decision: LogsDecision, *, directory_tools: Collection[Tool] = ()) -> str:
     header = F1.format(version=escape_terminal(decision.arci_version))
     groups = [header + ("\n" + F13 if decision.example else "")]
+    if decision.kept_table == "unreadable":
+        groups[0] += "\n" + F24
     for tool in decision.tools:
         result = (
             F4[tool.result] + "\n" + reason_text(tool, directory_given=tool.tool in directory_tools)
@@ -333,6 +417,7 @@ def render_text(decision: LogsDecision, *, directory_tools: Collection[Tool] = (
             if tool.after
             else F3_EMPTY.format(s=tool.split_date)
         )
+        result = "\n".join([result, *short_history(tool)])
         groups.extend(["\n".join([format_scope(tool, decision), *periods]), result, _table(tool)])
         tested = [m for m in tool.measures if m.p_streak is not None]
         groups.append(
@@ -340,6 +425,7 @@ def render_text(decision: LogsDecision, *, directory_tools: Collection[Tool] = (
                 [
                     F7_HEADER,
                     context_text(tool),
+                    *client_versions(tool),
                     *(
                         [
                             F8.format(
@@ -352,19 +438,22 @@ def render_text(decision: LogsDecision, *, directory_tools: Collection[Tool] = (
                         if tested
                         else []
                     ),
+                    *kept_days(tool, decision),
                     *notices(tool),
                     F11.format(digest=(tool.day_table_sha256 or "")[:12]),
                 ]
             )
         )
     if any(tool.result != "ERROR" for tool in decision.tools):
-        groups.append(F10)
+        groups.append(limits_text())
     groups.append(F12 + "\n" + EXIT.format(code=decision.exit_code))
     return wrap_text("\n\n".join(groups)) + "\n"
 
 
 def render_markdown(decision: LogsDecision, *, directory_tools: Collection[Tool] = ()) -> str:
     blocks: list[str] = [F13] if decision.example else []
+    if decision.kept_table == "unreadable":
+        blocks.append(F24)
     for tool in decision.tools:
         if tool.model is None:
             block = "\n".join(
@@ -375,7 +464,10 @@ def render_markdown(decision: LogsDecision, *, directory_tools: Collection[Tool]
                 ]
             )
             block += "\n" + "\n".join(
-                [*notices(tool), *([" ".join(F10.splitlines())] if tool.result != "ERROR" else [])]
+                [
+                    *notices(tool),
+                    *([" ".join(limits_text().splitlines())] if tool.result != "ERROR" else []),
+                ]
             )
             block = block.rstrip()
         else:
@@ -384,9 +476,17 @@ def render_markdown(decision: LogsDecision, *, directory_tools: Collection[Tool]
                     f"**{format_scope(tool, decision)} · {tool.result.replace('_', ' ')}**",
                     _table(tool, markdown=True),
                     f"split {tool.split_date} · {context_text(tool)}",
+                    *client_versions(tool),
+                    *(" ".join(line.splitlines()) for line in short_history(tool)),
+                    *kept_days(tool, decision),
                     *(notices(tool)),
                     MD_CLOSING[tool.result],
-                    MD_LIMITS.format(digest=(tool.day_table_sha256 or "")[:12]),
+                    MD_LIMITS.format(
+                        digest=(tool.day_table_sha256 or "")[:12],
+                        rate_max=RATE_MAX,
+                        worst_after=RATE_MAX_AFTER,
+                        worst_before=RATE_MAX_BEFORE,
+                    ),
                 ]
             )
         blocks.append(block)

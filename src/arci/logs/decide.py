@@ -18,6 +18,8 @@ from .schema import (
     ReasonCode,
     Result,
     ToolDecision,
+    ToolDecisionV1,
+    earliest_date,
     median,
 )
 from .schema import (
@@ -98,7 +100,9 @@ def _measure(table: MeasureTable) -> MeasureDecision:
     )
 
 
-def decide_tool(table: ToolTable, counters: InputCounters) -> ToolDecision:
+def decide_tool(
+    table: ToolTable, counters: InputCounters, *, since_given: bool = False
+) -> ToolDecision:
     counts = ReaderCounters(**asdict(counters))
     if table.model is None:
         return ToolDecision(
@@ -107,6 +111,10 @@ def decide_tool(table: ToolTable, counters: InputCounters) -> ToolDecision:
             reason="no_usable_setting",
             split_date=table.split_date,
             counters=counts,
+            other_settings=table.other_settings,
+            kept_rows_other_offset=table.kept_rows_other_offset,
+            settings_not_kept=table.settings_not_kept,
+            days_not_kept=table.days_not_kept,
         )
     measures = tuple(_measure(m) for m in table.measures)
     result, reason = ladder(tuple(m.finding for m in measures))
@@ -124,6 +132,17 @@ def decide_tool(table: ToolTable, counters: InputCounters) -> ToolDecision:
         context=table.context,
         counters=counts,
         day_table_sha256=day_table_digest(table),
+        first_response_day=table.first_response_day,
+        response_days_before=table.response_days_before,
+        response_days_after=table.response_days_after,
+        earliest_test_date=earliest_date(measures, table.after)
+        if reason == "too_few_days" and not since_given
+        else None,
+        kept_days_before=table.kept_days_before,
+        kept_days_after=table.kept_days_after,
+        kept_rows_other_offset=table.kept_rows_other_offset,
+        settings_not_kept=table.settings_not_kept,
+        days_not_kept=table.days_not_kept,
     )
 
 
@@ -135,7 +154,7 @@ def error_tool(tool: Tool, reason: str, counters: InputCounters) -> ToolDecision
     )
 
 
-def exit_code(tools: Sequence[ToolDecision]) -> int:
+def exit_code(tools: Sequence[ToolDecision | ToolDecisionV1]) -> int:
     results = {tool.result for tool in tools} - {"ERROR"}
     if "REAL_DROP" in results:
         return 1

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/ajaysurya1221/agent-reliability-ci/security/advisories/new
+    about: Private reporting for a suspected vulnerability. Do not open a public issue for this.

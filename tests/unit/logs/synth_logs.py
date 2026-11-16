@@ -174,6 +174,7 @@ def generate(
                                 id=f"CANARY-session-{day}-{session}",
                                 cwd=cwd,
                                 thread_source="user" if main else "subagent",
+                                cli_version="2.1.325" if session == 0 else "98234567.76543210",
                             ),
                             context(model, "canary-payroll-9" if private else "high"),
                         ]
@@ -193,6 +194,7 @@ def generate(
                             stamp=stamp,
                             model=model,
                             reasoning=9999,
+                            version="2.1.325" if session == 0 else "98234567.76543210",
                             cwd=cwd,
                             isSidechain=not main,
                         )

@@ -179,17 +179,17 @@ def test_calendar_overflow_and_since_boundary() -> None:
         build(data, utc_offset=timedelta(), now=NOW, since=newest - timedelta(days=84))
 
 
-def test_pooled_setting_selection_and_effort_tie() -> None:
+def test_after_setting_selection_and_effort_tie() -> None:
     data = sample()
     other = tuple(replace(r, effort=1) for r in data.responses if r.when.date() >= SPLIT)
-    # The minority setting owns more after responses, but the original wins pooled.
+    # The minority setting owns more after responses and wins under record 0017.
     data = replace(
         data,
         responses=(*data.responses, *other, *other),
         efforts=("high", "low"),
         effort_order=(1, 0),
     )
-    assert table(data).effort == "high"
+    assert table(data).effort == "low"
     assert table(data, effort="low").effort == "low"
     assert table(data, effort="effort-1").model is None
     tied = replace(

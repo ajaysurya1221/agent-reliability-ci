@@ -1,0 +1,18 @@
+version: 2
+
+updates:
+  # Python dependencies are pinned by hash in uv.lock and in .github/requirements/uv.txt
+  # and constraints/*.txt. uv.lock is frozen (FROZEN.sha256) and changes only with a
+  # design record and a release re-freeze (docs/RELEASING.md); the other pinned files
+  # are deliberate, reviewed pins. So there is no Python ecosystem entry here: Dependabot
+  # would only propose pull requests this repository's own rules forbid taking.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"

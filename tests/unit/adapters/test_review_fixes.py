@@ -168,13 +168,21 @@ def test_interrupted_run_rejected(source: str) -> None:
 
 
 def test_slow_healthy_predecessor_has_no_gate_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Findings 3, 12, 21, 24: active predecessors suspend the idle deadline."""
-    monkeypatch.setattr(implementation, "WAIT_SECONDS", 0.03)
+    """Findings 3, 12, 21, 24: active predecessors suspend the idle deadline.
+
+    The margin between WAIT_SECONDS and the tool sleep is widened (10x the
+    original 0.03s/0.08s pair) so ordinary thread-scheduling jitter on a
+    loaded machine cannot push the gap between one tool finishing and the
+    next one being scheduled past WAIT_SECONDS and flake this test; see
+    CHANGELOG.md. The sleep still clearly exceeds WAIT_SECONDS, so a deadline
+    that wrongly kept running during an active predecessor would still fail.
+    """
+    monkeypatch.setattr(implementation, "WAIT_SECONDS", 0.3)
     bodies: list[str] = []
 
     def slow(key: str) -> str:
         bodies.append(key)
-        time.sleep(0.08)
+        time.sleep(0.8)
         return key
 
     def spec() -> dict[str, Any]:

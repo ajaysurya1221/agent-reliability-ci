@@ -21,7 +21,7 @@ from arci.logs.schema import LogsDecision, ToolDecision, seal
 from tests.unit.logs.test_measures import sample, table
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
-RECORD = Path(__file__).resolve().parents[3] / "docs/design/0016-logs.md"
+RECORD = Path(__file__).resolve().parents[3] / "docs/design/0017-logs-2.md"
 
 
 def normalize_version(text: str) -> str:
@@ -29,7 +29,11 @@ def normalize_version(text: str) -> str:
 
 
 def record(
-    tools: tuple[ToolDecision, ...], *, example: bool = False, offset: int = 330
+    tools: tuple[ToolDecision, ...],
+    *,
+    example: bool = False,
+    offset: int = 330,
+    since_given: bool = True,
 ) -> LogsDecision:
     return seal(
         LogsDecision(
@@ -37,6 +41,7 @@ def record(
             example=example,
             utc_offset_minutes=offset,
             project_filtered=False,
+            since_given=since_given,
             tools=tools,
             exit_code=exit_code(tools),
         )
@@ -49,7 +54,7 @@ def example_record() -> LogsDecision:
     for reader, paths in ((read_claude, claude_files(claude)), (read_codex, codex_files(codex))):
         result = reader(paths, project=None, now=now)
         tools.append(decide_tool(build(result, utc_offset=timedelta(), now=now), result.counters))
-    return record(tuple(tools), example=True, offset=0)
+    return record(tuple(tools), example=True, offset=0, since_given=False)
 
 
 def cases() -> dict[str, LogsDecision]:
@@ -102,7 +107,7 @@ def test_snapshot(name: str, extension: str) -> None:
 
 def test_every_fixed_text_matches_record() -> None:
     source = RECORD.read_text(encoding="utf-8")
-    section = source.split("## Fixed texts\n", 1)[1].split("## Command line", 1)[0]
+    section = source.split("## Fixed texts\n", 1)[1].split("## Coverage of the bound", 1)[0]
     fixed = re.findall(r"`([^`]+)`", section)
     constants = [
         report.F1,
@@ -112,7 +117,7 @@ def test_every_fixed_text_matches_record() -> None:
         report.F3_EMPTY,
         *report.F4.values(),
         report.EXIT,
-        *report.F5.values(),
+        *(line for text in report.F5.values() for line in text.splitlines()),
         report.F5_DIRECTORY,
         report.DUPLICATE_OUTPUT,
         report.INTERNAL_ERROR,
@@ -130,6 +135,7 @@ def test_every_fixed_text_matches_record() -> None:
         report.F7,
         report.F8,
         report.F9,
+        report.F9_ERROR,
         report.F9_NEXT,
         *report.F10.splitlines(),
         report.F11.replace("{digest}", "{12 hex}"),
@@ -139,6 +145,19 @@ def test_every_fixed_text_matches_record() -> None:
         report.F15,
         report.F16,
         report.F17,
+        report.F17_ERROR,
+        report.KEEP_PROJECT,
+        report.IGNORE_KEEP,
+        report.USAGE_ERROR,
+        report.F18,
+        *report.F19.splitlines(),
+        *report.F20.splitlines(),
+        report.F21,
+        report.F22,
+        report.F23,
+        report.F24,
+        report.F25,
+        report.F26,
         *report.MD_CLOSING.values(),
         report.MD_LIMITS.replace("{digest}", "{12 hex}"),
     ]

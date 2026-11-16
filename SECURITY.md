@@ -37,3 +37,10 @@ hostile agent forging or bypassing its own record, or code running when an untru
 replayed, is a documented limit rather than a vulnerability. A way to break a guarantee the trust
 model does make (for example, a real API key reaching the agent process or a sealed record, or a
 bundle payload escaping its temporary directory) is in scope.
+
+## realornoise
+
+The local-log command has its own [realornoise threat model](docs/THREAT_MODEL_LOGS.md),
+including read and write paths, bounded output, kept-table limits and supply-chain checks.
+For these reports, attach the tool's own output and a synthetic reproducer, never a log line.
+Review the printed names and dates before sharing them.

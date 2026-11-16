@@ -1,0 +1,8 @@
+# Hash-pinned uv for every workflow's "Install uv" step. Installed with
+# `python -m pip install --disable-pip-version-check --require-hashes -r .github/requirements/uv.txt`.
+# One hash per platform wheel pip can pick on a GitHub-hosted runner; pip accepts
+# whichever one matches the runner. Update by hand alongside UV_VERSION when uv is bumped.
+uv==0.12.5 \
+    --hash=sha256:3e195ccf1ed60c8bb24a6447ce306441a4181d54b602407e09bc56e963911c15 \
+    --hash=sha256:d87156bc174d94fae890bb7a261e2867140abb9fe1e9de81a5295e582fb9d0f5 \
+    --hash=sha256:455c3e57602e2141e66e2f0bf685898c9c5e5a70377d14c9a71554a3baf3ddbf

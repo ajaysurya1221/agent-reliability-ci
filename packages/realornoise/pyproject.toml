@@ -1,12 +1,12 @@
 [project]
 name = "realornoise"
-version = "2.3.0"
+version = "2.4.0"
 description = "Did your coding agent get worse? Reads the Claude Code and Codex session logs on your disk and answers real drop, no drop or cannot tell. Sends nothing."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
-dependencies = ["agent-reliability-ci==2.3.0"]
+dependencies = ["agent-reliability-ci==2.4.0"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",

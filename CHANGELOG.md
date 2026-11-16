@@ -1,9 +1,88 @@
 # Changelog
 
-## Unreleased
+## v2.4.0 (2026-11-16)
 
+- **Added:** `arci-logs/2` records, a best-case earliest test date when usable days are
+  too few, and bounded client-version names after the split. `--keep` saves daily counts,
+  dates and accepted settings to `realornoise-days/1`; `--keep-dir` chooses its directory
+  and `--ignore-kept` skips reading it. Kept days are counted and marked in HTML.
+- **Changed:** the default model and effort now come from the most responses after the
+  split, falling back to the whole window only when no candidate has an after-response.
+  In 2.4.0 the readers return client-version names and also return main-thread and
+  sub-agent responses that lack a model or an effort. Those responses count only toward
+  context counts and the version list, never toward responses or day values. The readers
+  take model and effort names from the kept table so labels stay stable across runs.
+  Context counts can therefore differ from those 2.3.0 printed for the same logs.
+  2.4.0 follows the definition in the records.
+  Both skills run `uvx --python 3.14 realornoise==2.4.0` without keeping days. Version 1
+  log records remain readable. The printed limits state the largest wrong REAL DROP rate
+  of the rule as built over all histories in the correlation, weekly-cycle and regime
+  cells of the [self-check](docs/results/logs-selfcheck.md):
+  wrong REAL DROP 362/2000 = 0.181000 [0.164743, 0.198480] (18.1%, Wilson 95% interval),
+  seed 18112185, regime-switching days with log SD 0.45, 14 days after and 16 before.
+  Work in phases can break the bound; other patterns can give more.
+- **Fixed:** the tool never removes a directory. A failed write restores files;
+  the table directory and any parents it created stay, empty, with mode 0700.
+  Existing directories keep their mode. Overlapping table writes merge under an
+  exclusive directory lock, held through moves and cleanup. Failure to open the
+  directory is a write error; an unavailable lock module or failed lock call
+  allows the write to proceed without a lock. The tool assumes no other program
+  removes or replaces the directory during a run. Output names beginning with
+  `.realornoise-`, after NFKC normalization and case folding, including symbolic
+  links that resolve to such names, are refused before any read or write.
+  Successful table writes remove regular files with that prefix while holding the
+  lock. Report temporary files use `.realornoise.out-`, so table cleanup leaves
+  another run's pending reports alone. A keyboard interrupt during writing ends
+  with the write error and exit 3. An interrupt during the same-file check removes
+  this run's new empty targets and preserves another writer's file. An interrupted
+  move restores old bytes and modes and removes new targets; after the last move
+  the files are already written. A second interrupt during restore can leave some
+  files replaced, and an interrupt can leave a report temporary file. A process
+  killed outright restores nothing and can leave replaced files, empty new targets
+  and temporary files. Report leftovers may be deleted by hand.
+- **Fixed:** equal numeric client-version tuples now use ascending text order in both
+  the displayed list and record validation. With four equivalent spellings, the wrong
+  three had been shown. A kept-table path below a regular file is now absent rather
+  than unreadable: `--keep` reports a write error instead of success without a write,
+  and a read-only run no longer reports an unreadable table that never existed.
+  Both defects were found by the blind acceptance tests. Same-file placeholders are removed
+  before staging, so interruption during staging or replacement leaves no new empty target.
+  A zero-byte table is absent and can be replaced.
+  Overlapping writes merge under a directory lock where available; a successful write removes
+  leftover regular `.realornoise-` files. An empty `--keep-dir` is a usage error.
+  Margin self-checks also gate the moved measure's own finding. Gates remain active under
+  Python optimisation. Quick gates use exact binomial smoke limits and support no claim.
+  Privacy tests restrict bounded names and versions to their specified JSON fields.
+  Documentation corrects release metadata, reader changes and installation network use.
+- **Not in this release:** an unknown split date, repeated daily looks with a stated
+  error rate, a replacement streak check, two-model comparisons, a range for the change,
+  other coding agents, OpenTelemetry input, a public tracker, real-machine Windows
+  checks, older log formats, usage-limit or cost measures, or sending data anywhere.
+- **Docs:** record 0017, the logs/2 statistics and self-check, the live example transcript,
+  kept-table format and retention limits, the realornoise threat model, skill pins,
+  release checks, compatibility and roadmap. The documented command requests Python
+  3.14 for compressed Codex logs. Related tools are described without comparison claims.
+- **CI:** CodeQL (Python and Actions) and zizmor now scan every push to `main` and
+  `sprint/**` and every pull request to `main`, Dependabot opens one monthly grouped pull request for
+  GitHub Actions versions, uv is installed from a hash-pinned requirements file in every
+  workflow that can check out the repository first, and a new "oracle / SciPy" CI job checks
+  the exact rank test against SciPy's own permutation and Mann-Whitney tests.
+- **Docs:** added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates,
+  and a test that these files exist and stay consistent with each other.
 - **Docs:** the README now starts with a generated banner (`docs/assets/banner-{light,dark}.svg`,
   from `make_figures.py`) whose dots are the packaged example's day values, checked by a test.
+- **Tests:** `test_slow_healthy_predecessor_has_no_gate_deadline` now uses a wait limit of
+  0.3 s and tool calls of 0.8 s (before: 0.03 s and 0.08 s). On a loaded CI machine the
+  gap between one tool call ending and the next starting could pass 0.03 s and fail the
+  test with "tool order wait timeout". The released code uses 30 s and was not affected.
+- **Tests:** added `tests/unit/logs/test_format_incidents.py`, guarding the three 2026
+  `ccusage` breakages (a `null` model inside `usage.iterations[]`, a session kept twice
+  once compressed, and a record cut off in the middle of its JSON) against both readers
+  and against an end-to-end `arci logs` run, plus `tests/unit/packaging/test_client_versions.py`.
+- **CI:** a new daily `client-versions` workflow asks npm for the latest Claude Code and
+  Codex CLI versions and compares them with the versions `docs/LOG_FORMATS.md` says the
+  readers were checked against; when either is newer it keeps one open issue up to date
+  asking for the format tests to be run against a session of the new client.
 
 ## v2.3.0 (2026-11-15)
 
