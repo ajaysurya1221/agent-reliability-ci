@@ -32,9 +32,12 @@ today. Not by stars (0). Submissions that fail a rule are closed automatically.
 
 ## Facts you can lean on (each true of 2.4.0, checked against the released files)
 
-- It is a Claude Code plugin and a command-line tool. The plugin runs one pinned command,
-  `uvx --python 3.14 realornoise==2.4.0`, only when the user types
-  `/realornoise:realornoise`, and shows the output unchanged.
+- It is a Claude Code plugin and a command-line tool. Since pull request 29 (2026-11-16)
+  the plugin's skill tells Claude to run one pinned command,
+  `uvx --python 3.14 realornoise==2.4.0`, once, with nothing added, and to show the output
+  unchanged. Claude does not start it on its own; the user types
+  `/realornoise:realornoise`. It is an instruction to Claude, not a lock, and whether
+  Claude Code asks before the command runs depends on the permission mode.
 - It reads the Claude Code and Codex session logs already on disk. For each tool it
   compares recent days with earlier days, for the model and effort used most in the
   recent days.
