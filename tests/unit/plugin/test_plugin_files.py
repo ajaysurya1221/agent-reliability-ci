@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import re
+import struct
 from pathlib import Path
 
 import arci
@@ -68,3 +71,44 @@ def test_codex_skill_names_the_same_command() -> None:
 def test_descriptions_fit_the_listing_limit() -> None:
     for path in (CLAUDE_SKILL, CODEX_SKILL):
         assert len(_frontmatter(path)["description"]) <= 1536
+
+
+def test_plugin_folder_has_its_own_readme() -> None:
+    """A plugin directory reads the README inside the plugin folder, not the repository's."""
+    text = (PLUGIN / "README.md").read_text(encoding="utf-8")
+    prose = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    assert len(prose.split()) >= 40
+    # What the plugin reads, runs, fetches, writes and sends is stated, one line each.
+    for label in ("- Reads:", "- Runs:", "- Fetches:", "- Writes:", "- Prints:", "- Sends:"):
+        assert label in text, label
+    assert "It cannot show a cause, answer quality" in text
+    assert "CANNOT TELL, which is a normal result" in text
+    assert "\u2014" not in text
+
+
+def test_every_launcher_command_in_the_plugin_and_skill_is_pinned() -> None:
+    """An unpinned `uvx realornoise` would run another version than the one described."""
+    for path in (PLUGIN / "README.md", CLAUDE_SKILL, CODEX_SKILL):
+        text = path.read_text(encoding="utf-8")
+        commands = re.findall(r"uvx[^\n`]*?realornoise(\S*)", text)
+        assert commands, path
+        for suffix in commands:
+            assert suffix.rstrip(".,;:)`") == f"=={arci.__version__}", (path, suffix)
+
+
+def test_listing_icon_is_a_square_png_drawn_by_the_generator() -> None:
+    """A plugin directory wants a square PNG, 512 to 2048 pixels a side, under 2 MB."""
+    icon = PLUGIN / ".claude-plugin" / "icon.png"
+    data = icon.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR"
+    width, height = struct.unpack(">II", data[16:24])
+    assert width == height and 512 <= width <= 2048
+    assert len(data) < 2 * 1024 * 1024
+    source = ROOT / "docs" / "assets" / "src" / "make_plugin_icon.py"
+    spec = importlib.util.spec_from_file_location("make_plugin_icon", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    # Pixels, not bytes: the compressed form may differ between zlib builds.
+    expected = b"".join(b"\x00" + bytes(row) for row in module.pixels())
+    assert module.decode(data) == expected

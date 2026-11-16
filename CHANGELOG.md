@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Docs:** the Claude Code plugin folder has its own README
+  (`plugins/realornoise/README.md`): what the plugin reads, runs, fetches, writes, prints
+  and sends, three uses, what the result means and what it cannot show. A plugin directory
+  reads the README inside the plugin folder. Both skills now give the `--keep` command
+  with the pinned version, so that every launcher command they show is pinned; tests hold
+  both. The plugin also has a listing icon (`.claude-plugin/icon.png`, drawn by
+  `docs/assets/src/make_plugin_icon.py` with the standard library; a test compares its
+  pixels with the generator). No behaviour changes.
+
 ## v2.4.0 (2026-11-16)
 
 - **Added:** `arci-logs/2` records, a best-case earliest test date when usable days are

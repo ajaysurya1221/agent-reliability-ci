@@ -20,6 +20,6 @@ shows and what it cannot show. An exit status of 0, 1 or 2 is a normal result.
 If `uvx` is not found, tell the user to install `uv` (https://docs.astral.sh/uv/) or to run
 `pip install agent-reliability-ci` and then `arci logs`, and stop.
 
-The skill does not pass `--keep`. The user can run `uvx --python 3.14 realornoise --keep`
-themselves to save daily counts, dates and accepted model and effort names in
+The skill does not pass `--keep`. The user can run
+`uvx --python 3.14 realornoise==2.4.0 --keep` themselves to save daily counts, dates and accepted model and effort names in
 `~/.realornoise/days-1.json` (or `$REALORNOISE_HOME/days-1.json`).
