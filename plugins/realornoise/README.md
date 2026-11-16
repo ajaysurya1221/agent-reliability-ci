@@ -28,8 +28,8 @@ In Claude Code:
 
 Type the command yourself. In Claude Code, Claude does not start it on its own. If Claude
 Code asks before running the shell command, check that it is the one above, then approve
-it. The command takes no options: Claude is told not to pass on anything typed after its
-name.
+it. The command takes no options: if you type anything after its name, Claude is told to
+run nothing and to say so. For options such as `--example`, use a terminal.
 
 ```text
 /realornoise:realornoise
@@ -89,14 +89,15 @@ Details: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ST
   package index `uv` is set to use (PyPI by default). If Python 3.14 is not installed, `uv` also
   downloads a Python build from the python-build-standalone project
   (https://docs.astral.sh/uv/concepts/python-versions/).
-- Writes: realornoise writes no file here, because the command has no `--keep` and Claude
-  is told not to add one. `uv`
-  keeps what it downloaded in its own cache until you clear it.
+- Writes: Claude is told to run the command with no options. Without an option
+  realornoise writes no file. `uv` keeps what it downloaded in its own cache until you
+  clear it.
 - Prints: counts, rates, dates, the UTC offset your computer uses for calendar days, the
   program version, a short digest of the daily counts, and model, effort and client-version
   names that pass fixed rules. Other model and effort names become opaque labels. Prompts,
-  answers, file paths and raw log lines are not printed. Through the plugin, any message
-  from `uvx` itself, such as a download line or an error, is shown too.
+  answers, file paths and raw log lines are not printed by realornoise. Through the plugin,
+  any message from `uvx` itself, such as a download line or an error, is shown too, and
+  such a message can show a path on your computer.
 - Sends: the plugin puts the printed output into this conversation. From there it goes
   wherever this conversation goes, like anything else you type. realornoise sends nothing
   itself.
@@ -111,9 +112,12 @@ Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/do
   `pip install agent-reliability-ci` and then `arci logs` in a terminal.
 - Claude Code marks the command as failed: the command exits with status 1 when a result
   is REAL DROP and 2 when a result is CANNOT TELL. That is the result, not a failure.
-- You installed the plugin before 16 November 2026: that copy keeps the earlier skill
-  until the plugin's version changes. The earlier skill ran the command itself when you
-  typed it, with the command approved ahead of time.
+- Claude says that nothing ran: your permission mode, a deny rule or auto mode's
+  classifier refused the command.
+- The command runs by itself, with nothing shown first: a copy of plugin version 2.4.0
+  installed before the skill became an instruction to Claude keeps the earlier skill
+  until the plugin's version changes and you update the plugin. The earlier skill ran
+  the command itself when you typed it, with the command approved ahead of time.
 - ERROR for a tool: the tool found no logs, no readable file or no usable response for it on
   this computer. Results for the other tool can still appear.
 - To keep daily counts beyond the 30 days Claude Code keeps session files by default, run

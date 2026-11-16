@@ -60,15 +60,17 @@ package, or from another user on your computer.
 ## Through the plugin or the skill
 
 The Claude Code plugin and the Codex skill each tell the assistant to run one pinned
-command, once, with nothing added. In Claude Code the plugin's command starts only when you
-type it. Whether Claude Code asks you before the shell command runs depends on your
-permission mode and settings. In a mode that asks, the prompt shows the command. In one
-that does not ask (auto mode, an allow rule, a hook), it runs without a prompt and the
-transcript shows what ran. These are instructions to an assistant, not locks. A copy of
-the plugin installed before 16 November 2026 keeps the earlier skill until the plugin's
-version changes: that skill ran the command itself when you typed it, with the command
-approved ahead of time. Everything that command prints enters your conversation with the
-assistant. That includes any message from `uvx` itself, such as a
+command, once, with nothing added. In Claude Code, Claude does not start the plugin's
+command on its own: it starts when you type it, or when your message names it and Claude
+judges that you asked for it. Whether Claude Code asks you before the shell command runs
+depends on your permission mode and settings. In a mode that asks, the prompt shows the
+command. In one that does not ask (auto mode, an allow rule, a hook), it can run without
+a prompt, and the transcript shows what ran. A mode, a classifier or a deny rule can also
+refuse it; then nothing runs. These are instructions to an assistant, not locks. A copy
+of plugin version 2.4.0 installed before the skill became an instruction keeps the
+earlier skill until the plugin's version changes and you update the plugin: that skill
+ran the command itself when you typed it, with the command approved ahead of time.
+Everything that command prints enters your conversation with the assistant. That includes any message from `uvx` itself, such as a
 download line or an error, which can show a path on your computer. The assistant is told
 to show the output unchanged. From there it goes wherever that conversation goes, like
 anything else in it. The project does not control that; the terms of your assistant's

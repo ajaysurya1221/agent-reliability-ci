@@ -81,14 +81,17 @@ on PyPI too. See [Releasing](RELEASING.md#4-verify). Hashes check bytes, not beh
 
 The Claude Code plugin and Codex skill each tell the assistant to run one pinned command,
 once and with nothing added: `uvx --python 3.14 realornoise==2.4.0`. They tell it not to
-add `--keep`. In Claude Code the plugin's skill starts only when the user types it; it
-approves no tool ahead of time and has no shell line of its own. Whether Claude Code asks
+add `--keep`. In Claude Code, Claude does not start the plugin's skill on its own: it
+starts when the user types its command, or names it in a message and Claude judges that
+they asked for it. The skill approves no tool ahead of time and has no shell line of its
+own. Whether Claude Code asks
 before the command runs depends on the user's permission mode and settings. An instruction
 is not a control: the prompt, when there is one, and the transcript show the command. A
-copy of the plugin installed before 16 November 2026 keeps the earlier skill, which ran
-the command itself with the command approved ahead of time, until the plugin's version
-changes. The printed numbers and
-bounded names enter the assistant's conversation and go wherever that conversation goes.
+copy of plugin version 2.4.0 installed before the skill became an instruction keeps the
+earlier skill, which ran the command itself with the command approved ahead of time,
+until the plugin's version changes and the user updates the plugin. Everything the
+command prints, including any message from uvx, which can show a path, enters the
+assistant's conversation and goes wherever that conversation goes.
 realornoise itself opens no connection and sends nothing. uvx downloads the package,
 and Python 3.14 if it is missing, to run it.
 

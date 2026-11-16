@@ -69,20 +69,26 @@ def test_claude_skill_names_only_the_fixed_command() -> None:
     # No shell line that runs before the conversation, in any spelling, and no fenced block:
     # the skill is an instruction to Claude.
     assert "!" not in body and "```" not in body and "~~~" not in body and "\t" not in body
-    # No placeholder that would paste typed text into the instruction.
-    assert not re.search(r"\$(\d|ARGUMENTS|\{)", body)
+    # No placeholder that would paste typed text into the instruction, and no file reference.
+    assert "$" not in body and "@" not in body
     command = f"uvx --python 3.14 realornoise=={arci.__version__}"
     assert [line for line in body.splitlines() if line.startswith("    ")] == ["    " + command]
     # The command appears twice: the line to run, and the `--keep` form the user may run.
     assert re.findall(r"uvx --python[^\n`]*", body) == [command, command + " --keep"]
     assert re.findall(r"(?<![-\w])--[a-z][a-z-]*", body) == ["--python", "--keep"] * 2
     prose = " ".join(body.split())
+    # These sentences are held word for word. A sentence added to reverse one of them is not
+    # something a text test can catch; a reviewer has to read a change to this file.
     for sentence in (
-        "made of this line and nothing else",
-        "Run no other command in this turn",
-        "do not pass it",
+        "(it appears at the end of this text as `ARGUMENTS:`), run nothing.",
+        "Otherwise run one shell command, in the foreground, made of this line and nothing else:",
+        "Nothing goes before it",
+        "Run no other command in this turn, before or after it,",
+        "stop and say that nothing ran. Do not try another way to run it.",
+        "Your reply is one code block and nothing else,",
+        "exactly as printed, in that code block, and add nothing to it.",
+        "A status of 1 or 2 is the result, not a failure of the command.",
         "Do not add `--keep`.",
-        "It is the result, not a failure of the command.",
     ):
         assert sentence in prose, sentence
     assert "visible to this assistant" in body
