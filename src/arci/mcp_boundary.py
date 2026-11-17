@@ -26,7 +26,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC
-from typing import BinaryIO, TextIO, cast
+from typing import BinaryIO, Protocol, TextIO, cast
 from urllib.parse import urlsplit
 
 from pydantic import JsonValue
@@ -799,6 +799,63 @@ def _server_environment(
     return env
 
 
+_STOP_TICK = 0.05
+
+
+class StoppableServer(Protocol):
+    """The part of a tool server process that `stop_server` uses."""
+
+    def poll(self) -> int | None: ...
+
+    def terminate(self) -> None: ...
+
+    def kill(self) -> None: ...
+
+
+def stop_server(
+    server: StoppableServer,
+    *,
+    close_input: Callable[[], None],
+    idle: Callable[[float], None],
+    remaining: float,
+    clock: Callable[[], float] = time.monotonic,
+    tick: float = _STOP_TICK,
+) -> None:
+    """Stop the tool server in the order the MCP stdio shutdown asks for.
+
+    Close the server's input, then wait for the PROCESS to exit (not for EOF on its output: a
+    descendant may hold that pipe). With R = `remaining` seconds left before the trial's
+    deadline at entry t, send SIGTERM at t + R/2 if it is still running and SIGKILL at
+    t + 3R/4; the last quarter is left for reaping and the boundary's own exit. The budget is
+    never restarted. With R = 0 the server is killed at once.
+
+    `idle(seconds)` must return after at most `seconds`, and earlier when the server writes
+    output or exits; it is also where that output is drained, so a full pipe cannot block the
+    server. It is the only place this function waits, so a fake clock and a fake `idle` test
+    every stage. Nothing about the stop is returned or recorded: whichever stage ended it, the
+    trial is graded the same way.
+    """
+    started = clock()
+    budget = remaining if math.isfinite(remaining) and remaining > 0.0 else 0.0
+    terminate_at = started + budget / 2.0
+    kill_at = started + budget * 3.0 / 4.0
+    close_input()
+    terminated = False
+    while server.poll() is None:
+        now = clock()
+        if budget > 0.0 and not terminated and now >= terminate_at:
+            with contextlib.suppress(OSError):
+                server.terminate()
+            terminated = True
+            continue
+        if now >= kill_at:
+            with contextlib.suppress(OSError):
+                server.kill()
+            return
+        until = kill_at if terminated else terminate_at
+        idle(min(tick, until - now))
+
+
 def _error_result(kind: str, text: str) -> dict[str, JsonValue]:
     del kind
     return {
@@ -816,8 +873,15 @@ class _Boundary:
         socket_path: str,
         workdir: str,
         decision_token: str | None = None,
+        *,
+        deadline: float | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.nonce = nonce
+        # This process's own monotonic deadline for the trial (see `main`); None stops the
+        # server at once, as a boundary built in-process without one always has.
+        self.deadline = deadline
+        self.clock = clock
         self.spec = spec
         self.socket_path = socket_path
         self.workdir = workdir
@@ -845,6 +909,10 @@ class _Boundary:
         self.recording: list[RecordedCall] = []
         self.perturbations: tuple[Perturbation, ...] = ()
         self.tools_inflight = False
+        # True once the server has sent a valid JSON-RPC response whose id matched a request
+        # this boundary forwarded in this trial (set only in `_server_message`). Read only by
+        # `_server_is_idle`; never recorded.
+        self.server_answered = False
         self.known_tools: set[str] | None = None
         self.next_upstream_id = 0
         self.async_io = False
@@ -1757,6 +1825,7 @@ class _Boundary:
         if pending is None:
             raise ValueError("unexpected MCP server response")
         self.client_pending.discard(pending.client_key)
+        self.server_answered = True
         reply: dict[str, JsonValue]
         if error is None:
             reply = {
@@ -2062,15 +2131,123 @@ class _Boundary:
                 with contextlib.suppress(OSError):
                     value.close()
         if self.server is not None:
-            with contextlib.suppress(Exception):
-                if self.server.stdin is not None:
-                    self.server.stdin.close()
-            if self.server.poll() is None:
-                with contextlib.suppress(OSError):
-                    self.server.kill()
-            with contextlib.suppress(Exception):
-                self.server.wait()
+            self._stop_server(self.server)
         self.selector.close()
+
+    def _server_is_idle(self) -> bool:
+        """Whether waiting for the server at cleanup can no longer change what the grader reads.
+
+        The rule: the server is idle when (1) it has sent at least one valid response whose id
+        matched a request this boundary forwarded in this trial (`server_answered`; server
+        notifications, unmatched or invalid responses and bare output do not count), (2) no
+        forwarded request is still unanswered (`pending`, `client_pending`, `tools_inflight`),
+        (3) no bytes for the server are still queued unwritten (`output["server"]`), and (4) no
+        harness fault is latched. An idle server is closed and killed at once, as before the
+        staged stop; any other server gets the staged stop (`stop_server`).
+
+        The limit: this trusts that a server which has answered has already written its state.
+        A server that answers before it writes its state, that saves only on EOF, or that
+        writes its state in reaction to a notification (no response ever comes) can still lose
+        that state when it is idle, exactly as before the staged stop. The project's own
+        bridge and its fixture server write before they answer. A server still starting, or
+        one with a request open, is never treated as idle.
+
+        Conditions (2) and (3) are deliberately conservative. Bytes still queued when the stop
+        begins are discarded, never delivered (that keeps the old choice not to deliver what
+        an agent abandoned), so for a request whose bytes were not fully written, the wait
+        cannot change the final state; it only costs time for a server that ignores EOF.
+        """
+        return (
+            self.server_answered
+            and not self.pending
+            and not self.client_pending
+            and not self.tools_inflight
+            and not self.output["server"]
+            and self.latches.harness is None
+        )
+
+    @staticmethod
+    def _kill_server(server: subprocess.Popen[bytes]) -> None:
+        """Close the server's input, kill it if it is still running, and reap it."""
+        with contextlib.suppress(Exception):
+            if server.stdin is not None:
+                server.stdin.close()
+        try:
+            running = server.poll() is None
+        except Exception:
+            running = True
+        if running:
+            with contextlib.suppress(OSError):
+                server.kill()
+        with contextlib.suppress(Exception):
+            server.wait()
+
+    def _stop_server(self, server: subprocess.Popen[bytes]) -> None:
+        """Stop the server at the end of the trial and reap it.
+
+        An idle server (`_server_is_idle`) is killed at once, as before the staged stop. Any
+        other server is let finish and exit by itself within the trial's deadline. Bytes still
+        queued for the server are not flushed: closing its input discards them. A tools/call
+        the boundary had already fully written to the server may complete during that wait; its
+        reply
+        is drained and discarded, so its effect can reach the final state while the events hold
+        its tool_start without a tool_finish and the recording has no entry for it. Any failure
+        here (including a selector that cannot be created) falls back to killing the server at
+        once.
+        """
+        try:
+            server_idle = self._server_is_idle()
+        except Exception:
+            server_idle = True
+        if server_idle:
+            self._kill_server(server)
+            return
+        remaining = 0.0 if self.deadline is None else self.deadline - self.clock()
+        output: selectors.BaseSelector | None = None
+        try:
+            output = selectors.DefaultSelector()
+            if server.stdout is not None:
+                with contextlib.suppress(Exception):
+                    output.register(server.stdout, selectors.EVENT_READ)
+            selector = output
+
+            def close_input() -> None:
+                with contextlib.suppress(Exception):
+                    if server.stdin is not None:
+                        server.stdin.close()
+
+            def idle(seconds: float) -> None:
+                # Drain and discard whatever the server writes: its replies have no reader any
+                # more, and nothing about the stop may reach an event or a sealed field.
+                if selector.get_map():
+                    for key, _ in selector.select(timeout=seconds):
+                        try:
+                            chunk = os.read(key.fd, 65536)
+                        except (BlockingIOError, InterruptedError):
+                            continue
+                        except OSError:
+                            chunk = b""
+                        if not chunk:
+                            selector.unregister(key.fileobj)
+                    return
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    server.wait(timeout=seconds)
+
+            stop_server(
+                server, close_input=close_input, idle=idle, remaining=remaining, clock=self.clock
+            )
+        except BaseException as exc:
+            self._kill_server(server)
+            # An ordinary error is absorbed, as before, so the result frame is still written;
+            # an interrupt or exit still propagates, but only after the server is reaped.
+            if not isinstance(exc, Exception):
+                raise
+        finally:
+            if output is not None:
+                with contextlib.suppress(Exception):
+                    output.close()
+        with contextlib.suppress(Exception):
+            server.wait()
 
     def write_result(self) -> None:
         if self.latches.replay is not None:
@@ -2102,7 +2279,7 @@ class _Boundary:
         )
 
 
-def _read_config() -> tuple[str, TrialSpec, str, str, str | None]:
+def _read_config() -> tuple[str, TrialSpec, str, str, str | None, float, float]:
     value = json.load(sys.stdin.buffer)
     if not isinstance(value, dict):
         raise TypeError("boundary config is not an object")
@@ -2110,6 +2287,19 @@ def _read_config() -> tuple[str, TrialSpec, str, str, str | None]:
     socket_path = value.get("socket_path")
     workdir = value.get("workdir")
     decision_token = value.get("decision_token")
+    seconds_remaining = value.get("seconds_remaining")
+    parent_deadline = value.get("deadline_monotonic")
+    for name, number in (
+        ("seconds_remaining", seconds_remaining),
+        ("deadline_monotonic", parent_deadline),
+    ):
+        if (
+            isinstance(number, bool)
+            or not isinstance(number, int | float)
+            or not math.isfinite(number)
+            or (name == "seconds_remaining" and number < 0)
+        ):
+            raise ValueError(f"boundary config has no valid {name}")
     if not isinstance(nonce, str) or not nonce:
         raise ValueError("boundary config has no nonce")
     if not isinstance(socket_path, str) or not isinstance(workdir, str):
@@ -2119,15 +2309,57 @@ def _read_config() -> tuple[str, TrialSpec, str, str, str | None]:
         raise ValueError("boundary config has no decision token")
     if spec.decisions is None and decision_token is not None:
         raise ValueError("boundary config has an unexpected decision token")
-    return nonce, spec, socket_path, workdir, cast(str | None, decision_token)
+    return (
+        nonce,
+        spec,
+        socket_path,
+        workdir,
+        cast(str | None, decision_token),
+        float(cast(float, seconds_remaining)),
+        float(cast(float, parent_deadline)),
+    )
+
+
+def trial_deadline(started: float, seconds_remaining: float, parent_deadline: float) -> float:
+    """This process's deadline for the trial: never later than the parent's.
+
+    The parent sends both its own `time.monotonic()` deadline and the seconds it had left when
+    it launched this process. `time.monotonic()` reads one system-wide clock in every process:
+    `mach_absolute_time()` (time since boot) on macOS, `clock_gettime(CLOCK_MONOTONIC)` on
+    Linux, where a child shares its parent's time namespace unless something unshares it,
+    which `subprocess.Popen` never does. So the parent's deadline is the exact one. Taking the
+    earlier of the two keeps the result safe even if that ever failed: a parent reading that
+    is too late is capped by `started + seconds_remaining` (late only by this process's
+    start-up, as when no clock is compared), and one that is too early only shortens the
+    server's stop, down to the old immediate kill. The boundary must never outlive the
+    parent's deadline because of its own wait: the parent would then kill both process groups
+    and grade a completed trial as a timeout.
+    """
+    return min(started + seconds_remaining, parent_deadline)
 
 
 def main() -> int:
+    started = time.monotonic()
     try:
-        nonce, spec, socket_path, workdir, decision_token = _read_config()
+        (
+            nonce,
+            spec,
+            socket_path,
+            workdir,
+            decision_token,
+            seconds_remaining,
+            parent_deadline,
+        ) = _read_config()
     except BaseException:
         return 2
-    boundary = _Boundary(nonce, spec, socket_path, workdir, decision_token)
+    boundary = _Boundary(
+        nonce,
+        spec,
+        socket_path,
+        workdir,
+        decision_token,
+        deadline=trial_deadline(started, seconds_remaining, parent_deadline),
+    )
     signal.signal(signal.SIGTERM, boundary.request_stop)
     boundary.run()
     boundary.write_result()

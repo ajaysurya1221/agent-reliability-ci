@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- **Fixed:** at the end of a command trial the boundary now waits for its MCP tool server when
+  waiting can change what the grader reads, instead of always killing it at once. Why: a CI run
+  showed that for an agent that never uses its tool server, `final_state` (and so
+  `record_sha256`) was `{}` or the server's starting state depending on timing, because a
+  server still starting when the agent exited was killed before it wrote its first state. The
+  boundary waits when any of these holds at cleanup: the server has not sent one valid response
+  matching a request the boundary forwarded in this trial (notifications and unmatched or
+  invalid responses do not count), a forwarded request still has no response, bytes for the
+  server are still queued unwritten, or a harness fault is latched. Then it stops the server in
+  stages, in the order the MCP specification's stdio shutdown asks for: it closes the server's
+  input, waits for the process to exit (draining its output meanwhile), sends SIGTERM if it is
+  still running after half of the time left before the trial's deadline, and SIGKILL after
+  three quarters. Otherwise the server is idle, and the boundary closes its input and kills it
+  at once, as before. The time comes from the trial's own deadline: the parent passes its
+  deadline and the seconds left to the boundary in its launch configuration, outside the spec
+  and every sealed record, and the boundary never uses a deadline later than the parent's. No
+  new outcome, termination, event or latch exists, and nothing about the stop (whether the
+  boundary waited, or which stage ended the server) is recorded or graded. The final state can
+  now differ from before (that is the fix). Limits: the idle rule trusts that a server which
+  has answered has already written its state, so a server that answers before it writes its
+  state, that saves only on EOF, or that writes its state in reaction to a notification (to
+  which no response ever comes) can still lose that state when it is idle, as before this
+  change (the project's own bridge and its fixture server write before they answer); a server
+  whose start-up takes longer than half of the time left still leaves `{}`; a server that
+  ignores EOF makes a trial last longer, by about half of the time left when the agent finishes
+  early (three quarters if it also ignores SIGTERM), but only in trials where the idle rule
+  above does not hold (for example it never answered a request, still had one open, still had
+  bytes queued, or a harness fault was latched, which any server notification causes), since an
+  idle server is killed at once; with decisions configured that wait is all extra time, while
+  without decisions the parent already waited about as long before signalling the boundary; the
+  wait is conservative, since bytes still queued for the server when the stop begins are
+  discarded, not delivered; in those same trials, an agent that exits within a small fraction
+  of a second of the deadline while its server ignores EOF can now end in timeout instead of
+  completed, since the stop's last quarter must still fit the boundary's own exit; and a tool
+  call whose request was fully written to the server when the agent left may complete during
+  the wait, so its effect can reach the final state while its reply is discarded unrecorded.
 - **Docs:** a third pre-registered run of the order-desk study
   (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
   without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
