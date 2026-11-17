@@ -1,0 +1,15 @@
+**Choose selective waiting only where save-before-reply is verified; retain staged stopping otherwise. I agree about the cost, disagree that an empty request map proves arbitrary servers’ snapshots are complete.**
+
+1. **First snapshot:** yes for both inspected implementations. The Python bridge saves during construction before serving requests ([mcp_toolset_server.py:135](/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/src/arci/mcp_toolset_server.py:135), lines 254–255). The fixture saves before its input loop ([mcp_fixture_server.py:66](/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/tests/acceptance/mcp_fixture_server.py:66)). Both ordinarily save mutations before replying. Use an explicit **validated, matched response observed** flag—not arbitrary stdout, `known_tools`, or recording length. This proves initial publication for these servers, not general persistence after every possible error.
+
+2. **Pending state:** `self.pending` and `self.client_pending` are initialized at [mcp_boundary.py:903](/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/src/arci/mcp_boundary.py:903). `_forward` inserts before queuing/writing upstream (1561–1568); `_server_message` removes after JSON-RPC validation and ID matching (1819–1823). Cleanup does not clear them (2120–2129).
+
+   They survive normal EOF, handled exceptions and SIGTERM into cleanup, but are **conservative transport bookkeeping, not universal quiescence evidence**. Queued/partially written requests already count; unread replies leave entries outstanding. Entries disappear before tool-result validation and downstream processing, which can fail. `tools_inflight` (911, 1663, 1856) covers only tool calls. `output["server"]` (902, 1014) also contains notifications, which bypass `pending` (1725–1727). Forced process death never reaches cleanup.
+
+   For the fast path, require the response flag, empty `pending`, false `tools_inflight`, empty upstream output and no harness fault; otherwise retain staged stopping.
+
+3. **Additional regression:** an external server can acknowledge initialization before publishing state, reply before flushing writes, perform notification-triggered work, or save on EOF. Immediate killing can lose or interrupt writes that the built grace would have allowed. Selector timing can then change the snapshot despite identical requests. Even the bridge permits arbitrary toolset code; background work is not excluded by its wrapper. Neither policy guarantees determinism when startup or pending work exceeds the available grace.
+
+4. **Pinned wording:** no inspected sentence mandates grace for an actually idle server. “[No fixed waits.](/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/docs/AGENT_SEMANTICS.md:85)” does not prohibit skipping it. But the generic heuristic can violate “[Determinism: for a scripted client the envelope must be identical across runs.](/Users/ajay/Developer/.arci-worktrees/wt-v2-logs/docs/AGENT_SEMANTICS.md:211)”
+
+Files changed: **none**. Tests: **not run; read-only source consultation**. Next: add a fake-server regression that replies before publishing its snapshot.
