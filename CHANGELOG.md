@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Fixed:** the tool server for Python toolsets (`arci.mcp_toolset_server`) wrote
+  `state.json` in place, which empties the file before the new content goes in. When the
+  trial ends the boundary closes the server's input and, if it is still running, stops it
+  with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`), so a stop at that moment left an
+  empty file and the trial ended `ERROR` (`grader_error`, "snapshot failed"). This was
+  seen once in hosted CI, in 1 trial of 100, with an agent that finishes without using
+  the tool server: one candidate trial ended `ERROR` instead of `FAIL`, which failed the
+  hero acceptance test (no trial may be `ERROR`), and the gate then returned `ERROR` for
+  the experiment. The server now writes `state.json.tmp` in the same folder and moves it
+  into place, so the grader reads no file or a complete file; the bytes are the same as
+  before. New unit tests read `state.json` at every Python call and return during a
+  write: with the old code the reader finds an empty file, with the new code it finds no
+  file, the old state or the new state. One behaviour changes: when a snapshot cannot be
+  written (for example text that cannot be encoded), `state.json` now keeps the last
+  complete state instead of being left empty; the tool call still returns -32603
+  "snapshot failed". Not changed: for an agent that never uses the tool server, the
+  graded final state is still `{}` or the starting state, by timing.
 - **Docs:** a third pre-registered run of the order-desk study
   (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
   without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
