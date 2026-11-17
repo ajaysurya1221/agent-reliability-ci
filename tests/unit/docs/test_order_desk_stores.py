@@ -4,13 +4,15 @@ Loads each committed suite store through the same public functions the CLI
 uses (`load_suite_run`, `decide_suite`), and checks the re-derived decision
 against the committed `decision.json` byte for byte (as sealed records), plus
 the headline counts and wealth figures quoted in
-`docs/results/order-desk-study.md`.
+`docs/results/order-desk-study.md`, and the counts quoted in the blog post about run 3,
+`docs/blog/2026-11-order-desk-run-3.md`.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -22,6 +24,7 @@ from arci.suite_storage import load_suite_run
 REPO = Path(__file__).resolve().parents[3]
 STUDY_DOC = REPO / "docs" / "results" / "order-desk-study.md"
 STORES_DIR = REPO / "docs" / "results" / "order-desk-study"
+RUN_3_POST = REPO / "docs" / "blog" / "2026-11-order-desk-run-3.md"
 
 
 def _store_dir(run_label: str, prefix: str) -> Path:
@@ -191,3 +194,63 @@ def test_run_3_table_in_the_doc_matches_the_store() -> None:
     assert counts.plus == 0
     ties = f"{candidate_ok} both passed, {counts.zero - candidate_ok} both failed"
     assert f"| {counts.minus} / {counts.zero} ({ties}) / {counts.plus} |" in text
+
+
+def test_run_3_blog_post_counts_match_the_stores() -> None:
+    """The post about run 3 quotes its counts in sentences; each is rebuilt from a store."""
+    text = " ".join(RUN_3_POST.read_text(encoding="utf-8").split())
+    decision = _rederived_decision(RUN_3)
+    pairs = sum(cell.pairs for cell in decision.cells)
+    with_message = sum(cell.baseline_successes for cell in decision.cells)
+    with_null = sum(cell.candidate_successes for cell in decision.cells)
+    counts = decision.history[-1].counts
+    # As in the write-up's table: no pair was won by the candidate alone, so its passes are
+    # the pairs in which both arms passed, and the other ties are pairs in which both failed.
+    assert counts.plus == 0
+    assert counts.errored == 0
+    both_failed = counts.zero - with_null
+    expected = (
+        f"With the message, {with_message} of {pairs} trials passed. "
+        f"With `null`, {with_null} of {pairs}.",
+        f"{decision.verdict.value} after {decision.stopped_at_round} rounds, "
+        f"which is {pairs} pairs.",
+        f"- With the message: {with_message} of {pairs} passed.",
+        f"- With `null`: {with_null} of {pairs} passed.",
+        f"- In {counts.minus} pairs only the side with the message passed. "
+        f"In {with_null} both passed. In {both_failed} both failed. "
+        "In none did only the side with `null` pass.",
+        f"so {with_message} of {pairs} and {with_null} of {pairs} are raw counts",
+    )
+    for sentence in expected:
+        assert sentence in text, sentence
+
+    # The grid and the margin, as the post states them.
+    tasks = {cell.task_id for cell in decision.cells}
+    assert {cell.condition_id for cell in decision.cells} == {"empty_result"}
+    assert len(tasks) == decision.n_cells == len(decision.cells)
+    margin_points = Fraction(decision.delta) * 100
+    assert margin_points.denominator == 1
+    for sentence in (
+        f"- {len(tasks)} stock-note tasks.",
+        f"on {len(tasks)} cases I picked",
+        f"by more than {margin_points.numerator} percentage points of mean pass rate "
+        f"over the {len(tasks)} tasks.",
+    ):
+        assert sentence in text, sentence
+
+    # Run 2's failures of the 4B model (its candidate arm), counted from the stored trials:
+    # all of them, those under the empty result, and those of them on run 3's tasks.
+    run_2_manifest, run_2_trials = load_suite_run(RUN_2)
+    failures = [
+        trial
+        for trial in run_2_trials
+        if trial.arm == "candidate" and trial.outcome.value != "PASS"
+    ]
+    under_empty = [trial for trial in failures if trial.condition_id == "empty_result"]
+    on_these_tasks = [trial for trial in under_empty if trial.task_id in tasks]
+    for sentence in (
+        f"{len(under_empty)} of the 4B's {len(failures)} failures were in trials with that fault",
+        f"The records give {len(on_these_tasks)} of {len(under_empty)}.",
+        f"Anything about the other {len(run_2_manifest.tasks) - len(tasks)} tasks",
+    ):
+        assert sentence in text, sentence
