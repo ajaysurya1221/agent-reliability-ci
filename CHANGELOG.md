@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Docs:** a third pre-registered run of the order-desk study
+  (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
+  without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
+  a statistical `BLOCK` at round 2 with swapped arm roles, which means the set-up without
+  the message passes less often by more than 10 points on those cells. It says nothing
+  about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
+  and the store test re-derives its decision. No code change.
+- **Docs:** the Codex reader is checked against Codex CLI 0.169.0 (one short session;
+  record types and the fields the reader uses are the same as in 0.167.0).
+  `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than
+  `subagent` counts as main thread. No code change.
 - **Fixed:** the tool server for Python toolsets (`arci.mcp_toolset_server`) wrote
   `state.json` in place, which empties the file before the new content goes in. When the
   trial ends the boundary closes the server's input and, if it is still running, stops it
@@ -19,17 +30,6 @@
   complete state instead of being left empty; the tool call still returns -32603
   "snapshot failed". Not changed: for an agent that never uses the tool server, the
   graded final state is still `{}` or the starting state, by timing.
-- **Docs:** a third pre-registered run of the order-desk study
-  (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
-  without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
-  a statistical `BLOCK` at round 2 with swapped arm roles, which means the set-up without
-  the message passes less often by more than 10 points on those cells. It says nothing
-  about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
-  and the store test re-derives its decision. No code change.
-- **Docs:** the Codex reader is checked against Codex CLI 0.169.0 (one short session;
-  record types and the fields the reader uses are the same as in 0.167.0).
-  `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than
-  `subagent` counts as main thread. No code change.
 - **Changed:** the Claude Code plugin's skill is now an instruction to Claude: run
   `uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and show the output
   unchanged. If anything is typed after the command name, it tells Claude to run nothing. Before, the skill ran that line itself when the command was typed and
