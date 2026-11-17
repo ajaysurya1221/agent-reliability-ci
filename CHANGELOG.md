@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Docs:** a third pre-registered run of the order-desk study
+  (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
+  without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
+  a statistical `BLOCK` at round 2 with swapped arm roles, which means the set-up without
+  the message passes less often by more than 10 points on those cells. It says nothing
+  about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
+  and the store test re-derives its decision. No code change.
 - **Docs:** every README figure and badge now uses one theme, the banner's: a neutral ground,
   blue for the reference or the good outcome (A, PASS, REPRODUCED), orange for the thing in
   question or the bad outcome (B, BLOCK, injected faults), a neutral bar for INCONCLUSIVE,
@@ -17,13 +24,6 @@
   2.4.0 README on PyPI links them. Tests hold the palette, the two font stacks, the same text
   in light and dark, the colour of every verdict word, the tint opacities, the hero's dot
   counts and grids, and the gate's bar widths on one shared scale. No code change.
-- **Docs:** a third pre-registered run of the order-desk study
-  (`docs/results/order-desk-study.md`, section "Run 3"): the 4B model in both arms, with and
-  without a message at the injected empty lookup, on 8 cells chosen after run 2. Verdict:
-  a statistical `BLOCK` at round 2 with swapped arm roles, which means the set-up without
-  the message passes less often by more than 10 points on those cells. It says nothing
-  about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
-  and the store test re-derives its decision. No code change.
 - **Docs:** the Codex reader is checked against Codex CLI 0.169.0 (one short session;
   record types and the fields the reader uses are the same as in 0.167.0).
   `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than
