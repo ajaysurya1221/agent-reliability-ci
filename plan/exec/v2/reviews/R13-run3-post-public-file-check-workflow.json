@@ -1,0 +1,122 @@
+[
+  {
+    "verdict": "Yes, it is safe to merge once the low-severity points are fixed or accepted. Every count in the post matches the public write-up and the sealed stores, the scoping follows the write-up, and nothing private is in it. Two statements rest only on things outside main (the quote from a commenter and the location of the retry demo), and the post is wrapped at 100 columns where the first post uses 92.",
+    "findings": [
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:16-17",
+        "problem": "The quoted words from \"Halfcycle\" (\"Did you try varying the error wording?\") are not in any public file in this worktree. The write-up only paraphrases this commenter. The paraphrase in the post (\"proposed writing the next step into the error text\") is also slightly stronger than the write-up's \"asked whether a message that names the next step ... would close the gap\".",
+        "fix": "Keep the quote only if it is word for word from the public Hashnode comment, and the maintainer should check that. Otherwise paraphrase it as the write-up does.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:24",
+        "problem": "The post says \"A scripted test with no model, in the repository, shows how such a retry behaves.\" That test (plan/exec/v2/study/order-desk-empty-message/tests/code_retry_demo.py) exists only at working-records commit 49d86b3, which is on origin/v2/phase0. It is not on main, and the post gives no link, so a reader cannot find it from the main tree.",
+        "fix": "Say \"in the working records\" and link https://github.com/ajaysurya1221/agent-reliability-ci/tree/49d86b3/plan/exec/v2/study, as the write-up does. Or point to the write-up's errata list.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md (whole file)",
+        "problem": "The body wraps at up to 100 columns, and 37 non-link lines are longer than 92. The first post wraps every body line at 92 or less, so the form is not consistent.",
+        "fix": "Rewrap the prose at 92 columns to match docs/blog/2026-11-order-desk-study.md. The sentence assertions in the new test join whitespace first, so rewrapping does not break them.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:109",
+        "problem": "The post says \"As far as file times show, the files of the study folder itself did not change.\" The write-up says \"The other study files were not changed\". The post's version leaves unclear whether the changed start script belongs to \"the study folder\". At 49d86b3 the script is not in order-desk-empty-message/, but readers cannot tell that.",
+        "fix": "Use the write-up's wording: \"The other study files were not changed after the smoke run, as far as file times show.\"",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:123 and the write-up's c217ae6 and 49d86b3 links",
+        "problem": "The pre-registration commit c217ae6 and working-records commit 49d86b3 are reachable only from origin/v2/phase0, not from main. The links work on GitHub only while that branch, or a tag that holds them, still exists. The write-up already depends on this too.",
+        "fix": "No change to the post is needed. Make sure v2/phase0 is never deleted, or tag those commits.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:127",
+        "problem": "No public file in the repository holds or links the first post's URL (realornoise.hashnode.dev/...). Its slug matches the first post's title, but I could not check the host from the worktree.",
+        "fix": "The maintainer should open the link once before merging.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:1,7",
+        "problem": "The title and line 7 say readers \"asked for a third test\" or \"one more test\". The write-up says each reader \"asked about a further variant\". One of the two asked for a retry in code, which was not run. This overstates things slightly, but the next section corrects it.",
+        "fix": "This is optional. For example: \"Readers suggested a third test of my 4B agent. I ran one of them: one tool message changed.\"",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:128-129",
+        "problem": "There is a small difference in link style. The first post puts \"Repository: <url>\" on one line, while the new post puts the URL on the next line. Apart from that, the link style matches (bare <url> on an indented line under a dash item).",
+        "fix": "This is optional. Put \"- Repository: <https://github.com/ajaysurya1221/agent-reliability-ci>\" on one line, as the first post does.",
+        "severity": "low"
+      }
+    ],
+    "checked": [
+      "15 of 16 with the message and 2 of 16 with null are recounted from run-3 trials.jsonl (baseline PASS 15, FAIL 1; candidate PASS 2, FAIL 14) and match the write-up.",
+      "The pair split of 13 only-message, 2 both passed, 1 both failed and 0 only-null is recounted from the pair_ids in the store, and the decision.json round-2 counts (minus 13, zero 3, plus 0, errored 0) agree.",
+      "BLOCK after 2 rounds with 16 pairs matches decision.json (stopped_at_round 2, round-2 verdict BLOCK, reason \"regression established\").",
+      "8 stock-note tasks, all under empty_result, in 32 trials: confirmed in the run-3 manifest and trials. The 8 task ids are desk-03 to desk-24 in steps of 3, one task sentence with different order ids.",
+      "\"The first order lookup\" is injected empty: the manifest fault is lookup_order at_occurrence 0. The post says \"set to\", which is correct because one candidate trial made no lookup.",
+      "The same model on both sides is confirmed: both arms are ollama:qwen3.5:4b-mlx-ctx32k, temperature 0.7, reasoning off.",
+      "The run-2 numbers are re-derived from the run-2 store: the 4B (candidate) had 52 failures, 34 of them under empty_result and 33 of those on the 8 stock-note tasks (erratum 2: 33, not 32).",
+      "\"The other 16 tasks\" and \"no fault, a timeout, a one-off error\" are correct: run 2 has 24 tasks and the conditions clean, tool_timeout, tool_error_once and empty_result.",
+      "The pass definition (right stock note and no refund) matches examples/langchain_quickstart/check.py for stock_note: refunded_cents == 0 and notes == [\"stock: ...\"].",
+      "The verdict set is correct: PASS, BLOCK, INCONCLUSIVE and ERROR in src/arci/schema.py Verdict, and the hard-violation BLOCK is described in the write-up. Margin 10 points, alpha 1/20 and 40 rounds match decision.json (delta 1/10, max_rounds 40).",
+      "Pre-registration before the first trial, no prediction for run 3 while runs 1 and 2 had one, the smoke run's 6 of 8 and 3 of 8, \"Retry an empty lookup once.\" in both prompts, the exact message text, and the different seeds and tool version from run 2 all match the write-up.",
+      "The errata wording matches the write-up apart from the \"study folder\" phrase reported above.",
+      "Scope is kept: no rates are made from the counts, the post says outright that these are raw counts and not estimates, there is no claim about the 12B, other tasks, other conditions or the full suite, cause is explicitly disclaimed, there is no claim of uniqueness, assumptions are attached to the decision, and no error guarantee is claimed across the three experiments.",
+      "Nothing private found: no local paths, no plan/research or private file names, no personal data beyond the commenters' public names \"Agentic Affairs\" and \"Halfcycle\", and no sales wording.",
+      "All five links are well-formed https URLs in angle brackets. Under GitHub's anchor rules, the anchor #run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms matches the heading \"Run 3 (2026-11-16): a message at the empty lookup, one model in both arms\", and the write-up uses the same anchor internally. Commit c217ae6 exists (on origin/v2/phase0).",
+      "The title line (H1, two sentences) and the italic subtitle match the first post's form.",
+      "The new test passes: tests/unit/docs/test_order_desk_stores.py gives 10 passed. ruff check and ruff format --check are clean on that file."
+    ]
+  },
+  {
+    "verdict": "Yes, safe to merge. The new test passes and really holds the post's main result counts to the run 3 and run 2 stores, the pinned hashes all match, and nothing else in the repo needs to change by existing practice. A few secondary numbers in the post are not held by any test (low).",
+    "findings": [
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:21 and :110-111; tests/unit/docs/test_order_desk_stores.py:228-229",
+        "problem": "Some store-derived numbers in the post are not held. Line 21 quotes \"34 of the 4B's 52 failures\", and the test only asserts the substring \"of the 4B's 52 failures\", so a wrong 34 would pass. Erratum 2 at lines 110-111 says the records give 33 of 34 (32 is the registration's figure), and no test re-derives that either. The write-up quotes the same 34 and 33 (order-desk-study.md:120, :255-256) and its tests do not hold them, so this does not break precedent. The post is still quoting record-derived figures as checked when they are not.",
+        "fix": "Either derive the two figures from the run 2 trials (candidate failures whose injected fault is the empty lookup, then the subset on the 8 run 3 task ids) and assert \"34 of the 4B's 52 failures\" and \"The records give 33 of 34\", or say in the test docstring that these two figures are checked only by hand.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:4, :10, :29, :61, :84, :97",
+        "problem": "Structural numbers in the post are not asserted against the manifest: 8 cases or tasks (len(decision.cells)), the margin of 10 percentage points, and \"the other 16 tasks\". The 6 of 8 and 3 of 8 smoke counts (line 52-53) come from no committed store, so they cannot be held. These do not belong to the result section, which is fully held.",
+        "fix": "Optional: assert len(decision.cells) == 8 next to \"on 8 selected cases\" or \"over the 8 tasks\", and assert the rule's margin in the \"more than 10 percentage points\" sentence. Leave the smoke counts unasserted, since they are not in the repository.",
+        "severity": "low"
+      },
+      {
+        "where": "tests/unit/docs/test_order_desk_stores.py:198 (placement)",
+        "problem": "The earlier blog post's figures are tested in their own file (tests/unit/docs/test_blog_figures.py). This blog test sits inside the store test file. That is defensible, because the counts come from the stores and reuse _rederived_decision and RUN_2 and RUN_3, and the module docstring was updated to say so. It is only a small break from the pattern.",
+        "fix": "No change needed. If wanted, put a one-line pointer in test_blog_figures.py's docstring, or leave it as is.",
+        "severity": "low"
+      },
+      {
+        "where": "docs/blog/2026-11-order-desk-run-3.md:122-123",
+        "problem": "The pre-registration link points to commit c217ae6. That commit is reachable only from origin/v2/phase0 and is not an ancestor of origin/main (checked with git merge-base --is-ancestor). If that branch is ever deleted, GitHub may stop serving the commit. The write-up already uses the same link (order-desk-study.md:231), so this follows precedent.",
+        "fix": "Keep the v2/phase0 branch, or a tag on c217ae6, on the remote for as long as the post and the write-up cite it.",
+        "severity": "low"
+      }
+    ],
+    "checked": [
+      "Each result-section sentence (lines 76-81, plus lines 9 and 90) is built from store values: the verdict and stopped_at_round, pairs, the baseline and candidate success sums, and the minus and zero counts. The text is whitespace-normalised, so a wrong 15, 2, 16, 13, 1, BLOCK or 2 rounds fails the test.",
+      "The 'In 2 both passed' and 'In 1 both failed' sentences rest on asserting counts.plus == 0 and counts.errored == 0, the same reasoning test_run_3_table_in_the_doc_matches_the_store uses. None of the asserts is vacuous.",
+      "Reusing pairs (16) as the trial count per side in '15 of 16 trials passed' is correct: 8 cells times 2 rounds.",
+      "Run 2's 52 is pairs minus candidate successes, 480 - 428. The run 2 manifest's candidate label is qwen3.5-4b, so 'the 4B's 52 failures' is right.",
+      "The test is brittle only to the post's wording, the same way the neighbouring write-up tests are. Reflowing lines does not break it because whitespace is normalised.",
+      "pytest tests/unit/docs -q: 69 passed in 4.80s. The summary line appears only with -o addopts=\"\", and the exit code is 0.",
+      "ruff check tests/unit/docs: All checks passed!",
+      "ruff format --check tests/unit/docs: 4 files already formatted",
+      "basedpyright tests/unit/docs/test_order_desk_stores.py: 0 errors, 0 warnings, 0 notes",
+      "shasum -a 256 -c FROZEN.sha256: all 76 entries OK. Neither changed file is pinned, and there is no blog or docs-tests entry in the list.",
+      "No index or list of blog posts exists: no docs/blog index, no docs/README, and README.md, ROADMAP.md and the write-up name no blog post.",
+      "CHANGELOG: neither earlier blog commit added an entry (1568a2d touched only the post; e25b6c3 touched the post and its test). Unreleased already records run 3. No gap.",
+      "No test walks docs/ for links, line width or wording. The existing blog posts also have lines over 100 characters on URLs.",
+      "Packaging: the sdist has only-include = src/arci, README, LICENSE, NOTICE, CHANGELOG, pyproject, and the wheel packages only src/arci. docs/blog is excluded by design, so there is no gap.",
+      "CI: ci.yml triggers on push and pull_request with no path filters, so the docs test runs on this PR.",
+      "Cross-links: the first post does not link the second (eval-noise), and the write-up links no blog post. By existing practice, neither the first post nor the write-up needs a link to the new post. The new post linking the write-up, the stores and the first post matches the first post's 'check it yourself' list.",
+      "The write-up anchor #run-3-2026-11-16-a-message-at-the-empty-lookup-one-model-in-both-arms matches the one the write-up itself uses at line 23."
+    ]
+  }
+]

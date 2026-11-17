@@ -24,7 +24,7 @@ On dev.to, "Agentic Affairs" asked whether I would run a variant in which the co
 
 I adapted the second idea. The empty lookup is not an error. It reaches the model as a successful call whose whole result is the text `null`. I tested one message at that point, because in run 2 (the second test in my last post) 34 of the 4B's 52 failures were in trials with that fault.
 
-I did not run the retry in code. It is a useful question about system design, and I have not tested it with a model. A scripted test with no model, in the repository, shows how such a retry behaves.
+I did not run the retry in code. It is a useful question about system design, and I have not tested it with a model. A scripted test with no model, in the working records linked from the write-up, shows how such a retry behaves.
 
 ## The set-up
 
