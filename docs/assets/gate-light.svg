@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560" role="img" aria-labelledby="title desc">
+<title id="title">200 trials still do not guarantee a decision</title>
+<desc id="desc">200 trials still do not guarantee a decision. Probability of each verdict, by exact enumeration. Default Clopper-Pearson · alpha 0.05 · delta 0.10 · K=1 · N per arm · independent arms. One bar per case, drawn to scale: 95% → 65%, N=20: PASS 0.0%, BLOCK 0.8%, INCONCLUSIVE 99.2%. 95% → 65%, N=200: PASS 0.0%, BLOCK 98.5%, INCONCLUSIVE 1.5%. 95% → 75%, N=200: PASS 0.0%, BLOCK 36.5%, INCONCLUSIVE 63.5%. 80% → 80%, N=200: PASS 21.8%, BLOCK 0.0%, INCONCLUSIVE 78.2%. Twenty runs decide almost nothing. False PASS at the margin and false BLOCK under no change are both far below alpha; the price is conservatism. Source: the table under "The gate, measured against itself" in the README.</desc>
+<rect x="0" y="0" width="1600" height="560" fill="#F6F8FA"/>
+<text x="64" y="101" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="36" fill="#10161D" font-weight="600">200 trials still do not guarantee a decision</text>
+<text x="64" y="140" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#57606A">Probability of each verdict, by exact enumeration.</text>
+<text x="64" y="172" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#57606A">Default Clopper-Pearson · alpha 0.05 · delta 0.10 · K=1 · N per arm · independent arms.</text>
+<text x="64" y="247" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">95% → 65%, N=20</text>
+<rect x="352" y="212" width="9" height="56" fill="#E8590C"/>
+<rect x="361" y="212" width="1175" height="56" fill="#D0D7DE"/>
+<text x="377" y="247" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">INCONCLUSIVE 99.2%</text>
+<text x="64" y="323" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">95% → 65%, N=200</text>
+<rect x="352" y="288" width="1166" height="56" fill="#E8590C"/>
+<text x="368" y="323" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">BLOCK 98.5%</text>
+<rect x="1518" y="288" width="18" height="56" fill="#D0D7DE"/>
+<text x="64" y="399" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">95% → 75%, N=200</text>
+<rect x="352" y="364" width="432" height="56" fill="#E8590C"/>
+<text x="368" y="399" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">BLOCK 36.5%</text>
+<rect x="784" y="364" width="752" height="56" fill="#D0D7DE"/>
+<text x="800" y="399" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">INCONCLUSIVE 63.5%</text>
+<text x="64" y="475" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">80% → 80%, N=200</text>
+<rect x="352" y="440" width="258" height="56" fill="#1F6FEB"/>
+<text x="368" y="475" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#FFFFFF">PASS 21.8%</text>
+<rect x="610" y="440" width="926" height="56" fill="#D0D7DE"/>
+<text x="626" y="475" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#10161D">INCONCLUSIVE 78.2%</text>
+</svg>

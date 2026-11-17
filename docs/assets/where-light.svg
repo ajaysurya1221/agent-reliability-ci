@@ -1,61 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="716" viewBox="0 0 1600 716" role="img" aria-labelledby="title desc">
 <title id="title">Where arci sits in a CI pipeline</title>
 <desc id="desc">Where arci sits. Between an agent change and the merge decision: a frozen, repeated experiment, and diagnosis from the same records. Before the run: Frozen manifest (baseline and candidate, oracle, faults, seeds, N and the decision rule). In CI: Recorded trials (seeded trials per arm, injected tool faults, sealed boundary records), then arci gate (exact Clopper-Pearson bounds on the difference, frozen margin), verdict PASS · BLOCK · INCONCLUSIVE · ERROR, exit 0 · 1 · 2 · 3. Merge decision: merge on PASS (exit 0); BLOCK and ERROR fail the job; INCONCLUSIVE fails by default. A separate branch from the recorded trials: Trace comparison (first divergent step, passing vs failing trial); then Fault reduction (ddmin over injected faults, same fingerprint); then Offline replay (recorded boundary calls, not fresh model inference). Diagnosis does not need a BLOCK: it compares any passing and failing trial in the records. Replay re-serves the recorded boundary calls; it does not repeat model inference.</desc>
-<rect x="0" y="0" width="1600" height="560" fill="#F4F1EA"/>
-<text x="64" y="84" font-family="Georgia, 'Times New Roman', serif" font-size="32" fill="#16211D" font-weight="600">Where arci sits</text>
-<text x="64" y="122" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#3E3D38">Between an agent change and the merge decision: a frozen, repeated experiment, and diagnosis from the same records.</text>
-<rect x="64" y="146" width="304" height="374" rx="12" fill="#ECE8DD"/>
-<text x="82" y="176" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#6B6A65" letter-spacing="1.56">BEFORE THE RUN</text>
-<rect x="400" y="146" width="800" height="374" rx="12" fill="#E9E4D8"/>
-<text x="418" y="176" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#6B6A65" letter-spacing="1.56">CI</text>
-<rect x="1216" y="146" width="320" height="374" rx="12" fill="#ECE8DD"/>
-<text x="1234" y="176" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#6B6A65" letter-spacing="1.56">MERGE DECISION</text>
-<rect x="88" y="200" width="256" height="128" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="216" y="237" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Frozen manifest</text>
-<text x="216" y="260" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">baseline and candidate,</text>
-<text x="216" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">oracle, faults, seeds, N</text>
-<text x="216" y="304" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">and the decision rule</text>
-<rect x="424" y="200" width="296" height="128" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="572" y="237" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Recorded trials</text>
-<text x="572" y="260" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">seeded trials per arm,</text>
-<text x="572" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">injected tool faults,</text>
-<text x="572" y="304" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">sealed boundary records</text>
-<rect x="1240" y="200" width="272" height="128" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="1376" y="237" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Merge</text>
-<text x="1376" y="260" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">on PASS (exit 0)</text>
-<text x="1376" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">BLOCK and ERROR fail the job;</text>
-<text x="1376" y="304" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">INCONCLUSIVE fails by default</text>
-<rect x="424" y="392" width="232" height="104" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="540" y="428" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Trace comparison</text>
-<text x="540" y="451" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">first divergent step,</text>
-<text x="540" y="473" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">passing vs failing trial</text>
-<rect x="692" y="392" width="220" height="104" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="802" y="428" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Fault reduction</text>
-<text x="802" y="451" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">ddmin over injected</text>
-<text x="802" y="473" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">faults, same fingerprint</text>
-<rect x="948" y="392" width="232" height="104" rx="10" fill="#FFFFFF" stroke="#D9D4C7" stroke-width="1"/>
-<text x="1064" y="428" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#16211D" font-weight="600" text-anchor="middle">Offline replay</text>
-<text x="1064" y="451" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">recorded boundary calls,</text>
-<text x="1064" y="473" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#3E3D38" text-anchor="middle">not fresh model inference</text>
-<rect x="768" y="186" width="384" height="156" rx="12" fill="#16211D" stroke="#B8431F" stroke-width="2"/>
-<text x="960" y="222" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#F0A48A" font-weight="600" text-anchor="middle">arci gate</text>
-<text x="960" y="250" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#E9E4D8" text-anchor="middle">exact Clopper-Pearson bounds</text>
-<text x="960" y="272" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#E9E4D8" text-anchor="middle">on the difference, frozen margin</text>
-<text x="960" y="304" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="15" fill="#E9E4D8" font-weight="600" text-anchor="middle">PASS · BLOCK · INCONCLUSIVE · ERROR</text>
-<text x="960" y="326" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#A8A397" text-anchor="middle">exit 0 · 1 · 2 · 3</text>
-<path d="M 344 264 L 420 264" fill="none" stroke="#6B6A65" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 420 264 L 411 269 L 411 259 Z" fill="#6B6A65"/>
-<path d="M 720 264 L 764 264" fill="none" stroke="#6B6A65" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 764 264 L 755 269 L 755 259 Z" fill="#6B6A65"/>
-<path d="M 1154 264 L 1236 264" fill="none" stroke="#1F7A4D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 1236 264 L 1227 269 L 1227 259 Z" fill="#1F7A4D"/>
-<text x="1196" y="252" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#1F7A4D" text-anchor="middle">verdict</text>
-<path d="M 540 328 L 540 388" fill="none" stroke="#B8431F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 540 388 L 535 379 L 545 379 Z" fill="#B8431F"/>
-<text x="554" y="365" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" fill="#B8431F">from the records, any verdict</text>
-<path d="M 656 444 L 688 444" fill="none" stroke="#6B6A65" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 688 444 L 679 449 L 679 439 Z" fill="#6B6A65"/>
-<path d="M 912 444 L 944 444" fill="none" stroke="#6B6A65" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 944 444 L 935 449 L 935 439 Z" fill="#6B6A65"/>
-<text x="64" y="546" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#6B6A65">Diagnosis does not need a BLOCK: it compares any passing and failing trial in the records. Replay re-serves the recorded boundary calls; it does not repeat model inference.</text>
+<rect x="0" y="0" width="1600" height="716" fill="#F6F8FA"/>
+<text x="64" y="101" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="36" fill="#10161D" font-weight="600">Where arci sits</text>
+<text x="64" y="140" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#57606A">Between an agent change and the merge decision: a frozen, repeated experiment, and diagnosis from the same records.</text>
+<rect x="64" y="172" width="278" height="420" rx="4" fill="#1F6FEB" fill-opacity="0.1"/>
+<text x="84" y="202" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">BEFORE THE RUN</text>
+<rect x="366" y="172" width="833" height="420" rx="4" fill="#1F6FEB" fill-opacity="0.1"/>
+<text x="386" y="202" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">CI</text>
+<rect x="1223" y="172" width="313" height="420" rx="4" fill="#1F6FEB" fill-opacity="0.1"/>
+<text x="1243" y="202" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">MERGE DECISION</text>
+<rect x="84.5" y="220.5" width="237" height="155" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="203" y="257" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Frozen manifest</text>
+<text x="203" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">baseline and</text>
+<text x="203" y="306" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">candidate, oracle,</text>
+<text x="203" y="330" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">faults, seeds, N</text>
+<text x="203" y="354" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">and the decision rule</text>
+<rect x="386.5" y="220.5" width="246" height="155" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="509" y="257" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Recorded trials</text>
+<text x="509" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">seeded trials per arm,</text>
+<text x="509" y="306" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">injected tool faults,</text>
+<text x="509" y="330" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">sealed boundary</text>
+<text x="509" y="354" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">records</text>
+<rect x="1243.5" y="220.5" width="272" height="155" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="1379" y="257" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Merge</text>
+<text x="1379" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">on <tspan fill="#0B57D0" font-weight="600">PASS</tspan> (exit 0)</text>
+<text x="1379" y="306" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle"><tspan fill="#9C3A06" font-weight="600">BLOCK</tspan> and <tspan fill="#10161D" font-weight="600">ERROR</tspan> fail</text>
+<text x="1379" y="330" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">the job; <tspan fill="#57606A" font-weight="600">INCONCLUSIVE</tspan></text>
+<text x="1379" y="354" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">fails by default</text>
+<rect x="386.5" y="440.5" width="243" height="131" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="508" y="489" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Trace comparison</text>
+<text x="508" y="514" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">first divergent step,</text>
+<text x="508" y="538" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">passing vs failing trial</text>
+<rect x="686.5" y="440.5" width="212" height="131" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="792" y="477" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Fault reduction</text>
+<text x="792" y="502" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">ddmin over</text>
+<text x="792" y="526" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">injected faults,</text>
+<text x="792" y="550" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">same fingerprint</text>
+<rect x="955.5" y="440.5" width="222" height="131" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="1066" y="477" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D" font-weight="600" text-anchor="middle">Offline replay</text>
+<text x="1066" y="502" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">recorded boundary</text>
+<text x="1066" y="526" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">calls, not fresh</text>
+<text x="1066" y="550" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">model inference</text>
+<rect x="665.5" y="220.5" width="441" height="155" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="886" y="257" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#0B57D0" font-weight="600" text-anchor="middle">arci gate</text>
+<text x="886" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">exact Clopper-Pearson bounds</text>
+<text x="886" y="306" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A" text-anchor="middle">on the difference, frozen margin</text>
+<text x="886" y="330" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" text-anchor="middle"><tspan fill="#0B57D0" font-weight="600">PASS</tspan> · <tspan fill="#9C3A06" font-weight="600">BLOCK</tspan> · <tspan fill="#57606A" font-weight="600">INCONCLUSIVE</tspan> · <tspan fill="#10161D" font-weight="600">ERROR</tspan></text>
+<text x="886" y="354" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" text-anchor="middle">exit 0 · 1 · 2 · 3</text>
+<path d="M 326 298 L 380 298" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 380 298 L 371 303 L 371 293 Z" fill="#57606A"/>
+<path d="M 637 298 L 659 298" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 659 298 L 650 303 L 650 293 Z" fill="#57606A"/>
+<path d="M 1111 298 L 1237 298" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 1237 298 L 1228 303 L 1228 293 Z" fill="#57606A"/>
+<text x="1153" y="284" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" text-anchor="middle">verdict</text>
+<path d="M 434 380 L 434 434" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 434 434 L 429 425 L 439 425 Z" fill="#57606A"/>
+<text x="450" y="414" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A">from the records, any verdict</text>
+<path d="M 634 506 L 680 506" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 680 506 L 671 511 L 671 501 Z" fill="#57606A"/>
+<path d="M 903 506 L 949 506" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 949 506 L 940 511 L 940 501 Z" fill="#57606A"/>
+<text x="64" y="627" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A">Diagnosis does not need a <tspan fill="#9C3A06" font-weight="600">BLOCK</tspan>: it compares any passing and failing trial in the records.</text>
+<text x="64" y="653" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" fill="#57606A">Replay re-serves the recorded boundary calls; it does not repeat model inference.</text>
 </svg>
