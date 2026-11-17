@@ -18,6 +18,7 @@ from .schema import Day, KeptState, Model, NonNegative
 
 MAX_BYTES = 33_554_432
 MAX_COUNTS = 5_000
+READ_ATTEMPTS = 4
 FILENAME = "days-1.json"
 Key = tuple[Tool, int, str, str, str]
 
@@ -85,6 +86,37 @@ def _object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
+    """Read the table; read the path again when it appeared between two calls.
+
+    A run with `--keep` reads the table once before it holds the directory lock, so another
+    run may be installing the table at that moment. A writer takes the path from absent to
+    an empty placeholder, back to absent, then to the finished table. An attempt is repeated
+    only when one call found nothing and the next call found something, so each repeat uses
+    up one appearance of the path, and the attempts give an answer when the path appears at
+    most `READ_ATTEMPTS - 1` times during the read. One writer makes it appear twice (three
+    attempts at most). A writer that fails after its placeholder, followed by a writer that
+    succeeds, makes it appear three times (four attempts at most). Two writers that succeed
+    one after the other make it appear twice: the second one replaces the table in one step.
+
+    A path that appears more often can use up every attempt, for example with a writer that
+    is interrupted after it moved a new table into place and rolls it back, followed by
+    another writer (five attempts). The table is then reported unreadable. That is safe:
+    the run uses no table, writes none and says so. These counts take the writers one at a
+    time, as under the directory lock. Where the platform has no such lock the run goes on
+    without it (record 0017), and writers that overlap can make the path appear more often.
+
+    The count is fixed and no attempt waits. A dangling symlink is found by `lstat()` and
+    missed by `stat()` at every attempt, and is unreadable.
+    """
+    for _ in range(READ_ATTEMPTS):
+        result = _read_once(path)
+        if result is not None:
+            return result
+    return "unreadable", ()
+
+
+def _read_once(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]] | None:
+    """One attempt. None: the path was absent at one call and present at the next."""
     try:
         info = path.stat()
         if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
@@ -100,14 +132,15 @@ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
         return "read", table.rows
     except (FileNotFoundError, NotADirectoryError):
         # The path is absent when it does not exist, also when a parent is not a
-        # directory. A dangling symlink is a path that exists but cannot be read.
+        # directory. A path that exists now is a dangling symlink, or a file that another
+        # run put there after the call that failed: the caller reads it again.
         try:
             path.lstat()
         except (FileNotFoundError, NotADirectoryError):
             return "absent", ()
         except OSError:
-            pass
-        return "unreadable", ()
+            return "unreadable", ()
+        return None
     except (OSError, ValueError, RecursionError):
         return "unreadable", ()
 

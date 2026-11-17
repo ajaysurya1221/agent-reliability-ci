@@ -25,6 +25,19 @@
   directory on the first submission refused a skill with its own shell line, or with
   `allowed-tools` beyond Read, Grep, Glob and LS, from an organization that is not
   verified. The package is unchanged.
+- **Fixed:** two runs with `--keep` that started together when no kept table existed yet
+  could leave one run's rows out of the table. That run still succeeded and printed that
+  the table could not be read, and its JSON record, when `--json` was given, has
+  `kept_table: "unreadable"`. The rows were not lost for good while the logs were still
+  there: the next run with `--keep` writes them. The cause: a run reads the table once
+  before it holds the directory lock, with two file-system calls, and when another run
+  put the table in place between the two, the reader took it for a path that exists and
+  cannot be read; a run that finds an unreadable table does not write one. The reader now
+  reads the path again when it was absent at one call and present at the next, four
+  attempts at most and with no waiting. A dangling symlink, a path that is not a regular
+  file, a file over the size limit and invalid content are unreadable as before; a
+  missing path and an empty file are absent as before. Seen once, in CI, in the test that
+  starts six writers together.
 - **Docs:** the Claude Code plugin folder has its own README
   (`plugins/realornoise/README.md`): what the plugin reads, runs, fetches, writes, prints
   and sends, three uses, what the result means and what it cannot show. A plugin directory
