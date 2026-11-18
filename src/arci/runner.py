@@ -1160,6 +1160,12 @@ def _run_command_trial(
             "spec": spec.model_dump(mode="json"),
             "socket_path": socket_path,
             "workdir": directory,
+            # Private to the boundary (never in the spec or a sealed record): what it needs to
+            # let its tool server exit by itself at the end of the trial without outliving
+            # this deadline. The boundary takes the earlier of the two
+            # (`arci.mcp_boundary.trial_deadline` explains why the clock reading is sound).
+            "seconds_remaining": max(0.0, deadline - time.monotonic()),
+            "deadline_monotonic": deadline,
         }
         if decision_token is not None:
             boundary_config["decision_token"] = decision_token
