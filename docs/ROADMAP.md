@@ -117,6 +117,16 @@ vendor retention, gives a best-case test date for short histories, lists bounded
 versions and prints the worst wrong-REAL-DROP rate measured in the self-check
 ([record 0017](design/0017-logs-2.md), [recipe](recipes/logs.md)).
 
+## Done in v2.4.1
+
+Fixes, a changed plugin skill, updated Action pins and documents: no new command, option,
+record field or exit code. The tool server for Python
+toolsets replaces `state.json` whole; at the end of a command trial the boundary waits for
+its MCP tool server when waiting can change what is graded; and a run with `--keep` reads a
+kept table again when another run put it in place during the read. The Claude Code
+plugin's skill is an instruction to Claude, in plugin version 2.4.1. See
+[CHANGELOG.md](../CHANGELOG.md) and [record 0018](design/0018-v2.4.1-release.md).
+
 ## Next
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it

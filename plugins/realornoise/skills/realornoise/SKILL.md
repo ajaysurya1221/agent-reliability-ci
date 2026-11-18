@@ -10,7 +10,7 @@ when realornoise is run in a terminal, and stop.
 
 Otherwise run one shell command, in the foreground, made of this line and nothing else:
 
-    uvx --python 3.14 realornoise==2.4.0
+    uvx --python 3.14 realornoise==2.4.1
 
 Nothing goes before it (no `cd`, no variable) and nothing after it (no option, pipe,
 redirection, `;`, `&&` or `||`). Run no other command in this turn, before or after it,
@@ -42,5 +42,5 @@ missing, to run it. Its output becomes part of this conversation, so what it pri
 visible to this assistant and goes wherever this conversation goes.
 
 Do not add `--keep`. The user can run
-`uvx --python 3.14 realornoise==2.4.0 --keep` themselves in a terminal to save daily counts, dates and accepted model and effort names in
+`uvx --python 3.14 realornoise==2.4.1 --keep` themselves in a terminal to save daily counts, dates and accepted model and effort names in
 `~/.realornoise/days-1.json` (or in the folder named by the REALORNOISE_HOME variable).

@@ -159,6 +159,7 @@ run 2 came from that comment. In run 2 the small model made the same wrong first
 often and went on to pass in most of those trials; 77 of its passes came after a tool error
 that would have ended the trial under run 1's set-up. Most of its remaining failures (41 of
 52) had both an injected fault and a tool error of this kind in one trial. These are two runs on one suite and say nothing about the models elsewhere.
+A third pre-registered run is a different comparison: the 4B model in both arms, with and without a message at the injected empty lookup, on 8 cells chosen after run 2. It is in the write-up and is not in this table.
 Write-up: [docs/results/order-desk-study.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.md). Reports:
 [run 1](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study.html), [run 2](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/results/order-desk-study-run-2.html).
 
@@ -597,15 +598,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v2.4.0`, the current release (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==2.4.0`). See
+This example pins `v2.4.1`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.4.1`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v2.4.0
+- uses: ajaysurya1221/agent-reliability-ci@v2.4.1
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -714,7 +715,7 @@ here claims adoption, performance or superiority.
 ## Roadmap
 
 Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need. What is not in 2.4.0
+asks for it, or when a recorded run shows the need. What is not in 2.4.1
 (a scan over split dates, reading an Inspect `.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
 example with several faults in one condition, a second framework adapter, the v1 commands that
 do not yet accept suites) and the earlier candidate list (last revised for v0.8.0) are in
@@ -755,9 +756,9 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v2.4.0 is the current release. Install `agent-reliability-ci==2.4.0` from PyPI
-(`agent-reliability-ci[langchain]==2.4.0` for the LangChain adapter), use `uvx realornoise`,
-or use Action tag `v2.4.0`. The `realornoise` distribution pins the same main-package version.
+**Availability:** v2.4.1 is the current release. Install `agent-reliability-ci==2.4.1` from PyPI
+(`agent-reliability-ci[langchain]==2.4.1` for the LangChain adapter), use `uvx realornoise`,
+or use Action tag `v2.4.1`. The `realornoise` distribution pins the same main-package version.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds both distributions, tests their wheels on Ubuntu/macOS, and publishes the main

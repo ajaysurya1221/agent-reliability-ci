@@ -5,7 +5,7 @@ tool it compares recent days with earlier days, for the model and effort you use
 the recent days, and answers REAL DROP, NO DROP or CANNOT TELL. It runs no model.
 
 This plugin adds one command to Claude Code. The command tells Claude to run
-`uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and to show what it
+`uvx --python 3.14 realornoise==2.4.1` once, with nothing added, and to show what it
 prints, unchanged. Whether Claude Code asks you before that command runs depends on your
 permission mode and settings.
 
@@ -44,7 +44,7 @@ Three uses:
    earliest date a test could run, as a best case if you use the same setting every day.
    That date is not a promise of a decisive result.
 3. You want to see the output before reading your own logs. In a terminal, run
-   `uvx --python 3.14 realornoise==2.4.0 --example`. It reads only packaged example data,
+   `uvx --python 3.14 realornoise==2.4.1 --example`. It reads only packaged example data,
    generated, not anyone's logs. That run exits 1, because the example has one REAL DROP.
 
 ## What the result means
@@ -80,7 +80,7 @@ Details: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ST
   `$CLAUDE_CONFIG_DIR/projects`), and Codex `rollout-*.jsonl` and `.jsonl.zst` files below
   `~/.codex/sessions` and `~/.codex/archived_sessions` (or the same folders under
   `$CODEX_HOME`). These logs hold your conversations. The tool turns them into daily counts.
-- Runs: `uvx --python 3.14 realornoise==2.4.0`, which Claude runs in the shell. This is an
+- Runs: `uvx --python 3.14 realornoise==2.4.1`, which Claude runs in the shell. This is an
   instruction to Claude, not a lock. In a permission mode that asks, the prompt shows the
   command before it runs. In one that does not ask (auto mode, an allow rule, a hook), the
   transcript shows the command that ran. The package itself opens no network connection
@@ -116,12 +116,12 @@ Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/do
   classifier refused the command.
 - The command runs by itself, with nothing shown first: a copy of plugin version 2.4.0
   installed before the skill became an instruction to Claude keeps the earlier skill
-  until the plugin's version changes and you update the plugin. The earlier skill ran
+  until the plugin is updated. Plugin version 2.4.1 holds the instruction. The earlier skill ran
   the command itself when you typed it, with the command approved ahead of time.
 - ERROR for a tool: the tool found no logs, no readable file or no usable response for it on
   this computer. Results for the other tool can still appear.
 - To keep daily counts beyond the 30 days Claude Code keeps session files by default, run
-  `uvx --python 3.14 realornoise==2.4.0 --keep` yourself in a terminal. It writes
+  `uvx --python 3.14 realornoise==2.4.1 --keep` yourself in a terminal. It writes
   `~/.realornoise/days-1.json`, which holds daily counts, dates, UTC offsets and accepted
   model and effort names. It holds no prompts, answers, paths or client versions.
 

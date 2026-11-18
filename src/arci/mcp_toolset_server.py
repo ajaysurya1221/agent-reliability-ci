@@ -119,7 +119,7 @@ def _describe(name: str, tool: Callable[..., JsonValue]) -> str:
 def _write_whole(path: Path, data: bytes) -> None:
     """Put `data` at `path` so that a reader sees no file, the old file or the new one.
 
-    The boundary stops this server with SIGKILL when the trial ends, and the grader reads the
+    The boundary may stop this server with SIGKILL when the trial ends, and the grader reads the
     file afterwards. A write in place empties the file first, so a kill at that moment would
     leave an empty `state.json`, which the grader reports as "snapshot failed".
     A kill between the write and the move can leave `state.json.tmp`; `snapshot` ignores it.
