@@ -1,0 +1,165 @@
+{
+  "summary": "Two independent read-only checks of the 2.4.1 release page text: facts against the changelog and code at the tag, and wording and claims",
+  "agentCount": 2,
+  "logs": [],
+  "result": {
+    "facts": {
+      "summary": "I checked every sentence of the page text against the v2.4.1 changelog section and the code at the tag, and found no factual error. All link paths exist at the tag. The first line holds for the src and packages diff. The skill command, the pin and the plugin version match. The Windows limit matches ci.yml. Three things are worth fixing. The timing limit reads as a complete list but leaves out two cases the changelog gives (a server that writes its state in reaction to a notification, and a tool call that finishes during the wait). The Changed item leaves out that the skill now runs nothing when anything is typed after the command name, which a 2.4.0 user of the slash command would notice. The page also adds one sentence (\"Stored records are not re-graded.\") that the changelog does not contain. The page also leaves out the Codex 0.169.0 check and the fixture-server limit, but neither matters to a user who is upgrading.",
+      "findings": [
+        {
+          "severity": "should",
+          "quote": "The graded final state can still depend on timing: a server that answers before it writes its state, that saves only when its input closes, or whose start-up takes longer than half of the time left.",
+          "problem": "The colon makes this read as the full list of cases, but it leaves out two that the changelog's first entry lists. One is a server that writes its state in reaction to a notification. The other is a tool call already written to the server, which can finish during the wait, so its effect reaches the final state while its reply is thrown away unrecorded. Each of the three cases the page names does appear in the changelog.",
+          "evidence": "At the tag, the CHANGELOG.md v2.4.1 first entry says the server \"writes its state in reaction to a notification (to which no response ever comes) can still lose that state\". The same entry says \"a tool call whose request was fully written to the server when the agent left may complete during the wait, so its effect can reach the final state while its reply is discarded unrecorded\". The _server_is_idle docstring in src/arci/mcp_boundary.py repeats the notification case, and _stop_server repeats the tool-call case.",
+          "fix": "The graded final state can still depend on timing, for example for a server that answers before it writes its state, that saves only when its input closes, that writes its state in reaction to a notification, or whose start-up takes longer than half of the time left; and a tool call already sent to the server can finish during the wait, so its effect reaches the final state without a recorded reply (the changelog's first entry lists every case)."
+        },
+        {
+          "severity": "should",
+          "quote": "The Claude Code plugin's skill is an instruction to Claude: run `uvx --python 3.14 realornoise==2.4.1` once, with nothing added, and show the output.",
+          "problem": "Two user-visible changes are left out. With 2.4.1, if anything is typed after the command name, Claude runs nothing. Claude's shell tool can also show exit 1 or 2 as an error, and the skill tells Claude that this is the result. A 2.4.0 user who typed options after the slash command will see different behaviour after upgrading. The page also drops \"unchanged\" after \"show the output\".",
+          "evidence": "At the tag, CHANGELOG.md says \"show the output unchanged. If anything is typed after the command name, it tells Claude to run nothing.\" and \"The command now exits 1 or 2 in Claude's shell tool for REAL DROP or CANNOT TELL, and the skill says that this is the result.\" plugins/realornoise/skills/realornoise/SKILL.md at the tag says \"If the user typed anything after the command name ... run nothing.\"",
+          "fix": "The Claude Code plugin's skill is an instruction to Claude: run `uvx --python 3.14 realornoise==2.4.1` once, with nothing added, and show the output unchanged; if anything is typed after the command name, Claude runs nothing (options work when realornoise is run in a terminal), and an exit status of 1 or 2 is the result, not a failure."
+        },
+        {
+          "severity": "note",
+          "quote": "Stored records are not re-graded.",
+          "problem": "The changelog section does not say this. It is true, since nothing in the diff re-grades stored records, but it is the page's own addition.",
+          "evidence": "The CHANGELOG.md v2.4.1 section has no sentence about re-grading. Its closest wording is \"The final state can now differ from before (that is the fix).\" No re-grading code appears in git diff v2.4.0..v2.4.1 -- src.",
+          "fix": "Records stored by 2.4.0 stay as they are; nothing in 2.4.1 re-grades them."
+        },
+        {
+          "severity": "note",
+          "quote": "The reader now reads the path again when it was absent at one call and present at the next (four attempts, no waiting).",
+          "problem": "The cause and the remedy are correct. The page does not say how a 2.4.0 user can tell they were affected: the run printed that the table could not be read, its JSON had kept_table \"unreadable\", and the next run with --keep writes the missing rows.",
+          "evidence": "CHANGELOG.md says \"That run still succeeded and printed that the table could not be read, and its JSON record, when `--json` was given, has `kept_table: \"unreadable\"`. ... the next run with `--keep` writes them.\" src/arci/logs/kept.py has READ_ATTEMPTS = 4, and its loop contains no sleep.",
+          "fix": "The reader now reads the path again when it was absent at one call and present at the next (four attempts, no waiting); a run affected in 2.4.0 printed that the kept table could not be read, and the next run with `--keep` writes the missing rows."
+        }
+      ],
+      "checked_ok": [
+        "\"No new command, option, exit code, schema, record field or fixed text\": git diff v2.4.0..v2.4.1 -- src packages changes only the version strings, kept.py, mcp_toolset_server.py, runner.py and mcp_boundary.py. The runner adds two private boundary_config keys (seconds_remaining, deadline_monotonic), described as \"never in the spec or a sealed record\". The only new string is an internal ValueError, \"boundary config has no valid {name}\", raised when the private config is invalid. That is not user-facing fixed text, and no argparse or exit code was added.",
+        "Fixed 1, cause and remedy: the 2.4.0 code is `(self._workdir / \"state.json\").write_text(...)`, and 2.4.1 replaces it with _write_whole, which writes state.json.tmp and then calls os.replace. The changelog says \"seen once in hosted CI, in 1 trial of 100\" and \"`state.json` now keeps the last complete state\".",
+        "Fixed 2: the changelog says \"`{}` or the server's starting state depending on timing\". stop_server sets terminate_at = started + budget / 2.0 and kill_at = started + budget * 3.0 / 4.0 after close_input(). _stop_server calls _kill_server immediately when _server_is_idle(), which matches \"as before\".",
+        "Fixed 3: kept.py has READ_ATTEMPTS = 4, and _read_once returns None for a path that was absent at stat and present at lstat. There is no sleep.",
+        "Changed, skill command and pin: SKILL.md at the tag shows `uvx --python 3.14 realornoise==2.4.1`, and plugin.json has version 2.4.1. The sentence about a copy of plugin 2.4.0 follows the changelog's wording.",
+        "Changed, Actions: the changelog's Changed entry covers the workflows and action.yml. ci.yml at the tag pins actions/checkout v7.0.1 and setup-python v7.1.0 by SHA.",
+        "What can differ: final_state and record_sha256 can differ (\"that is the fix\"); trials can last longer when a server ignores EOF; and in a narrow case a trial can end in timeout instead of completed. All three are in the changelog's first entry.",
+        "Known limit, --keep: matches the changelog's known-limits entry. It writes no table and prints no line about it; the rows can be recovered while the logs still exist.",
+        "Known limit, \"The stop's stages are not recorded, so keep the version of arci beside a stored result\": this is the changelog's own wording.",
+        "Known limit, \"Not verified: Windows beyond install and --help\": the ci.yml windows-smoke job is named \"install/--help only; execution unsupported\". Its steps are build, install the wheel, import arci, and run arci --help.",
+        "Documents: run 3 with its sealed store and post, the privacy page, the plugin-folder README and one README theme all match the changelog's Docs entries.",
+        "Every link path exists at the tag (git cat-file -e): CHANGELOG.md, docs/results/order-desk-study.md, docs/blog/2026-11-order-desk-run-3.md, docs/PRIVACY.md, docs/design/0018-v2.4.1-release.md and docs/COMPATIBILITY.md."
+      ]
+    },
+    "wording": {
+      "summary": "Checked the release page text in plan/exec/v2/launch/release-2.4.1-body.md against the tag v2.4.1, reading only through the tag: CHANGELOG.md, design records 0018, 0013 and 0014, the plugin SKILL.md, the file list and the workflow/action.yml diff. I also read the 2.4.0 page at HEAD, for its shape only. The page breaks none of the hard rules. It does not say the final state is now deterministic, that --keep never loses a day, or that an installed plugin updates by itself. It claims nothing is unique, uses no sales wording and has no AI attribution. The code block is correct. One should-fix: the second Fixed heading is in the past tense, which reads as if the timing dependence is gone. The page's own Known limits section, further down, says it is still there, and the start-up case listed there is the same case the heading describes. One more should-fix and three notes cover places where the page leaves out a case that the changelog or the record lists.",
+      "findings": [
+        {
+          "severity": "should",
+          "quote": "**The graded final state of a command agent that never used its MCP tool server depended on timing** (`{}` or the server's starting state).",
+          "problem": "The heading is in the past tense and says nothing about a limit, so it reads as if the dependence is gone. The page's own Known limits section, two sections down, says it is not, and the start-up case listed there is the very case this heading describes (an agent that never used its server). Nothing in this entry points to that limit, so it is hard to find.",
+          "evidence": "Page, Known limits: \"The graded final state can still depend on timing: ... or whose start-up takes longer than half of the time left.\" CHANGELOG v2.4.1, first entry: \"a server whose start-up takes longer than half of the time left still leaves `{}`\". Record 0018, Known gaps 1: \"The staged stop narrows the timing dependence of the graded final state and does not remove it.\"",
+          "fix": "- **The graded final state of a command agent that never used its MCP tool server could depend on timing** (`{}` or the server's starting state); 2.4.1 narrows this and does not remove it (see Known limits)."
+        },
+        {
+          "severity": "should",
+          "quote": "The graded final state can still depend on timing: a server that answers before it writes its state, that saves only when its input closes, or whose start-up takes longer than half of the time left.",
+          "problem": "After the colon, the list reads as complete, but it leaves out one case the changelog names: a server that writes its state in reaction to a notification.",
+          "evidence": "CHANGELOG v2.4.1, first entry, Limits: \"a server that answers before it writes its state, that saves only on EOF, or that writes its state in reaction to a notification (to which no response ever comes) can still lose that state when it is idle\".",
+          "fix": "- The graded final state can still depend on timing: a server that answers before it writes its state, that saves only when its input closes, that writes its state in reaction to a notification, or whose start-up takes longer than half of the time left."
+        },
+        {
+          "severity": "note",
+          "quote": "A trial can last longer when a server does not exit after its input is closed, and in a narrow case can end in timeout instead of completed. The [changelog](https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2.4.1/CHANGELOG.md)'s first entry lists the cases.",
+          "problem": "The record lists one more difference from 2.4.0, and the page states it only through the changelog link: a tool call in flight when the agent left can now change the final state while its reply goes unrecorded.",
+          "evidence": "Record 0018, What can differ: \"A tool call fully written to the server when the agent left may complete during the wait: its effect can reach the final state, its reply is discarded unrecorded.\"",
+          "fix": "- A trial can last longer when a server does not exit after its input is closed, and in a narrow case can end in timeout instead of completed. A tool call fully written to the server when the agent left may complete during the wait: its effect can reach the final state, and its reply is not recorded. The [changelog](https://github.com/ajaysurya1221/agent-reliability-ci/blob/v2.4.1/CHANGELOG.md)'s first entry lists the cases."
+        },
+        {
+          "severity": "note",
+          "quote": "it closes the server's input, sends SIGTERM after half of the time left before the trial's deadline and SIGKILL after three quarters.",
+          "problem": "As written, every waiting server is signalled. In fact each signal is sent only if the server is still running at that point.",
+          "evidence": "CHANGELOG v2.4.1: \"sends SIGTERM if it is still running after half of the time left before the trial's deadline, and SIGKILL after three quarters.\"",
+          "fix": "it closes the server's input and, if the server is still running, sends SIGTERM after half of the time left before the trial's deadline and SIGKILL after three quarters."
+        },
+        {
+          "severity": "note",
+          "quote": "A patch release: fixes, a changed plugin skill and documents.",
+          "problem": "The record's list of what the release may say includes updated Action pins, and the page lists them under Changed. The opening line and the title (\"v2.4.1: fixes since 2.4.0\") name only part of what ships. The title is acceptable because record 0018 uses the same name, and the opening line names the skill change.",
+          "evidence": "Record 0018 heading: \"# 0018: v2.4.1, fixes since 2.4.0\"; What the release may say: \"Fixes, a changed plugin skill, updated Action pins and documents; no new feature.\"",
+          "fix": "A patch release: fixes, a changed plugin skill, updated Action pins and documents."
+        }
+      ],
+      "checked_ok": [
+        "Code block `uvx --python 3.14 realornoise==2.4.1 --example` is exactly the line in v2.4.1:plugins/realornoise/skills/realornoise/SKILL.md (\"uvx --python 3.14 realornoise==2.4.1\") plus --example.",
+        "\"No new command, option, exit code, schema, record field or fixed text.\" matches record 0018, Why.",
+        "First Fixed entry (in-place write, temp file moved into place, last complete state kept, \"Seen once in hosted CI, in 1 trial of 100\") matches the changelog's state.json entry; it claims no cause beyond what the changelog shows.",
+        "\"An idle server is closed and killed at once, as before.\" matches the changelog's \"closes its input and kills it at once, as before\".",
+        "Third Fixed entry (four attempts, no waiting) matches the changelog and record 0018 (\"four attempts at most, no wait\").",
+        "The Changed entry for the skill matches the changelog and SKILL.md, and makes no claim that the plugin updates itself (\"keeps the earlier skill until the plugin is updated\").",
+        "Action pins: the v2.4.0..v2.4.1 diff touches seven workflow files and action.yml.",
+        "The --keep known limit matches record 0018, Known gap 2, and does not claim that --keep never loses a day (\"they cannot be recovered\").",
+        "\"Stored records are not re-graded.\" and the record_sha256 sentence match record 0018, What can differ.",
+        "\"Not verified: Windows beyond install and `--help`\" is consistent with COMPATIBILITY.md line 34 and CHANGELOG line 428.",
+        "\"third pre-registered run\" matches docs/results/order-desk-study.md line 3 (\"Three pre-registered runs\").",
+        "Every linked file exists at the tag: CHANGELOG.md, docs/design/0018-v2.4.1-release.md, docs/COMPATIBILITY.md, docs/PRIVACY.md, docs/results/order-desk-study.md, docs/blog/2026-11-order-desk-run-3.md.",
+        "Rules from records 0013 and 0014 (no claim of fewer runs, no verdict from one run, no caused-by claims) are not broken; the page makes no study claim beyond naming the run.",
+        "The shape is consistent with the 2.4.0 page: H3 sections, a limits section, a footer line of links separated by ·, and the SHA-256 list in the same four-line form; the page is consistent with itself.",
+        "No spelling errors or broken Markdown found; the link-then-possessive form \"[changelog](...)'s\" renders correctly in GitHub Markdown.",
+        "No uniqueness claim, sales wording or AI attribution found."
+      ]
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Check"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "check:facts",
+      "phaseIndex": 1,
+      "phaseTitle": "Check",
+      "agentId": "a870c6dcbe0422a63",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794991883703,
+      "queuedAt": 1794991883269,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I checked every sentence of the page text against the v2.4.…",
+      "promptPreview": "You are an independent checker of a release page text you did not write. Project ARCI (packages agent-reliability-ci and realornoise), release 2.4.1, tagged v2.4.1 in the git repository at /Users/ajay/Developer/agent-reliability-ci. The text to check is the file /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/release-2.4.1-body.md: everything below its first \"---\" line goes on the G…",
+      "promptFramed": true,
+      "lastProgressAt": 1794991952002,
+      "tokens": 81427,
+      "toolCalls": 10,
+      "durationMs": 68298,
+      "resultPreview": "{\"summary\":\"I checked every sentence of the page text against the v2.4.1 changelog section and the code at the tag, and found no factual error. All link paths exist at the tag. The first line holds for the src and packages diff. The skill command, the pin and the plugin version match. The Windows limit matches ci.yml. Three things are worth fixing. The timing limit reads as a complete list but lea…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "check:wording",
+      "phaseIndex": 1,
+      "phaseTitle": "Check",
+      "agentId": "ae98976ec6d1d42db",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794991883703,
+      "queuedAt": 1794991883269,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Checked the release page text in plan/exec/v2/launch/releas…",
+      "promptPreview": "You are an independent checker of a release page text you did not write. Project ARCI (packages agent-reliability-ci and realornoise), release 2.4.1, tagged v2.4.1 in the git repository at /Users/ajay/Developer/agent-reliability-ci. The text to check is the file /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/launch/release-2.4.1-body.md: everything below its first \"---\" line goes on the G…",
+      "promptFramed": true,
+      "lastProgressAt": 1794991950776,
+      "tokens": 79227,
+      "toolCalls": 7,
+      "durationMs": 64431,
+      "resultPreview": "{\"summary\":\"Checked the release page text in plan/exec/v2/launch/release-2.4.1-body.md against the tag v2.4.1, reading only through the tag: CHANGELOG.md, design records 0018, 0013 and 0014, the plugin SKILL.md, the file list and the workflow/action.yml diff. I also read the 2.4.0 page at HEAD, for its shape only. The page breaks none of the hard rules. It does not say the final state is now deter…"
+    }
+  ],
+  "totalTokens": 160654,
+  "totalToolCalls": 17
+}
