@@ -116,3 +116,15 @@ file-deletion assumptions. It does not recover days that were never captured who
 The 2.4.0 change leaves controlled-trial and imported-outcome contracts unchanged. Vendor
 log formats, an error rate for repeated daily looks, and assumptions about a user's task
 mix are not compatibility promises.
+
+## Command trials in 2.4.1
+
+2.4.1 changes no schema, command, option, exit code, record field or fixed text. At the
+end of a command trial the boundary can now wait for its MCP tool server before stopping
+it. For the same spec, `final_state`, and therefore `record_sha256`, can then differ from
+what 2.4.0 sealed, in the cases the [changelog](../CHANGELOG.md) lists; that difference
+is the fix. A trial can last longer when a server does not exit after its input is
+closed, and in a narrow case the changelog names a trial can end in timeout instead of
+completed. Nothing about the stop is recorded. Stored 2.4.0 records stay valid and are
+not re-graded. `arci-logs/2` records and the kept table format `realornoise-days/1` are
+unchanged. See [record 0018](design/0018-v2.4.1-release.md).

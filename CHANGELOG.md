@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.4.1 (2026-11-18)
 
 - **Fixed:** at the end of a command trial the boundary now waits for its MCP tool server when
   waiting can change what the grader reads, instead of always killing it at once. Why: a CI run
@@ -44,7 +44,10 @@
   a statistical `BLOCK` at round 2 with swapped arm roles, which means the set-up without
   the message passes less often by more than 10 points on those cells. It says nothing
   about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
-  and the store test re-derives its decision. No code change.
+  and the store test re-derives its decision. A post about run 3 is at
+  `docs/blog/2026-11-order-desk-run-3.md`, and a test
+  (`tests/unit/docs/test_order_desk_stores.py`) holds its counts to the stores. No code
+  change.
 - **Docs:** every README figure and badge now uses one theme, the banner's: a neutral ground,
   blue for the reference or the good outcome (A, PASS, REPRODUCED), orange for the thing in
   question or the bad outcome (B, BLOCK, injected faults), a neutral bar for INCONCLUSIVE,
@@ -66,9 +69,11 @@
   `subagent` counts as main thread. No code change.
 - **Fixed:** the tool server for Python toolsets (`arci.mcp_toolset_server`) wrote
   `state.json` in place, which empties the file before the new content goes in. When the
-  trial ends the boundary closes the server's input and, if it is still running, stops it
-  with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`), so a stop at that moment left an
-  empty file and the trial ended `ERROR` (`grader_error`, "snapshot failed"). This was
+  trial ended, the 2.4.0 boundary closed the server's input and, if it was still running,
+  stopped it with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`), so a stop at that moment
+  left an empty file and the trial ended `ERROR` (`grader_error`, "snapshot failed"). An idle
+  server is still stopped this way (see the first entry), which is why the whole-file write
+  is still needed. This was
   seen once in hosted CI, in 1 trial of 100, with an agent that finishes without using
   the tool server: one candidate trial ended `ERROR` instead of `FAIL`, which failed the
   hero acceptance test (no trial may be `ERROR`), and the gate then returned `ERROR` for
@@ -79,17 +84,20 @@
   file, the old state or the new state. One behaviour changes: when a snapshot cannot be
   written (for example text that cannot be encoded), `state.json` now keeps the last
   complete state instead of being left empty; the tool call still returns -32603
-  "snapshot failed". Not changed: for an agent that never uses the tool server, the
-  graded final state is still `{}` or the starting state, by timing.
+  "snapshot failed". This change alone does not settle the case of an agent that never
+  uses the tool server, whose graded final state was `{}` or the starting state by timing;
+  the first entry of this section does, within the limits listed there.
 - **Changed:** the Claude Code plugin's skill is now an instruction to Claude: run
-  `uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and show the output
-  unchanged. If anything is typed after the command name, it tells Claude to run nothing. Before, the skill ran that line itself when the command was typed and
+  `uvx --python 3.14 realornoise==2.4.1` once, with nothing added, and show the output
+  unchanged. If anything is typed after the command name, it tells Claude to run nothing.
+  Before, the skill ran that line itself when the command was typed and
   approved it ahead of time (`allowed-tools`). Now nothing is approved ahead of time:
   whether Claude Code asks before the command runs depends on your permission mode and
   settings. In Claude Code, Claude still does not start it on its own. The command
   now exits 1 or 2 in Claude's shell tool for REAL DROP or CANNOT TELL, and the skill says
-  that this is the result. A copy of plugin version 2.4.0 installed before this change
-  keeps the earlier skill until the plugin's version changes and you update the plugin. The reason: the report of Anthropic's plugin
+  that this is the result. A copy of plugin version 2.4.0 installed before the skill
+  became an instruction keeps the earlier skill until the plugin is updated; plugin
+  version 2.4.1 holds the instruction. The reason: the report of Anthropic's plugin
   directory on the first submission refused a skill with its own shell line, or with
   `allowed-tools` beyond Read, Grep, Glob and LS, from an organization that is not
   verified. The package is unchanged.
@@ -120,6 +128,38 @@
   (`privacyPolicyUrl`, `documentationUrl`, `supportUrl`), and sets a display name and
   keywords, because a plugin directory shows these; a test holds the links to files that
   exist.
+- **Docs:** the Codex skill now also tells Codex not to add `--keep`, and its README
+  (`integrations/codex/`) and the log threat model (`docs/THREAT_MODEL_LOGS.md`) say that
+  each skill is an instruction to the assistant: run the pinned command once, with nothing
+  added. The logs recipe (`docs/recipes/logs.md`) says that the plugin's skill tells Claude
+  to run the pinned command and to show its output, and that neither skill asks for
+  `--keep`. No code change.
+- **Changed:** the pinned GitHub Actions in the workflows and in `action.yml` are updated:
+  `actions/checkout` v7.0.0 to v7.0.1, `actions/setup-node` v7.0.0 to v7.1.0,
+  `actions/setup-python` v7.0.0 to v7.1.0, `actions/upload-artifact` v7.0.1 to v7.0.2
+  (also in `action.yml`) and `pypa/gh-action-pypi-publish` v1.14.2 to v1.14.3, each still
+  pinned by commit SHA. The publish action's new pin first runs at this release's tag. No
+  code change.
+- **Docs:** the README's study paragraph now points to run 3. `docs/COMPATIBILITY.md` has a
+  section on command trials in 2.4.1 and `docs/ROADMAP.md` lists what is done in 2.4.1.
+  `docs/RELEASING.md` names the files record 0018 re-freezes and says that the maintainer
+  publishes the GitHub release page by hand.
+- **Known limits, not fixed in 2.4.1:**
+  - `arci logs --keep`: when the read before the directory lock finds no table or a
+    readable one, and the read under the lock then finds the table unreadable, the run
+    writes no table and says nothing about it. It still writes the other requested outputs
+    and exits with the code of its result (0, 1 or 2); the printed text has no line saying
+    that the kept table could not be read, and the JSON record, when `--json` is given, has
+    `kept_table` as the first read found it (`"absent"` or `"read"`). Record 0017 says that a
+    run that finds the table unreadable says so; this path does not
+    (`src/arci/logs/cli.py`, `_write_outputs` and `_execute`). The rows are not lost while
+    the logs still exist; if the vendor has deleted those days by the next run with
+    `--keep`, they cannot be recovered.
+  - For a command agent with an MCP tool server, the graded final state can still depend
+    on timing in the cases listed in the first entry of this section. The stop's stages are
+    not recorded, so keep the version of arci beside a stored result.
+  - The fixture server `tests/acceptance/mcp_fixture_server.py` still writes its state file
+    in place. It is a pinned test file, not shipped code.
 
 ## v2.4.0 (2026-11-16)
 

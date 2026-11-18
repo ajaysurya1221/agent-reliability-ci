@@ -32,10 +32,10 @@ arci logs --example
 ```
 
 Example data, generated, not anyone's logs. This is the complete output captured in the
-2.4.0 checkout on 2026-11-16.
+2.4.1 checkout on 2026-11-18.
 
 ```text
-realornoise 2.4.0 · reads local session logs · sends nothing · writes nothing unless asked
+realornoise 2.4.1 · reads local session logs · sends nothing · writes nothing unless asked
 Example data, generated. Not anyone's logs.
 
 Claude Code · model-1 · effort high · main thread · days at UTC+00:00
@@ -297,7 +297,7 @@ In Claude Code:
 /realornoise:realornoise
 ```
 
-The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) tells Claude to run `uvx --python 3.14 realornoise==2.4.0` and to show its output.
+The [plugin](../../plugins/realornoise/skills/realornoise/SKILL.md) tells Claude to run `uvx --python 3.14 realornoise==2.4.1` and to show its output.
 Whether Claude Code asks you first depends on your permission mode and settings. Neither skill asks for
 `--keep`; run that option yourself in a terminal when you want to store counts.
 Everything the command prints then enters that assistant's conversation.

@@ -1,6 +1,6 @@
 [project]
 name = "agent-reliability-ci"
-version = "2.4.0"
+version = "2.4.1"
 description = "Did your AI agent get worse? Real, noise, or cannot tell: from coding-agent session logs, imported results, or controlled trials with fault injection."
 readme = "README.md"
 license = "Apache-2.0"

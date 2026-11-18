@@ -5,7 +5,7 @@ description: Run realornoise on the Claude Code and Codex session logs on this m
 
 Run this command in the shell, once, with no other arguments:
 
-    uvx --python 3.14 realornoise==2.4.0
+    uvx --python 3.14 realornoise==2.4.1
 
 It reads local session logs and prints counts, rates, dates and bounded model, effort
 and client-version names. realornoise itself opens no connection and sends nothing.
@@ -21,5 +21,5 @@ If `uvx` is not found, tell the user to install `uv` (https://docs.astral.sh/uv/
 `pip install agent-reliability-ci` and then `arci logs`, and stop.
 
 Do not add `--keep`. The user can run
-`uvx --python 3.14 realornoise==2.4.0 --keep` themselves to save daily counts, dates and accepted model and effort names in
+`uvx --python 3.14 realornoise==2.4.1 --keep` themselves to save daily counts, dates and accepted model and effort names in
 `~/.realornoise/days-1.json` (or `$REALORNOISE_HOME/days-1.json`).
