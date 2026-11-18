@@ -1,0 +1,808 @@
+{
+ "audits": [
+  {
+   "key": "changelog",
+   "result": {
+    "summary": "The Unreleased section is accurate on the concrete claims I checked (numbers, option names, file names, behaviours), but it is incomplete and has three misleading passages that need rewording before a 2.4.1 section is cut. Two of them sit in the state.json entry, which contradicts the boundary-wait entry. I did not run any tests.",
+    "blockers": [],
+    "items": [
+     {
+      "what": "(c) MISLEADING: the state.json entry says 'Not changed: for an agent that never uses the tool server, the graded final state is still `{}` or the starting state, by timing.' That is exactly what the first Fixed entry (L5-L9 and L22-L23) changes: it waits for the server and says 'The final state can now differ from before (that is the fix).' Both entries are in the same 2.4.1 section, so one denies what the other claims.",
+      "where": "CHANGELOG.md:82-83 (against 5-9 and 22-23)",
+      "action": "Delete the 'Not changed:' sentence, or replace it with a pointer: 'For an agent that never uses the tool server, the graded final state is addressed by the entry above.' The other two edits to this entry are listed in the next two items.",
+      "confidence": "high"
+     },
+     {
+      "what": "(c) MISLEADING: the same entry describes cleanup in the present tense: 'When the trial ends the boundary closes the server's input and, if it is still running, stops it with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`)'. On main, `_cleanup` calls `_stop_server`. Only an idle server (`_server_is_idle`) is closed and killed at once. Any other server gets the staged stop (close input, SIGTERM at half of the time left, SIGKILL at three quarters), see mcp_boundary.py `_stop_server` and `stop_server`. For a 2.4.1 reader this reads as current behaviour, and it is no longer accurate for non-idle servers.",
+      "where": "CHANGELOG.md:67-72",
+      "action": "Put it in the past tense, for example 'Before this release, when the trial ended the boundary closed the server's input and, if it was still running, killed it with SIGKILL'. Add that an idle server is still killed this way, and refer to the entry above. The reader should see that the SIGKILL window remains for idle servers, which is why the atomic write stays needed.",
+      "confidence": "high"
+     },
+     {
+      "what": "(c) MISLEADING: 'The server now writes `state.json.tmp` ... so the grader reads no file or a complete file' and 'seen once in hosted CI, in 1 trial of 100' read as unconnected to the staged stop. Combined with 'Not changed', a reader cannot tell that the two entries fix the same CI flake from two sides. The code supports the atomic-write claims (mcp_toolset_server.py `_write_whole`, os.replace; -32603 'snapshot failed' at line 214).",
+      "where": "CHANGELOG.md:74-83",
+      "action": "Add one cross-reference sentence in whichever entry is kept first, for example: 'The staged stop (entry above) and the atomic write together address this.' Keep the evidence sentences as they are.",
+      "confidence": "medium"
+     },
+     {
+      "what": "(a) NO ENTRY: the Dependabot actions bump (commit ea8c804, merge f79a751, PR 26). actions/checkout 7.0.0 to 7.0.1, setup-python to 7.1.0, setup-node to 7.1.0, upload-artifact to 7.0.2, pypa/gh-action-pypi-publish 1.14.2 to 1.14.3. It touches ci.yml, release.yml, codeql.yml, adapters-latest.yml, client-versions.yml, ttfv-reference.yml, workflow-audit.yml and action.yml. Notably, release.yml, which publishes to PyPI, and the root action.yml, which users consume, both changed pins.",
+      "where": "git diff --stat v2.4.0..HEAD (.github/workflows/*, action.yml)",
+      "action": "Add a short entry, for example '**Changed:** the pinned GitHub Actions in the workflows and in `action.yml` are updated (checkout 7.0.1, setup-python 7.1.0, setup-node 7.1.0, upload-artifact 7.0.2, pypi-publish 1.14.3). No code change.'",
+      "confidence": "high"
+     },
+     {
+      "what": "(a) NO ENTRY: the blog post about run 3, `docs/blog/2026-11-order-desk-run-3.md` (135 lines), added in 98a801b. The `grep -i blog` over CHANGELOG.md returns nothing. The run-3 entry covers the study doc and the store only. The same commit also changes tests/unit/docs/test_order_desk_stores.py to hold the post's counts to the stores. The run-3 entry mentions 'the store test re-derives its decision' but not the post.",
+      "where": "CHANGELOG.md:41-47",
+      "action": "Add to the run-3 entry: 'A post about run 3 is at `docs/blog/2026-11-order-desk-run-3.md`; a test holds its counts to the stores.'",
+      "confidence": "high"
+     },
+     {
+      "what": "(a) NO ENTRY: the Codex skill and Codex README were reworded (integrations/codex/skills/realornoise/SKILL.md, integrations/codex/README.md). They now say the skill 'tells Codex' to run the command once with no other arguments, and 'Do not add `--keep`'. The `--keep` example now carries the pinned version, and the README notes that uvx messages also enter the conversation. Also reworded without entry: docs/recipes/logs.md and docs/THREAT_MODEL_LOGS.md (instruction wording, 'Everything the command prints'), the marketplace.json description (.claude-plugin/marketplace.json), docs/RELEASING.md (pin list now names plugins/realornoise/README.md and drops 'including `allowed-tools`'), and the 'tui_side_chat' sentence in docs/LOG_FORMATS.md:104-106. The Changed entry at L84-95 speaks only of the Claude Code skill, and the Codex entry says only 'checked against 0.169.0'.",
+      "where": "CHANGELOG.md:63-66 and 84-95",
+      "action": "Add a clause or one Docs entry: 'The Codex skill and README, the logs recipe and the log threat model are reworded to say the skill is an instruction, and the Codex skill's `--keep` example is pinned. The marketplace description matches the plugin's.' Optionally add to the Codex entry: 'The 0.169.0 source can save a side chat as `tui_side_chat`; no such file was seen and the reader would count it as main thread.' RELEASING.md is process documentation and needs no entry.",
+      "confidence": "medium"
+     },
+     {
+      "what": "(c) STALE AT RELEASE: the entries name the command as `uvx --python 3.14 realornoise==2.4.0`, and say 'A copy of plugin version 2.4.0 installed before this change'. On main the pins and plugin.json version are still 2.4.0 (plugins/realornoise/skills/realornoise/SKILL.md, integrations/codex/skills/realornoise/SKILL.md, plugin.json version '2.4.0'). docs/RELEASING.md step 1 bumps these pins to X.Y.Z. After the bump, the L85 sentence 'run `uvx ... realornoise==2.4.0`' would be wrong inside a 2.4.1 section. The L91 sentence remains correct because it is about an installed 2.4.0 copy, but check that the plugin version actually changes in 2.4.1, since the claim 'keeps the earlier skill until the plugin's version changes' depends on it.",
+      "where": "CHANGELOG.md:85 and 91-92",
+      "action": "At the version bump, change L85 to `realornoise==2.4.1`, or word it as 'the pinned version'. Also update the matching 2.4.0 pins in docs/THREAT_MODEL_LOGS.md and docs/recipes/logs.md per RELEASING.md. Bump plugin.json to 2.4.1 so L91-92 holds.",
+      "confidence": "high"
+     },
+     {
+      "what": "(c) FORMATTING/STRAY SENTENCES: L86 holds two sentences on one line ('...run nothing. Before, the skill ran that line itself...'), where the surrounding lines are wrapped. L92 runs on past the wrap ('...you update the plugin. The reason: the report of Anthropic's plugin directory...'). This is cosmetic, but it looks like a merge or edit artefact.",
+      "where": "CHANGELOG.md:85-86 and 91-93",
+      "action": "Re-wrap. Content stays.",
+      "confidence": "high"
+     },
+     {
+      "what": "(b) CHECKED AND SUPPORTED: every concrete claim I read against the code. Staged stop: close input, SIGTERM at half and SIGKILL at three quarters of the time left, matching `stop_server` in mcp_boundary.py. Idle rule: all four conditions, matching `_server_is_idle`. Deadline: `trial_deadline` is min(started + seconds_remaining, parent_deadline), and runner.py passes the two private config keys outside the spec. 'a harness fault was latched, which any server notification causes': mcp_boundary.py:1821 'server notifications are unsupported'. With decisions the parent signals the boundary at once, without decisions at remaining/2: runner.py boundary_stop_at, so 'that wait is all extra time' and 'the parent already waited about as long' hold. Kept table: READ_ATTEMPTS = 4, no waiting, empty file is 'absent', dangling symlink is 'unreadable'; six writers at tests/unit/logs/test_logs2.py:1757. Atomic write: `state.json.tmp` plus os.replace; -32603 'snapshot failed' at mcp_toolset_server.py:214. Codex reader: any thread_source other than 'subagent' is main thread (codex.py:98). Plugin: `disable-model-invocation: true`, `uvx --python 3.14 realornoise==2.4.0`, the ARGUMENTS rule and the exit 1 or 2 note are in SKILL.md; the `--keep` command is pinned in both skills. Manifest keys displayName, icon, keywords, documentationUrl, supportUrl and privacyPolicyUrl are in plugin.json. Plugin README has 'Three uses'. Run 3: n_cells 8, BLOCK, stopped_at_round 2, alpha 1/20, delta 1/10, run-3 store directory exists, 'roles are swapped' in the study doc. Hero A 192/200, B 132/200 in make_figures.py. PNGs remain in docs/images. 'The package is unchanged' holds: no files under packages/ changed.",
+      "where": "CHANGELOG.md:5-122",
+      "action": "Keep as is.",
+      "confidence": "high"
+     }
+    ],
+    "not_checked": [
+     "Whether the 'No code change' / 'No behaviour changes' sentences hold for the whole diff: I read the src/ diffs (kept.py, mcp_boundary.py, mcp_toolset_server.py, runner.py) but did not run the test suite.",
+     "The claim 'the report of Anthropic's plugin directory on the first submission refused a skill with its own shell line, or with `allowed-tools` beyond Read, Grep, Glob and LS' (CHANGELOG.md:92-95): it rests on an external report and plan/ records I was told not to open.",
+     "The claim 'the project's own bridge and its fixture server write before they answer' (CHANGELOG.md:27): I confirmed it for `arci.mcp_toolset_server` (snapshot written inside the request handler before the reply) but did not read the bridge or the fixture server.",
+     "The README-theme entry's fine detail: 'a neutral bar for INCONCLUSIVE', 'system sans-serif and monospace type, no serif', tint opacities, grids, gate bar widths and the 'Jev was not run' footer in the old PNG. I only spot-checked the hero dot counts (192 and 132, make_figures.py:574) and the alpha/delta settings. I did not parse the SVGs or read tests/unit/docs/test_figures.py, and I could not see the old footer because it was a PNG.",
+     "The run-3 entry's other numbers beyond n_cells, verdict and round: the 8 cells 'chosen after run 2' and the claim that the store test re-derives the decision. I did not read the run-3 events, the manifest or tests/unit/docs/test_order_desk_stores.py.",
+     "Plugin README prose ('what the plugin reads, runs, fetches, writes, prints and sends') and docs/PRIVACY.md content against the actual program behaviour, and the icon test that 'compares its pixels with the generator': I confirmed only that the files and test names exist.",
+     "docs/blog/2026-11-order-desk-run-3.md and the 2.4.0 README on PyPI linking the PNGs (the latter needs network).",
+     "plan/ was excluded by instruction. CITATION.cff, pyproject version and uv.lock were not examined because they did not change in the diff."
+    ]
+   }
+  },
+  {
+   "key": "versions",
+   "result": {
+    "summary": "Fourteen locations change from 2.4.0 to 2.4.1 by hand, one file is regenerated by a lock command, and six are regenerated by one script. I read the version tests and grepped the worktree at 06a01f5 (the 2, 4, 0 spelling only hits unrelated tuples). I ran no tests, so the claim that these edits make test_every_release_version_matches pass is from reading it, not running it.",
+    "blockers": [
+     {
+      "what": "pyproject.toml and uv.lock are frozen and appear in docs/RELEASING.md step 4, so the bump needs the orchestrator to re-freeze them. The new design record under docs/design/ is also frozen once added, and nothing in the checked tests or docs checks that a record for 2.4.1 exists; the design record is a RELEASING.md step 1 requirement.",
+      "where": "pyproject.toml:3; uv.lock:11; FROZEN.sha256; docs/RELEASING.md:22-24,57-64",
+      "evidence": "FROZEN.sha256 lists pyproject.toml, uv.lock, docs/design/0017-logs-2.md and docs/STATISTICS_LOGS.md among the files whose names I filtered for. docs/design currently ends at 0017-logs-2.md. RELEASING.md:24 says the bump is a re-freeze. RELEASING.md:58-62 describes which hashes change only for 2.4.0 (record 0017 plus the five files), not for 2.4.1.",
+      "proposed_action": "Add docs/design/0018-*.md naming 2.4.1 and why it is cut, edit pyproject.toml, run uv lock (no network, not checked here) and confirm uv lock --check passes and resolved versions do not move, then recompute only the FROZEN.sha256 lines for pyproject.toml, uv.lock and the new record. Run shasum -a 256 -c FROZEN.sha256."
+     }
+    ],
+    "items": [
+     {
+      "what": "[project].version",
+      "where": "pyproject.toml:3 `version = \"2.4.0\"` (frozen)",
+      "action": "change to 2.4.1 (hand edit, then re-freeze its hash)",
+      "confidence": "high"
+     },
+     {
+      "what": "__version__",
+      "where": "src/arci/__init__.py:3 `__version__ = \"2.4.0\"` (not in the FROZEN list I filtered; tests compare everything against it)",
+      "action": "change to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "realornoise package version",
+      "where": "packages/realornoise/pyproject.toml:3 `version = \"2.4.0\"`",
+      "action": "change to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "realornoise dependency pin",
+      "where": "packages/realornoise/pyproject.toml:9 `dependencies = [\"agent-reliability-ci==2.4.0\"]`",
+      "action": "change to agent-reliability-ci==2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "realornoise __version__",
+      "where": "packages/realornoise/src/realornoise/__init__.py:3 `__version__ = \"2.4.0\"`",
+      "action": "change to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "plugin manifest version",
+      "where": "plugins/realornoise/.claude-plugin/plugin.json:5 `\"version\": \"2.4.0\"`",
+      "action": "change to 2.4.1. CHANGELOG.md:91-92 says an installed plugin keeps the earlier skill until the plugin version changes, so this bump is what delivers the new skill.",
+      "confidence": "high"
+     },
+     {
+      "what": "CITATION.cff version and date",
+      "where": "CITATION.cff:10 `version: \"2.4.0\"`; CITATION.cff:11 `date-released: \"2026-11-16\"`",
+      "action": "change line 10 to 2.4.1 and line 11 to the 2.4.1 release date. Keep line 26, `date-released: \"2026-11-15\"`, which belongs to the nested technical-report reference.",
+      "confidence": "high"
+     },
+     {
+      "what": "uvx pin in plugin skill",
+      "where": "plugins/realornoise/skills/realornoise/SKILL.md:13 and :45 `realornoise==2.4.0` (test regex `uvx --python 3.14 realornoise==...` also matches both)",
+      "action": "change both to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "uvx pins in plugin README",
+      "where": "plugins/realornoise/README.md:8, :47, :83, :124 `realornoise==2.4.0`",
+      "action": "change all four to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "plugin README prose about plugin version",
+      "where": "plugins/realornoise/README.md:117 `a copy of plugin version 2.4.0 installed before...`",
+      "action": "keep. It names the plugin version that held the old skill, which is historical. It is not covered by a version test, but changing it would make the statement false.",
+      "confidence": "medium"
+     },
+     {
+      "what": "uvx pins in Codex skill",
+      "where": "integrations/codex/skills/realornoise/SKILL.md:8 and :24",
+      "action": "change both to 2.4.1",
+      "confidence": "high"
+     },
+     {
+      "what": "command in Codex README",
+      "where": "integrations/codex/README.md:4 `realornoise==2.4.0`",
+      "action": "change to 2.4.1. RELEASING.md:37-38 asks that it agree with the skills; no test pins this file.",
+      "confidence": "high"
+     },
+     {
+      "what": "README current-release pins and sentences",
+      "where": "README.md:600 (`pins v2.4.0, the current release`), :601 (`agent-reliability-ci==2.4.0`), :608 (`agent-reliability-ci@v2.4.0`), :758 (`v2.4.0 is the current release`, `agent-reliability-ci==2.4.0`), :759 (`[langchain]==2.4.0`), :760 (`Action tag v2.4.0`)",
+      "action": "change all of these to 2.4.1. Tests check the four regexes `v(..) is the current release`, `pins v(..), the current release`, `@v(..)` and `agent-reliability-ci(...)==(..)`; lines 600, 601, 608, 758-760 are covered.",
+      "confidence": "high"
+     },
+     {
+      "what": "README.md:717 `What is not in 2.4.0`",
+      "where": "README.md:717",
+      "action": "keep unless the 2.4.1 changelog changes the not-planned list. No version test matches it, so a reader may expect 2.4.1; it is a judgement call for the release orchestrator, and 2.4.1 is a patch from the same code line.",
+      "confidence": "low"
+     },
+     {
+      "what": "README heading `New in 2.4: ...`",
+      "where": "README.md:45; held by README_SECTIONS in tests/unit/docs/test_logs_docs.py:29",
+      "action": "keep. It is a feature-introduction heading, and the docs test looks the section up by this exact text; changing it would break test_logs_docs.",
+      "confidence": "high"
+     },
+     {
+      "what": "docs/recipes/logs.md captured banner (current-version location)",
+      "where": "docs/recipes/logs.md:38 `realornoise 2.4.0 \u00b7 reads local session logs \u00b7 ...`",
+      "action": "change to 2.4.1. Test tests/unit/docs/test_logs_docs.py:207-212 compares the captured block exactly to the live `--example` output, which prints the current version, so it fails if left. RELEASING.md:47-49 lists this as an exception.",
+      "confidence": "high"
+     },
+     {
+      "what": "docs/recipes/logs.md capture date text",
+      "where": "docs/recipes/logs.md:35 `2.4.0 checkout on 2026-11-16`",
+      "action": "change to 2.4.1 checkout and the capture date, since the banner is re-captured; not held by a test, so a judgement call.",
+      "confidence": "medium"
+     },
+     {
+      "what": "docs/recipes/logs.md plugin command",
+      "where": "docs/recipes/logs.md:300 `realornoise==2.4.0`",
+      "action": "change to 2.4.1. RELEASING.md:38 lists this file for agreement with the pin.",
+      "confidence": "high"
+     },
+     {
+      "what": "THREAT_MODEL_LOGS pin",
+      "where": "docs/THREAT_MODEL_LOGS.md:83 `uvx --python 3.14 realornoise==2.4.0`",
+      "action": "change to 2.4.1 (listed in RELEASING.md:38)",
+      "confidence": "high"
+     },
+     {
+      "what": "THREAT_MODEL_LOGS plugin-version statement",
+      "where": "docs/THREAT_MODEL_LOGS.md:90; also docs/PRIVACY.md:70 `copy of plugin version 2.4.0 installed before the skill became an instruction`",
+      "action": "keep. Historical statements about the version that held the old skill.",
+      "confidence": "medium"
+     },
+     {
+      "what": "CHANGELOG Unreleased entry carrying the pin",
+      "where": "CHANGELOG.md:85 `uvx --python 3.14 realornoise==2.4.0`, :91 `plugin version 2.4.0`, :60 `the 2.4.0 README on PyPI`",
+      "action": "Line 85 describes the pin the skill will run, so with the bump it shows 2.4.1 and should change; lines 60 and 91 are historical (the version that shipped before the change) and stay. Move the Unreleased block under `## v2.4.1 (date)` (RELEASING step 3). Keep the line 124 `## v2.4.0 (2026-11-16)` heading and lines 132, 137, 138, which describe the 2.4.0 release.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Log snapshots holding the header version",
+      "where": "tests/unit/logs/snapshots/*.txt:1 and example.html:22, too_few_days.html:22 `realornoise 2.4.0 \u00b7`",
+      "action": "keep, do not regenerate. tests/unit/logs/test_report.py:27-28 and :100-101 normalize the header version before comparing; test_review_fixes.py:235 holds that behaviour. RELEASING.md:41-42 says the same.",
+      "confidence": "high"
+     },
+     {
+      "what": "HTML golden footers (five)",
+      "where": "tests/unit/html_report/golden/{pass,block,inconclusive,error,v1}.html:25 `<footer><p>ARCI 2.4.0</p></footer>`; docs/results/sample-suite-report.html:25 same text",
+      "action": "do not hand-edit. Regenerate all six with `.venv/bin/python -m tests.unit.html_report.generate` (writes the five goldens and docs/results/sample-suite-report.html per RELEASING.md:45-46 and generate.py:3,35).",
+      "confidence": "high"
+     },
+     {
+      "what": "uv.lock main package version",
+      "where": "uv.lock:11 `version = \"2.4.0\"` (frozen; in the package block with `source = { editable = \".\" }`)",
+      "action": "regenerate with `uv lock`, not by hand. The test reads this entry. Per RELEASING.md:53-55, resolved versions must not change and `uv lock --check` must pass. I did not run it (no network and no uv allowed). The file has no realornoise entry in the lines I read (the grep for `realornoise` in uv.lock matched nothing).",
+      "confidence": "high"
+     },
+     {
+      "what": "Design record 0017 and docs naming 2.4.0 as the logs-2 release",
+      "where": "docs/design/0017-logs-2.md (many lines, e.g. 1, 4, 82, 1086, 1198; frozen); docs/STATISTICS_LOGS.md:238,333,341,630,641 (frozen); docs/LOG_FORMATS.md:14,19; docs/COMPATIBILITY.md:90-116; docs/ROADMAP.md:113; docs/results/order-desk-study.md:226; CHANGELOG.md:124-138",
+      "action": "keep. All are historical or describe the 2.4.0 release and the 2.4.0 self-check. Two are frozen (0017 and STATISTICS_LOGS.md) and must not be touched. Line 1086 states the `arci_version` value `2.4.0` that the 2.4.0 records allow; no change.",
+      "confidence": "high"
+     },
+     {
+      "what": "Test files containing the literal 2.4.0 or hard-coded versions",
+      "where": "tests/unit/packaging/test_trust_files.py:1 (docstring `added for 2.4.0`); tests/unit/logs/test_schema.py:16, tests/unit/logs/test_decide.py:108, tests/acceptance/test_logs.py:3554 (`\"arci_version\": \"2.3.0\"` fixtures)",
+      "action": "keep. Docstring is historical; the 2.3.0 values are fixed fixtures, not tied to the release. tests/acceptance/ is frozen. bench/selfcheck_logs.py:560 `2, 4, 0, 0, 2` is function arguments, unrelated to a version.",
+      "confidence": "high"
+     },
+     {
+      "what": "Version tests that follow `__version__` without a literal",
+      "where": "tests/unit/packaging/test_review_fixes.py:20-66 (test_every_release_version_matches); tests/unit/plugin/test_plugin_files.py:41,74,103,132; tests/unit/packaging/test_realornoise_distribution.py:47-70,124-134; tests/unit/logs/test_report.py:40",
+      "action": "keep. They need no edit; they pass only if all the by-hand locations above match arci.__version__. test_review_fixes.py:66 also asserts that each location path appears in docs/RELEASING.md, which is already true.",
+      "confidence": "high"
+     },
+     {
+      "what": "Locations RELEASING.md does not name that a reader may expect to change",
+      "where": "docs/RELEASING.md:58-62 (for 2.4.0 only); README.md:717; docs/recipes/logs.md:35; CHANGELOG.md:85",
+      "action": "RELEASING.md step 4 spells out the frozen-file set for 2.4.0 only, so the 2.4.1 set (pyproject.toml, uv.lock, new design record) has to be decided by the orchestrator. The other three are the unlisted spots described above. Nothing found in .github/, constraints/ or .github/scripts/wheel_smoke.sh holds a literal version (wheel_smoke reads the version from wheel metadata).",
+      "confidence": "medium"
+     },
+     {
+      "what": "Dates held by tests",
+      "where": "grep over tests for `date-released` and `2026-11-1`",
+      "action": "no test holds the CITATION.cff date or any release date; only CITATION.cff:11 changes by hand. The tag v2.4.0 exists locally (git tag --list).",
+      "confidence": "high"
+     }
+    ],
+    "not_checked": [
+     "Whether `uv lock` leaves resolved versions unchanged (uv and network were forbidden).",
+     "Whether the goldens regenerate cleanly with the generate command (I did not run it).",
+     "Whether the changed files pass the tests (I ran no tests).",
+     "The full FROZEN.sha256 listing beyond the filtered file names (I filtered for named files and only pyproject.toml, uv.lock, docs/STATISTICS_LOGS.md and docs/design/0017-logs-2.md matched).",
+     "Anything under plan/, ~/.claude, ~/.codex or ~/.realornoise, as instructed.",
+     "Hidden or generated documents outside the grep's scope (I excluded plan/, .git, .venv and cache directories); binary files were skipped by grep -I.",
+     "The release workflow's tag check beyond what the packaging tests show; I did not read .github/workflows/release.yml."
+    ]
+   }
+  },
+  {
+   "key": "compat",
+   "result": {
+    "summary": "2.4.1 is the right number. Since v2.4.0, src changes only src/arci/mcp_boundary.py, mcp_toolset_server.py, runner.py and logs/kept.py, and packages/ has no source change. None of the four adds or removes a command, option, exit code, schema version or record field, and every file listed in FROZEN.sha256 still passes `shasum -a 256 -c`. No pinned sentence is contradicted outright. AGENT_SEMANTICS.md:317 and :165 are now incomplete for a reader. Two Unreleased CHANGELOG sentences and one docstring now contradict the staged-stop entry and should be fixed before tagging.",
+    "blockers": [],
+    "items": [
+     {
+      "what": "The sentence that decides patch against minor. docs/COMPATIBILITY.md has no explicit patch rule. The deciding text is lines 8-10: \"Within 1.x, a valid existing documented command and supported record must retain its meaning. Additive commands or optional output fields may arrive in minor releases.\" (line 9 holds \"Additive commands or optional output fields may arrive in minor\"). Verdict 2.4.1. The diff adds no command, option, output field, schema_version or exit code. The only new keys are `seconds_remaining` and `deadline_monotonic` in the private boundary launch config (runner.py:1163-1168, mcp_boundary.py:2290-2302). That config is launched only from runner.py:1150, and no acceptance test builds it. kept.py adds no new `kept_table` value: it still returns read, absent or unreadable. The state.json bytes are unchanged (same json.dumps payload, written through a temporary file and os.replace). The changes are bug fixes that keep existing records and commands meaning the same, so they need no minor.",
+      "where": "docs/COMPATIBILITY.md:8-13; git diff v2.4.0..HEAD -- src packages",
+      "action": "Keep 2.4.1. A 2.5.0 would be justified only by an additive public surface, and there is none.",
+      "confidence": "high"
+     },
+     {
+      "what": "Same inputs can now give a different sealed hash (intended). When the tool server is not idle at cleanup, the boundary now waits for it, so `final_state` can differ from what 2.4.0 graded. That changes `record_sha256` for the same inputs, and in a narrow case the outcome too: an agent that exits just before the deadline while its server ignores EOF can now end in timeout instead of completed. CHANGELOG.md:3-38 states both. When the server is idle (it has answered, nothing is pending or queued, no fault is latched), it is killed at once as before (mcp_boundary.py:2200-2205), so those trials are unchanged. The stop leaves no trace in events or records (stop_server returns None; idle() discards output). Archived stores are not rewritten, so COMPATIBILITY.md:29-30 still holds.",
+      "where": "src/arci/mcp_boundary.py:2186-2250; CHANGELOG.md:3-38",
+      "action": "Keep as is. It is the documented fix and is not a field or schema change. Mention in the release note that new trials can seal differently from 2.4.0 for non-idle servers.",
+      "confidence": "high"
+     },
+     {
+      "what": "A pinned sentence a reader would now find incomplete: \"the parent signals it as soon as the agent has exited (no half-deadline grace)\". The parent still signals at once (runner.py:1265: `boundary_stop_at = now if spec.decisions is not None else now + remaining / 2.0`), so the sentence is literally true. But the boundary, once signalled, can now wait up to 3/4 of the time left for a non-idle server. The changelog says this itself: \"with decisions configured that wait is all extra time\" (CHANGELOG.md:31). The frozen text does not mention this wait.",
+      "where": "docs/AGENT_SEMANTICS.md:317",
+      "action": "No frozen edit is required, since the sentence describes the parent and stays true. If you want the frozen doc to match the behaviour, it needs the amendment process. Otherwise keep it as is and rely on CHANGELOG.md:3-38.",
+      "confidence": "medium"
+     },
+     {
+      "what": "A pinned sentence that is now incomplete: the boundary \"Reads its config (spec, nonce, socket path, workdir) as ONE JSON document on stdin.\" `_read_config` now refuses (main returns 2) unless `seconds_remaining` (finite, at least 0) and `deadline_monotonic` (finite) are present (mcp_boundary.py:2290-2302). The list was already incomplete before this change (decision_token arrived in v0.5), and the only launcher is runner.py, so nothing public breaks.",
+      "where": "docs/AGENT_SEMANTICS.md:165-166",
+      "action": "Keep as is. The config is internal, and COMPATIBILITY.md:16-17 says internal modules are not an SDK. Note it for the next amendment of the frozen doc.",
+      "confidence": "medium"
+     },
+     {
+      "what": "A pinned sentence checked and not contradicted: \"No fixed waits.\" (the worker deadline section). The new stop has no constant sleep. It waits for process exit with ticks of at most 0.05 s, sends SIGTERM at R/2 and SIGKILL at 3R/4 of the trial's own time left, and ends early when the server exits (mcp_boundary.py:837-857). It also waits on process exit, not pipe EOF, which matches AGENT_SEMANTICS.md:129-131 and :219-220.",
+      "where": "docs/AGENT_SEMANTICS.md:85",
+      "action": "Keep as is.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Pinned sentences checked and not contradicted: \"Snapshot write failures are -32603 too.\" still holds (the error is still -32603 \"snapshot failed\"; only state.json keeps its last complete content). The cleanup rule \"kill the whole process group after EVERY trial\" still holds in the parent. 0002:28-29 (snapshot runs in the grader after the agent exits) is unchanged. Determinism \"for a scripted client\" (AGENT_SEMANTICS.md:222) is not weakened: nothing about timing is recorded. One residual case: a fully written tools/call that completes during the wait changes final_state with no tool_finish in the events, a timing dependence that AGENT_SEMANTICS.md:221 (\"No outcome may depend on scheduling luck\") would flag. The kill at once before this change had the same kind of dependence.",
+      "where": "docs/AGENT_SEMANTICS.md:253, :86-87, :221-222; docs/design/0002-out-of-process-boundary.md:28-29, :54-56; docs/TRUST_MODEL.md:18",
+      "action": "Keep as is. Grepped kill, SIGKILL, SIGTERM, cleanup, snapshot, state.json, half, grace, EOF and stdin across AGENT_SEMANTICS.md, TRUST_MODEL.md and docs/design/*.md, and found no other statement about how the server is stopped.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Kept-table read, checked against record 0017 and not contradicted. 0017 says \"`kept_table` is `absent` only when the path does not exist or the file there holds 0 bytes; any other failure to open it is `unreadable`\" (lines 495-496, similar at 143-144). The new reader returns absent only when both stat and lstat find nothing (kept.py:136-140). A dangling symlink, a broken lstat or using up all 4 attempts still gives unreadable (kept.py:111-115, :141-143). An empty file is still absent (that path is unchanged). Line 506, \"The result of the run still uses the table as it was read at the start\", still holds: it is one logical read with up to 4 attempts and no waiting. 0017:526 (\"no second attempt is needed, and none is made\") is about the directory's identity under the lock, not the file read.",
+      "where": "docs/design/0017-logs-2.md:143-144, :495-506, :526; src/arci/logs/kept.py:88-145",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "A stale sentence in the Unreleased changelog (not pinned): the state.json entry says the boundary \"closes the server's input and, if it is still running, stops it with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`)\". After PR 35 this is true only for an idle server, and `_cleanup` now calls `_stop_server`.",
+      "where": "CHANGELOG.md:68-70",
+      "action": "Reword to the past tense, for example \"In 2.4.0 the boundary ... stopped it with SIGKILL; an idle server still is (see the entry above)\".",
+      "confidence": "high"
+     },
+     {
+      "what": "A contradiction inside the Unreleased changelog (not pinned): the state.json entry ends \"Not changed: for an agent that never uses the tool server, the graded final state is still `{}` or the starting state, by timing.\" The first entry (CHANGELOG.md:3-8) says the staged-stop change fixes exactly that: the server never answered, so it is not idle and the boundary waits. What remains is only a server whose start-up takes longer than half of the time left (CHANGELOG.md:26). The two entries were written on separate branches.",
+      "where": "CHANGELOG.md:82-83",
+      "action": "Replace with: \"This change alone does not fix the `{}`-or-starting-state timing for an agent that never uses the tool server; the staged stop above does, except for a server whose start-up takes longer than half of the time left.\"",
+      "confidence": "high"
+     },
+     {
+      "what": "A stale docstring (not pinned): \"The boundary stops this server with SIGKILL when the trial ends\". That is now true only for an idle server, or at 3/4 of the time left.",
+      "where": "src/arci/mcp_toolset_server.py:122",
+      "action": "Reword to \"The boundary may stop this server with SIGKILL when the trial ends\". Optional, since it is a comment only.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Version locations for the bump. pyproject.toml:3 and packages/realornoise/pyproject.toml:3 are 2.4.0. pyproject.toml and uv.lock are frozen, so the bump is a re-freeze under docs/RELEASING.md:22-64 (a new design record, then FROZEN.sha256 recomputed), as v2.4.0 did (commits 6a751b3 and 987a963). The skills pin `realornoise==2.4.0` at plugins/realornoise/skills/realornoise/SKILL.md:13,45 and integrations/codex/skills/realornoise/SKILL.md:8,24, plugin.json:5 is 2.4.0, and CHANGELOG.md:85 also names realornoise==2.4.0.",
+      "where": "pyproject.toml:3; packages/realornoise/pyproject.toml:3; plugins/realornoise/.claude-plugin/plugin.json:5; both SKILL.md files",
+      "action": "Follow RELEASING.md step 1 for X.Y.Z = 2.4.1, then search for 2.4.0 again. This is process, not an audit failure.",
+      "confidence": "high"
+     }
+    ],
+    "not_checked": [
+     "Did not run the tests, ruff or basedpyright; this audit only read code and docs.",
+     "Did not read the new unit tests (test_server_stop_stages.py, test_tool_server_stop_at_trial_end.py, test_atomic_snapshot.py, test_kept_read_race.py) beyond the diff stat.",
+     "Did not read AGENT_SEMANTICS.md, TRUST_MODEL.md or the docs/design records in full. Only the grepped sections were read (AGENT_SEMANTICS.md lines 75-100, 125-260, 300-330, 395-415; TRUST_MODEL.md 10-30; 0002 20-60; 0017 138-146, 490-530, 600-610).",
+     "Did not check STATISTICS*.md beyond a grep of STATISTICS_LOGS.md for kept/unreadable/absent.",
+     "Did not check whether a recorded store from a non-idle server trial actually seals differently between v2.4.0 and HEAD; that conclusion rests on the code and CHANGELOG.md:3-38.",
+     "Did not check non-src changes (workflows, action.yml, README, figures) for compatibility impact.",
+     "Did not check how the Python toolset's snapshot() treats state.json.tmp beyond the docstring's claim."
+    ]
+   }
+  },
+  {
+   "key": "pipeline",
+   "result": {
+    "summary": "I found nothing in .github that would fail at a v2.4.1 tag. Every action changed since v2.4.0 stayed on the same major version (minor or patch bumps only), no workflow or script hard-codes 2.4.0, and none of the files added since v2.4.0 can reach the main sdist or either wheel. The release will pass only if the bump commit sets 2.4.1 in every place the guard and test_every_release_version_matches check, re-freezes pyproject.toml and uv.lock in FROZEN.sha256, and regenerates the HTML goldens. Packaging tests at HEAD: 53 passed, 1 skipped (the hatchling wheel build, unavailable offline).",
+    "blockers": [],
+    "items": [
+     {
+      "what": "actions/checkout moved from v7.0.0 to v7.0.1 (SHA 3d3c42e5...) in release.yml:32 and :198, and in ci.yml, adapters-latest, client-versions, codeql and workflow-audit. The only input used is persist-credentials: false.",
+      "where": ".github/workflows/release.yml:32,198 (git diff v2.4.0..HEAD -- .github)",
+      "action": "Keep as is. It is a patch bump within v7, so the input should still exist. I could not confirm the SHA-to-tag mapping or the action's input list without network; the repo only gives the '# v7.0.1' comment.",
+      "confidence": "medium"
+     },
+     {
+      "what": "actions/setup-python moved from v7.0.0 to v7.1.0 (SHA 6d4fd22b...). The only input used is python-version: 3.12 in build, and 3.11 and 3.14 in the smoke matrix.",
+      "where": ".github/workflows/release.yml:36,202",
+      "action": "Keep as is. It is a minor bump within v7 and python-version is its core input. I could not confirm offline that 3.14 resolves on the new version, but CI already runs 3.14 jobs with this same SHA on main.",
+      "confidence": "medium"
+     },
+     {
+      "what": "actions/upload-artifact moved from v7.0.1 to v7.0.2 (SHA cf430e03...). Inputs used: name, path, if-no-files-found: error.",
+      "where": ".github/workflows/release.yml:174,180",
+      "action": "Keep as is. It is a patch bump within v7. The CI build-realornoise job already uploads with this SHA on main and the same name and path inputs. if-no-files-found is used only in release.yml, so CI has not exercised it on this SHA. I could not confirm it offline.",
+      "confidence": "medium"
+     },
+     {
+      "what": "pypa/gh-action-pypi-publish moved from v1.14.2 to v1.14.3 (SHA 7245906f...). Inputs used: attestations: true, skip-existing: false, packages-dir: dist-realornoise/. v2.4.1 will be the first run of this SHA anywhere, because only release.yml uses it.",
+      "where": ".github/workflows/release.yml:243-246,271-275",
+      "action": "Keep as is. It is a patch bump within v1, so the inputs should be unchanged. Neither I (offline) nor any earlier CI run has confirmed them. If it fails at the OIDC or upload step, follow the 'When the publish job fails' section of docs/RELEASING.md.",
+      "confidence": "medium"
+     },
+     {
+      "what": "actions/download-artifact is unchanged: v8.0.2, SHA 9000827c..., the same as at v2.4.0. It was already paired with upload-artifact v7 at v2.4.0.",
+      "where": ".github/workflows/release.yml:206,211,232,260; git show v2.4.0:.github/workflows/release.yml:206",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "Release guard: the tag must equal 'v' plus the pyproject.toml version; src/arci/__init__.py __version__ must equal that version; the realornoise project and module versions must equal it; and realornoise's dependencies must be exactly ['agent-reliability-ci==<version>']. ref_type must be tag. All four are 2.4.0 today: pyproject.toml:3, src/arci/__init__.py:3, packages/realornoise/pyproject.toml:3 and :9, packages/realornoise/src/realornoise/__init__.py:3.",
+      "where": ".github/workflows/release.yml:41-88",
+      "action": "In the bump commit, set all five values to 2.4.1 and push the tag v2.4.1 at that commit. The guard has no hard-coded version.",
+      "confidence": "high"
+     },
+     {
+      "what": "The sdist allowlist takes its root from the pyproject.toml version and accepts only README.md, LICENSE, NOTICE, CHANGELOG.md, pyproject.toml, PKG-INFO, .gitignore and anything under src/arci/. pyproject.toml:67 limits the sdist with only-include to src/arci and those five top-level files. None of the new files can enter the main sdist: plugins/realornoise/README.md, icon.png, docs/PRIVACY.md, docs/assets/*.svg, docs/assets/src/make_plugin_icon.py, docs/blog/, docs/results/order-desk-study/run-3/. The only changes since v2.4.0 under src/ and packages/ are edits to four existing src/arci files.",
+      "where": ".github/workflows/release.yml:93-142; pyproject.toml:66-67; git diff --name-status v2.4.0..HEAD",
+      "action": "Keep as is. Nothing new breaks the allowlist. The check has 1 job-level assumption I did not run: hatch adds no extra entry such as .gitignore beyond the allowlist. That is unchanged since v2.4.0.",
+      "confidence": "high"
+     },
+     {
+      "what": "wheel_smoke.sh checks the main wheel's 4 example files and reads Version from its METADATA. It then checks the realornoise wheel: only realornoise/__init__.py, realornoise/py.typed, and METADATA, WHEEL, RECORD, entry_points.txt and licenses/ under realornoise-<version>.dist-info. It also checks that Version equals the main version, Requires-Dist is exactly agent-reliability-ci==<version>, Requires-Python is >=3.11, and the entry point is realornoise=arci.logs.cli:main. Nothing is hard-coded, and packages/realornoise/pyproject.toml:31 ships only src/realornoise, so the new plugin and docs files cannot reach either wheel.",
+      "where": ".github/scripts/wheel_smoke.sh:29-64",
+      "action": "Keep as is. For 2.4.1 it needs only the consistent bump above, plus requires-python staying >=3.11 (pyproject.toml:9 and packages/realornoise/pyproject.toml:8).",
+      "confidence": "high"
+     },
+     {
+      "what": "No hard-coded 2.4.0 in .github, action.yml or justfile (git grep returns nothing). UV_VERSION 0.12.5 (release.yml:23) matches .github/requirements/uv.txt:5, which is unchanged since v2.4.0.",
+      "where": ".github/**",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "test_every_release_version_matches compares every one of these against arci.__version__: both pyproject versions and the dependency pin, both __init__ files, plugins/realornoise/.claude-plugin/plugin.json:5, CITATION.cff:10, the agent-reliability-ci entry in uv.lock (uv.lock:11), and the 'uvx --python 3.14 realornoise==' pins. The new plugins/realornoise/README.md has those pins at lines 8, 47, 83 and 124; the two SKILL.md files have them too. It also checks the four README.md patterns, and that every one of these paths is named in docs/RELEASING.md. It fails after the bump if any of them is left at 2.4.0.",
+      "where": "tests/unit/packaging/test_review_fixes.py:20-66",
+      "action": "No test change needed. The bump commit must update every location listed in docs/RELEASING.md step 1 (lines 27-39), including plugins/realornoise/README.md, and set CITATION.cff date-released (line 11, now 2026-11-16).",
+      "confidence": "high"
+     },
+     {
+      "what": "pyproject.toml and uv.lock are hash-pinned in FROZEN.sha256 (lines 26 and 76). Changing the version changes both hashes. shasum -a 256 -c FROZEN.sha256 passes at HEAD today.",
+      "where": "FROZEN.sha256:26,76; docs/RELEASING.md:24,52-64",
+      "action": "Do the bump as a re-freeze: add a design record, regenerate uv.lock, recompute only those hashes plus the new record, and check that every other hash is unchanged. The CI frozen-hash checks will fail if this is skipped.",
+      "confidence": "high"
+     },
+     {
+      "what": "The 5 HTML goldens under tests/unit/html_report/golden/ (block, error, inconclusive, pass, v1) carry 'ARCI 2.4.0' in their footer line 25. They are outside tests/unit/packaging, but the CI unit suite will fail after the bump unless they are regenerated. The log snapshots normalize the version (tests/unit/logs/test_report.py:27), so they need no change.",
+      "where": "tests/unit/html_report/golden/*.html:25; docs/RELEASING.md:43-46",
+      "action": "Run .venv/bin/python -m tests.unit.html_report.generate at the bump. It also regenerates docs/results/sample-suite-report.html. Also set the banner in docs/recipes/logs.md:38 to realornoise 2.4.1; RELEASING.md calls it a current-version location.",
+      "confidence": "high"
+     },
+     {
+      "what": "tests/unit/packaging at HEAD: last line '53 passed, 1 skipped in 1.04s'. The skip is test_realornoise_and_main_wheel_file_lists, because hatchling is not installed offline. The release guard test (6 cases) and the wheel_smoke content tests read versions dynamically or use 2.2.0 fixtures, so they need no change at the bump. test_trust_files.py names 2.4.0 only in its docstring. git status was clean after the run.",
+      "where": "tests/unit/packaging (run with PYTHONDONTWRITEBYTECODE=1, -p no:cacheprovider)",
+      "action": "Keep as is. Re-run after the bump commit; test_every_release_version_matches is the one that catches a missed location.",
+      "confidence": "high"
+     }
+    ],
+    "not_checked": [
+     "Whether the new action SHAs really are the tagged v7.0.1, v7.1.0, v7.0.2 and v1.14.3 releases, and whether their input lists are unchanged: no network, so only the repo's version comments were seen.",
+     "Whether the hosted CI run on main 06a01f5 is green, and whether the v2.4.0 release run succeeded: no network or gh access.",
+     "The built-wheel file-list test: hatchling is unavailable offline, so it was skipped. uv build was not run, so the real sdist and wheel contents were not inspected.",
+     "PyPI trusted-publisher setup and the GitHub pypi environment protection.",
+     "The full test suite outside tests/unit/packaging, including the html_report goldens and the CI frozen-hash and uv lock --check steps after a bump.",
+     "Non-version-related CI behaviour of the src/arci changes since v2.4.0 (mcp_boundary.py, kept.py, mcp_toolset_server.py, runner.py)."
+    ]
+   }
+  },
+  {
+   "key": "plugin",
+   "result": {
+    "summary": "The plugin and both skills cannot be bumped alone: the tests tie plugin.json and the three pinned files to arci.__version__, so the bump is the whole 2.4.1 release set. Every sentence saying a 2.4.0 copy \"keeps the earlier skill until the plugin's version changes\" stays literally true, but reads as if nothing changes at 2.4.1, so five of them need a small rewording. I changed and ran nothing; I only read files and grepped.",
+    "blockers": [],
+    "items": [
+     {
+      "what": "Pins of realornoise==2.4.0 in current-version locations (all must become 2.4.1). Seven are the pin string; one is a banner line.",
+      "where": "plugins/realornoise/skills/realornoise/SKILL.md:13 and :45; plugins/realornoise/README.md:8, :47, :83, :124; integrations/codex/skills/realornoise/SKILL.md:8 and :24; integrations/codex/README.md:4; docs/THREAT_MODEL_LOGS.md:83; docs/recipes/logs.md:300 (pin) and :38 (banner 'realornoise 2.4.0 \u00b7'); also :35 '2.4.0 checkout' (see the next item)",
+      "action": "Replace 2.4.0 with 2.4.1 in each. Also bump plugins/realornoise/.claude-plugin/plugin.json:5 ('version': '2.4.0'). docs/RELEASING.md:31-39 lists these same locations.",
+      "confidence": "high"
+     },
+     {
+      "what": "Version bumps for the package set, which the plugin bump is bound to by tests",
+      "where": "pyproject.toml:3; src/arci/__init__.py:3; packages/realornoise/pyproject.toml:3 (and its agent-reliability-ci== dependency); packages/realornoise/src/realornoise/__init__.py; CITATION.cff; uv.lock; README.md:600-608, :758-760",
+      "action": "Set all of these to 2.4.1. The plugin and skills cannot be bumped without them, because the tests compare against arci.__version__.",
+      "confidence": "high"
+     },
+     {
+      "what": "Sentence that must be reworded: 'The command runs by itself, with nothing shown first: a copy of plugin version 2.4.0 installed before the skill became an instruction to Claude keeps the earlier skill until the plugin's version changes and you update the plugin.' It is still true, but after the bump '2.4.0' is both the old copy and the version before the change, and it never says what to install.",
+      "where": "plugins/realornoise/README.md:117-120",
+      "action": "Rewrite as: 'a copy of plugin version 2.4.0 keeps the earlier skill. Version 2.4.1 has the new one: update the plugin to 2.4.1 or later.' Keep the last sentence about the earlier skill (README.md:120-121) as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "Sentence that must be reworded: 'A copy of plugin version 2.4.0 installed before the skill became an instruction keeps the earlier skill until the plugin's version changes and you update the plugin: that skill ran the command itself when you typed it, with the command approved ahead of time.' It is still true, but the 'version changes' condition is now met by 2.4.1.",
+      "where": "docs/PRIVACY.md:69-72",
+      "action": "Rewrite as: 'A copy of plugin version 2.4.0 keeps the earlier skill until you update the plugin to 2.4.1 or later: that skill ran the command itself when you typed it, with the command approved ahead of time.' Do not add any claim that Claude Code updates it by itself; no file in this tree says so (grep for update and auto-update found nothing).",
+      "confidence": "high"
+     },
+     {
+      "what": "Sentence that must be reworded: 'A copy of plugin version 2.4.0 installed before the skill became an instruction keeps the earlier skill, which ran the command itself with the command approved ahead of time, until the plugin's version changes and the user updates the plugin.'",
+      "where": "docs/THREAT_MODEL_LOGS.md:89-92",
+      "action": "Rewrite the tail as: '... until the user updates the plugin to 2.4.1 or later.' Drop 'installed before the skill became an instruction' or replace it with 'version 2.4.0'.",
+      "confidence": "high"
+     },
+     {
+      "what": "CHANGELOG entry, now under Unreleased and to be moved under v2.4.1: 'A copy of plugin version 2.4.0 installed before this change keeps the earlier skill until the plugin's version changes and you update the plugin.' Also its text 'uvx --python 3.14 realornoise==2.4.0' in the same entry (line 85) will be wrong for the 2.4.1 release.",
+      "where": "CHANGELOG.md:85 and :91-92",
+      "action": "Change the command at :85 to realornoise==2.4.1 for the new section. Reword :91-92 as 'A copy of plugin version 2.4.0 keeps the earlier skill until you update the plugin to 2.4.1 or later.' Leave the v2.4.0 entry at CHANGELOG.md:138 ('realornoise==2.4.0') unchanged, as history.",
+      "confidence": "high"
+     },
+     {
+      "what": "Sentences that stay true unchanged",
+      "where": "docs/PRIVACY.md and docs/THREAT_MODEL_LOGS.md, the surrounding text; plugins/realornoise/README.md:122-126",
+      "action": "Keep as is. These describe how the skill works now and what --keep does; only the version string in README.md:124 changes. docs/recipes/logs.md:35 ('2.4.0 checkout on 2026-11-16') is a dated capture. docs/RELEASING.md:50-55 says the captured banner at :38 is a current-version location set at the bump. Re-capture the output (or edit the line) so the banner and the text at :35 agree; do not change :35 without re-capturing.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Tests that fail if only some of the locations change",
+      "where": "tests/unit/packaging/test_review_fixes.py:20-60 (test_every_release_version_matches); tests/unit/plugin/test_plugin_files.py:38-43, :66-77, :100-104",
+      "action": "(a) test_every_release_version_matches fails if plugin.json, the CITATION, uv.lock, either pyproject, either __init__, or any pin in plugin SKILL.md, plugin README.md or codex SKILL.md differs from arci.__version__, and also checks README.md's current-release sentences. (b) test_plugin_manifest_matches_the_package fails if plugin.json version differs from arci.__version__. (c) test_claude_skill_names_only_the_fixed_command fails if the two uvx lines in the Claude SKILL.md differ from realornoise==arci.__version__. (d) test_codex_skill_names_the_same_command fails if the codex SKILL.md indented command line lacks the current version. If only plugin.json, SKILL.md and README pins are moved to 2.4.1 and the package is left at 2.4.0, all of these fail the other way round.",
+      "confidence": "high"
+     },
+     {
+      "what": "What no test holds: the docs prose and pins",
+      "where": "integrations/codex/README.md:4; docs/THREAT_MODEL_LOGS.md:83; docs/recipes/logs.md:300 and :38; the PRIVACY, THREAT_MODEL and CHANGELOG rewordings above",
+      "action": "A stale 2.4.0 there would not fail any test I found. Check them by search before the release: grep for 2.4.0 outside CHANGELOG history. I grepped tests/ for these four and found no check of the doc pins; I did not run the suite.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Snapshots and goldens that carry 2.4.0",
+      "where": "tests/unit/logs/snapshots/*.txt and *.html (line 1); tests/unit/html_report/golden/*.html (footer)",
+      "action": "Log snapshots are normalised for the header version (tests/unit/logs/test_review_fixes.py:235-241; docs/RELEASING.md:41-43), so they need no change. The five HTML goldens hold 'ARCI 2.4.0' in the footer and are regenerated with .venv/bin/python -m tests.unit.html_report.generate (docs/RELEASING.md:43-47), which also regenerates docs/results/sample-suite-report.html. This is not plugin-related but is part of the same bump.",
+      "confidence": "high"
+     },
+     {
+      "what": "plugin.json fields besides version",
+      "where": "plugins/realornoise/.claude-plugin/plugin.json:6-16",
+      "action": "No other field names a version. privacyPolicyUrl and documentationUrl point at docs/PRIVACY.md and docs/recipes/logs.md on main; test_plugin_files.py:53-56 requires those files to exist and PRIVACY.md to contain 'opens no network connection'. Rewording PRIVACY.md must keep that phrase. .claude-plugin/marketplace.json has no version field (grep).",
+      "confidence": "high"
+     }
+    ],
+    "not_checked": [
+     "I did not run any test; the failure predictions above come from reading the test code only.",
+     "I did not open docs/design, docs/STATISTICS_LOGS.md or FROZEN.sha256 contents beyond a grep, so I do not know whether any frozen file needs a re-freeze for the bump (docs/RELEASING.md:56-60 describes recomputing hashes for touched files).",
+     "I did not check whether Claude Code updates a plugin on its own or only when the user runs an update; no file in the tree says so, so the rewordings above make no such claim.",
+     "I did not read README.md of the main project beyond the version lines, nor plan/ or plan/research (excluded).",
+     "I did not verify that the full tests/ tree has no other 2.4.0 sensitive check; I grepped for 2.4.0, plugin.json, SKILL.md, realornoise== and privacyPolicyUrl only, and the output of the broad grep was truncated, so I read the specific test files directly."
+    ]
+   }
+  },
+  {
+   "key": "risk",
+   "result": {
+    "summary": "I found no blockers. I read every source change since v2.4.0 in kept.py, mcp_boundary.py, mcp_toolset_server.py and runner.py, plus the four new test files, which pass. None of the code merged since v2.4.0 can hang past the trial deadline, leave a temp file that a grader reads or that gets packaged, or change an outcome through an exception path. The three open items can ship with notes, but one Unreleased changelog sentence now contradicts the staged-stop entry and should be fixed before tagging.",
+    "blockers": [],
+    "items": [
+     {
+      "what": "Staged stop cannot run past the deadline. stop_server (mcp_boundary.py:816-857) takes R from the deadline when it starts and never restarts it. It returns at the latest at kill_at = start + 3R/4. Every idle() call is capped at min(tick, until - now), and that value is always positive on the paths that reach idle. When R = 0 it kills at once. trial_deadline (mcp_boundary.py:~2324) takes min(started + seconds_remaining, parent_deadline), so the boundary never uses a deadline later than the parent's. A SIGTERM from the parent (runner.py, the boundary_stop_at branch) only sets self.stop, so it does not cut the stop short, and the stop is bounded anyway. The only unbounded wait is server.wait() after SIGKILL at the end of _stop_server, and the old code had the same wait. If it ever blocked, the parent's deadline and stop_all() would still kill the boundary's process group.",
+      "where": "src/arci/mcp_boundary.py:802-857, 2185-2250; src/arci/runner.py:1160-1168",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "No child process is left running beyond what v2.4.0 already allowed. The tool server runs in the boundary's session (Popen with no start_new_session, mcp_boundary.py:1978). The runner starts the boundary with start_new_session=True and its finally block always calls stop_all(), which runs os.killpg(SIGKILL) (runner.py:150-152, 1013-1017). That happens before _grade reads the snapshot (runner.py:1400-1410). A grandchild that calls setsid itself would escape, exactly as before.",
+      "where": "src/arci/runner.py:150-152, 1013-1017, 1335-1350",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "state.json.tmp is never read by a grader and never packaged. The toolset snapshot() reads only workdir/state.json (mcp_toolset_server.py:218-227). The workdir is mkdtemp under /tmp (runner.py:981) and is removed with rmtree (runner.py:1456). Nothing in src copies, tars or zips it. os.replace moves the file within the same directory, so the source and target are on the same file system on Linux and macOS. Windows execution is unsupported (ci.yml windows-smoke only runs --help). One case is not a regression: an agent sharing the workdir could plant state.json.tmp as a symlink or a directory. The agent could already do the same to state.json itself in v2.4.0, and can write state.json directly.",
+      "where": "src/arci/mcp_toolset_server.py:119-134, 218-227",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "Exception paths do not change outcomes. _stop_server treats a failure inside _server_is_idle as idle and kills at once. Any Exception during the staged stop falls back to _kill_server and is absorbed, so the result frame is still written. Only a BaseException that is not an Exception propagates, after the server is reaped, which is the same as the old code's suppress(Exception). In the toolset server, _call catches BaseException around save_snapshot and returns -32603. _write_whole removes its temp file and re-raises, so state.json keeps the last complete state.",
+      "where": "src/arci/mcp_boundary.py:2195-2250; src/arci/mcp_toolset_server.py:119-134, 204-210",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "Linux and macOS behave the same in this code. DefaultSelector is epoll on Linux and kqueue on macOS. Both accept the server's non-blocking stdout pipe, which _start_server set non-blocking, and a second registration in a new selector. os.read handles BlockingIOError. Popen.terminate and kill target a single pid on both. CI runs the unit tests on ubuntu-latest and macos-latest (ci.yml:210-215). I ran them on macOS only.",
+      "where": "src/arci/mcp_boundary.py:2214-2232; .github/workflows/ci.yml:210-215",
+      "action": "Keep as is.",
+      "confidence": "medium"
+     },
+     {
+      "what": "The retry loop in kept.read cannot return a wrong state. _read_once returns None only when stat() raised FileNotFoundError or NotADirectoryError and lstat() then succeeded. Every other branch returns exactly what v2.4.0 returned. After 4 attempts the answer is 'unreadable', which is the safe value: line 322 then skips the table write and F24 is printed. A dangling symlink costs 4 cheap attempts and ends unreadable, as before. One pre-existing nuance: an empty placeholder seen by the unlocked read gives 'absent' (kept.py:126-127). The report then misses rows that another run is just installing. The write is still correct because it merges with the table read under the lock (cli.py:400-406).",
+      "where": "src/arci/logs/kept.py:88-145",
+      "action": "Keep as is.",
+      "confidence": "high"
+     },
+     {
+      "what": "Open item (a): the frozen fixture server writes state.json in place (save() at tests/acceptance/mcp_fixture_server.py:56-57, called at 65, 101 and 105). It is a test fixture and is not used by the product. It writes before it answers, and it exits on EOF because its loop reads stdin (line 66). The staged stop closes its input and lets it exit, so an empty file now needs a SIGKILL at 3R/4 to land during one tiny write. It is frozen and cannot be edited.",
+      "where": "tests/acceptance/mcp_fixture_server.py:56-57, 65-66",
+      "action": "Ship with a note. It is not shipped code, the staged stop makes the window narrower, and editing it is forbidden.",
+      "confidence": "high"
+     },
+     {
+      "what": "Open item (b) is confirmed. The step-by-step trace: (1) The unlocked read at cli.py:200-204 returns 'absent' or 'read'. (2) Line 321-326 sets table_output to non-None, because table_state != 'unreadable'. (3) _write_outputs takes the lock (line 398) and reads again (line 400). (4) Line 401 removes the table from outputs. When state == 'unreadable', line 402 adds nothing back, and nothing is raised. (5) The other outputs are written, and _execute writes text and returns decision.exit_code (lines 331-332). That decision was sealed at line 291 with kept_table set to the first state and keep=True, so F24 is not printed (report.py:396, 455) and the JSON says 'read' or 'absent'. The exit code is unchanged. How a user notices: only indirectly. days-1.json does not change, or F21 'Days from the kept table' does not grow on later runs. If the table really is corrupt, the next run's first read says unreadable and prints F24, so the silence lasts one run. This code is unchanged since v2.4.0 (git diff v2.4.0..HEAD -- src shows no cli.py change), so it is not a regression. With the lock, it needs the table to really become unreadable between the two reads: corruption, a permission change, a symlink, a size over MAX_BYTES, or an unlocked writer where flock fails (cli.py:346-349). The 2.4.1 retry fix does not push the reported race into this case, because the read under the lock sees the finished table.",
+      "where": "src/arci/logs/cli.py:200-204, 321-332, 398-408",
+      "action": "Ship with a note in the changelog's known limits and fix it in the next patch. The smallest correct fix: at cli.py:402, replace `if state != \"unreadable\":` with `if state == \"unreadable\": raise OSError` and leave the append unconditional. _execute (line 329-330) then turns this into WRITE_ERROR 'Requested output could not be written.', and because the outputs are not yet staged, nothing is written. That matches the all-or-none output rule in 0017. Test, in tests/unit/logs/: monkeypatch arci.logs.kept.read to return ('absent', ()) on the first call and ('unreadable', ()) on the second. Run the CLI with --keep-dir tmp and --json out.json. Assert the WRITE_ERROR message and the usage-error exit, that out.json does not exist and that days-1.json does not exist. Before release, also run tests/acceptance/test_logs.py to confirm that no frozen test reaches this path. I did not find one, because a first-read 'unreadable' never takes the lock.",
+      "confidence": "high"
+     },
+     {
+      "what": "Open item (c): the graded final state still depends on timing in the cases the staged-stop entry lists. These are: a server that answers before it writes its state, saves only on EOF, or writes in reaction to a notification; start-up longer than R/2; a fully written tools/call that completes during the wait; and the timeout case near the deadline. The rule in _server_is_idle (mcp_boundary.py:2137-2171) matches that list. The project's own toolset server writes before it answers (mcp_toolset_server.py:204-210).",
+      "where": "src/arci/mcp_boundary.py:2137-2171; CHANGELOG.md:5-40",
+      "action": "Ship with the note that is already there. The limits are documented, and in every case a trial is no worse off than it was in v2.4.0.",
+      "confidence": "high"
+     },
+     {
+      "what": "A changelog sentence is now stale. The state.json entry ends 'Not changed: for an agent that never uses the tool server, the graded final state is still `{}` or the starting state, by timing.' The staged-stop entry, merged afterwards, fixes exactly that case: a server that never answered gets the staged stop, as tested by test_an_unused_slow_server_is_graded_on_its_starting_state. Read as release notes for 2.4.1, the two entries contradict each other.",
+      "where": "CHANGELOG.md:82-83",
+      "action": "Edit the sentence to say that the first entry under Unreleased (the boundary waits for its tool server) changes this, apart from the limits listed there.",
+      "confidence": "high"
+     },
+     {
+      "what": "Some release-prep version pins still say 2.4.0: src/arci/__init__.py:3, plugins/realornoise/.claude-plugin/plugin.json:5, plugins/realornoise/skills/realornoise/SKILL.md:13 and 45, and integrations/codex/skills/realornoise/SKILL.md:8 and 24. The changelog says that users keep the old skill until the plugin's version changes.",
+      "where": "plugins/realornoise/.claude-plugin/plugin.json:5; src/arci/__init__.py:3",
+      "action": "Bump these as part of the 2.4.1 release step. I made no edit.",
+      "confidence": "medium"
+     }
+    ],
+    "not_checked": [
+     "I did not run the full test suite or the acceptance tests. I ran only the four named files, on macOS, with no cache and no bytecode written. All of them passed, and the worktree stayed clean.",
+     "I ran nothing on Linux. My Linux conclusions come from reading the code and from the ubuntu jobs in the CI config.",
+     "Docs, figures, the study store, the workflow files and the plugin README in the diff are outside the src review.",
+     "I did not test platforms where flock is missing or fails, nor tool servers that call setsid themselves.",
+     "I did not read the bodies of the new tests beyond their names and the platform markers."
+    ]
+   }
+  },
+  {
+   "key": "docs",
+   "result": {
+    "summary": "No README or other document sentence becomes false by changing the version alone; the edits are a CHANGELOG dating, a ROADMAP entry, a COMPATIBILITY section, a design record, and one README study paragraph that run 3 already made stale on main. Everything below was read in the worktree at 06a01f5 against v2.4.0; I ran no tests and checked nothing against the actual release commit.",
+    "blockers": [],
+    "items": [
+     {
+      "what": "README version-pin sentences, 6 places. The test test_every_release_version_matches checks four of the patterns, and RELEASING.md step 1 already lists them.",
+      "where": "README.md:600-601 ('pins `v2.4.0`, the current release' and 'agent-reliability-ci==2.4.0'), :608 (@v2.4.0), :758 ('v2.4.0 is the current release', '==2.4.0'), :759 ('[langchain]==2.4.0'), :760 ('Action tag `v2.4.0`')",
+      "action": "Change 2.4.0 to 2.4.1 in each of these six places. Do not change README.md:45 ('New in 2.4'), because 2.4.1 adds no feature and the heading is still true. Lines 758-763 (release page, trusted publishing, realornoise pinned to the main package) stay true as written.",
+      "confidence": "high"
+     },
+     {
+      "what": "README 'What is not in 2.4.0' names a list that 2.4.1 leaves untouched.",
+      "where": "README.md:717",
+      "action": "Change 'What is not in 2.4.0' to 'What is not in 2.4' (or '2.4.1'), because the list is unchanged by this patch. No test checks this line. If left alone, it is still true but looks stale next to the 2.4.1 pins.",
+      "confidence": "medium"
+     },
+     {
+      "what": "README says the order-desk study had two runs and shows a two-column table. The Unreleased CHANGELOG entry and docs/results/order-desk-study.md on main add run 3, and docs/results/README.md was already changed to 'all three runs'. After 2.4.1 ships, the README is the only place still saying two.",
+      "where": "README.md:145 ('Two recorded comparisons. Both pre-registered...'), :146-153 (table with Run 1 and Run 2 only), :161 ('These are two runs on one suite'), :162-163 (links to run 1 and run 2 reports only). Run 3 is a different comparison: 4B model in both arms, 8 cells, arm roles swapped, BLOCK at round 2 (docs/results/order-desk-study/README.md and CHANGELOG.md:41-47).",
+      "action": "Choose one of two edits. (a) Leave the 'two' claim and add one sentence after line 163 saying that run 3, a different comparison (one model in both arms, 8 cells chosen after run 2, swapped arm roles), is in the write-up and is not in this table. (b) Add a third column. (a) is the safer edit, because run 3's BLOCK means something different from runs 1 and 2. Do not leave line 161 as it is without adding the run 3 sentence. This edit is a maintainer decision.",
+      "confidence": "medium"
+     },
+     {
+      "what": "CHANGELOG: rename the Unreleased heading and add the date. Earlier release sections start with a bold '**Added:**' bullet, not a summary paragraph. The '## Unreleased' section on main has 9 bullets (Fixed, Docs, Changed) and no summary paragraph.",
+      "where": "CHANGELOG.md:3 ('## Unreleased'), against '## v2.4.0 (2026-11-16)' at :124. Format is '## vX.Y.Z (YYYY-MM-DD)' (v2.3.0 at :208, v2.2.0 at :242, v2.1.0 at :272). v2.4.0 and v2.3.0 open directly with a '- **Added:**' bullet.",
+      "action": "Replace line 3 with '## v2.4.1 (2026-11-XX)', using the release date. Do not add a new empty 'Unreleased' heading unless later work needs it. A one-line summary is optional, since earlier sections have none. If one is added, it should say plainly that the package code changes are the MCP tool-server stop (the boundary waits for its tool server when that can change what the grader reads), the atomic state.json write, and the kept-table read race; everything else is docs, the plugin skill and the study run 3 record. Two entries must be re-checked against the release date: the 'Fixed' bullet at :5 and the 'Changed' plugin-skill bullet at :84-95, which says 'A copy of plugin version 2.4.0 installed before this change keeps the earlier skill until the plugin's version changes and you update the plugin'. That sentence is exactly why plugins/realornoise/.claude-plugin/plugin.json must be bumped to 2.4.1. Keep it, and note the 2.4.0 pin in it is historical and must not be rewritten to 2.4.1.",
+      "confidence": "high"
+     },
+     {
+      "what": "CHANGELOG line 60 says the PNGs stay in docs/images/ because the 2.4.0 README on PyPI links them. This stays true after 2.4.1, because the published 2.4.0 page is not rewritten. The current README does not reference docs/images at all (I found no reference to it outside CHANGELOG.md:59). PyPI pictures: README.md:2-3, 289-290, 360-361, 408-409, 475-476 use absolute raw.githubusercontent.com .../main/docs/assets/*.svg URLs, so the 2.4.1 page on PyPI will show the SVGs, provided main still has those files at the time the page is viewed.",
+      "where": "CHANGELOG.md:58-60; README.md:2-4, 288-291, 359-362, 407-410, 474-477; docs/images/*.png (4 files)",
+      "action": "Keep as is. Do not delete docs/images/*.png in the release, because the 2.4.0 page on PyPI depends on them. No README sentence about pictures on PyPI exists, so none can be false.",
+      "confidence": "high"
+     },
+     {
+      "what": "ROADMAP: earlier releases each got a 'Done in vX.Y.Z' section (v2.0.0, v2.1.0, v2.2.0, v2.3.0, v2.4.0) and the intro paragraph (lines 1-12) names releases up to 2.3.0. A patch release with no new feature has no precedent here, because every prior release added something.",
+      "where": "docs/ROADMAP.md:113-118 ('## Done in v2.4.0'), :1-12 intro (stops at v2.3.0; 2.4.0 was never added to it)",
+      "action": "Add a short '## Done in v2.4.1' section after line 118, before '## Next', in the same one-paragraph style. Truthful content: fixes only, no new feature. It would list (1) the boundary waits for its MCP tool server at trial end when that can change the graded state, (2) the Python toolset server replaces state.json whole instead of writing it in place, (3) a kept table installed by another run during the first read is read, not reported unreadable, (4) the Codex reader checked against Codex CLI 0.169.0, (5) the Claude Code plugin skill is now an instruction with nothing approved ahead of time, plus its README, privacy page and icon, (6) order-desk study run 3 with its sealed store and write-up, (7) README figures and badges in one theme. Say that no command, record kind, exit code or schema changes. Link docs/design/0018-v2.4.1-release.md. The 'Next' section (:120-140) needs no change. Optional: add 'v2.4.0 adds arci-logs/2 and keeping days' to the intro; that omission already existed.",
+      "confidence": "medium"
+     },
+     {
+      "what": "COMPATIBILITY: a section exists for 2.3.0 (:74) and 2.4.0 (:90), and v2.2.0 also touched this file. v2.1.0 did not. These sections are for contract or format changes. 2.4.1 changes no record, schema, exit code or format. It does change one observable behaviour for command-agent trials, which is the reason to add a section.",
+      "where": "docs/COMPATIBILITY.md after :118 (end of file; the 2.4.0 section ends at :117); pattern from git diff v2.1.0 v2.2.0 (COMPATIBILITY.md +36) and v2.3.0/v2.4.0 (+16, +30)",
+      "action": "Add a short section 'Command trials in 2.4.1'. State: (a) at trial end the boundary can now wait for its MCP tool server in staged shutdown, so a command-trial's final_state (and so record_sha256) can differ from 2.4.0 for an agent that never used its tool server (it was {} or the server's starting state depending on timing); that difference is the fix; (b) such a trial can last longer when a server ignores EOF; (c) nothing about the wait is recorded; (d) schemas, `arci-logs/2` and imported outcomes are unchanged; (e) stores sealed by 2.4.0 stay readable. Also say state.json for toolset servers is now replaced whole. Check the claim in (a) against CHANGELOG.md:5-40 before writing. I did not re-read the code at src/arci/mcp_boundary.py.",
+      "confidence": "medium"
+     },
+     {
+      "what": "CITATION.cff has two release-specific fields. In v2.2.0 CITATION.cff was not changed (git diff v2.1.0 v2.2.0 shows 6 lines of change in the two files together; v2.3.0 and v2.4.0 changed it). RELEASING.md now requires both fields.",
+      "where": "CITATION.cff:10 (version: \"2.4.0\"), :11 (date-released: \"2026-11-16\"). Do not change :27 (the references entry date-released \"2026-11-15\" for the technical report).",
+      "action": "Set version to \"2.4.1\" and the top-level date-released to the release date. test_every_release_version_matches checks version only.",
+      "confidence": "high"
+     },
+     {
+      "what": "RELEASING.md names 2.4.0 specifics in two sentences: the re-freeze list for record 0017, and the check locations added for 2.4.0. The 2.3.0 sentence was replaced by the 2.4.0 sentence at 2.4.0, so the pattern is 'replace the previous release's specifics with this release's'. Its general text is version-neutral.",
+      "where": "docs/RELEASING.md:56-62 ('For 2.4.0, record 0017 re-freezes exactly ... newly pins docs/design/0017-logs-2.md'), :71-77 ('Check locations added for 2.4.0')",
+      "action": "Replace lines 58-62 with a 2.4.1 sentence: record 0018 re-freezes exactly pyproject.toml and uv.lock and newly pins docs/design/0018-v2.4.1-release.md, and every other hash stays as it is. This is accurate only if no frozen file is touched; git diff v2.4.0 HEAD showed no change to FROZEN.sha256, pyproject.toml or AGENTS.md since the tag. Leave 'Check locations added for 2.4.0' as is (the workflows still exist). Do not add a 2.4.1 check-locations sentence unless a workflow is added. Optionally add a sentence in step 1 that Unreleased bullets quoting 'version 2.4.0' (CHANGELOG.md:60, :85, :91) are historical, because the change-to-pin search the document asks for will hit them.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Version locations outside the README that still say 2.4.0 and that the version-neutral RELEASING step lists. The test checks all of them, so a missed one fails CI; this is the complete list found by search.",
+      "where": "pyproject.toml:3; src/arci/__init__.py:3; packages/realornoise/pyproject.toml:3 and :9; packages/realornoise/src/realornoise/__init__.py:3; plugins/realornoise/.claude-plugin/plugin.json:5; plugins/realornoise/skills/realornoise/SKILL.md:13,:45; plugins/realornoise/README.md:8,:47,:83,:117 (check),:124; integrations/codex/skills/realornoise/SKILL.md:8,:24; integrations/codex/README.md:4; docs/recipes/logs.md:35,:38,:300; docs/THREAT_MODEL_LOGS.md:83,:90 (:90 is a historical 'plugin version 2.4.0' sentence, keep); docs/PRIVACY.md:70 (same, keep); tests/unit/html_report/golden/{pass,block,inconclusive,error,v1}.html:25 and docs/results/sample-suite-report.html:25 (regenerate with .venv/bin/python -m tests.unit.html_report.generate); uv.lock",
+      "action": "Bump the pins and metadata. Keep historical uses of 2.4.0: plugins/realornoise/README.md:117 and docs/PRIVACY.md:70 and docs/THREAT_MODEL_LOGS.md:90 say 'a copy of plugin version 2.4.0 installed before the skill became an instruction'. Those are about the old plugin and stay 2.4.0. docs/recipes/logs.md:35 ('2.4.0 checkout on 2026-11-16') is a captured banner with the date; RELEASING.md says line :38 is set at the bump. I did not check whether line :35 should be reworded when line :38 changes; decide at the edit. docs/results/order-desk-study.md:226 ('2.4.0; run 2 used 2.0.0') is a record of what run 3 used and stays. Log snapshots under tests/unit/logs/snapshots normalize the header, so do not regenerate them per RELEASING.md.",
+      "confidence": "medium"
+     },
+     {
+      "what": "Design record outline for docs/design/0018-v2.4.1-release.md. Shape taken from 0013 (52 lines) and 0014 (73 lines): title line '# 0018: v2.4.1, <short summary>', then a byline paragraph, then these headings. 0014 adds a section for a first-screen change; 0018 has no equivalent unless the README study paragraph changes.",
+      "where": "docs/design/0013-v2.0.0-release.md, docs/design/0014-v2.1.0-release.md; new file docs/design/0018-v2.4.1-release.md",
+      "action": "Write about 40-60 lines. Title '# 0018: v2.4.1, fixes since 2.4.0 and a third study run'. Byline: release record by the orchestrator, date, who implemented (briefs under plan/exec/v2/tasks/, PRs 28-37 on main), who reviewed, and that the maintainer asked for this release on 2026-11-18. Do not name the orchestrator model unless the maintainer wants it (earlier records did). Headings: (1) '## Why 2.4.1' - a patch, because main holds four fixes and docs since the tag and no new command, record, exit code or schema; what the CI failures showed (state.json timing, kept-table read race). (2) '## What ships' - bullets, fixes first: tool-server stop at trial end; atomic state.json; kept-table read race; Codex reader checked against 0.169.0; plugin skill as an instruction, plugin README, PRIVACY.md, icon; README theme; run 3 of the order-desk study. Keep each to one or two lines and point to the CHANGELOG for the detail. (3) '## Frozen changes in this release' - pyproject.toml version 2.4.1, uv.lock project version entry only, FROZEN.sha256 re-hashed for those two and this record added; every other hash unchanged (verify with shasum -a 256 -c FROZEN.sha256 and state the entry count at that time; 0014 gave '66 entries'). (4) '## What changes in behaviour' - the one behavioural change, final_state/record_sha256 of a command trial can differ from 2.4.0 when the server had not started; stores sealed by 2.4.0 stay readable. (5) '## What is not in 2.4.1' - nothing new is added; the 2.4.0 list (README.md:717) is unchanged; the stop-wait limits stay in the CHANGELOG. (6) '## What the release may and must not say' - run 3 is one run of a different comparison and says nothing about the 12B model or a measured effect of returning tool errors; the stop fix is not a claim that command trials are now deterministic; the plugin change is not a security audit or a directory listing (state submission status only as you check it); no claim of adoption. Add a sentence that 0018 supersedes nothing.",
+      "confidence": "medium"
+     },
+     {
+      "what": "FROZEN.sha256 must gain an entry for the new design record. 0016 and 0017 are listed at lines 22-23.",
+      "where": "FROZEN.sha256:22-23",
+      "action": "Add docs/design/0018-v2.4.1-release.md after the record exists, and re-hash pyproject.toml and uv.lock. This is the orchestrator's step per AGENTS.md; I did not touch it.",
+      "confidence": "high"
+     },
+     {
+      "what": "README 'Development' paragraph credits design records and the review of each release ('For 2.3.0, record 0016 ... design records 0011 to 0016'). It was not updated for 2.4.0 (still stops at 0016).",
+      "where": "README.md:719-734",
+      "action": "Optional: change 'design records 0011 to 0016' to 'to 0018' only if the maintainer wants the record range current. It is not false for 2.4.1 as written (it names 2.3.0 specifically). Keep as is unless asked.",
+      "confidence": "low"
+     }
+    ],
+    "not_checked": [
+     "Whether the tests pass after the proposed edits; I ran nothing.",
+     "The truth of the CHANGELOG bullets against the code (src/arci/mcp_boundary.py, mcp_toolset_server.py, logs/kept.py); I relied on the CHANGELOG text and the diff stat.",
+     "docs/results/order-desk-study.md run 3 contents beyond the CHANGELOG and README summaries.",
+     "Whether PyPI renders the README SVG images, and whether the GitHub raw URLs resolve; no network.",
+     "The exact count of FROZEN.sha256 entries and whether any frozen file differs from its hash (shasum -c not run).",
+     "docs/blog/*, docs/PROVENANCE.md, and the docs/LOG_FORMATS.md sentence at :14-19 for any version claim; only grep hits on 2.4.0 were examined.",
+     "Whether the plugin directory submission or listing status mentioned in the CHANGELOG is accurate."
+    ]
+   }
+  }
+ ],
+ "critic": {
+  "summary": "I found no blockers. I checked 11 of the auditors' high-confidence items myself and all hold, apart from one wrong line number (CITATION.cff). The things nobody covered are: the GitHub release page with its checksums and verification receipt, which README promises but neither release.yml nor RELEASING.md creates; the RELEASING.md step 5 CI wait and the section 4 PyPI checks after publishing; and two places where the auditors disagree on wording (CHANGELOG.md:85 and plugins/realornoise/README.md:117).",
+  "blockers": [],
+  "items": [
+   {
+    "what": "No auditor covered how the GitHub release page is made. README.md:761-762 says the release page 'links the wheel, sdist, checksums and verification receipt'. release.yml has no step that creates a release (grep for gh release, softprops and 'contents: write' finds nothing). No tracked file outside plan/ runs `gh release`, and docs/RELEASING.md never mentions a release page or a receipt.",
+    "where": "README.md:761-762; .github/workflows/release.yml; docs/RELEASING.md (no such step)",
+    "action": "The orchestrator should confirm how the v2.4.0 release page and receipt were made, then repeat that by hand for v2.4.1 after both PyPI uploads (attach SHA256SUMS from the dist and dist-realornoise artifacts). Otherwise the README sentence is false for releases/latest. Adding the step to RELEASING.md is optional.",
+    "confidence": "medium"
+   },
+   {
+    "what": "No auditor covered the RELEASING.md steps after the tag. Step 5 (lines 65-69): CI must be green on the bump commit, including wheel-smoke and 'oracle / SciPy'. Section 4 (lines 119-138): download both distributions from PyPI, check them with shasum -c, check the attestations, check Requires-Python >=3.11 and the exact pin, and run the three uvx commands (demo exits 0 with 'All six steps held.', both examples exit 1 with 'RESULT: REAL DROP'). PyPI versions cannot be replaced (RELEASING.md:3-5, 156-158), so whether 2.4.1 already exists on PyPI must be checked before tagging. I could not check this offline.",
+    "where": "docs/RELEASING.md:65-69, 119-144, 156-158",
+    "action": "Add these as explicit gates in the release plan: CI on the bump commit, then the tag, then the section 4 checks. Treat the pypi-publish 1.14.3 pin (never run before, per the pipeline audit) as the most likely failure point.",
+    "confidence": "high"
+   },
+   {
+    "what": "Contradiction about CHANGELOG.md:85. The docs auditor says the realornoise==2.4.0 pin in the plugin-skill entry is historical and 'must not be rewritten to 2.4.1'. The changelog, versions and plugin auditors say line 85 should become 2.4.1. I read lines 84-92: line 85 says what the skill now runs ('run `uvx --python 3.14 realornoise==2.4.0` once'). After the bump the 2.4.1 skill runs ==2.4.1, so 2.4.0 would be wrong in a v2.4.1 section. Line 91 ('A copy of plugin version 2.4.0 installed before this change') really is historical.",
+    "where": "CHANGELOG.md:84-92",
+    "action": "Change line 85 to realornoise==2.4.1 and keep the 2.4.0 on line 91. The docs auditor is wrong on line 85. No test reads CHANGELOG, so nothing catches this either way.",
+    "confidence": "high"
+   },
+   {
+    "what": "Contradiction about plugins/realornoise/README.md:117, docs/PRIVACY.md:69-72 and docs/THREAT_MODEL_LOGS.md:89-92. The versions and docs auditors say keep them as they are. The plugin auditor says reword them to 'update the plugin to 2.4.1 or later'. Both readings are literally true. Rewording PRIVACY.md must keep the phrase 'opens no network connection', which test_plugin_files.py requires (per the plugin auditor; I did not re-read that assertion).",
+    "where": "plugins/realornoise/README.md:117; docs/PRIVACY.md:69-72; docs/THREAT_MODEL_LOGS.md:89-92",
+    "action": "This is the maintainer's call and not a release gate. If reworded, keep '2.4.0' as the name of the old copy and add only the version to install.",
+    "confidence": "medium"
+   },
+   {
+    "what": "Checked myself, confirmed: CHANGELOG.md:82-83 ('Not changed: for an agent that never uses the tool server, the graded final state is still `{}` or the starting state, by timing.') contradicts lines 5-9 and 22-23 of the same Unreleased section. Lines 68-70 still describe the SIGKILL at _cleanup in the present tense.",
+    "where": "CHANGELOG.md:5-9, 22-23, 67-83",
+    "action": "Fix it as the changelog, compat and risk auditors propose: delete or replace the 'Not changed' sentence, and put lines 68-70 in the past tense, noting that an idle server is still killed at once.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, confirmed: README.md pins at lines 600, 601, 608, 758, 759 and 760 (four regex patterns in test_review_fixes.py:54-62). The test also requires every checked path to be named in docs/RELEASING.md (test_review_fixes.py:65-66). README.md has no reference to docs/images (grep is empty), and README.md:145-163 still describes only two study runs while docs/results/README.md:69 says 'all three runs'.",
+    "where": "README.md:145-163, 600-608, 758-760; tests/unit/packaging/test_review_fixes.py:20-66",
+    "action": "Bump the pins. The run-3 sentence in README is the maintainer's choice, as the docs auditor says.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, confirmed: the banner at docs/recipes/logs.md:38 is held exactly. test_example_output_is_real_and_labelled (tests/unit/docs/test_logs_docs.py:202-215, not 207-212) compares the whole captured ```text block with the live `--example` output, which prints the current version. The prose at docs/recipes/logs.md:35 ('2.4.0 checkout on 2026-11-16') is not tested.",
+    "where": "docs/recipes/logs.md:35-38; tests/unit/docs/test_logs_docs.py:202-215",
+    "action": "Re-capture the block after the bump rather than editing only the version, and update line 35 to match.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, confirmed: FROZEN.sha256 has 76 entries. pyproject.toml is line 26, uv.lock line 76 and 0017 line 23. `shasum -a 256 -c FROZEN.sha256` prints no non-OK line at 06a01f5. uv.lock has no realornoise package entry, which matches RELEASING.md:52.",
+    "where": "FROZEN.sha256:23,26,76; uv.lock",
+    "action": "Keep as is. Re-freeze only pyproject.toml, uv.lock and the new 0018 record, and replace the 2.4.0-specific sentence at RELEASING.md:58-62.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, one correction: CITATION.cff line 10 is version 2.4.0, line 11 is date-released 2026-11-16, and the nested technical-report date is at line 26. The docs auditor's ':27' is off by one; the versions auditor is right.",
+    "where": "CITATION.cff:10-11, 26",
+    "action": "Change lines 10-11 only.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, confirmed: the only changes since v2.4.0 under src and packages are four src/arci files (kept.py, mcp_boundary.py, mcp_toolset_server.py, runner.py); packages/ is unchanged. No tracked file in .github/, action.yml or justfile contains 2.4.0. action.yml:43 installs from github.action_path, so the Action's version is simply the tag. No separate version is pinned inside action.yml.",
+    "where": "git diff --stat v2.4.0..HEAD -- src packages; action.yml:43",
+    "action": "Keep as is. Pushing tag v2.4.1 is what makes README.md:608 '@v2.4.1' resolve.",
+    "confidence": "high"
+   },
+   {
+    "what": "Checked myself, confirmed: tests/unit/html_report/generate.py:19-36 rewrites the five goldens and docs/results/sample-suite-report.html by running the real demo suite. test_html_report.py:313 compares the demo output byte for byte with that file. So the generator must run after the bump, from the worktree root, because it writes a relative path.",
+    "where": "tests/unit/html_report/generate.py:35; tests/unit/html_report/test_html_report.py:313",
+    "action": "Run `.venv/bin/python -m tests.unit.html_report.generate` from the repository root at the bump and review the diff, which should change only the footer.",
+    "confidence": "high"
+   },
+   {
+    "what": "Locations no auditor looked at, now checked. bench/ is unchanged since v2.4.0, and nothing in it calls mcp_boundary or the runner. bench/selfcheck_logs.py uses kept.merge, not kept.read (lines 29, 901), so the kept.py fix does not invalidate docs/results/logs-selfcheck.md (dated 2026-11-16, with no version string). tests/unit/docs changed only test_figures.py and test_order_desk_stores.py. The packaged example data under src/arci is unchanged. .claude-plugin/marketplace.json has no version field.",
+    "where": "bench/; docs/results/logs-selfcheck.md:1-4; tests/unit/docs; .claude-plugin/marketplace.json",
+    "action": "Keep as is. None of these needs regenerating for 2.4.1.",
+    "confidence": "high"
+   },
+   {
+    "what": "Test evidence at 06a01f5 before the bump: tests/unit/docs, tests/unit/plugin, tests/unit/html_report and tests/unit/packaging gave 272 passed, 1 skipped (the offline hatchling wheel test), run with -p no:cacheprovider and PYTHONDONTWRITEBYTECODE=1. git status was clean afterwards.",
+    "where": ".venv/bin/pytest tests/unit/{docs,plugin,html_report,packaging}",
+    "action": "Re-run these after the bump commit. test_every_release_version_matches, test_example_output_is_real_and_labelled and the html goldens are the checks that catch a missed location.",
+    "confidence": "high"
+   }
+  ],
+  "not_checked": [
+   "Whether 2.4.1 already exists on PyPI for either project, whether the trusted publishers and the pypi environment protection are set up, and whether hosted CI on 06a01f5 is green (all need network).",
+   "How the v2.4.0 GitHub release page and verification receipt were produced (needs network or plan/, which is excluded).",
+   "The full unit suite outside docs, plugin, html_report and packaging, and the acceptance tests.",
+   "The compat and risk auditors' code-level claims about mcp_boundary.py stop timing and cli.py:398-408. I confirmed only that cli.py is unchanged since v2.4.0 (it is absent from the src diff).",
+   "docs/ROADMAP.md, docs/COMPATIBILITY.md and AGENT_SEMANTICS.md line references cited by other auditors.",
+   "Whether `uv lock` after the bump leaves resolved versions unchanged (uv is not allowed here)."
+  ]
+ },
+ "missing": []
+}

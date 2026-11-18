@@ -1,0 +1,305 @@
+[
+ {
+  "key": "versions",
+  "review": {
+   "summary": "No defects found. All current-version locations RELEASING.md lists are 2.4.1. The FROZEN.sha256 and uv.lock checks match, the HTML goldens differ only in the footer, and the docs and packaging tests pass with one expected skip.",
+   "findings": [],
+   "checked_ok": [
+    "2.4.1 verified in: both pyproject.toml files, the dependency pin agent-reliability-ci==2.4.1, both __init__.py, plugin.json, CITATION.cff (version 2.4.1, top-level date-released 2026-11-18; the nested reference date is not in the diff), README (Action pin, PyPI pins, current-release sentences, 'not in 2.4.1'), the uvx pins in both SKILL.md files, plugins/realornoise/README.md (3 pins), integrations/codex/README.md and SKILL.md, docs/recipes/logs.md (banner, pin, capture date), docs/THREAT_MODEL_LOGS.md pin, uv.lock project entry, and the six HTML footers.",
+    "Remaining 2.4.0 / v2.4.0 occurrences all read as correct history: older CHANGELOG sections and the v2.4.0 heading, plugin README, PRIVACY and THREAT_MODEL text about the earlier installed copy 'plugin version 2.4.0', COMPATIBILITY 2.4.0 sections, STATISTICS_LOGS and LOG_FORMATS self-check history, ROADMAP 'Done in v2.4.0', design records 0017 and 0018, the order-desk-study note, and the trust-files docstring. The v2.4.0 tag reference in design record 0018 is correct.",
+    "Log snapshots under tests/unit/logs/snapshots still carry 2.4.0 in the header line. This matches RELEASING.md ('a version bump does not regenerate them'), and tests/unit/logs/test_report.py:27 defines normalize_version for that purpose.",
+    "git diff --stat origin/main: 27 tracked files plus the untracked docs/design/0018-v2.4.1-release.md (HEAD equals origin/main at 06a01f5). Version and metadata files, the six goldens and uv.lock are expected. CHANGELOG, COMPATIBILITY, PRIVACY, ROADMAP, THREAT_MODEL_LOGS and RELEASING are expected release documents. src/arci/mcp_toolset_server.py is a docstring-only change to _write_whole ('may stop this server'), which matches the changelog fix, is not frozen, and has no code change.",
+    "FROZEN.sha256: 77 lines. Only the pyproject.toml and uv.lock hashes changed, and one line was added for docs/design/0018-v2.4.1-release.md. Records 0016 and 0017 are unchanged. shasum -a 256 -c FROZEN.sha256 printed no non-OK line.",
+    "uv.lock differs from origin/main in one line (1 insertion, 1 deletion), the project version. Each of the five goldens and docs/results/sample-suite-report.html differs by 1 line, and the only changed text is 'ARCI 2.4.0' to 'ARCI 2.4.1'.",
+    "Test run: tests/unit/docs/test_logs_docs.py and tests/unit/packaging gave '..... [100%]' with one skip, SKIPPED [1] tests/unit/packaging/test_realornoise_distribution.py:84 (Hatchling unavailable offline; built-wheel checks run in CI). No failures, so the captured example block in docs/recipes/logs.md matches live output."
+   ],
+   "not_checked": [
+    "The full test suite, which is running elsewhere.",
+    "The built-wheel checks that the offline skip leaves out, which run in CI.",
+    "uv lock --check, because uv is not to be called.",
+    "Accuracy of the CHANGELOG and design-record prose against the code, which is outside this lens.",
+    "The nested reference date in CITATION.cff was checked only by its absence from the diff, not by reading its value."
+   ]
+  },
+  "verified": []
+ },
+ {
+  "key": "changelog-facts",
+  "review": {
+   "summary": "I read the whole v2.4.1 section of CHANGELOG.md and checked it against the code, git and record 0018. Nearly everything is true of this branch, including the \"Known limits\" first bullet, which I traced clause by clause through cli.py and kept.py. I found one misleading sentence (\"should\"): this branch removed the qualifier \"installed before this change\" from the plugin entry. Without it the entry says every plugin-2.4.0 copy keeps the old skill, which is wrong for copies installed from main after the skill changed, and PRIVACY.md and the threat model still carry the qualifier. I also have two notes: one fact is stated twice, and the logs recipe is described more broadly than its text supports. I changed no file.",
+   "findings": [
+    {
+     "severity": "should",
+     "where": "CHANGELOG.md:99",
+     "quote": "A copy of plugin version 2.4.0 keeps the earlier skill until\n  the plugin is updated; plugin version 2.4.1 holds the instruction.",
+     "problem": "This branch dropped the qualifier \"installed before this change\" (main's text read \"A copy of plugin version 2.4.0 installed before this change keeps the earlier skill\"). On origin/main (06a01f5) the plugin manifest is still \"version\": \"2.4.0\" and the skill is already the instruction (commits d841897 and 287247b; the SKILL.md frontmatter has disable-model-invocation and no shell line). The repo ships .claude-plugin/marketplace.json, so a 2.4.0 copy installed from main after the change already has the instruction. The sentence as written says every 2.4.0 copy keeps the earlier skill. It also no longer matches docs/PRIVACY.md and docs/THREAT_MODEL_LOGS.md, which both still say \"installed before the skill became an instruction\".",
+     "fix": "A copy of plugin version 2.4.0 installed before this change keeps the earlier skill until the plugin is updated; plugin version 2.4.1 holds the instruction."
+    },
+    {
+     "severity": "note",
+     "where": "CHANGELOG.md:134",
+     "quote": "The Codex skill's `--keep` example now\n  carries the pinned version.",
+     "problem": "The same change is already stated in the plugin-README entry of this section: \"Both skills now give the `--keep` command with the pinned version, so that every launcher command they show is pinned; tests hold both.\" The two entries agree, but one change is listed twice.",
+     "fix": "Drop the sentence from the new Docs entry, or drop \"Both skills now give the `--keep` command with the pinned version\" from the plugin-README entry."
+    },
+    {
+     "severity": "note",
+     "where": "CHANGELOG.md:130",
+     "quote": "the logs recipe\n  (`docs/recipes/logs.md`) and the log threat model (`docs/THREAT_MODEL_LOGS.md`) now say\n  that the skill is an instruction: it tells the assistant to run the pinned command once,\n  with nothing added, and not to add `--keep`.",
+     "problem": "The threat model and the Codex README say this in full. The recipe only says the plugin \"tells Claude to run `uvx --python 3.14 realornoise==2.4.1` and to show its output\" and \"Neither skill asks for `--keep`\". It says nothing about \"once, with nothing added\", nothing about the Codex skill being an instruction, and does not say \"not to add\". Also, the Codex SKILL.md already said \"once, with no other arguments\" at v2.4.0; the only new part there is \"Do not add `--keep`\". Not false, but the sentence describes more than the recipe says.",
+     "fix": "Optional: name what each file now says, for example \"the logs recipe says the plugin's skill tells Claude to run the pinned command and that neither skill asks for `--keep`\"."
+    }
+   ],
+   "checked_ok": [
+    "state.json entry: v2.4.0 `_cleanup` (git show v2.4.0:src/arci/mcp_boundary.py:2056) closed stdin, killed the server if still running and waited; the past-tense description is accurate",
+    "state.json entry: the current `_stop_server` (mcp_boundary.py:2185) calls `_kill_server` (close stdin, kill if running, wait) when `_server_is_idle()` is true or raises, so 'An idle server is still stopped this way' is true",
+    "state.json entry's closing sentence agrees with the first entry: an agent that never uses the server leaves `server_answered` False, so it is never idle and gets the staged stop",
+    "Pinned Actions: from/to pairs match `git diff v2.4.0..origin/main -- .github action.yml`: checkout v7.0.0 to v7.0.1, setup-node v7.0.0 to v7.1.0, setup-python v7.0.0 to v7.1.0, upload-artifact v7.0.1 to v7.0.2, pypi-publish v1.14.2 to v1.14.3, all SHA-pinned",
+    "setup-node is really used and changed (ci.yml); action.yml's only `uses:` is upload-artifact, which changed; the actions left unchanged (download-artifact, codeql, zizmor) are not claimed",
+    "The publish action is used only in release.yml, which runs on v* tags (and workflow_dispatch, behind the tag guard); the pin changed after v2.4.0, so 'first runs at this release's tag' holds",
+    "Codex skill and README, recipe, threat model: the diffs since v2.4.0 plus the working-tree version bumps match the entry, apart from the recipe note",
+    "Blog-post sentence: docs/blog/2026-11-order-desk-run-3.md exists, and test_run_3_blog_post_counts_match_the_stores in tests/unit/docs/test_order_desk_stores.py rebuilds its counts from the run-2 and run-3 stores",
+    "Known limits bullet 1, clause by clause (src/arci/logs/cli.py `_execute` and `_write_outputs`): a table already found unreadable by the first read is never written (`table_output` is None) and F24 prints; this bullet covers the other case, a first read of absent or read",
+    "In that case `table_output` is set; under the lock, `kept.read` returns unreadable, so the table output is filtered out and not re-added. The JSON, Markdown and HTML outputs are still written",
+    "The run then prints the text and returns `decision.exit_code`. That is 0, 1 or 2, because `table_output` needs a non-empty `newest`, which needs at least one tool that is not ERROR; exit 3 is impossible in this path",
+    "F24 prints only when `decision.kept_table == \"unreadable\"` (report.py:396 and 455), and `kept_table` is `table_state` from the first read ('absent' or 'read'), so no line about the unreadable table prints",
+    "'the rows are not lost while the logs still exist' follows: `write_rows` are rebuilt from the logs by `measures.build` on every run, and `kept.merge` keeps the newer pair at the next successful write",
+    "Known limits bullet 3: tests/acceptance/mcp_fixture_server.py:57 uses `state_path.write_text`, an in-place write",
+    "Kept-table Fixed entry: READ_ATTEMPTS = 4 and `_read_once` returns None only for absent-then-present, so 'four attempts at most, with no waiting' is true",
+    "Design record 0018: no contradiction with the section (staged-stop stages, idle-kill 'as in 2.4.0', four attempts, Codex 0.169.0, Actions pins, F24 gap matching the Known limits bullet, no determinism claim); FROZEN.sha256 has 77 lines, as 0018 says; RELEASING.md has the new 0018 re-freeze list and a '5. Release page' section, as the Docs entry says"
+   ],
+   "not_checked": [
+    "The first entry's timing claims in full (the SIGTERM and SIGKILL fractions in `stop_server` and the deadline passed from src/arci/runner.py); I read only the idle and kill path",
+    "The theme, icon and privacy entries against their tests and generators",
+    "The Codex CLI 0.169.0 entry against docs/LOG_FORMATS.md",
+    "The run-3 verdict figures against the sealed store (they are covered by the existing test)",
+    "Any test run; a full run was in progress and I was told to change nothing"
+   ]
+  },
+  "verified": [
+   {
+    "severity": "should",
+    "where": "CHANGELOG.md:99",
+    "quote": "A copy of plugin version 2.4.0 keeps the earlier skill until\n  the plugin is updated; plugin version 2.4.1 holds the instruction.",
+    "problem": "This branch dropped the qualifier \"installed before this change\" (main's text read \"A copy of plugin version 2.4.0 installed before this change keeps the earlier skill\"). On origin/main (06a01f5) the plugin manifest is still \"version\": \"2.4.0\" and the skill is already the instruction (commits d841897 and 287247b; the SKILL.md frontmatter has disable-model-invocation and no shell line). The repo ships .claude-plugin/marketplace.json, so a 2.4.0 copy installed from main after the change already has the instruction. The sentence as written says every 2.4.0 copy keeps the earlier skill. It also no longer matches docs/PRIVACY.md and docs/THREAT_MODEL_LOGS.md, which both still say \"installed before the skill became an instruction\".",
+    "fix": "A copy of plugin version 2.4.0 installed before this change keeps the earlier skill until the plugin is updated; plugin version 2.4.1 holds the instruction.",
+    "verdict": {
+     "real": true,
+     "reason": "I checked this and it holds. On main, plugins/realornoise/.claude-plugin/plugin.json has \"version\": \"2.4.0\", and main's plugins/realornoise/skills/realornoise/SKILL.md is already the instruction form. It has no allowed-tools line and says \"Otherwise run one shell command ... uvx --python 3.14 realornoise==2.4.0\". The v2.4.0 tag still has the earlier skill, with `allowed-tools: Bash(uvx --python 3.14 realornoise==2.4.0)` and \"The command below has already run\". .claude-plugin/marketplace.json on main points to ./plugins/realornoise. So there are two different 2.4.0 copies: one installed from the tag or before the change, and one installed from main after it, which already has the instruction. CHANGELOG.md:98-99 now reads \"A copy of plugin version 2.4.0 keeps the earlier skill until the plugin is updated\". That is false for the second copy. It also drops the qualifier that main's text had (\"installed before this change\"). And it no longer matches docs/PRIVACY.md:70 and docs/THREAT_MODEL_LOGS.md:90, which both say \"installed before the skill became an instruction\". The reviewer's fix is correct. Using the wording from PRIVACY.md and THREAT_MODEL_LOGS.md would make the three files match exactly. The finding cites line 99, but the sentence starts at line 98.",
+     "corrected_fix": "In CHANGELOG.md, lines 98-99, replace \"A copy of plugin version 2.4.0 keeps the earlier skill until\\n  the plugin is updated; plugin version 2.4.1 holds the instruction.\" with \"A copy of plugin version 2.4.0 installed before the skill became an instruction keeps\\n  the earlier skill until the plugin is updated; plugin version 2.4.1 holds the instruction.\" This matches docs/PRIVACY.md:70 and docs/THREAT_MODEL_LOGS.md:90. The reviewer's wording, \"installed before this change\", is also correct."
+    }
+   }
+  ]
+ },
+ {
+  "key": "record",
+  "review": {
+   "summary": "I checked record 0018 against the worktree, the code diff v2.4.0..HEAD, git log v2.4.0..origin/main, CHANGELOG, COMPATIBILITY, AGENT_SEMANTICS, 0017, RELEASING and release.yml. Most of it is accurate. Three defects: one quotation's line reference is wrong (the 0017 sentence runs to line 563, not 562); \"Otherwise as in 0013 and 0017\" points to a record that has no section on what a release may say; and the claim that both fixes \"were seen as failures in hosted CI\" says more than the changelog does for the kept-table fix. One note: the COMPATIBILITY sentence the record relies on comes from the 2.3.0 session-logs section.",
+   "findings": [
+    {
+     "severity": "must",
+     "where": "docs/design/0018-v2.4.1-release.md:50",
+     "quote": "2. Record 0017, lines 561 and 562: \"With `--keep`, a table that could not be read is not replaced and not changed; the run goes on, F24 says so, and the exit code is the one of the result.\"",
+     "problem": "The quoted text matches its source exactly, but it covers three lines, not two. In docs/design/0017-logs-2.md it starts on line 561 (\"...The run goes on without it. With `--keep`, a table that\"), continues on 562 and ends on 563 (\"code is the one of the result. Without `--keep`...\"). A pinned record would keep the wrong line reference.",
+     "fix": "Replace \"Record 0017, lines 561 and 562:\" with \"Record 0017, lines 561 to 563:\"."
+    },
+    {
+     "severity": "should",
+     "where": "docs/design/0018-v2.4.1-release.md:80",
+     "quote": "Otherwise as in 0013 and 0017.",
+     "problem": "0017 has no section on what a release may and must not say. Only 0013, 0014 and 0015 have the heading \"What the release may and must not say\". A search of 0017 finds no rules on release wording. The cross-reference points to rules that do not exist.",
+     "fix": "Write \"Otherwise as in 0013 and 0014.\" If the limits of the logs method are meant, name the document that states them instead of 0017."
+    },
+    {
+     "severity": "should",
+     "where": "docs/design/0018-v2.4.1-release.md:12-13",
+     "quote": "Two of the fixes were seen as failures in hosted CI: a 0-byte `state.json` in 1 trial of 100, and the kept-table read in the six-writer test.",
+     "problem": "For state.json the changelog supports this wording: \"seen once in hosted CI, in 1 trial of 100\", and it says the hero acceptance test failed. For the kept-table read the changelog (CHANGELOG.md:114-115) says only \"Seen once, in CI, in the test that starts six writers together.\" It does not say \"hosted\" and does not say the test failed. Separately, the staged-stop fix was also prompted by CI (\"a CI run showed that ... final_state ... was `{}` or the server's starting state depending on timing\"), so \"Two of the fixes\" reads as if only two came from CI.",
+     "fix": "Use the changelog's wording, for example: \"Two of the fixes follow defects seen in CI: an empty `state.json` in 1 trial of 100 in hosted CI, and the kept-table read, seen once in the test that starts six writers together.\" Or add \"hosted\" and \"failure\" to the changelog entry if there is evidence for them."
+    },
+    {
+     "severity": "note",
+     "where": "docs/design/0018-v2.4.1-release.md:15-16",
+     "quote": "this record relies on its sentence \"Existing commands and records retain their meaning.\"",
+     "problem": "The quotation is exact (docs/COMPATIBILITY.md:77), but it comes from the section \"Session logs in 2.3.0\" and refers to what 2.3.0 added. The fix in question changes command trials (final_state). The general rule is at COMPATIBILITY.md:8-9: \"a valid existing documented command and supported record must retain its meaning\". The record does not say which section the sentence comes from.",
+     "fix": "Say where the sentence comes from (\"its sentence in the 2.3.0 section ...\"), or rely on the general rule at lines 8 and 9 as well."
+    }
+   ],
+   "checked_ok": [
+    "docs/AGENT_SEMANTICS.md:211 is the bullet \"- Determinism: for a scripted client the envelope must be identical across runs.\" The quotation matches character for character.",
+    "docs/AGENT_SEMANTICS.md:165-166 holds \"config (spec, nonce, socket\" / \"path, workdir)\". Quotation and line numbers are correct. decision_token is documented separately at line 313, so calling the list incomplete is fair.",
+    "docs/COMPATIBILITY.md:77 holds \"Existing commands and records retain their meaning.\" exactly. COMPATIBILITY has no rule about patch releases (no match for patch).",
+    "_write_whole (src/arci/mcp_toolset_server.py) writes state.json.tmp and calls os.replace. If anything fails, it removes the temporary file, so the previous state.json stays.",
+    "_server_is_idle is true when the server has answered, nothing is pending, client_pending and tools_inflight are clear, no server output is queued and no harness latch is set. An idle server goes to _kill_server, which closes input, kills and reaps, as in the 2.4.0 _cleanup.",
+    "stop_server closes input, sends terminate() at started + budget/2 and kill() at started + 3*budget/4. The budget is the deadline minus the clock at entry, so \"half/three quarters of the time left\" is correct.",
+    "trial_deadline returns min(started + seconds_remaining, parent_deadline), so the boundary's deadline is never later than the parent's. runner.py sends seconds_remaining and deadline_monotonic in the boundary config only.",
+    "kept.read makes READ_ATTEMPTS = 4 calls with no wait. It repeats only when stat() raised FileNotFoundError and lstat() then succeeded.",
+    "Gap 2 holds in the code: src/arci/logs/cli.py:400-402 re-reads under the lock, and on \"unreadable\" drops the table write. F24 depends only on decision.kept_table from the first read.",
+    "git diff v2.4.0..HEAD -- src packages changes only kept.py, mcp_boundary.py, mcp_toolset_server.py and runner.py. It adds no CLI option, exit code, schema, record field, Termination, event, latch or fixed text (report.py is not touched).",
+    "FROZEN.sha256 has 77 lines. Compared with HEAD, the only changes are the added 0018 entry and new hashes for pyproject.toml and uv.lock. shasum -a 256 -c reports every entry OK, including the current 0018 file.",
+    "Of the frozen files, only pyproject.toml and uv.lock differ from v2.4.0. Each differs by its version line only, and uv.lock by one line.",
+    "All five HTML goldens differ from v2.4.0 only in the footer \"ARCI 2.4.0\" -> \"ARCI 2.4.1\".",
+    "git log v2.4.0..origin/main shows merges #34 (state-json-atomic), #35 (server-stop-wait), #36 (readme-theme) and #37 (kept-read-race). origin/main is 06a01f5.",
+    "The \"Not code\" items (plugin skill and manifest, README/icon/PRIVACY, theme, run 3 and its post, Codex 0.169.0, Actions pins in the workflows and action.yml) match the changelog and the diff since v2.4.0.",
+    "Order of publication: in release.yml, publish-realornoise needs publish, so the main package goes first. gh-action-pypi-publish moved from v1.14.2 to v1.14.3 after v2.4.0. RELEASING.md has a section on what to do when a publish job fails, and step 5 requires green CI before the tag.",
+    "\"What can differ\" and \"no new outcome, termination, event or latch\" match the changelog's first entry and the code.",
+    "Compared with 0013/0014, 0018 has the same sections (Why, What ships, Frozen changes with entry count, a not-in or known-gaps section, release language). Nothing those records state for a release is missing."
+   ],
+   "not_checked": [
+    "The process claims: maintainer request date, the Codex consultation, and \"Seven read-only audits and a completeness check\". Their evidence is outside the worktree (plan/exec/v2/reviews), which I did not open.",
+    "Whether the 1-in-100 and six-writer CI failures actually happened in hosted runs. No network access.",
+    "Whether a skill run on main between merge and publish fails at install. Not run.",
+    "Whether a full test run passes. A run was in progress and I left it alone."
+   ]
+  },
+  "verified": [
+   {
+    "severity": "must",
+    "where": "docs/design/0018-v2.4.1-release.md:50",
+    "quote": "2. Record 0017, lines 561 and 562: \"With `--keep`, a table that could not be read is not replaced and not changed; the run goes on, F24 says so, and the exit code is the one of the result.\"",
+    "problem": "The quoted text matches its source exactly, but it covers three lines, not two. In docs/design/0017-logs-2.md it starts on line 561 (\"...The run goes on without it. With `--keep`, a table that\"), continues on 562 and ends on 563 (\"code is the one of the result. Without `--keep`...\"). A pinned record would keep the wrong line reference.",
+    "fix": "Replace \"Record 0017, lines 561 and 562:\" with \"Record 0017, lines 561 to 563:\".",
+    "verdict": {
+     "real": true,
+     "reason": "I checked this by reading the file. In docs/design/0017-logs-2.md, line 558 starts with \"**Faults.**\". The quoted sentence starts near the end of line 561 (\"...The run goes on without it. With `--keep`, a table that\"), continues on line 562 (\"could not be read is not replaced and not changed; the run goes on, F24 says so, and the exit\"), and ends on line 563 (\"code is the one of the result. Without `--keep` ...\"). So the quote covers lines 561 to 563. docs/design/0018-v2.4.1-release.md line 50 says \"lines 561 and 562\", which is wrong. The reviewer's fix is correct.",
+     "corrected_fix": "In docs/design/0018-v2.4.1-release.md line 50, replace \"2. Record 0017, lines 561 and 562:\" with \"2. Record 0017, lines 561 to 563:\"."
+    }
+   },
+   {
+    "severity": "should",
+    "where": "docs/design/0018-v2.4.1-release.md:80",
+    "quote": "Otherwise as in 0013 and 0017.",
+    "problem": "0017 has no section on what a release may and must not say. Only 0013, 0014 and 0015 have the heading \"What the release may and must not say\". A search of 0017 finds no rules on release wording. The cross-reference points to rules that do not exist.",
+    "fix": "Write \"Otherwise as in 0013 and 0014.\" If the limits of the logs method are meant, name the document that states them instead of 0017.",
+    "verdict": {
+     "real": true,
+     "reason": "This is real. docs/design/0018-v2.4.1-release.md:80 says \"Otherwise as in 0013 and 0017.\" Only 0013:48, 0014:69, 0015:457 and 0018:77 carry the heading \"What the release may and must not say\". 0017-logs-2.md has none. Its headings are Why, Decision, Decisions of this record beyond the memo, What 0017 leaves unchanged, replaces and adds, Names, Command line and layout, The earliest date a test is possible, The kept day table, Record model, How a test reads this record, Fixed texts, Coverage of the bound, Files, Open, and not built, and Acceptance. A grep of 0017 for \"may not\", \"must not\", \"claim\" and \"release\" turns up only command-line rules (lines 256, 280), one remark about the kept table (592) and a re-freeze note (882). None of these limit what the release may say. The nearest thing in 0017 is the list under \"Open, and not built\" (886-895), which limits scope, not wording. So \"as in 0017\" points to rules that do not exist. The reviewer's fix (0013 and 0014) works, but it leaves out 0015, the latest record that does have such rules. 0015's section opens with \"As in 0013 and 0014\" and adds rules for the imported-outcomes verdict, which 2.4.1 still ships. If the author meant 0017's limits, the honest way to say so is to name its \"Open, and not built\" list, not to suggest 0017 has wording rules.",
+     "corrected_fix": "In docs/design/0018-v2.4.1-release.md line 80, replace \"Otherwise as in 0013 and 0017.\" with \"Otherwise as in 0013, 0014 and 0015, and nothing that 0017 lists under \\\"Open, and not built\\\" may be described as shipped.\" If the 0017 clause is not wanted, use \"Otherwise as in 0013, 0014 and 0015.\" instead."
+    }
+   },
+   {
+    "severity": "should",
+    "where": "docs/design/0018-v2.4.1-release.md:12-13",
+    "quote": "Two of the fixes were seen as failures in hosted CI: a 0-byte `state.json` in 1 trial of 100, and the kept-table read in the six-writer test.",
+    "problem": "For state.json the changelog supports this wording: \"seen once in hosted CI, in 1 trial of 100\", and it says the hero acceptance test failed. For the kept-table read the changelog (CHANGELOG.md:114-115) says only \"Seen once, in CI, in the test that starts six writers together.\" It does not say \"hosted\" and does not say the test failed. Separately, the staged-stop fix was also prompted by CI (\"a CI run showed that ... final_state ... was `{}` or the server's starting state depending on timing\"), so \"Two of the fixes\" reads as if only two came from CI.",
+    "fix": "Use the changelog's wording, for example: \"Two of the fixes follow defects seen in CI: an empty `state.json` in 1 trial of 100 in hosted CI, and the kept-table read, seen once in the test that starts six writers together.\" Or add \"hosted\" and \"failure\" to the changelog entry if there is evidence for them.",
+    "verdict": {
+     "real": false,
+     "reason": "The sentence at docs/design/0018-v2.4.1-release.md:12-13 is supported, and the finding's objections don't hold up. (1) Kept-table read: the git history shows it was a hosted CI failure. Commit 35d8fd7 says \"pull requests 34 to 36 opened; 34's failure is a race in the kept-table read; job re-run\". So a CI job on pull request 34 failed because of this race. The changelog entry being shorter (CHANGELOG.md:114-115, \"Seen once, in CI, in the test that starts six writers together\") does not make the design record false. The record only adds \"hosted\" and \"failure\", and the commit history backs both. (2) state.json: CHANGELOG.md:77-79 says \"seen once in hosted CI, in 1 trial of 100\" and that it \"failed the hero acceptance test\", which matches the record. Calling it a \"0-byte\" file matches \"left an empty file\" at CHANGELOG.md:74. (3) Staged stop: CHANGELOG.md:6-8 says \"a CI run showed that ... `final_state` ... was `{}` or the server's starting state depending on timing\". That describes timing-dependent output, not a failure, so \"Two of the fixes were seen as failures\" is still accurate. It does not claim only two fixes came from CI. Nothing here is false, and nothing is inconsistent enough to need a change.",
+     "corrected_fix": ""
+    }
+   }
+  ]
+ },
+ {
+  "key": "wording",
+  "review": {
+   "summary": "I found no false statement, broken release step or wrongly changed pinned file in the public wording this branch changes. I found four places where the wording is unclear or does not match: two \"should\" and two \"note\". All other checks in the lens hold.",
+   "findings": [
+    {
+     "severity": "should",
+     "where": "docs/PRIVACY.md:71-72",
+     "quote": "earlier skill until the plugin is updated, and plugin version 2.4.1 holds the instruction: the earlier skill\nran the command itself when you typed it, with the command approved ahead of time.",
+     "problem": "The new clause was put in front of the colon. The colon's explanation of what the earlier skill did now reads as if it explained the 2.4.1 clause. The other two copies of this sentence (plugins/realornoise/README.md:119, docs/THREAT_MODEL_LOGS.md:92) and CHANGELOG.md:99 split it into separate sentences.",
+     "fix": "earlier skill until the plugin is updated. Plugin version 2.4.1 holds the instruction. The earlier skill ran the command itself when you typed it, with the command approved ahead of time."
+    },
+    {
+     "severity": "should",
+     "where": "docs/ROADMAP.md:122",
+     "quote": "Fixes only: no new command, option, record field or exit code.",
+     "problem": "The 2.4.1 changelog also has entries marked **Changed:** (CHANGELOG.md:90, the plugin's skill becomes an instruction and no longer approves its command ahead of time; CHANGELOG.md:130, the Action pins are updated) and several Docs entries. This paragraph itself lists the skill change. So 2.4.1 is not \"fixes only\". The rest of the sentence is supported.",
+     "fix": "Fixes and one change to the plugin's skill: no new command, option, record field or exit code."
+    },
+    {
+     "severity": "note",
+     "where": "CHANGELOG.md:98-99",
+     "quote": "A copy of plugin version 2.4.0 keeps the earlier skill until\n  the plugin is updated; plugin version 2.4.1 holds the instruction.",
+     "problem": "The three doc sentences (plugins/realornoise/README.md:117, docs/PRIVACY.md:70, docs/THREAT_MODEL_LOGS.md:90) say only a copy of 2.4.0 \"installed before the skill became an instruction\" keeps the earlier skill. The changelog drops that limit. A 2.4.0 copy installed from main after the change already had the instruction. None of the four claims that a plugin updates by itself, and they agree otherwise.",
+     "fix": "A copy of plugin version 2.4.0 installed before the skill became an instruction keeps the earlier skill until the plugin is updated; plugin version 2.4.1 holds the instruction."
+    },
+    {
+     "severity": "note",
+     "where": "README.md:161-162",
+     "quote": "These are two runs on one suite and say nothing about the models elsewhere.\nA third pre-registered run is a different comparison:",
+     "problem": "\"Two recorded comparisons\" and \"These are two runs on one suite\" still describe the table correctly, but the next line names a third run on the same suite. A reader can trip on \"two\" then \"third\". Also, \"Both pre-registered, with the prediction written first\" does not cover run 3: the write-up's table row \"Prediction written first\" says \"none was supplied\". The new sentence does not claim one, so it is not false. Otherwise it stays within the \"Run 3\" section: 4B in both arms, with and without the message at the empty lookup, 8 cells chosen after run 2. It gives no verdict, nothing about the 12B model, no cause and no size of a gain.",
+     "fix": "Optional: change the earlier sentence to \"These two runs are on one suite and say nothing about the models elsewhere.\" Or add to the new sentence: \"(no prediction was written first)\"."
+    }
+   ],
+   "checked_ok": [
+    "The README text before the first '## ' heading is identical to origin/main (same shasum, 731fcb2c...).",
+    "Every README version sentence the test patterns match reads 2.4.1, as do CITATION.cff (version and date-released 2026-11-18), the plugin manifest and the four realornoise==2.4.1 pins in the plugin and Codex skill files.",
+    "docs/PRIVACY.md:56 still contains 'opens no network connection'.",
+    "None of the four plugin-copy sentences says that a plugin updates by itself.",
+    "docs/COMPATIBILITY.md 'Command trials in 2.4.1': the wait, the final_state and record_sha256 difference, the longer trial when a server ignores EOF, the narrow timeout-instead-of-completed case and 'nothing about the stop is recorded' are all in the changelog's first entry. 'Stored ... records ... are not re-graded' is in record 0018:43. Its links ../CHANGELOG.md and design/0018-v2.4.1-release.md resolve.",
+    "docs/ROADMAP.md 'Done in v2.4.1': the three fixes match the changelog entries (boundary wait, whole-file state.json, kept-table re-read). Its links resolve.",
+    "docs/RELEASING.md step 4 matches the FROZEN.sha256 diff: only pyproject.toml and uv.lock are re-hashed, 0018 is newly pinned, and 0016 and 0017 are unchanged.",
+    ".github/workflows/release.yml creates no GitHub release page (no gh release step or release action). It writes SHA256SUMS into dist and dist-realornoise and uploads them as the artifacts 'dist' and 'dist-realornoise'. The new '## 5. Release page' section is true.",
+    "RELEASING.md section headings now run 0 to 5 in order. The anchor RELEASING.md#4-verify used in docs/THREAT_MODEL_LOGS.md:80 still resolves.",
+    "The RELEASING.md requirement in test_every_release_version_matches (every version-location path appears in the file) is unaffected, since the step 2 list did not change.",
+    "The src/arci/mcp_toolset_server.py docstring change ('may stop ... with SIGKILL') matches the staged and idle stop described in the changelog.",
+    "The docs/recipes/logs.md banner line and capture date (2.4.1, 2026-11-18) are the current-version location RELEASING.md names.",
+    "No sales wording, uniqueness claim or AI attribution line appears in the reviewed diff."
+   ],
+   "not_checked": [
+    "CHANGELOG.md and docs/design/0018-v2.4.1-release.md as a whole (assigned to other reviewers; read only to check claims against them).",
+    "Whether the boundary code really behaves as the changelog's first entry says (src/arci/mcp_boundary.py was not read).",
+    "Whether docs/recipes/logs.md's captured example output matches what 2.4.1 prints (not run).",
+    "No tests were run, because a test run was in progress in the worktree."
+   ]
+  },
+  "verified": [
+   {
+    "severity": "should",
+    "where": "docs/PRIVACY.md:71-72",
+    "quote": "earlier skill until the plugin is updated, and plugin version 2.4.1 holds the instruction: the earlier skill\nran the command itself when you typed it, with the command approved ahead of time.",
+    "problem": "The new clause was put in front of the colon. The colon's explanation of what the earlier skill did now reads as if it explained the 2.4.1 clause. The other two copies of this sentence (plugins/realornoise/README.md:119, docs/THREAT_MODEL_LOGS.md:92) and CHANGELOG.md:99 split it into separate sentences.",
+    "fix": "earlier skill until the plugin is updated. Plugin version 2.4.1 holds the instruction. The earlier skill ran the command itself when you typed it, with the command approved ahead of time.",
+    "verdict": {
+     "real": true,
+     "reason": "Confirmed from the uncommitted diff. docs/PRIVACY.md:71-72 changed \"earlier skill until the plugin's version changes and you update the plugin: that skill / ran the command itself...\" to \"earlier skill until the plugin is updated, and plugin version 2.4.1 holds the instruction: the earlier skill / ran the command itself when you typed it, with the command approved ahead of time.\" The colon now comes right after the 2.4.1 clause, so the explanation of what the earlier skill did reads as if it explained that clause. The other copies split it into separate sentences: plugins/realornoise/README.md:118-120 (\"until the plugin is updated. Plugin version 2.4.1 holds the instruction. The earlier skill ran...\"), docs/THREAT_MODEL_LOGS.md:90-92 and CHANGELOG.md:98-99 (semicolon). The only test that reads PRIVACY.md (tests/unit/plugin/test_plugin_files.py:57-59) checks for \"opens no network connection\" and for no em dash, so the fix touches no test. Severity \"should\" fits: the wording is misleading, not false.",
+     "corrected_fix": "In docs/PRIVACY.md replace lines 71-72:\n\"earlier skill until the plugin is updated, and plugin version 2.4.1 holds the instruction: the earlier skill\nran the command itself when you typed it, with the command approved ahead of time.\"\nwith:\n\"earlier skill until the plugin is updated. Plugin version 2.4.1 holds the instruction. The\nearlier skill ran the command itself when you typed it, with the command approved ahead of\ntime.\"\n(This matches the wording in plugins/realornoise/README.md:118-120. Re-wrapping the line is optional.)"
+    }
+   },
+   {
+    "severity": "should",
+    "where": "docs/ROADMAP.md:122",
+    "quote": "Fixes only: no new command, option, record field or exit code.",
+    "problem": "The 2.4.1 changelog also has entries marked **Changed:** (CHANGELOG.md:90, the plugin's skill becomes an instruction and no longer approves its command ahead of time; CHANGELOG.md:130, the Action pins are updated) and several Docs entries. This paragraph itself lists the skill change. So 2.4.1 is not \"fixes only\". The rest of the sentence is supported.",
+    "fix": "Fixes and one change to the plugin's skill: no new command, option, record field or exit code.",
+    "verdict": {
+     "real": true,
+     "reason": "The finding is real, at \"should\" level. docs/ROADMAP.md:122 says \"Fixes only: no new command, option, record field or exit code.\" But the 2.4.1 CHANGELOG section has two **Changed:** entries that are not fixes. The first changes the plugin's skill: it \"is now an instruction to Claude\", and before, it \"approved it ahead of time (`allowed-tools`)\". Now \"nothing is approved ahead of time\". That changes what users see, because whether Claude Code asks before running the command now depends on their permission mode. The second updates the pinned GitHub Actions (\"the pinned GitHub Actions in the workflows and in `action.yml` are updated\"). There are also three **Docs:** entries. The ROADMAP paragraph itself names the skill change, so it contradicts its own \"Fixes only\" label. The part after the colon is accurate: no new command, option, record field or exit code. Design record 0018:11 also describes main more carefully: \"`main` holds fixes and documents since the tag `v2.4.0`\". No test checks this ROADMAP sentence, so changing it breaks nothing. The reviewer's fix is incomplete. It names only the skill change and leaves out the Action pin update and the documentation changes, which also ship in 2.4.1. Record 0018:79 uses \"Fixes only.\" too, but there it limits what the release notes may claim, not what ships, so the ROADMAP is the place to correct.",
+     "corrected_fix": "In docs/ROADMAP.md:122, replace \"Fixes only: no new command, option, record field or exit code.\" with \"Fixes, a changed plugin skill, updated Action pins and documents: no new command, option, record field or exit code.\""
+    }
+   }
+  ]
+ },
+ {
+  "key": "guard",
+  "review": {
+   "summary": "No defects found. Every release guard I evaluated by hand passes for tag v2.4.1. The frozen-hash check passes. The packaging and plugin tests pass, with one expected skip.",
+   "findings": [],
+   "checked_ok": [
+    "release.yml guard, run read-only with .venv/bin/python against the worktree files with tag 'v2.4.1': pyproject 2.4.1, src/arci/__init__.py 2.4.1, realornoise pyproject 2.4.1, realornoise __init__.py 2.4.1, realornoise dependencies == ['agent-reliability-ci==2.4.1'] (True), tag == 'v'+project (True). Every condition of the guard is satisfied.",
+    "requires-python is '>=3.11' in both pyproject files. wheel_smoke.sh asserts Requires-Python '>=3.11', the exact Requires-Dist pin, and the equality of both wheel versions. The new values satisfy all three.",
+    "Sdist allowlist: pyproject.toml sets [tool.hatch.build.targets.sdist] only-include to src/arci, README.md, LICENSE, NOTICE, CHANGELOG.md and pyproject.toml, and the wheel to packages = [\"src/arci\"]. docs/design/0018-v2.4.1-release.md is in neither, and the release.yml allowlist would not accept it either. The sdist root is derived from the pyproject version, so it needs no edit.",
+    "ci.yml frozen step is 'shasum -a 256 -c FROZEN.sha256'. I ran it in the worktree, rc=0, with no non-OK lines. FROZEN.sha256 now has 77 lines, and every listed hash matches the files on disk. The changes are the new 0018 pin and the re-hashes of pyproject.toml and uv.lock, which docs/RELEASING.md step 4 and the 0.0.0 diff describe.",
+    "uv lock --check: uv.lock's agent-reliability-ci entry reads 2.4.1 to match pyproject.toml. realornoise is not in the lock file, so it needs no entry. I could not run uv, as instructed.",
+    "ci.yml has no step that greps versions. justfile recipes 'frozen' (shasum -c) and 'check' (ruff, basedpyright, pytest) neither count pinned files nor name a version. justfile is unchanged.",
+    "tests/ has no assertion on the line count of FROZEN.sha256. The only test that reads it, tests/unit/docs/test_logs_docs.py:226, parses the file into a set of paths. No test hard-codes 76 for it.",
+    "'PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest tests/unit/packaging tests/unit/plugin -q -p no:cacheprovider -rs' ended with all tests passing and one skip: 'SKIPPED [1] tests/unit/packaging/test_realornoise_distribution.py:84: Hatchling unavailable offline; built-wheel checks run in .github/scripts/wheel_smoke.sh in CI and release smoke jobs'.",
+    "I also ran tests/unit/logs/test_report.py, tests/unit/logs/test_review_fixes.py, tests/unit/html_report and tests/unit/docs. All passed. The logs snapshots under tests/unit/logs/snapshots still say 'realornoise 2.4.0' in their header, but test_snapshots_ignore_only_header_version (tests/unit/logs/test_review_fixes.py:235) shows the comparison ignores only that header version. The changed HTML goldens also pass.",
+    "The tests/acceptance files are not in the diff, and nothing under them mentions 2.4.0 or 2.4.1."
+   ],
+   "not_checked": [
+    "I did not build the wheel or sdist, because Hatchling is unavailable offline and no files may be written. The build and the sdist allowlist run were checked by reading the config only.",
+    "I did not run uv lock --check. I compared the uv.lock version by reading it.",
+    "I did not run the full test suite, which is in progress elsewhere, nor ruff or basedpyright. The one-line src/arci/mcp_toolset_server.py docstring change was not linted.",
+    "I did not run the CI steps for the adapter environments, SciPy, the Windows smoke job, or the action fixture.",
+    "I did not verify the CHANGELOG, README and docs prose for correctness of the version and date statements. Those are outside the release-machinery lens.",
+    "I did not check network or PyPI state, such as whether the trusted publisher exists or version 2.4.1 is unused."
+   ]
+  },
+  "verified": []
+ }
+]
