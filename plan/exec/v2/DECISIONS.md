@@ -422,3 +422,66 @@ items: 79; blind tests: 140 functions, 236 cases. The review of the write path e
 5,147 passed, 21 skipped (LangChain extra, SciPy, Node SDK, two Python 3.14 cases,
 Hatchling; each run in its own environment: adapters 414 passed, oracle 300 passed, logs
 on Python 3.14 pass). Both wheels pass `wheel_smoke.sh` on Python 3.11 and 3.14.
+
+## D-23: after 2.4.1, no new feature before the stop rule; one study with a spike first (2026-11-18)
+
+The maintainer asked for the next direction after 2.4.1 and sent a brief to an outside
+research agent. Its report could not be used: against the brief it had 0 links (40
+asked), none of the five items that show the state section was read, and a plan for a
+web dashboard built by four engineers. The same questions were then put to in-house
+agents: four research topics, each re-checked claim by claim by a second agent (61 claims
+re-checked: 49 supported, 9 partly, 3 not reachable, 0 refuted), a list of gaps, a design
+agent, and a consult with Astra. The working files are private and are not in this
+repository.
+
+**What was found that bears on engineering.**
+
+- The complaint this project's log step answers is real and comes in bursts after model
+  releases. Other tools that answer it spread when someone else passed them on during a
+  dispute; the closest neighbour in method had no stars.
+- No published work was found that tests whether signals in coding-agent logs go with a
+  session's outcome. Public trackers re-run fixed tasks instead.
+- A public collection of real sessions exists (SWE-chat, 17,968 sessions, gated access).
+  Its tables have no reasoning-token column and no error flag for tool results; its raw
+  transcripts may.
+- The niche of `arci verdict` has peers with very little use. Inspect AI, promptfoo,
+  LangSmith and Braintrust were not found to give a verdict with a stated error rate.
+- No sign was found that another release of this project would change who uses it.
+
+**Decisions (approved by the maintainer on 2026-11-18).**
+
+1. **No new feature, command, option or release before 14 Dec 2026.** The two defects
+   named in the 2.4.1 changelog stay documented; one is fixed earlier only if an outside
+   user reports it.
+2. **One study, spike first.** The spike (`tasks/S1-logsignals-spike.md`) finds out by
+   27 Nov whether public data can answer the question; it computes marginal counts only.
+   A "no-go", or no access to the data by 25 Nov, ends the study with a short note under
+   `docs/results/`. On a "go": a registration under `study/logsignals/`, pushed before any
+   joint look at signals and outcomes and reviewed read-only by Astra; blind acceptance
+   tests on simulated data with and without a planted effect; one run; a result page with
+   a re-derivation test. No second dataset before 14 Dec.
+3. **The study changes no code under `src/arci` and no pinned file.** Its code is under
+   `bench/logsignals/` on branch `v2/logsignals`. No version bump.
+4. **What the study cannot show, whatever it finds:** that log signals measure quality;
+   that `arci logs` is validated (the study compares other people's sessions, not one
+   user's days); any cause. A null result leaves the tool's claim about recorded numbers
+   as it is and adds a sentence to the README that the measures have no shown link to
+   outcomes.
+5. **No pull request to another project's code before 14 Dec.** If that is taken up
+   later, the candidate is Inspect AI issue 1327, not promptfoo (several open pull
+   requests for the same request are waiting there).
+6. **One optional check with a date fixed here, before any run:** split date
+   2026-11-03, the tool's default measures, one run of `arci logs --since 2026-11-03` on
+   the maintainer's own logs, the answer recorded whatever it is. The date comes from a
+   public claim, not from those logs. One machine's record says nothing about a vendor.
+7. **The stop rule of 14 Dec 2026 stands unchanged.** If it is met, work follows what
+   outside issues ask for. If it misses, engineering stops and the maintainer decides;
+   agents propose nothing further. The study is not a feature and is finished or ended by
+   then either way.
+
+**Views recorded.** The orchestrator proposed the study and a contribution to another
+tool. Astra agreed with stopping features, asked for a feasibility test with a hard go
+rule, and named the main risk: research that reaches nobody in place of features that
+reached nobody. The design agent found the data gated and without the needed columns in
+its tables, and advised against the contribution before 14 Dec. Decisions 2 and 5 follow
+them.
