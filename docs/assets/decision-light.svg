@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="762" viewBox="0 0 1600 762" role="img" aria-labelledby="title desc">
+<title id="title">Agents that use a decision model</title>
+<desc id="desc">Agents that use a decision model. TypeSafe's Jev answers typed questions with calibrated probabilities. arci tests what the agent does with those answers, with zero agent changes. Agent process: Any SDK, unchanged. It reads two environment variables the harness sets: the endpoint is a loopback port, the key is a per-trial token. The two variables are TYPESAFE_BASE_URL and TYPESAFE_API_KEY. An arrow to the harness-owned boundary: Serves the MCP tools and the decision endpoint. Every request and answer is recorded as a tool call, budgeted, and perturbed on schedule. Injected decision faults: decision_low_confidence and decision_unavailable. An arrow to the upstream: fixture: seeded answers, offline, runs in CI. http: the real API or a gateway, key held by the harness, model pinned, trial starts paced. Sealed records: The answer the agent saw and the raw upstream answer, side by side. Never the key. An arrow to the same commands: gate: the same exact intervals; a model's confidence never enters a verdict; replay: serves the recording; no provider needed; preflight: key, endpoint, pinned model, one smoke request; report: recorded decisions, tokens, estimated cost.</desc>
+<rect x="0" y="0" width="1600" height="762" fill="#F6F8FA"/>
+<text x="64" y="101" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="36" fill="#10161D" font-weight="600">Agents that use a decision model</text>
+<text x="64" y="140" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#57606A">TypeSafe's Jev answers typed questions with calibrated probabilities.</text>
+<text x="64" y="172" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#57606A">arci tests what the agent does with those answers, with zero agent changes.</text>
+<rect x="64.5" y="212.5" width="399" height="275" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<rect x="520.5" y="212.5" width="559" height="275" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<rect x="1136.5" y="212.5" width="399" height="275" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="88" y="256" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">AGENT PROCESS</text>
+<text x="544" y="256" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">HARNESS-OWNED BOUNDARY</text>
+<text x="1160" y="256" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">UPSTREAM</text>
+<text x="88" y="298" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">Any SDK, unchanged. It reads two</text>
+<text x="88" y="328" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">environment variables the harness</text>
+<text x="88" y="358" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">sets: the endpoint is a loopback</text>
+<text x="88" y="388" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">port, the key is a per-trial token.</text>
+<text x="88" y="428" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#10161D">TYPESAFE_BASE_URL</text>
+<text x="88" y="456" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#10161D">TYPESAFE_API_KEY</text>
+<text x="544" y="298" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">Serves the MCP tools and the decision endpoint.</text>
+<text x="544" y="328" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">Every request and answer is recorded as a tool call,</text>
+<text x="544" y="358" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">budgeted, and perturbed on schedule.</text>
+<rect x="544" y="380" width="297" height="34" rx="3" fill="#E8590C" fill-opacity="0.12"/>
+<text x="692" y="403" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#9C3A06" text-anchor="middle">decision_low_confidence</text>
+<rect x="544" y="424" width="264" height="34" rx="3" fill="#E8590C" fill-opacity="0.12"/>
+<text x="676" y="447" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#9C3A06" text-anchor="middle">decision_unavailable</text>
+<text x="1160" y="298" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-weight="600">fixture</tspan>: seeded answers, offline,</text>
+<text x="1160" y="328" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">runs in CI.</text>
+<text x="1160" y="368" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-weight="600">http</tspan>: the real API or a gateway,</text>
+<text x="1160" y="398" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">key held by the harness, model</text>
+<text x="1160" y="428" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">pinned, trial starts paced.</text>
+<path d="M 468 350 L 514 350" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 514 350 L 505 355 L 505 345 Z" fill="#57606A"/>
+<path d="M 1084 350 L 1130 350" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 1130 350 L 1121 355 L 1121 345 Z" fill="#57606A"/>
+<rect x="64.5" y="512.5" width="399" height="185" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="88" y="556" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#57606A" letter-spacing="1.8">SEALED RECORDS</text>
+<text x="88" y="598" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">The answer the agent saw and the</text>
+<text x="88" y="628" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">raw upstream answer, side by</text>
+<text x="88" y="658" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">side. Never the key.</text>
+<rect x="520.5" y="512.5" width="1015" height="185" rx="4" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+<text x="544" y="558" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" fill="#0B57D0">gate</tspan><tspan x="598">the same exact intervals; a model's</tspan></text>
+<text x="544" y="588" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">confidence never enters a verdict</text>
+<text x="1052" y="558" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" fill="#0B57D0">replay</tspan><tspan x="1130">serves the recording; no provider</tspan></text>
+<text x="1052" y="588" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">needed</text>
+<text x="544" y="636" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" fill="#0B57D0">preflight</tspan><tspan x="658">key, endpoint, pinned model, one</tspan></text>
+<text x="544" y="666" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">smoke request</text>
+<text x="1052" y="636" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D"><tspan font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" fill="#0B57D0">report</tspan><tspan x="1130">recorded decisions, tokens, estimated</tspan></text>
+<text x="1052" y="666" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#10161D">cost</text>
+<path d="M 468 605 L 514 605" fill="none" stroke="#57606A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 514 605 L 505 610 L 505 600 Z" fill="#57606A"/>
+</svg>

@@ -45,6 +45,21 @@
   the message passes less often by more than 10 points on those cells. It says nothing
   about the 12B model. Its sealed store is under `docs/results/order-desk-study/run-3/`,
   and the store test re-derives its decision. No code change.
+- **Docs:** every README figure and badge now uses one theme, the banner's: a neutral ground,
+  blue for the reference or the good outcome (A, PASS, REPRODUCED), orange for the thing in
+  question or the bad outcome (B, BLOCK, injected faults), a neutral bar for INCONCLUSIVE,
+  system sans-serif and monospace type, no serif. The hero's evidence card gains one dot per
+  trial (192 of 200 filled for A, 132 of 200 for B). The decision-boundary and calibration
+  pictures, PNGs before, are redrawn as light and dark SVGs by the same generator
+  (`docs/assets/decision-*.svg`, `docs/assets/gate-*.svg`); the gate bars are drawn to scale
+  from the README table rows, and the generator's source check now also holds the table rows,
+  the gate settings (alpha 0.05, delta 0.10), the two environment variables, the two decision
+  faults and the four command names. The
+  decision picture drops the old footer that said Jev was not run (it was run on
+  2026-10-03, as the paragraph under it says). The PNGs stay in `docs/images/` because the
+  2.4.0 README on PyPI links them. Tests hold the palette, the two font stacks, the same text
+  in light and dark, the colour of every verdict word, the tint opacities, the hero's dot
+  counts and grids, and the gate's bar widths on one shared scale. No code change.
 - **Docs:** the Codex reader is checked against Codex CLI 0.169.0 (one short session;
   record types and the fields the reader uses are the same as in 0.167.0).
   `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than

@@ -5,7 +5,7 @@
 
 # Did your agent get worse? Real, noise, or cannot tell.
 
-[![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci)](https://pypi.org/project/agent-reliability-ci/)
+[![PyPI](https://img.shields.io/pypi/v/agent-reliability-ci?style=flat-square&labelColor=57606A&color=1F6FEB)](https://pypi.org/project/agent-reliability-ci/)
 
 ARCI (agent-reliability-ci) offers three comparisons with increasing effort and evidence.
 Each prints the assumptions it cannot check.
@@ -404,7 +404,10 @@ while any real key stays in the harness; the official Python and JavaScript SDKs
 unchanged by the acceptance tests. `arci preflight` checks key, endpoint, pinned model and one
 smoke decision before a live run.
 
-![The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report. Provenance: built from the vendor's documentation and both official SDKs, dated 2026-09-22; run against Jev on 2026-10-03, see docs/results/jev.](https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/images/decision-boundary.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/decision-dark.svg">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/decision-light.svg" alt="The agent process, any SDK unchanged, reads two environment variables that point at a loopback port and a per-trial token. The harness-owned boundary serves the MCP tools and the decision endpoint, records every request and answer, budgets them and injects decision_low_confidence or decision_unavailable on schedule. The upstream is a seeded fixture in CI or the real API with the key held by the harness. Sealed records keep the served answer and the raw upstream answer, never the key, and feed the same gate, replay, preflight and report.">
+</picture>
 
 **Run against Jev on 2026-10-03.** Built from documentation dated 2026-09-22, the boundary ran the
 pre-registered [day one](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/design/0004-day-one.md) live. Four things did not survive contact
@@ -468,7 +471,10 @@ PASS / BLOCK / INCONCLUSIVE:
 | 0.95 -> 0.65 | .000 / .008 / .992 | .000 / .685 / .315 | .000 / .985 / .015 | .000 / 1.000 / .000 |
 | 0.80 -> 0.80 | .003 / .000 / .997 | .059 / .000 / .941 | .218 / .000 / .782 | .615 / .000 / .385 |
 
-![Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.](https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/images/calibration.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/gate-dark.svg">
+  <img src="https://raw.githubusercontent.com/ajaysurya1221/agent-reliability-ci/main/docs/assets/gate-light.svg" alt="Verdict probabilities by exact enumeration for the default gate: a 95 to 65 percent drop is INCONCLUSIVE 99.2 percent of the time at N=20 and BLOCK 98.5 percent at N=200; a 95 to 75 percent drop is BLOCK 36.5 percent at N=200; two equal 80 percent agents PASS 21.8 percent at N=200.">
+</picture>
 
 - False PASS at the margin and false BLOCK under no change are both far below `alpha` (worst
   0.004 and 0.001 over the boundary sweep). The price is conservatism: two equal agents at 80%
@@ -761,11 +767,11 @@ The single-task gate, `triage`, `trace-check`, the packaged demo, descriptors, i
 available.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
-[![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-555?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
+[![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI&labelColor=57606A)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ajaysurya1221/agent-reliability-ci?sort=semver&style=flat-square&labelColor=57606A&color=1F6FEB)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
+[![Evidence package](https://img.shields.io/badge/evidence_package-2026--10--06-10161D?style=flat-square&labelColor=57606A)](https://github.com/ajaysurya1221/agent-reliability-ci/releases/tag/evidence-2026-10-06)
+[![License](https://img.shields.io/badge/license-Apache--2.0-1F6FEB?style=flat-square&labelColor=57606A)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-1F6FEB?style=flat-square&labelColor=57606A)](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/pyproject.toml)
 [Security policy](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/SECURITY.md)
 
 [Apache-2.0](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/LICENSE). See [NOTICE](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/NOTICE) for adapted code.
