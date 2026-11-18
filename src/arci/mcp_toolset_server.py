@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, suppress
 from pathlib import Path
 from typing import Any, NoReturn, cast
 
@@ -116,6 +116,24 @@ def _describe(name: str, tool: Callable[..., JsonValue]) -> str:
     return doc.splitlines()[0] if doc else name
 
 
+def _write_whole(path: Path, data: bytes) -> None:
+    """Put `data` at `path` so that a reader sees no file, the old file or the new one.
+
+    The boundary stops this server with SIGKILL when the trial ends, and the grader reads the
+    file afterwards. A write in place empties the file first, so a kill at that moment would
+    leave an empty `state.json`, which the grader reports as "snapshot failed".
+    A kill between the write and the move can leave `state.json.tmp`; `snapshot` ignores it.
+    """
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        temporary.write_bytes(data)
+        os.replace(temporary, path)
+    except BaseException:
+        with suppress(OSError):
+            temporary.unlink()
+        raise
+
+
 class ToolSetServer:
     """Small synchronous server; the boundary guarantees serial tool calls."""
 
@@ -139,7 +157,7 @@ class ToolSetServer:
         with redirect_stdout(sys.stderr):
             snapshot = self._toolset.snapshot()
         payload = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, allow_nan=False)
-        (self._workdir / "state.json").write_text(payload, encoding="utf-8")
+        _write_whole(self._workdir / "state.json", payload.encode("utf-8"))
 
     def handle(self, message: dict[str, JsonValue]) -> dict[str, JsonValue] | None:
         if "id" not in message:

@@ -64,6 +64,23 @@
   record types and the fields the reader uses are the same as in 0.167.0).
   `docs/LOG_FORMATS.md` names it and says that any `thread_source` other than
   `subagent` counts as main thread. No code change.
+- **Fixed:** the tool server for Python toolsets (`arci.mcp_toolset_server`) wrote
+  `state.json` in place, which empties the file before the new content goes in. When the
+  trial ends the boundary closes the server's input and, if it is still running, stops it
+  with SIGKILL (`src/arci/mcp_boundary.py`, `_cleanup`), so a stop at that moment left an
+  empty file and the trial ended `ERROR` (`grader_error`, "snapshot failed"). This was
+  seen once in hosted CI, in 1 trial of 100, with an agent that finishes without using
+  the tool server: one candidate trial ended `ERROR` instead of `FAIL`, which failed the
+  hero acceptance test (no trial may be `ERROR`), and the gate then returned `ERROR` for
+  the experiment. The server now writes `state.json.tmp` in the same folder and moves it
+  into place, so the grader reads no file or a complete file; the bytes are the same as
+  before. New unit tests read `state.json` at every Python call and return during a
+  write: with the old code the reader finds an empty file, with the new code it finds no
+  file, the old state or the new state. One behaviour changes: when a snapshot cannot be
+  written (for example text that cannot be encoded), `state.json` now keeps the last
+  complete state instead of being left empty; the tool call still returns -32603
+  "snapshot failed". Not changed: for an agent that never uses the tool server, the
+  graded final state is still `{}` or the starting state, by timing.
 - **Changed:** the Claude Code plugin's skill is now an instruction to Claude: run
   `uvx --python 3.14 realornoise==2.4.0` once, with nothing added, and show the output
   unchanged. If anything is typed after the command name, it tells Claude to run nothing. Before, the skill ran that line itself when the command was typed and
