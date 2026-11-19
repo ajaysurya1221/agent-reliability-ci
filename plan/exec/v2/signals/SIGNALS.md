@@ -9,6 +9,9 @@ Public counters only. Unique visitors come from GitHub's 14-day traffic window.
 | Day | Date | Stars | Forks | Open issues | Traffic | Clones | PyPI downloads |
 |---|---|---|---|---|---|---|---|
 | 0 (release, nothing posted yet) | 2026-11-12 | 0 | 0 | 0 | 24 views, 13 unique visitors (last 14 days) | 248 clones, 58 unique | last_day 12, last_week 121, last_month 0 |
+| 7 | 2026-11-19 | 0 | 0 | 1 (2 opened since 2026-11-12, both by the github-actions bot; 0 by other people) | 142 views, 43 unique visitors (last 14 days) | 1915 clones, 385 unique | last_day 114, last_week 663, last_month 967 |
+
+Day 7 threshold (at least 25 stars and 300 unique visitors): NOT MET (0 stars, 43 unique visitors).
 
 ## Launch log
 
