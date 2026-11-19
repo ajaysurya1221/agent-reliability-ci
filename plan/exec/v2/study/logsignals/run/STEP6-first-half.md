@@ -65,3 +65,11 @@ Step 7 of the registration: the same unchanged code runs on the second half.
 
 The maintainer set, on 19 November 2026, a working date of 21 November 2026 for finishing
 the study. The registered dates are unchanged; finishing earlier is inside them.
+
+## Addition, 20 November 2026
+
+The text above is as it was written on 19 November 2026. The second half's check found one
+more leftover that applies to this half as well: the number with and the number without the
+shared-user repositories together bound, on one side, the number over the repositories that
+were left out. No value is isolated, and rule 4 is read as met. The mechanism is described
+as leftover 4 in `STEP6-second-half.md`.
