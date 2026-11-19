@@ -1,7 +1,7 @@
 # Interface note: file formats and names only
 
 This note fixes file formats and names so that two independent implementations can be compared.
-It contains no statistics. Every definition of a number comes from `PREREGISTRATION.md`
+It contains no statistics. Every definition of a number comes from `PREREGISTRATION-2.md`
 (sections "The two numbers per session", "What will be computed", "What will be published").
 
 ## Private input tables (UTF-8, tab separated, one header row, `\n` line ends)
@@ -17,7 +17,7 @@ It contains no statistics. Every definition of a number comes from `PREREGISTRAT
 | `user_key` | 16 lower-case hex digits, or empty (no user id) |
 | `model` | the session's model name as the registration defines it, or `unknown` |
 | `d` | session length: main-thread responses with a known reasoning count (integer, at least 20) |
-| `first_time` | time of the session's first main-thread response, ISO 8601 UTC such as `2026-05-03T14:07:09.123456+00:00`, or empty |
+| `first_time` | the earliest timestamp among the session's main-thread responses, counted or not (not necessarily first in file order), ISO 8601 UTC such as `2026-05-03T14:07:09.123456+00:00`, or empty |
 | `zero` | how many of the `d` responses have a count of 0 (integer); `no_reasoning_share = zero / d` exactly |
 | `tokens_num`, `tokens_den` | `reasoning_tokens` as the exact fraction `tokens_num / tokens_den` (`tokens_den` is 1 or 2) |
 

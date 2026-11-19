@@ -1,6 +1,6 @@
 """The log-signals study: the build of the registered description.
 
-`PREREGISTRATION.md` (committed under `plan/exec/v2/study/logsignals/`) is the only source for
+`PREREGISTRATION-2.md` (committed under `plan/exec/v2/study/logsignals/`) is the only source for
 every definition, number, sentence and rule used here. These modules hold no definition of their
 own.
 

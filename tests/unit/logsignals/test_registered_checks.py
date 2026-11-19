@@ -2,7 +2,7 @@
 
 The stage 1 fixture builds its sessions from `analyze.REGISTERED_CHECKS`, so no test that uses it
 can catch a wrong figure in that constant. This file is the one that can: every number below is
-typed from `PREREGISTRATION.md` ("Data and population", "What was looked at before writing
+typed from `PREREGISTRATION-2.md` ("Data and population", "What was looked at before writing
 this", "Conditions for reading the numbers as an answer").
 """
 

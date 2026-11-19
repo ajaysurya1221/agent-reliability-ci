@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the result page from the result files and the check counts.
 
-Every fixed text below is copied character for character from `PREREGISTRATION.md`: the headline
+Every fixed text below is copied character for character from `PREREGISTRATION-2.md`: the headline
 sentence, the yardstick table with its warning, the general limits, the facts of each half, the
 four conditions, the README sentence and the date-miss note. Nothing is added to them: no
 adjective and no sentence of this module's own. Every result file passes `check_result.check`
@@ -29,8 +29,9 @@ whole number from 0 to the found `sessions`, and the found month rows plus `mont
 be the found `sessions`, since every session either carries one of the months counted above or
 none.
 
-The date-miss note of "Order of work" is read as follows: "the last step completed; any check
-counts and result file already committed; and the sentence" means the last-step line, then exactly
+The date-miss note of "Order of work" holds the line "Last step completed: N.", "the check counts
+already committed, as the page prints them", "for a result file already committed, what the page
+carries for that half", and the sentence. That is the last-step line, then exactly
 what the ordinary page would print for the files the folder holds — a result file therefore comes
 with the limits, the yardstick table and the half's facts, which the registration prints "with
 the result", and a half with only a passing checks file gives its check section alone — then the
@@ -114,20 +115,22 @@ YARDSTICK_TABLE = (
 )
 YARDSTICK_NOTE = (
     '"AR(1) 0.6" means each session\'s value leans on the one before it with weight 0.6. The '
-    "last three rows are not applicable null cases of the rule. The last one is a shared cause, "
+    "rule applies to nine null cases of round 3. The first row is the round 2 run of one of them "
+    "(independent sessions). The third row is a round 2 case that is not among the nine. The "
+    "eighth and the tenth rows are round 3 cases outside the nine. The tenth is a shared cause, "
     "not a session-level link: one dated change that affects both records puts the number near "
-    "+0.09. The row above it has a coding fault found in review (the break had a fixed direction "
-    "in both numbers); it is kept because it was measured."
+    "+0.09. The ninth row is one of the nine, but it has a coding fault found in review (the "
+    "break had a fixed direction in both numbers); it is kept because it was measured."
 )
 
 GENERAL_LIMITS: tuple[str, ...] = (
     "The first number is a weighted average, and a few large repositories hold most of the "
     "possible weight (see the facts of each half). Realized contributing weights may differ from "
     "the possible weights.",
-    "Most sessions sit at an outcome endpoint. Inside many repositories the outcome takes few "
-    "distinct values, and ties carry much of the weight.",
-    "Many sessions carry no user id, and no repository shows two identified users. Repository "
-    "and person cannot be told apart.",
+    "Most sessions sit at an outcome endpoint (see the facts of each half), so many sessions "
+    "share the same outcome value.",
+    "Many sessions carry no user id (see the facts of each half). Blocking by repository does "
+    "not separate differences between people from the number.",
     "The halves are not independent: 7 user ids appear in both.",
     "All sessions fall between April and September 2026. A shared change over those months in "
     "both numbers moves the first number with no session-level link.",
@@ -139,8 +142,11 @@ GENERAL_LIMITS: tuple[str, ...] = (
     "both tools together) passed with 1,171 sessions in 104 repositories. 316 of them are Claude "
     "Code sessions that are not analysed. The analysed Codex population is 855 sessions in 65 "
     "repositories. The gate is a floor for feasibility, not a statement of power.",
-    "Each half's separate counts were inspected before this text was written (next section). "
-    "The block definitions, the floors and the sentence were chosen knowing them.",
+    "Each half's separate counts were inspected before the first registration was written, and "
+    "more signal-side counts were made before this one (next section). The block definitions, "
+    "the floors and the sentence were chosen knowing the first set. After the second set, two "
+    "readings inside the third block definition were written down; nothing else in them was "
+    "changed.",
     "The yardstick table is all that is known about how large this number gets with no "
     "session-level link, and it is simulated.",
 )
@@ -150,8 +156,10 @@ FACTS: dict[str, tuple[str, ...]] = {
         "The four largest repositories hold a little over three fifths of the possible weight.",
         "307 of the 423 sessions sit at an outcome endpoint (79 at 0%, 228 at 100%).",
         "168 of the 423 sessions carry no user id. 11 repositories mix sessions with and without "
-        "one and hold about seven tenths of the possible weight; 4 repositories have no "
-        "identified user.",
+        "one and hold about seven tenths of the possible weight (whether the four largest "
+        "repositories are among these 11 was not counted); 4 repositories have no identified "
+        "user.",
+        "No repository shows two or more identified user ids: 29 show one and 4 show none.",
         "The 7 shared user ids hold 62 of the 423 sessions, in 11 repositories (whether these "
         "are the 11 of the line above was not counted).",
     ),
@@ -159,6 +167,7 @@ FACTS: dict[str, tuple[str, ...]] = {
         "The four largest repositories hold a little over three fifths of the possible weight.",
         "291 of the 432 sessions sit at an outcome endpoint (107 at 0%, 184 at 100%).",
         "101 of the 432 sessions carry no user id.",
+        "Some of the 32 repositories show two or more identified user ids.",
         "The 7 shared user ids hold 80 of the 432 sessions, in 8 repositories.",
     ),
 }
@@ -179,7 +188,9 @@ CONDITIONS: tuple[str, ...] = (
     "an ancestor of the commit that holds the result file; the result file's recorded code digest "
     "matches the implementation record; and the recorded start time is later than the "
     "implementation record's commit date. Commit dates are what the committer wrote; the "
-    "ancestry is not.",
+    "ancestry is not. The chain is checked on the records branch `v2/phase0`, where this text, "
+    "the implementation record, the check counts and the result files are committed. The "
+    "published folder on the code branch holds copies with the same bytes.",
     "Stage 1 finds 423 sessions in 33 repositories in the first half and reproduces the separate "
     "counts: 79, 228 and 116 for the outcome; 25 sessions at 0 for the first measure; the six "
     "month counts.",
@@ -706,11 +717,13 @@ def _stopped_note(
     differences_discovery: list[tuple[str, str, str]] | None = None,
     stopped_after_step: int,
 ) -> str:
-    """The note of "Order of work": "the last step completed; any check counts and result file
-    already committed; and the sentence".
+    """The note of "Order of work": the line "Last step completed: N."; the check counts already
+    committed, as the page prints them; for a result file already committed, what the page
+    carries for that half (the headline sentence, the printed numbers, the yardstick table, the
+    limits and that half's facts); and the sentence.
 
-    "Any check counts and result file already committed" is read as exactly what the ordinary page
-    prints for the files the folder holds: a result file therefore comes with the limits, the
+    That is exactly what the ordinary page prints for the files the folder holds: a result file
+    therefore comes with the limits, the
     yardstick table and that half's facts, which the registration prints "with the result", and a
     half with only a passing checks file gives its check section alone.
     """

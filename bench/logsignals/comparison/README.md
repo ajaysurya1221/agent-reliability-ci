@@ -1,13 +1,14 @@
 # The comparison of step 2
 
-Step 2 of the registration (`plan/exec/v2/study/logsignals/PREREGISTRATION.md` on branch
-`v2/phase0`) asks for a second implementation written from the registration alone, three
-simulated data sets, and two requirements. These are the files of that comparison. Everything
-here is made-up data: nothing is counted from a real file.
+Step 2 of the registration (`plan/exec/v2/study/logsignals/PREREGISTRATION-2.md` on branch
+`v2/phase0`) describes a second implementation, the simulated data sets (one with a planted
+link, one with none, and the edge cases as four data sets: `edge`, `edge_few9`, `edge_ten`,
+`edge_eleven`) and two requirements. These are the files of that comparison. Everything here is
+made-up data: nothing is counted from a real file.
 
 | File | What it is |
 |---|---|
-| `blind_impl.py.txt` | the second implementation, by an agent that saw the registration and `../INTERFACE.md` only |
+| `blind_impl.py.txt` | the second implementation, by an agent that saw the first registration and `../INTERFACE.md` only |
 | `make_sets.py.txt` | writes the simulated sets (fixed seeds; a rerun writes the same bytes) |
 | `SETS.sha256` | the digests of the twelve tables `make_sets.py.txt` writes |
 | `expected/` | the second implementation's output on those tables |
@@ -29,3 +30,14 @@ cp -R bench/logsignals/comparison/expected /tmp/cmp/expected
 
 The comparison shows that two implementations give the same numbers on these tables. It does
 not test the extractors, and it says nothing about any real session.
+
+## History
+
+The comparison was first made under the first registration (`PREREGISTRATION.md` in the same
+folder, which ended on 19 November 2026 before any run), at code commit `c65ed3c`. The second
+implementation was written from that first text and from `../INTERFACE.md` as it stood at that
+commit; its notes and its own first lines name that text. After the replacement was registered,
+the page's fixed sentences, the tests and comments that quote them, and the notes in this folder
+were brought to the new text. `../analyze.py` did not change. The comparison was then run again
+on the same sets against the same second implementation, and it wrote `COMPARE_FINAL.md` with
+the same bytes as before.

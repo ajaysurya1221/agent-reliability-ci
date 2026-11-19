@@ -451,9 +451,10 @@ def test_a_folder_that_stopped_at_its_date_gives_the_note(
 def test_a_folder_that_stopped_after_a_result_prints_it_with_the_limits(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # MINOR 1 of review 3: "any check counts and result file already committed" is read as what
-    # the ordinary page prints for those files, so the result comes with the limits, the yardstick
-    # table and the half's facts, as the registration prints them "with the result".
+    # MINOR 1 of review 3: "the check counts already committed, as the page prints them; for a
+    # result file already committed, what the page carries for that half" is read as exactly
+    # what the ordinary page prints for those files, so the result comes with the limits, the
+    # yardstick table and the half's facts, as the registration prints them "with the result".
     folder = _build_folder(tmp_path, halves=("confirmation",))
     _ = capsys.readouterr()
     ordinary = (folder / render.PAGE_NAME).read_text(encoding="utf-8")
