@@ -24,7 +24,7 @@ from typing import Any, NoReturn
 COLUMNS: tuple[str, ...] = ("transcript_path", "agent_percentage")
 HEADER: tuple[str, ...] = ("path", "agent_percentage")
 
-_TRANSCRIPT_PATH_RE = re.compile(r"\Atranscripts[0-9]*/[^/\\\x00-\x1f]{1,480}\.jsonl\Z")
+_TRANSCRIPT_PATH_RE = re.compile(r"\Atranscripts[0-9]*/[^/\\\x00-\x1f]+\.jsonl\Z")
 _HEX16_RE = re.compile(r"\A[0-9a-f]{16}\Z")
 _MONTH_RE = re.compile(r"\A20[0-9]{2}-(0[1-9]|1[0-2])\Z")
 _VALID_GROUPS = frozenset({"claude_code", "codex"})
