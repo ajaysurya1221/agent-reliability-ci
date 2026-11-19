@@ -520,3 +520,48 @@ approved the third with one change.
 **Where.** `study/logsignals/PREREGISTRATION.md`, with the rule and its application beside
 it. Dates unchanged: implementation record by 1 Dec 2026, result by 10 Dec 2026, stop rule
 14 Dec 2026. No reader change, no second dataset, no release.
+
+## D-25: the first log-signals registration ended before any run; a replacement is registered (2026-11-19)
+
+**What happened.** The registration of D-24 printed a general limit with both halves: "no
+repository shows two identified users". It is true of the first reported half and false of the
+second. The text's own figures showed it (35 distinct user ids in 32 repositories). Limits are
+on the list of items that cannot be corrected, and the text says that changing one ends the
+registration. Astra found the error while it reviewed the implementation record; one reviewing
+agent reported the same contradiction in the same round. Two review rounds and Astra had read
+the text before it was registered and had not caught it. The orchestrator wrote the sentence.
+
+**What had run.** The code was built and compared with a second implementation on simulated
+data. Two programs wrote the two private tables, one side each. Counts were made on the signal
+side alone. Stage 1 and stage 2 never ran on the real tables: no signal value was set beside
+an outcome value, in either half.
+
+**The decision.** The maintainer chose, on 19 Nov 2026, to end the first registration with a
+note and to register a replacement before any pairing, and approved both texts the same day.
+The other course was to end the study with the note alone.
+
+**What the replacement keeps and changes.** The same: the question, the population, the two
+measures, the floors, the printed numbers, the headline sentence, the yardstick table, the
+README sentence and the dates. Changed: the limits and the facts of each half; two readings
+inside the third block definition are written down; two failure reports are fuller; the order
+of work is rewritten around code that already exists; one more privacy leftover is accepted
+and stated. The offer of a prediction sentence is not repeated, because more has been counted
+since. The text lists all 39 differences as old words and new words, and a script rebuilds the
+new text from that list and the first text, byte for byte.
+
+**Both views.** The orchestrator put three courses to Astra: run the first half under the
+old text, replace the registration in the open, or end the study. Astra chose the replacement,
+called ending the study permissible but not required, and ruled out running the first half
+alone, because the text fixes that the second half follows it. The orchestrator agreed.
+Astra then held three drafts of the replacement (a claim of sameness that was too wide, a
+renewed prediction offer, and counts that bound the number of user ids in one repository) and
+approved the fourth.
+
+**What it costs.** The replacement was written after signal-side counts that the first text
+did not have, and after the code existed. The text says so under "What was looked at" and
+"Order of work". It is a second registration of the same study and must be read as one.
+
+**Where.** `study/logsignals/FIRST-REGISTRATION-ENDED.md` and
+`study/logsignals/PREREGISTRATION-2.md`; the first text stays unchanged at commit `ea3b762`.
+Dates unchanged: implementation record by 1 Dec 2026, result by 10 Dec 2026, stop rule
+14 Dec 2026. No reader change, no second dataset, no release.
