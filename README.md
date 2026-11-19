@@ -653,6 +653,11 @@ never change the gate result. Racing duplicate comments are refreshed on the nex
   of two models, range for the change, cost or usage-limit measure, or reader for other
   agents. Days are kept only with `--keep`, and only when captured while their files
   still existed. Windows is untested for this command.
+- One study describes how a reasoning measure and an attribution share line up in public Codex
+  sessions (`docs/results/log-signals-study/`). It is a description. It does not validate these
+  measures against any outcome.
+- 2,799 of the 3,150 Claude Code pool sessions yield no countable response. That fits transcripts
+  that record no `effort` setting, but it is not a count of them.
 - **It is not a sandbox and not a security boundary.** Python agents share a process with their tool
   boundary. Command agents use a separate harness-owned MCP boundary, which is isolation from
   accident, not containment. Both assume buggy, non-hostile agent code; a hostile agent could still

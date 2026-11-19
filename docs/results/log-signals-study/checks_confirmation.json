@@ -1,0 +1,84 @@
+{
+  "all_same": true,
+  "also_printed": {
+    "model_unknown": 6,
+    "month_unknown": 0
+  },
+  "checks": [
+    {
+      "found": 423,
+      "name": "sessions",
+      "registered": 423,
+      "verdict": "same"
+    },
+    {
+      "found": 33,
+      "name": "repositories",
+      "registered": 33,
+      "verdict": "same"
+    },
+    {
+      "found": 79,
+      "name": "outcome_at_0",
+      "registered": 79,
+      "verdict": "same"
+    },
+    {
+      "found": 228,
+      "name": "outcome_at_100",
+      "registered": 228,
+      "verdict": "same"
+    },
+    {
+      "found": 116,
+      "name": "outcome_between",
+      "registered": 116,
+      "verdict": "same"
+    },
+    {
+      "found": 25,
+      "name": "first_measure_exactly_0",
+      "registered": 25,
+      "verdict": "same"
+    },
+    {
+      "found": 102,
+      "name": "month_2026-04",
+      "registered": 102,
+      "verdict": "same"
+    },
+    {
+      "found": 76,
+      "name": "month_2026-05",
+      "registered": 76,
+      "verdict": "same"
+    },
+    {
+      "found": 109,
+      "name": "month_2026-06",
+      "registered": 109,
+      "verdict": "same"
+    },
+    {
+      "found": 104,
+      "name": "month_2026-07",
+      "registered": 104,
+      "verdict": "same"
+    },
+    {
+      "found": 25,
+      "name": "month_2026-08",
+      "registered": 25,
+      "verdict": "same"
+    },
+    {
+      "found": 7,
+      "name": "month_2026-09",
+      "registered": 7,
+      "verdict": "same"
+    }
+  ],
+  "half": "confirmation",
+  "outcome_sha256": "0207c517088c4b83b67a8a89953ea01badfcfb269d528df9be1726a1677fd29d",
+  "signal_sha256": "68f65e4efc6f6c37a8fbbc93a12917b6fc7ed394775892c9528136f409f9a2f6"
+}

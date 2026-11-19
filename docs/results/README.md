@@ -69,3 +69,13 @@ failure, and a write-up generated from the committed evidence:
 The sealed suite stores behind [order-desk-study.md](order-desk-study.md), all three runs, with
 the exact command to re-derive each decision from a clone:
 [order-desk-study/README.md](order-desk-study/README.md).
+
+## The log-signals study
+
+One study describes how a reasoning measure and an attribution share line up in public Codex
+sessions (`docs/results/log-signals-study/`). It is a description. It does not validate these
+measures against any outcome.
+
+[The result page](log-signals-study/README.md) ·
+[the data notice](log-signals-study/DATA.md) ·
+[the note that ended the first registration](log-signals-study-first-registration-ended.md)
