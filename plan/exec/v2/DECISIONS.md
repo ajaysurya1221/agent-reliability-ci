@@ -485,3 +485,38 @@ rule, and named the main risk: research that reaches nobody in place of features
 reached nobody. The design agent found the data gated and without the needed columns in
 its tables, and advised against the contribution before 14 Dec. Decisions 2 and 5 follow
 them.
+
+## D-24: the log-signals study is registered as a description, not a test (2026-11-19)
+
+D-23 allowed one bounded study of association. The final count gave go for Codex only. The
+design work then asked whether any test of the chosen number keeps its false-alarm rate at
+these sizes, on synthetic data, before any real pairing.
+
+**What was found (simulated).** A shuffle test inside repositories is not valid when a
+repository's sessions depend on each other in time. A sign flip per repository repairs that
+but not a calendar drift shared by all repositories in both numbers; blocking by month
+lowers the rate and does not hold it. A pattern carried only by session length passes the
+planned baseline gate in a share of runs, and the first measure is a share of the session's
+length.
+
+**The decision.** A rule written and hashed before the last simulation results were opened
+says: if neither candidate test passes every null case, register a description only. Neither
+passed. The maintainer approved, on 19 Nov 2026, six changes to the approved plan:
+
+1. A description instead of a test.
+2. "A signal counts only if it adds to them" is dropped; blocked numbers are printed beside
+   the headline and nothing is claimed about adding to length or model.
+3. New standard-library code under `bench/logsignals/`; nothing under `src/arci` changes.
+4. The second half is described too, automatically, if the first run meets every condition.
+5. The study cannot come out "positive"; that row of the 14 Dec table cannot apply, and one
+   fixed README sentence is used whatever the numbers are.
+6. The plan's secondary outcomes judged by a model are dropped.
+
+**Both views.** The orchestrator: the rule's outcome is also the better design, because a
+"shown" verdict could not have told a direct link from one carried by session length. Astra:
+the same instruction before the results; it rejected the second draft of the text and
+approved the third with one change.
+
+**Where.** `study/logsignals/PREREGISTRATION.md`, with the rule and its application beside
+it. Dates unchanged: implementation record by 1 Dec 2026, result by 10 Dec 2026, stop rule
+14 Dec 2026. No reader change, no second dataset, no release.
