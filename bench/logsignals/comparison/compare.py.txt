@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""Compare the registered `describe()` with the blind implementation's expected JSON.
+
+Run with the repository's interpreter in isolated mode (this copy is stored with a `.txt`
+suffix so the repository's linter and type checker skip it):
+
+    .venv/bin/python -I compare.py REPO_ROOT BLIND_DIR OUT_FILE
+
+`REPO_ROOT` holds `bench/logsignals/analyze.py`; `BLIND_DIR` holds `blind_impl.py`, `sets/`
+(written by `make_sets.py`) and `expected/`.
+
+It computes numbers and compares them. It states no cause, no prediction and no measure of
+quality.
+
+What it does, per data set and per half:
+
+1. Calls the registered `describe()` on the set's own files, as the blind agent wrote them,
+   and records whether that call returns or raises.
+2. Builds a path-normalised copy of the set. Every transcript path in `signal.tsv` and
+   `outcome.tsv` is replaced by `transcripts/s<NNNNN>.jsonl`, the index taken from the plain
+   string order of the original paths over both files, so the plain string order of the paths
+   is unchanged and the map is one to one. Path content enters the described numbers only as
+   the last tie-break of the session-length thirds, which is an order comparison, so an
+   order-preserving rename cannot move any number. That claim is checked, not assumed: the
+   blind implementation is re-run on the normalised copy and compared with its own
+   `expected/*.json`, which was produced from the original files.
+3. Calls the registered `describe()` on the normalised copy and compares every leaf value with
+   the blind `expected/*.json`: integers and booleans must be equal, floats must agree within
+   1e-9, null must meet null.
+4. Prints the planted-minus-none figure for the repository-blocked `rho_bar` of the first
+   measure, from the registered code's output, for each half.
+
+It writes `OUT_FILE`, with the SHA-256 of every file it read, and prints the same text.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+if len(sys.argv) != 4:
+    raise SystemExit("usage: compare.py REPO_ROOT BLIND_DIR OUT_FILE")
+WORKTREE = Path(sys.argv[1]).resolve()
+BLIND = Path(sys.argv[2]).resolve()
+OUT_FILE = Path(sys.argv[3]).resolve()
+SETS = BLIND / "sets"
+EXPECTED = BLIND / "expected"
+
+HALVES = ("confirmation", "discovery")
+SET_NAMES = ("planted", "none", "edge", "edge_ten", "edge_eleven", "edge_few9")
+
+TOLERANCE = 1e-9
+
+sys.path.insert(0, str(WORKTREE))
+sys.path.insert(0, str(BLIND))
+
+import blind_impl  # noqa: E402
+from bench.logsignals import analyze  # noqa: E402
+
+
+# --- path normalisation -------------------------------------------------------
+
+
+def read_table(path):
+    lines = path.read_text(encoding="utf-8").split("\n")
+    while lines and lines[-1] == "":
+        lines.pop()
+    return lines[0].split("\t"), [line.split("\t") for line in lines[1:]]
+
+
+def write_table(path, header, rows):
+    text = "\t".join(header) + "\n"
+    for row in rows:
+        text += "\t".join(row) + "\n"
+    path.write_text(text, encoding="utf-8")
+
+
+def normalise(set_dir, out_dir):
+    """Rewrite both tables with order-preserving synthetic paths."""
+    sig_header, sig_rows = read_table(set_dir / "signal.tsv")
+    out_header, out_rows = read_table(set_dir / "outcome.tsv")
+    every = sorted({row[0] for row in sig_rows} | {row[0] for row in out_rows})
+    mapping = {old: f"transcripts/s{index:05d}.jsonl" for index, old in enumerate(every)}
+    # The rename is order-preserving by construction; assert it rather than trust it.
+    renamed = [mapping[old] for old in every]
+    assert renamed == sorted(renamed), "path rename changed the plain string order"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for row in sig_rows:
+        row[0] = mapping[row[0]]
+    for row in out_rows:
+        row[0] = mapping[row[0]]
+    write_table(out_dir / "signal.tsv", sig_header, sig_rows)
+    write_table(out_dir / "outcome.tsv", out_header, out_rows)
+    return out_dir
+
+
+# --- comparison ---------------------------------------------------------------
+
+
+def flatten(obj, prefix=""):
+    """Every leaf of a JSON object, keyed by its dotted path."""
+    leaves = {}
+    if isinstance(obj, dict):
+        for key in obj:
+            leaves.update(flatten(obj[key], f"{prefix}.{key}" if prefix else str(key)))
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            leaves.update(flatten(item, f"{prefix}[{index}]"))
+    else:
+        leaves[prefix] = obj
+    return leaves
+
+
+def show(value):
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return repr(value)
+    return str(value)
+
+
+def agrees(left, right):
+    """True when the two leaves agree under the rule of the brief."""
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if isinstance(left, int) and isinstance(right, int):
+        return left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return abs(float(left) - float(right)) <= TOLERANCE
+    return left == right
+
+
+def compare(name, left, right):
+    """Leaf-by-leaf comparison of two JSON objects. Returns (compared, differences)."""
+    a, b = flatten(left), flatten(right)
+    keys = sorted(set(a) | set(b))
+    differences = []
+    for key in keys:
+        if key not in a:
+            differences.append((name, key, "<key absent>", show(b[key])))
+            continue
+        if key not in b:
+            differences.append((name, key, show(a[key]), "<key absent>"))
+            continue
+        if not agrees(a[key], b[key]):
+            differences.append((name, key, show(a[key]), show(b[key])))
+    return len(keys), differences
+
+
+# --- the run ------------------------------------------------------------------
+
+
+def digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def main():
+    lines = []
+    compared_total = 0
+    differences = []
+    control_differences = []
+    raw_errors = {}
+    digests = []
+    registered_rho = {}
+
+    temp_root = Path(tempfile.mkdtemp(prefix="logsignals-compare-"))
+
+    for set_name in SET_NAMES:
+        set_dir = SETS / set_name
+        if not set_dir.is_dir():
+            raise SystemExit(f"missing data set: {set_dir}")
+        norm_dir = normalise(set_dir, temp_root / set_name)
+        for table in ("signal.tsv", "outcome.tsv"):
+            digests.append(
+                (f"sets/{set_name}/{table}", digest(set_dir / table), digest(norm_dir / table))
+            )
+        for half in HALVES:
+            label = f"{set_name}/{half}"
+
+            # 1. the registered function on the files as the blind agent wrote them
+            try:
+                _ = analyze.describe(set_dir / "signal.tsv", set_dir / "outcome.tsv", half)
+                raw_errors[label] = "returned"
+            except Exception as exc:  # noqa: BLE001 - the kind of failure is the finding
+                raw_errors[label] = type(exc).__name__
+
+            # 2. the registered function on the normalised copy
+            registered = analyze.describe(norm_dir / "signal.tsv", norm_dir / "outcome.tsv", half)
+            registered = json.loads(json.dumps(registered, sort_keys=True))
+
+            # 3. the blind implementation on the normalised copy (neutrality control)
+            control = blind_impl.describe(
+                str(norm_dir / "signal.tsv"), str(norm_dir / "outcome.tsv"), half
+            )
+            control = json.loads(json.dumps(control, sort_keys=True))
+
+            expected = json.loads((EXPECTED / f"{set_name}_{half}.json").read_text("utf-8"))
+
+            _, control_diff = compare(label, control, expected)
+            control_differences.extend(control_diff)
+
+            count, diff = compare(label, registered, expected)
+            compared_total += count
+            differences.extend(diff)
+
+            block = registered["measures"]["no_reasoning_share"]["repository"]
+            registered_rho[label] = (block["formed"], block["rho_bar"])
+
+    # --- the second requirement of the registration ---
+    planted_minus_none = {}
+    for half in HALVES:
+        planted = registered_rho[f"planted/{half}"][1]
+        none = registered_rho[f"none/{half}"][1]
+        planted_minus_none[half] = (
+            planted,
+            none,
+            None if (planted is None or none is None) else planted - none,
+        )
+
+    # --- the report ---
+    lines.append("# Comparison of the two implementations")
+    lines.append("")
+    lines.append(
+        "The registered `describe()` of "
+        "`bench/logsignals/analyze.py` "
+        "against the blind implementation's `expected/*.json`. Integers and booleans must be "
+        "equal, floats must agree within 1e-9, null must meet null."
+    )
+    lines.append("")
+    lines.append(f"Data sets: {', '.join(SET_NAMES)}. Halves: {', '.join(HALVES)}.")
+    lines.append(f"Leaf values compared: **{compared_total}**.")
+    lines.append(f"Differences: **{len(differences)}**.")
+    lines.append("")
+
+    lines.append("## The registered function on the files as the blind agent wrote them")
+    lines.append("")
+    lines.append("| set / half | result of `describe()` |")
+    lines.append("|---|---|")
+    for label in sorted(raw_errors):
+        lines.append(f"| `{label}` | `{raw_errors[label]}` |")
+    lines.append("")
+
+    lines.append("## Control: the blind implementation on the path-normalised copy")
+    lines.append("")
+    lines.append(
+        "The same comparison rule, blind implementation against its own `expected/*.json`. "
+        "An empty table here means the path rename moved no number, so the comparison above "
+        "is a comparison of the statistics and not of the rename."
+    )
+    lines.append("")
+    if control_differences:
+        lines.append("| set / half | key | blind on normalised copy | blind expected |")
+        lines.append("|---|---|---|---|")
+        for label, key, left, right in control_differences:
+            lines.append(f"| `{label}` | `{key}` | `{left}` | `{right}` |")
+    else:
+        lines.append("No difference: 0 of the compared leaves moved.")
+    lines.append("")
+
+    lines.append("## Differences, registered against blind")
+    lines.append("")
+    if differences:
+        lines.append("| set / half | key | registered | blind |")
+        lines.append("|---|---|---|---|")
+        for label, key, left, right in differences:
+            lines.append(f"| `{label}` | `{key}` | `{left}` | `{right}` |")
+    else:
+        lines.append("No difference in any compared leaf value.")
+    lines.append("")
+
+    lines.append("## The registration's second requirement")
+    lines.append("")
+    lines.append(
+        "Repository-blocked `rho_bar` of the first measure (`no_reasoning_share`), from the "
+        "registered code's output on the path-normalised copies."
+    )
+    lines.append("")
+    lines.append("| half | planted | none | planted - none |")
+    lines.append("|---|---|---|---|")
+    for half in HALVES:
+        planted, none, delta = planted_minus_none[half]
+        lines.append(
+            f"| {half} | `{show(planted)}` | `{show(none)}` | "
+            f"`{show(delta)}` |"
+        )
+    lines.append("")
+    lines.append("Every repository-blocked value of the first measure, both sets, both halves:")
+    lines.append("")
+    lines.append("| set / half | formed | rho_bar |")
+    lines.append("|---|---|---|")
+    for label in sorted(registered_rho):
+        formed, value = registered_rho[label]
+        lines.append(f"| `{label}` | `{show(formed)}` | `{show(value)}` |")
+    lines.append("")
+
+    lines.append("## Files read (SHA-256)")
+    lines.append("")
+    lines.append("| file | SHA-256 |")
+    lines.append("|---|---|")
+    code = WORKTREE / "bench" / "logsignals" / "analyze.py"
+    lines.append(f"| `bench/logsignals/analyze.py` | `{digest(code)}` |")
+    lines.append(f"| `blind_impl.py` | `{digest(BLIND / 'blind_impl.py')}` |")
+    for path in sorted(EXPECTED.glob("*.json")):
+        lines.append(f"| `expected/{path.name}` | `{digest(path)}` |")
+    lines.append("")
+    lines.append("| data set file | as the blind agent wrote it | path-normalised copy |")
+    lines.append("|---|---|---|")
+    for name, original, normalised in digests:
+        lines.append(f"| `{name}` | `{original}` | `{normalised}` |")
+    lines.append("")
+
+    OUT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    print("\n".join(lines))
+    return 0 if not differences and not control_differences else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
