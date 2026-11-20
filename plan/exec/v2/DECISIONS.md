@@ -565,3 +565,44 @@ did not have, and after the code existed. The text says so under "What was looke
 `study/logsignals/PREREGISTRATION-2.md`; the first text stays unchanged at commit `ea3b762`.
 Dates unchanged: implementation record by 1 Dec 2026, result by 10 Dec 2026, stop rule
 14 Dec 2026. No reader change, no second dataset, no release.
+
+## D-26: one README edit that points to the order-desk correction; nothing else is built (2026-11-21)
+
+The maintainer asked on 21 Nov 2026 for a plan of 24 to 48 hours of engineering by the
+orchestrator and Astra, and said to choose one path. In-house research was run first: five
+topics, four of them re-checked claim by claim by a second agent (79 claims re-checked: 58
+supported, 19 partly, 1 refuted, 1 not reachable), then two consults with Astra. The working
+files are private and are not in this repository.
+
+**What was found that bears on engineering.**
+
+- For none of the seven paths examined was evidence found that it brings outside users before
+  14 Dec 2026. None of them changes how many people see the project.
+- The repository already holds one registered case that went against its own prediction and
+  was corrected in public: `docs/results/order-desk-study.md` on `main`. The README's first
+  screen does not point to it.
+- The README's first screen holds 250 counted words and its test allows 250
+  (`tests/unit/docs/test_logs_docs.py`, `test_first_screen_word_count`).
+
+**The views.** The orchestrator's first choice was benchmark tasks in the Harbor task format,
+made from the released refund example. Astra chose to build nothing. The orchestrator's second
+draft had a documentation stage (README, a new page, a result form, a picture) and one
+benchmark task as an option. Astra held it and asked for one README edit and nothing else.
+The orchestrator accepted every change. The plan follows Astra.
+
+**The decision.** The maintainer approved the plan on 21 Nov 2026.
+
+- D-23 stays in force: no new feature, command, option or release, and no pull request to
+  another project, before 14 Dec 2026.
+- One documentation edit is allowed: about 40 words on the README's first screen that point
+  to the order-desk study and its correction. Every word added is paid for by a word cut. No
+  test is edited and the limit is not raised. If no such version passes the whole suite, the
+  edit is dropped and that is recorded here.
+- The edit is not started before the maintainer says so. The maintainer opens and merges its
+  pull request.
+- No benchmark task, no new page, no result form and no picture are built.
+
+**What it does not claim.** That the edit brings users, or that anyone reads the first
+screen. The counts on 21 Nov 2026 are 0 stars, 0 outside issues or discussions and 0 result
+blocks posted by someone else. The stop rule of 14 Dec 2026 is unchanged: engineering stops
+if all three thresholds (15, 2 and 1) are missed.
