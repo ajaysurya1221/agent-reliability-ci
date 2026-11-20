@@ -1,0 +1,1037 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Adversarial review of SPEC_D: a third, independent implementation.
+
+Synthetic data only. Standard library only. /usr/bin/python3 -I. Fixed seeds.
+No real data is read; no paired signal and outcome values exist anywhere.
+
+Nothing here claims a cause, a prediction, a measure of quality, or an order in
+time. "Time order" is only the index that labels the sessions of one repository.
+
+Subcommands:
+  checks            code checks on my own statistic and p-values
+  nulls             N0..N6 (two random-walk scalings), 1000 data sets each
+  disputed          the cells where report A and report B disagree
+  gate              G0a, G0b, G4: joint gate against two separate gates
+  breaks            further null scenarios built to break the sign-flip test
+"""
+
+import hashlib
+import math
+import os
+import random
+import sys
+from operator import mul
+
+# ------------------------------------------------------------------ fixed input
+
+SIZES = []  # [WITHHELD: the 33 repository session counts of the first half; disclosure rule 2 of the registration]
+NTOT = 423
+N_OUT_ZERO = 79
+N_OUT_MID = 116
+N_SIG_ZERO = 25
+
+REP_CORR = 0.6
+REP_SHARE = 0.3
+LEN_MEDIAN = 60.0
+LEN_SIGMA = 0.6
+LEN_MIN = 20
+MODELS = ("a", "b", "c", "d", "e")
+
+TOL = 1e-9
+ALPHA = 0.05
+TESTS = ("S", "C", "F", "K")
+
+# many short repositories: 141 repositories of 3 sessions
+SIZES_SHORT = [3] * 141
+# one dominant repository
+SIZES_DOM = [300, 20, 20, 20, 15, 15, 10, 10, 5, 4, 2, 2]
+
+T975 = {1: 12.7062, 2: 4.3027, 3: 3.1824, 4: 2.7764, 5: 2.5706, 6: 2.4469,
+        7: 2.3646, 8: 2.3060, 9: 2.2622, 10: 2.2281, 11: 2.2010, 12: 2.1788,
+        13: 2.1604, 14: 2.1448, 15: 2.1314, 16: 2.1199, 17: 2.1098, 18: 2.1009,
+        19: 2.0930, 20: 2.0860, 21: 2.0796, 22: 2.0739, 23: 2.0687, 24: 2.0639,
+        25: 2.0595, 26: 2.0555, 27: 2.0518, 28: 2.0484, 29: 2.0452, 30: 2.0423}
+
+
+def t975(df):
+    if df <= 0:
+        return float("nan")
+    if df in T975:
+        return T975[df]
+    if df > 140:
+        return 1.9771 if df < 200 else 1.9600
+    return 2.0 + 0.6 / math.sqrt(df)
+
+
+# -------------------------------------------------------------- latent series
+
+def pair(rnd, rho):
+    z1 = rnd.gauss(0.0, 1.0)
+    z2 = rnd.gauss(0.0, 1.0)
+    return z1, rho * z1 + math.sqrt(1.0 - rho * rho) * z2
+
+
+def ar(rnd, n, phi):
+    c = math.sqrt(1.0 - phi * phi)
+    v = rnd.gauss(0.0, 1.0)
+    out = [v]
+    for _ in range(n - 1):
+        v = phi * v + c * rnd.gauss(0.0, 1.0)
+        out.append(v)
+    return out
+
+
+def rw(rnd, n, scale):
+    out = []
+    c = 0.0
+    for _ in range(n):
+        c += rnd.gauss(0.0, 1.0)
+        out.append(c)
+    if scale == "A":
+        s = 1.0 / math.sqrt(n)
+    else:
+        s = math.sqrt(2.0 / (n + 1.0))
+    return [v * s for v in out]
+
+
+def regime(rnd, n, meanlen, noise):
+    a = math.sqrt(1.0 - noise)
+    b = math.sqrt(noise)
+    p = 1.0 / meanlen
+    g = rnd.gauss(0.0, 1.0)
+    out = []
+    for t in range(n):
+        if t > 0 and rnd.random() < p:
+            g = rnd.gauss(0.0, 1.0)
+        out.append(a * g + b * rnd.gauss(0.0, 1.0))
+    return out
+
+
+def seasonal(rnd, n, period, noise):
+    a = math.sqrt(1.0 - noise)
+    b = math.sqrt(noise)
+    ph = rnd.random() * 2.0 * math.pi
+    w = 2.0 * math.pi / period
+    return [a * math.sqrt(2.0) * math.cos(w * t + ph) + b * rnd.gauss(0.0, 1.0)
+            for t in range(n)]
+
+
+def hetero(rnd, n):
+    """independent draws whose spread grows over the index (0.2 -> 3.0)."""
+    out = []
+    for t in range(n):
+        s = 0.2 + 2.8 * (t / float(max(1, n - 1)))
+        out.append(s * rnd.gauss(0.0, 1.0))
+    return out
+
+
+def alt(rnd, n, cc, phi):
+    c = math.sqrt(1.0 - cc * cc)
+    cp = math.sqrt(1.0 - phi * phi)
+    z1 = rnd.gauss(0.0, 1.0)
+    z2 = rnd.gauss(0.0, 1.0)
+    e = [z1]
+    f = [cc * z1 + c * z2]
+    for t in range(1, n):
+        z1 = rnd.gauss(0.0, 1.0)
+        z2 = rnd.gauss(0.0, 1.0)
+        e.append(phi * e[t - 1] + cp * z1)
+        f.append(phi * f[t - 1] + cp * (cc * z1 + c * z2))
+    return e, f
+
+
+def runs(rnd, n, k):
+    k = min(k, n)
+    if k <= 1:
+        return [0] * n
+    cuts = sorted(rnd.sample(range(1, n), k - 1))
+    lab = []
+    b = [0] + cuts + [n]
+    for j in range(k):
+        lab.extend([j] * (b[j + 1] - b[j]))
+    return lab
+
+
+# ------------------------------------------------------------- marginal maps
+
+KNOTS = ((0.0, 0.0), (N_SIG_ZERO / float(NTOT), 0.01),
+         (0.25, 0.08), (0.50, 0.16), (0.75, 0.26), (0.95, 0.55), (1.0, 0.90))
+
+
+def share_at(q):
+    for i in range(1, len(KNOTS)):
+        if q <= KNOTS[i][0]:
+            q0, s0 = KNOTS[i - 1]
+            q1, s1 = KNOTS[i]
+            if q1 <= q0:
+                return s1
+            return s0 + (s1 - s0) * (q - q0) / (q1 - q0)
+    return KNOTS[-1][1]
+
+
+def map_signal(lat, ds, nzero):
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: (lat[i], i))
+    out = [0.0] * n
+    for pos, i in enumerate(order):
+        if pos < nzero:
+            out[i] = 0.0
+            continue
+        s = share_at((pos + 0.5) / n)
+        d = ds[i]
+        k = int(s * d + 0.5)
+        if k < 1:
+            k = 1
+        if k >= d:
+            k = d - 1
+        out[i] = k / float(d)
+    return out
+
+
+def map_outcome(lat, nzero, nmid):
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: (lat[i], i))
+    out = [0] * n
+    for pos, i in enumerate(order):
+        if pos < nzero:
+            out[i] = 0
+        elif pos >= nzero + nmid:
+            out[i] = 100
+        else:
+            out[i] = 1 + (98 * (pos - nzero)) // (nmid - 1)
+    return out
+
+
+# ------------------------------------------------------------------ generator
+
+SCEN = {
+    "N0": dict(w="iid"),
+    "N1": dict(w="ar", phi=(0.3, 0.3)),
+    "N2": dict(w="ar", phi=(0.6, 0.6)),
+    "N3": dict(w="ar", phi=(0.9, 0.9)),
+    "N4": dict(w="ar", phi=(0.9, 0.3)),
+    "N5": dict(w="regime", meanlen=5.0, noise=0.3),
+    "N6A": dict(w="rw", scale="A"),
+    "N6B": dict(w="rw", scale="B"),
+    "X1": dict(w="iid", trend=0.3, ntrend=8),
+    "A2": dict(w="alt", cc=0.18, phi=0.0),
+    "G0a": dict(w="iid"),
+    "G0b": dict(w="ar", phi=(0.6, 0.6)),
+    "G1": dict(w="iid", lengtheff=0.3),
+    "G2": dict(w="iid", modeleff=0.3),
+    "G4": dict(w="iid", lengtheff=0.3, modeleff=0.5),
+    "G0c": dict(w="regime", meanlen=15.0, noise=0.05),
+    "G0d": dict(w="cal", both=True),
+    # further nulls built for this review
+    "D1": dict(w="seas", period="half", noise=0.3),
+    "D2": dict(w="seas", period=2.0, noise=0.3),
+    "D3": dict(w="hetero"),
+    "D4": dict(w="regime", meanlen=15.0, noise=0.05),
+    "D5": dict(w="ar", phi=(0.6, 0.6), sizes="short"),
+    "D6": dict(w="ar", phi=(0.6, 0.6), sizes="dom"),
+    "D7": dict(w="ar", phi=(-0.9, -0.9)),
+    "D8": dict(w="cal", both=True),
+    "D9": dict(w="cal", both=False),
+    "D10": dict(w="mixed"),
+    "D11": dict(w="regime", meanlen=15.0, noise=0.05, sizes="dom"),
+}
+
+
+def sizes_of(cfg):
+    s = cfg.get("sizes")
+    if s == "short":
+        return SIZES_SHORT
+    if s == "dom":
+        return SIZES_DOM
+    return SIZES
+
+
+def within(rnd, n, cfg, r, ds, mods, lm, lsd, cal):
+    w = cfg["w"]
+    if w == "iid":
+        e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+    elif w == "ar":
+        e = ar(rnd, n, cfg["phi"][0])
+        f = ar(rnd, n, cfg["phi"][1])
+    elif w == "rw":
+        e = rw(rnd, n, cfg["scale"])
+        f = rw(rnd, n, cfg["scale"])
+    elif w == "regime":
+        e = regime(rnd, n, cfg["meanlen"], cfg["noise"])
+        f = regime(rnd, n, cfg["meanlen"], cfg["noise"])
+    elif w == "seas":
+        p = cfg["period"]
+        per = max(2.0, n / 2.0) if p == "half" else p
+        e = seasonal(rnd, n, per, cfg["noise"])
+        f = seasonal(rnd, n, per, cfg["noise"])
+    elif w == "hetero":
+        e = hetero(rnd, n)
+        f = hetero(rnd, n)
+    elif w == "alt":
+        e, f = alt(rnd, n, cfg["cc"], cfg["phi"])
+    elif w == "cal":
+        hu, hv, days = cal
+        a = math.sqrt(0.5)
+        e = [a * hu[d] + a * rnd.gauss(0.0, 1.0) for d in days[r]]
+        if cfg["both"]:
+            f = [a * hv[d] + a * rnd.gauss(0.0, 1.0) for d in days[r]]
+        else:
+            f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+    elif w == "mixed":
+        kind = r % 3
+        if kind == 0:
+            e, f = ar(rnd, n, 0.9), ar(rnd, n, 0.9)
+        elif kind == 1:
+            e, f = rw(rnd, n, "B"), rw(rnd, n, "B")
+        else:
+            e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+            f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+    else:
+        raise ValueError(w)
+
+    if cfg.get("trend") and r < cfg.get("ntrend", 0) and n > 1:
+        sd = math.sqrt((n * n - 1) / 12.0)
+        lam = cfg["trend"]
+        k1 = math.sqrt(1.0 - lam)
+        k2 = math.sqrt(lam)
+        g = [(t - (n - 1) / 2.0) / sd for t in range(n)]
+        e = [k1 * e[t] + k2 * g[t] for t in range(n)]
+        f = [k1 * f[t] + k2 * g[t] for t in range(n)]
+
+    if cfg.get("lengtheff"):
+        lam = cfg["lengtheff"]
+        k1 = math.sqrt(1.0 - lam)
+        k2 = math.sqrt(lam)
+        z = [(math.log(ds[t]) - lm) / lsd for t in range(n)]
+        e = [k1 * e[t] + k2 * z[t] for t in range(n)]
+        f = [k1 * f[t] + k2 * z[t] for t in range(n)]
+
+    if cfg.get("modeleff"):
+        lam = cfg["modeleff"]
+        k1 = math.sqrt(1.0 - lam)
+        k2 = math.sqrt(lam)
+        km = max(mods) + 1
+        ma = []
+        mb = []
+        for _ in range(km):
+            x, y = pair(rnd, 0.85)
+            ma.append(x)
+            mb.append(y)
+        e = [k1 * e[t] + k2 * ma[mods[t]] for t in range(n)]
+        f = [k1 * f[t] + k2 * mb[mods[t]] for t in range(n)]
+    return e, f
+
+
+def gen(cfg, seed, bstyle_models=False):
+    rnd = random.Random(seed)
+    sizes = sizes_of(cfg)
+    nrep = len(sizes)
+    ntot = sum(sizes)
+
+    ra = []
+    rb = []
+    for _ in range(nrep):
+        x, y = pair(rnd, REP_CORR)
+        ra.append(x)
+        rb.append(y)
+
+    ds = []
+    for n in sizes:
+        ds.append([max(LEN_MIN,
+                       int(round(LEN_MEDIAN * math.exp(LEN_SIGMA * rnd.gauss(0.0, 1.0)))))
+                   for _ in range(n)])
+    mods = []
+    for r in range(nrep):
+        n = sizes[r]
+        if bstyle_models:
+            k = (1 if rnd.random() < 0.5 else rnd.choice((2, 3))) if n >= 10 \
+                else rnd.choice((1, 2, 3))
+        else:
+            if n >= 11:
+                k = 1 if rnd.random() < 0.5 else rnd.choice((2, 3))
+            else:
+                k = 1 if rnd.random() < 0.5 else 2
+        mods.append(runs(rnd, n, k))
+
+    alld = [v for row in ds for v in row]
+    lm = sum(math.log(v) for v in alld) / len(alld)
+    lsd = math.sqrt(sum((math.log(v) - lm) ** 2 for v in alld) / len(alld))
+
+    cal = None
+    if cfg["w"] == "cal":
+        nd = 180
+        hu = []
+        hv = []
+        cu = cv = 0.0
+        sc = math.sqrt(2.0 / (nd + 1.0))
+        for _ in range(nd):
+            cu += rnd.gauss(0.0, 1.0)
+            cv += rnd.gauss(0.0, 1.0)
+            hu.append(cu * sc)
+            hv.append(cv * sc)
+        days = []
+        for n in sizes:
+            days.append(sorted(rnd.randrange(nd) for _ in range(n)))
+        cal = (hu, hv, days)
+
+    ca = math.sqrt(REP_SHARE)
+    cb = math.sqrt(1.0 - REP_SHARE)
+    latu = []
+    latv = []
+    for r in range(nrep):
+        n = sizes[r]
+        e, f = within(rnd, n, cfg, r, ds[r], mods[r], lm, lsd, cal)
+        for t in range(n):
+            latu.append(ca * ra[r] + cb * e[t])
+            latv.append(ca * rb[r] + cb * f[t])
+
+    nzero_o = int(round(N_OUT_ZERO * ntot / float(NTOT)))
+    nmid_o = int(round(N_OUT_MID * ntot / float(NTOT)))
+    nzero_s = int(round(N_SIG_ZERO * ntot / float(NTOT)))
+    sig = map_signal(latu, alld, nzero_s)
+    out = map_outcome(latv, nzero_o, nmid_o)
+
+    repos = []
+    p = 0
+    for r in range(nrep):
+        n = sizes[r]
+        repos.append((sig[p:p + n], out[p:p + n], ds[r], mods[r]))
+        p += n
+    return repos
+
+
+# ------------------------------------------------------------------ statistic
+
+def midranks2(vals):
+    """twice the midrank, as integers."""
+    n = len(vals)
+    order = sorted(range(n), key=lambda i: vals[i])
+    res = [0] * n
+    i = 0
+    while i < n:
+        j = i
+        vi = vals[order[i]]
+        while j + 1 < n and vals[order[j + 1]] == vi:
+            j += 1
+        m = i + j + 2
+        for k in range(i, j + 1):
+            res[order[k]] = m
+        i = j + 1
+    return res
+
+
+class Blk(object):
+    __slots__ = ("n", "x", "y", "w", "obs", "shift", "ktab", "klen")
+
+
+def prep(xs, ys):
+    n = len(xs)
+    if n < 2:
+        return None
+    if min(xs) == max(xs) or min(ys) == max(ys):
+        return None
+    x2 = midranks2(xs)
+    y2 = midranks2(ys)
+    xb = sum(x2) / float(n)
+    yb = sum(y2) / float(n)
+    vx = sum((a - xb) ** 2 for a in x2)
+    vy = sum((b - yb) ** 2 for b in y2)
+    if vx <= 0.0 or vy <= 0.0:
+        return None
+    c = (n - 1) / math.sqrt(vx * vy)
+    b = Blk()
+    b.n = n
+    b.x = x2
+    b.y = [(v - yb) * c for v in y2]
+    b.w = n - 1
+    b.obs = sum(map(mul, x2, b.y))
+    b.shift = None
+    b.ktab = None
+    return b
+
+
+def stats(blocks):
+    t = 0.0
+    w = 0
+    for b in blocks:
+        t += b.obs
+        w += b.w
+    if w == 0:
+        return 0.0, 0, 0, float("nan")
+    return t, w, len(blocks), t / float(w)
+
+
+def blocks_repo(repos):
+    out = []
+    for sig, o, ds, mods in repos:
+        b = prep(sig, o)
+        if b is not None:
+            out.append(b)
+    return out
+
+
+def terciles(idxs, ds):
+    srt = sorted(idxs, key=lambda i: (ds[i], i))
+    n = len(srt)
+    c1 = n // 3
+    c2 = (2 * n) // 3
+    return [sorted(srt[:c1]), sorted(srt[c1:c2]), sorted(srt[c2:])]
+
+
+def blocks_joint(repos):
+    out = []
+    for sig, o, ds, mods in repos:
+        bym = {}
+        for t in range(len(sig)):
+            bym.setdefault(mods[t], []).append(t)
+        for key in sorted(bym):
+            for blk in terciles(bym[key], ds):
+                if len(blk) >= 2:
+                    b = prep([sig[t] for t in blk], [o[t] for t in blk])
+                    if b is not None:
+                        out.append(b)
+    return out
+
+
+def blocks_len(repos):
+    out = []
+    for sig, o, ds, mods in repos:
+        for blk in terciles(list(range(len(sig))), ds):
+            if len(blk) >= 2:
+                b = prep([sig[t] for t in blk], [o[t] for t in blk])
+                if b is not None:
+                    out.append(b)
+    return out
+
+
+def blocks_mod(repos):
+    out = []
+    for sig, o, ds, mods in repos:
+        bym = {}
+        for t in range(len(sig)):
+            bym.setdefault(mods[t], []).append(t)
+        for key in sorted(bym):
+            blk = bym[key]
+            if len(blk) >= 2:
+                b = prep([sig[t] for t in blk], [o[t] for t in blk])
+                if b is not None:
+                    out.append(b)
+    return out
+
+
+# ---------------------------------------------------------------------- tests
+
+def p_S(blocks, tobs, B, rnd):
+    thr = abs(tobs) - TOL
+    sh = rnd.shuffle
+    pre = [(list(b.x), b.y) for b in blocks]
+    hit = 0
+    for _ in range(B):
+        s = 0.0
+        for x, y in pre:
+            sh(x)
+            s += sum(map(mul, x, y))
+        if abs(s) >= thr:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def p_C(blocks, tobs, B, rnd):
+    for b in blocks:
+        if b.shift is None:
+            x = b.x
+            y = b.y
+            b.shift = [sum(map(mul, x[k:] + x[:k], y)) for k in range(b.n)]
+    thr = abs(tobs) - TOL
+    rr = rnd.randrange
+    tab = [(b.shift, b.n) for b in blocks]
+    hit = 0
+    for _ in range(B):
+        s = 0.0
+        for v, n in tab:
+            s += v[rr(n)]
+        if abs(s) >= thr:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def p_F(blocks, tobs, B, rnd):
+    thr = abs(tobs) - TOL
+    ts = [b.obs for b in blocks]
+    m = len(ts)
+    if m == 0:
+        return 1.0
+    gb = rnd.getrandbits
+    hit = 0
+    for _ in range(B):
+        bits = gb(m)
+        s = 0.0
+        for i in range(m):
+            s = s + ts[i] if (bits >> i) & 1 else s - ts[i]
+        if abs(s) >= thr:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def _ktab(b):
+    n = b.n
+    L = int(math.ceil(math.sqrt(n)))
+    nb = (n + L - 1) // L
+    ch = [b.x[i * L:min((i + 1) * L, n)] for i in range(nb)]
+    last = len(ch[-1])
+    starts = set(j * L for j in range(nb))
+    if last != L:
+        for j in range(1, nb):
+            starts.add(j * L - (L - last))
+    tab = []
+    for blk in ch:
+        lb = len(blk)
+        d = {}
+        for s in starts:
+            if s >= 0 and s + lb <= n:
+                d[s] = sum(map(mul, blk, b.y[s:s + lb]))
+        tab.append(d)
+    b.ktab = tab
+    b.klen = [len(c) for c in ch]
+
+
+def p_K(blocks, tobs, B, rnd):
+    for b in blocks:
+        if b.ktab is None:
+            _ktab(b)
+    thr = abs(tobs) - TOL
+    sh = rnd.shuffle
+    pre = [(b.ktab, b.klen, list(range(len(b.klen)))) for b in blocks]
+    hit = 0
+    for _ in range(B):
+        s = 0.0
+        for tab, lens, perm in pre:
+            sh(perm)
+            pos = 0
+            for j in perm:
+                s += tab[j][pos]
+                pos += lens[j]
+        if abs(s) >= thr:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+PVAL = {"S": p_S, "C": p_C, "F": p_F, "K": p_K}
+
+
+def interval(blocks):
+    t, w, m, rb = stats(blocks)
+    if m < 2:
+        return None
+    loo = []
+    for b in blocks:
+        wd = w - b.w
+        if wd <= 0:
+            return None
+        loo.append((t - b.obs) / float(wd))
+    mn = sum(loo) / m
+    se = math.sqrt((m - 1) / float(m) * sum((v - mn) ** 2 for v in loo))
+    fl = 1.0 / math.sqrt(w)
+    h = t975(m - 1) * max(se, fl)
+    return rb, max(-1.0, rb - h), min(1.0, rb + h), m, w, se, fl
+
+
+# ------------------------------------------------------------------- one run
+
+def seed_of(tag, i):
+    h = hashlib.sha256(("REVIEW|" + tag + "|" + str(i)).encode("utf-8")).digest()
+    return int.from_bytes(h[:8], "big")
+
+
+def one_primary(arg):
+    scen, lo, hi, B, tests, bstyle = arg
+    cfg = SCEN[scen]
+    res = []
+    for i in range(lo, hi):
+        repos = gen(cfg, seed_of("p|" + scen, i), bstyle)
+        bl = blocks_repo(repos)
+        t, w, m, rb = stats(bl)
+        row = {"rb": rb, "m": m, "W": w}
+        iv = interval(bl)
+        if iv is None:
+            row["lo"] = row["hi"] = float("nan")
+        else:
+            row["lo"] = iv[1]
+            row["hi"] = iv[2]
+        for name in tests:
+            rnd = random.Random(seed_of("t|" + scen + "|" + name, i))
+            row[name] = PVAL[name](bl, t, B, rnd) if m > 0 else 1.0
+        res.append(row)
+    return res
+
+
+def one_gate(arg):
+    scen, lo, hi, B, tests, bstyle = arg
+    cfg = SCEN[scen]
+    res = []
+    for i in range(lo, hi):
+        repos = gen(cfg, seed_of("g|" + scen, i), bstyle)
+        sets = {"P": blocks_repo(repos), "J": blocks_joint(repos),
+                "L": blocks_len(repos), "M": blocks_mod(repos)}
+        row = {}
+        for key, bl in sets.items():
+            t, w, m, rb = stats(bl)
+            row[key + "W"] = w
+            row[key + "m"] = m
+            row[key + "rho"] = rb
+            for name in tests:
+                rnd = random.Random(seed_of("gt|" + scen + "|" + key + "|" + name, i))
+                row[key + name] = PVAL[name](bl, t, B, rnd) if m > 0 else 1.0
+        res.append(row)
+    return res
+
+
+def pool(fn, tasks, nproc):
+    if nproc <= 1 or len(tasks) < 2:
+        out = []
+        for t in tasks:
+            out.extend(fn(t))
+        return out
+    import multiprocessing as mp
+    ctx = mp.get_context("fork")
+    with ctx.Pool(nproc) as p:
+        out = []
+        for part in p.map(fn, tasks, chunksize=1):
+            out.extend(part)
+        return out
+
+
+def tasks_for(scen, n, B, tests, bstyle, size):
+    out = []
+    i = 0
+    while i < n:
+        j = min(n, i + size)
+        out.append((scen, i, j, B, tests, bstyle))
+        i = j
+    return out
+
+
+def mcerr(p, n):
+    return math.sqrt(max(p * (1 - p), 1e-12) / n)
+
+
+def mean_sd(v):
+    n = len(v)
+    m = sum(v) / n
+    if n < 2:
+        return m, 0.0
+    return m, math.sqrt(sum((x - m) ** 2 for x in v) / (n - 1))
+
+
+# ------------------------------------------------------------------- reports
+
+def report_primary(scen, rows, tests, log, label=None):
+    n = len(rows)
+    m_rb, s_rb = mean_sd([r["rb"] for r in rows])
+    mm, _ = mean_sd([float(r["m"]) for r in rows])
+    mw, _ = mean_sd([float(r["W"]) for r in rows])
+    inside = sum(1 for r in rows
+                 if r["lo"] > -0.15 and r["hi"] < 0.15) / float(n)
+    cov0 = sum(1 for r in rows if r["lo"] <= 0.0 <= r["hi"]) / float(n)
+    rates = {}
+    for t in tests:
+        rates[t] = sum(1 for r in rows if r[t] <= ALPHA) / float(n)
+    log("%-5s n=%4d  m %5.1f  W %6.1f  rho_bar %+.4f (sd %.4f)  inside+-0.15 %.3f"
+        "  interval covers 0 %.3f" %
+        (label or scen, n, mm, mw, m_rb, s_rb, inside, cov0))
+    log("        " + "   ".join("%s %.3f(+-%.3f)" % (t, rates[t], mcerr(rates[t], n))
+                                for t in tests))
+    if os.environ.get("REVIEW_ALPHA2"):
+        r2 = dict((t, sum(1 for r in rows if r[t] <= 0.025) / float(n)) for t in tests)
+        log("        at alpha 0.025: " +
+            "   ".join("%s %.3f" % (t, r2[t]) for t in tests))
+    return rates
+
+
+def cmd_nulls(nproc, nnull, B, log):
+    log("=" * 92)
+    log("MY OWN NULL TABLE (third implementation). B=%d, %d data sets per scenario." %
+        (B, nnull))
+    log("Monte Carlo error of a rate near 0.05: %.4f" % mcerr(0.05, nnull))
+    log("N6A = random walk scaled 1/sqrt(n) (report A's choice).")
+    log("N6B = random walk scaled sqrt(2/(n+1)) (report B's choice).")
+    log("=" * 92)
+    for scen in ("N0", "N1", "N2", "N3", "N4", "N5", "N6A", "N6B"):
+        rows = pool(one_primary, tasks_for(scen, nnull, B, TESTS, False, 25), nproc)
+        report_primary(scen, rows, TESTS, log)
+
+
+def cmd_disputed(nproc, B, log):
+    log("=" * 92)
+    log("DISPUTED CELLS")
+    log("=" * 92)
+    rows = pool(one_primary, tasks_for("X1", 1000, B, TESTS, False, 25), nproc)
+    report_primary("X1", rows, TESTS, log)
+    rows = pool(one_primary, tasks_for("A2", 1000, B, TESTS, False, 25), nproc)
+    report_primary("A2", rows, TESTS, log)
+    rows = pool(one_primary, tasks_for("G2", 1000, B, TESTS, False, 25), nproc)
+    report_primary("G2", rows, TESTS, log)
+
+
+def cmd_gate2(nproc, B, log, plan, tests):
+    log("=" * 92)
+    log("GATE, second pass: the cells where A and B disagree, and two further")
+    log("serial structures. Same block rules as above.")
+    log("=" * 92)
+    for scen, ngate in plan:
+        rows = pool(one_gate, tasks_for(scen, ngate, B, tests, False, 20), nproc)
+        n = len(rows)
+        jw = sorted(r["JW"] for r in rows)
+        log("%s  n=%d   W_J min %d median %d max %d   J blocks mean %.1f" %
+            (scen, n, jw[0], jw[n // 2], jw[-1],
+             sum(r["Jm"] for r in rows) / float(n)))
+        log("   cannot be formed: J %.3f" %
+            (sum(1 for r in rows if not (r["JW"] >= 150 and r["Jm"] >= 10)) / float(n)))
+        log("   test  P      J      P&J    L      M      L&M    P&L&M   (+- %.3f)" %
+            mcerr(0.08, n))
+        for t in tests:
+            pr = gj = both = gl = gm = lm = plm = 0
+            for r in rows:
+                p_ok = r["P" + t] <= ALPHA
+                sgn = r["Prho"] > 0
+                j_ok = (r["JW"] >= 150 and r["Jm"] >= 10 and r["J" + t] <= ALPHA
+                        and (r["Jrho"] > 0) == sgn)
+                l_ok = (r["LW"] >= 150 and r["Lm"] >= 10 and r["L" + t] <= ALPHA
+                        and (r["Lrho"] > 0) == sgn)
+                m_ok = (r["MW"] >= 150 and r["Mm"] >= 10 and r["M" + t] <= ALPHA
+                        and (r["Mrho"] > 0) == sgn)
+                pr += p_ok
+                gj += j_ok
+                both += p_ok and j_ok
+                gl += l_ok
+                gm += m_ok
+                lm += l_ok and m_ok
+                plm += p_ok and l_ok and m_ok
+            log("   %-4s %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f" %
+                (t, pr / float(n), gj / float(n), both / float(n), gl / float(n),
+                 gm / float(n), lm / float(n), plm / float(n)))
+        log("")
+
+
+def cmd_gate(nproc, ngate, B, log):
+    tests = ("S", "C", "F", "K")
+    log("=" * 92)
+    log("GATE. %d data sets per scenario, B=%d." % (ngate, B))
+    log("P = repository. J = repository x model x length tercile.")
+    log("L = repository x length tercile. M = repository x model.")
+    log("A gate counts only when W >= 150 and at least 10 blocks carry weight,")
+    log("and when it rejects with the same sign of rho_bar as the primary.")
+    log("=" * 92)
+    for scen, styles in (("G0a", (False, True)), ("G0b", (False, True)),
+                         ("G1", (False,)), ("G4", (False,))):
+        for bstyle in styles:
+            rows = pool(one_gate, tasks_for(scen, ngate, B, tests, bstyle, 20), nproc)
+            n = len(rows)
+            jw = sorted(r["JW"] for r in rows)
+            log("%s  model-name rule %s  n=%d" %
+                (scen, "B-style (small repos split more)" if bstyle else "A-style", n))
+            log("   W_J min %d median %d max %d    weight-carrying J blocks mean %.1f" %
+                (jw[0], jw[n // 2], jw[-1],
+                 sum(r["Jm"] for r in rows) / float(n)))
+            log("   cannot be formed: J %.3f  L %.3f  M %.3f" %
+                (sum(1 for r in rows if not (r["JW"] >= 150 and r["Jm"] >= 10)) / float(n),
+                 sum(1 for r in rows if not (r["LW"] >= 150 and r["Lm"] >= 10)) / float(n),
+                 sum(1 for r in rows if not (r["MW"] >= 150 and r["Mm"] >= 10)) / float(n)))
+            log("   test  P      J      P&J    L      M      L&M    P&L&M")
+            for t in tests:
+                pr = 0
+                gj = 0
+                both = 0
+                gl = 0
+                gm = 0
+                lm = 0
+                plm = 0
+                for r in rows:
+                    p_ok = r["P" + t] <= ALPHA
+                    sgn = r["Prho"] > 0
+                    j_ok = (r["JW"] >= 150 and r["Jm"] >= 10 and r["J" + t] <= ALPHA
+                            and (r["Jrho"] > 0) == sgn)
+                    l_ok = (r["LW"] >= 150 and r["Lm"] >= 10 and r["L" + t] <= ALPHA
+                            and (r["Lrho"] > 0) == sgn)
+                    m_ok = (r["MW"] >= 150 and r["Mm"] >= 10 and r["M" + t] <= ALPHA
+                            and (r["Mrho"] > 0) == sgn)
+                    pr += p_ok
+                    gj += j_ok
+                    both += p_ok and j_ok
+                    gl += l_ok
+                    gm += m_ok
+                    lm += l_ok and m_ok
+                    plm += p_ok and l_ok and m_ok
+                log("   %-4s %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f" %
+                    (t, pr / float(n), gj / float(n), both / float(n), gl / float(n),
+                     gm / float(n), lm / float(n), plm / float(n)))
+            log("")
+
+
+BREAK_LABEL = {
+    "D1": "seasonal, period about half the repository length, random phases",
+    "D2": "seasonal, period 2 (alternating), random phases",
+    "D3": "spread grows over the index (0.2 -> 3.0), both series",
+    "D4": "long constant runs, mean 15 sessions, noise share 0.05",
+    "D5": "141 repositories of 3 sessions, AR(1) 0.6 both",
+    "D6": "one repository of 300 of 423 sessions, AR(1) 0.6 both",
+    "D7": "AR(1) -0.9 both (alternating serial structure)",
+    "D8": "drift shared across repositories in BOTH series (independent drifts)",
+    "D9": "drift shared across repositories in the signal only",
+    "D10": "serial structure differs by repository (AR 0.9 / random walk / none)",
+    "D11": "long constant runs AND one dominant repository",
+}
+
+
+def cmd_breaks(nproc, nnull, B, log, which=None):
+    log("=" * 92)
+    log("FURTHER NULL SCENARIOS (the two series are independent of each other")
+    log("inside every repository). %d data sets each, B=%d." % (nnull, B))
+    log("Monte Carlo error of a rate near 0.05: %.4f" % mcerr(0.05, nnull))
+    log("=" * 92)
+    names = which or ("D1", "D2", "D3", "D4", "D5", "D6", "D7", "D10", "D11",
+                      "D9", "D8")
+    for scen in names:
+        rows = pool(one_primary, tasks_for(scen, nnull, B, TESTS, False, 25), nproc)
+        log("%-4s %s" % (scen, BREAK_LABEL[scen]))
+        report_primary(scen, rows, TESTS, log)
+        log("")
+
+
+# -------------------------------------------------------------------- checks
+
+def enum_T(blocks):
+    from itertools import permutations, product
+    per = []
+    for b in blocks:
+        per.append([sum(map(mul, [b.x[k] for k in p], b.y))
+                    for p in permutations(range(b.n))])
+    return [sum(c) for c in product(*per)]
+
+
+def cmd_checks(log):
+    ok = True
+    # 1 S against full enumeration on repositories of 4, 3, 2
+    sig = [3 / 40.0, 9 / 40.0, 0.0, 17 / 40.0, 5 / 30.0, 5 / 30.0, 1 / 30.0,
+           7 / 25.0, 2 / 25.0]
+    out = [0, 100, 44, 12, 100, 0, 61, 0, 100]
+    bl = [prep(sig[0:4], out[0:4]), prep(sig[4:7], out[4:7]),
+          prep(sig[7:9], out[7:9])]
+    bl = [b for b in bl if b is not None]
+    t, w, m, rb = stats(bl)
+    vals = enum_T(bl)
+    thr = abs(t) - TOL
+    p_ex = sum(1 for v in vals if abs(v) >= thr) / float(len(vals))
+    p_mc = p_S(bl, t, 200000, random.Random(seed_of("chk|S", 0)))
+    e = math.sqrt(max(p_ex * (1 - p_ex), 1e-12) / 200000)
+    good = abs(p_mc - p_ex) <= 4 * e + 1.0 / 200001
+    ok = ok and good
+    log("CHECK 1  S against full enumeration (%d arrangements)" % len(vals))
+    log("   T %.12f  rho_bar %.6f  W %d  m %d" % (t, rb, w, m))
+    log("   exact p %.6f   Monte Carlo p (B=200000) %.6f   error %.6f   agree %s" %
+        (p_ex, p_mc, e, "YES" if good else "NO"))
+
+    # 2 every reference set contains the observed arrangement; p >= 1/(B+1)
+    worst = 0.0
+    for name in ("S", "C", "F", "K"):
+        pv = PVAL[name](bl, t, 999, random.Random(seed_of("chk|obs|" + name, 0)))
+        log("   %s p with B=999 : %.4f   (floor 1/(B+1) = %.4f)" % (name, pv, 1 / 1000.0))
+        worst = max(worst, 1 / 1000.0 - pv)
+    good = worst <= 0.0
+    ok = ok and good
+    log("CHECK 2  no p-value below 1/(B+1): %s" % ("YES" if good else "NO"))
+
+    # 3 the observed value is reachable in each reference set
+    b = prep([1 / 20.0, 2 / 20.0, 5 / 20.0, 9 / 20.0, 9 / 20.0, 11 / 20.0],
+             [0, 100, 0, 44, 100, 7])
+    p_C([b], b.obs, 1, random.Random(1))
+    _ktab(b)
+    hit_c = any(abs(v - b.obs) <= TOL for v in b.shift)
+    hit_k = abs(sum(b.ktab[j][p] for j, p in
+                    zip(range(len(b.klen)), [sum(b.klen[:j]) for j in range(len(b.klen))]))
+                - b.obs) <= TOL
+    log("CHECK 3  observed arrangement inside the reference set:"
+        " circular shift %s, block shuffle %s" %
+        ("YES" if hit_c else "NO", "YES" if hit_k else "NO"))
+    ok = ok and hit_c and hit_k
+
+    # 4 Var(rho_r) under S equals 1/(n_r - 1) with ties
+    log("CHECK 4  Var(rho_r) under S equals 1/(n_r-1), by enumeration")
+    for lab, s, o in (("n=5 ties in both", [1 / 20.0, 1 / 20.0, 3 / 20.0, 7 / 20.0,
+                                            9 / 20.0], [0, 100, 0, 44, 100]),
+                      ("n=6 heavy ties", [0.0, 0.0, 2 / 25.0, 2 / 25.0, 5 / 25.0,
+                                          11 / 25.0], [0, 0, 100, 100, 37, 0])):
+        bb = prep(s, o)
+        vals = [v / float(bb.w) for v in enum_T([bb])]
+        mn = sum(vals) / len(vals)
+        var = sum((v - mn) ** 2 for v in vals) / len(vals)
+        good = abs(var - 1.0 / (bb.n - 1)) < 1e-12 and abs(mn) < 1e-12
+        ok = ok and good
+        log("   %-18s mean %.2e  Var %.15f  1/(n-1) %.15f  %s" %
+            (lab, mn, var, 1.0 / (bb.n - 1), "YES" if good else "NO"))
+
+    # 5 the null scenarios really are nulls: E[rho_bar] over 2000 data sets
+    log("CHECK 5  mean rho_bar over 2000 data sets per scenario (a null needs 0)")
+    for scen in ("N0", "N3", "N6A", "N6B", "D1", "D2", "D3", "D4", "D7", "D8", "D9"):
+        vals = []
+        for i in range(2000):
+            repos = gen(SCEN[scen], seed_of("truth|" + scen, i))
+            _, w, _, rb = stats(blocks_repo(repos))
+            if w > 0:
+                vals.append(rb)
+        m, sd = mean_sd(vals)
+        log("   %-4s mean %+.4f  sd %.4f  standard error of the mean %.4f" %
+            (scen, m, sd, sd / math.sqrt(len(vals))))
+
+    log("")
+    log("ALL CHECKS PASS: %s" % ("YES" if ok else "NO"))
+
+
+# ---------------------------------------------------------------------- main
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "checks"
+    opt = {}
+    for a in args[1:]:
+        if "=" in a:
+            k, v = a.split("=", 1)
+            opt[k] = v
+    nproc = int(opt.get("nproc", "6"))
+    B = int(opt.get("B", "999"))
+    n = int(opt.get("n", "1000"))
+    lines = []
+
+    def log(s=""):
+        lines.append(s)
+        sys.stdout.write(s + "\n")
+        sys.stdout.flush()
+
+    if cmd == "checks":
+        cmd_checks(log)
+    elif cmd == "nulls":
+        cmd_nulls(nproc, n, B, log)
+    elif cmd == "disputed":
+        cmd_disputed(nproc, B, log)
+    elif cmd == "gate":
+        cmd_gate(nproc, n, B, log)
+    elif cmd == "gate2":
+        cmd_gate2(nproc, B, log,
+                  (("G0b", 1200), ("G0c", 600), ("G0d", 600)), ("C", "F"))
+    elif cmd == "breaks":
+        cmd_breaks(nproc, n, B, log, tuple(opt["which"].split(",")) if "which" in opt
+                   else None)
+    else:
+        raise SystemExit("unknown command " + cmd)
+
+    out = opt.get("out")
+    if out:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), out),
+                  "w") as fh:
+            fh.write("\n".join(lines) + "\n")
+
+
+if __name__ == "__main__":
+    main()

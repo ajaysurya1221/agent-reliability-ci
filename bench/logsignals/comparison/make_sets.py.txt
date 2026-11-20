@@ -1,0 +1,426 @@
+#!/usr/bin/env python3
+"""Build the simulated data sets for the blind comparison.
+
+Every set is a folder holding `signal.tsv` and `outcome.tsv` in the formats of
+INTERFACE.md. All draws come from `random.Random` with fixed seeds, so a rerun
+writes byte-identical files. These are made-up numbers: nothing here is counted
+from any real file, and no number produced from them says anything about a cause,
+a prediction or a quality.
+
+Usage:
+    make_sets.py [OUT_ROOT]      (default: the folder holding this script)
+"""
+
+import hashlib
+import os
+import sys
+
+from fractions import Fraction
+from random import Random
+
+MONTHS = ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"]
+MODEL_NAMES = ["gpt-5-codex", "gpt-5.1-codex", "o4-mini", "codex-mini"]
+D_CHOICES = [
+    20, 21, 22, 23, 24, 25, 26, 28, 30, 32, 35, 38,
+    40, 45, 50, 55, 60, 70, 80, 95, 110, 130, 160, 200,
+]
+
+SIGNAL_HEADER = [
+    "path", "repo_key", "half", "month", "user_key", "model",
+    "d", "first_time", "zero", "tokens_num", "tokens_den",
+]
+OUTCOME_HEADER = ["path", "agent_percentage"]
+
+STRUCT_SEED = 20261119
+PLANTED_SEED = 777001
+NONE_SEED = 777002
+EDGE_SEED = 555001
+FEW9_SEED = 555009
+TEN_SEED = 555010
+ELEVEN_SEED = 555011
+
+
+def hexkey(label):
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+
+
+def make_time(rng, month):
+    year, mon = month.split("-")
+    return "%s-%s-%02dT%02d:%02d:%02d.%06d+00:00" % (
+        year, mon,
+        rng.randint(1, 28), rng.randint(0, 23),
+        rng.randint(0, 59), rng.randint(0, 59), rng.randint(0, 999999),
+    )
+
+
+# ------------------------------------------------------------------ repo specs
+
+def repo(label, n, months, models=None, model_groups=None, users=None,
+         signal="normal", outcome="linked", tie_d=None,
+         model_unknown_at=(), blank_month_at=(), blank_time_at=(),
+         missing_outcome_at=(), fixed=None):
+    return {
+        "label": label,
+        "n": len(fixed) if fixed is not None else n,
+        "fixed": fixed,
+        "months": months,
+        "models": models if models is not None else [MODEL_NAMES[0]],
+        "model_groups": model_groups,
+        "users": users if users is not None else [""],
+        "signal": signal,
+        "outcome": outcome,
+        "tie_d": tie_d,
+        "model_unknown_at": set(model_unknown_at),
+        "blank_month_at": set(blank_month_at),
+        "blank_time_at": set(blank_time_at),
+        "missing_outcome_at": set(missing_outcome_at),
+    }
+
+
+# ------------------------------------------------------------ signal side build
+
+def build_sessions(specs, seed):
+    """One session row per repository position, signal side only."""
+    rng = Random(seed)
+    sessions = []
+    for spec in specs:
+        repo_key = hexkey("repo:" + spec["label"])
+        if spec["model_groups"] is not None:
+            model_of_position = []
+            for name, count in spec["model_groups"]:
+                model_of_position.extend([name] * count)
+            if len(model_of_position) != spec["n"]:
+                raise ValueError("model_groups do not sum to n in %s" % spec["label"])
+        else:
+            model_of_position = [
+                spec["models"][i % len(spec["models"])] for i in range(spec["n"])
+            ]
+        for i in range(spec["n"]):
+            u = rng.random()
+            month = spec["months"][i % len(spec["months"])]
+            if i in spec["blank_month_at"]:
+                month = ""
+            model = model_of_position[i]
+            if i in spec["model_unknown_at"]:
+                model = "unknown"
+
+            if spec["fixed"] is not None:
+                zero, d, tokens_num, tokens_den, fixed_outcome = spec["fixed"][i]
+            elif spec["signal"] == "const":
+                d, zero = 40, 0
+                tokens_num, tokens_den = 600 + (i % 7) * 25, 1
+            elif spec["signal"] == "ties":
+                d = 25
+                zero = 5 if u < 0.5 else 10
+                tokens_num, tokens_den = (300 if u < 0.5 else 450), 1
+            else:
+                d = spec["tie_d"] if spec["tie_d"] else rng.choice(D_CHOICES)
+                share = 0.05 + 0.50 * u + rng.uniform(-0.09, 0.09)
+                share = min(max(share, 0.0), 1.0)
+                zero = min(max(int(round(d * share)), 0), d)
+                base = rng.randint(20, 2000)
+                tokens_den = rng.choice([1, 2])
+                tokens_num = 2 * base + 1 if tokens_den == 2 else base
+
+            first_time = "" if i in spec["blank_time_at"] else make_time(
+                rng, month if month else MONTHS[i % len(MONTHS)]
+            )
+
+            sessions.append({
+                "path": "pool/%s/session-%03d.jsonl" % (spec["label"], i),
+                "repo_key": repo_key,
+                "repo_label": spec["label"],
+                "half": spec["half"],
+                "month": month,
+                "user_key": spec["users"][i % len(spec["users"])],
+                "model": model,
+                "d": d,
+                "first_time": first_time,
+                "zero": zero,
+                "tokens_num": tokens_num,
+                "tokens_den": tokens_den,
+                "u": u,
+                "outcome_mode": spec["outcome"],
+                "fixed_outcome": fixed_outcome if spec["fixed"] is not None else None,
+                "outcome_missing": i in spec["missing_outcome_at"],
+                "repair_signal": spec["fixed"] is None and (
+                    spec["signal"] == "normal" or spec["tie_d"] is not None),
+                "repair_outcome": spec["fixed"] is None and spec["outcome"] != "const100",
+            })
+    repair_signals(sessions)
+    return sessions
+
+
+def repair_signals(sessions):
+    """Keep the two measures non-constant inside every repository meant to carry
+    weight, so the planned block structure does not depend on a lucky draw."""
+    by_repo = {}
+    for s in sessions:
+        by_repo.setdefault(s["repo_label"], []).append(s)
+    for members in by_repo.values():
+        if not members[0]["repair_signal"] or len(members) < 2:
+            continue
+        shares = set(Fraction(m["zero"], m["d"]) for m in members)
+        if len(shares) < 2:
+            last = members[-1]
+            last["zero"] = last["zero"] + 1 if last["zero"] + 1 <= last["d"] else last["zero"] - 1
+        tokens = set((m["tokens_num"], m["tokens_den"]) for m in members)
+        if len(tokens) < 2:
+            members[-1]["tokens_num"] += 1
+
+
+# ----------------------------------------------------------- outcome side build
+
+def outcome_value(rng, mode, u):
+    if mode == "const100":
+        return 100.0
+    if mode == "endpoints":
+        return 100.0 if u >= 0.5 else 0.0
+    if mode == "ties":
+        if u < 0.40:
+            return 0.0
+        if u < 0.80:
+            return 100.0
+        return 50.0
+    # "linked": mostly an endpoint, the rest a share of a small denominator.
+    p_hundred = 0.15 + 0.60 * u
+    p_zero = 0.15 + 0.60 * (1.0 - u)
+    draw = rng.random()
+    if draw < p_hundred:
+        return 100.0
+    if draw < p_hundred + p_zero:
+        return 0.0
+    den = rng.randint(8, 120)
+    num = min(max(int(round(u * den)), 1), den - 1)
+    return 100.0 * num / den
+
+
+def assign_outcomes(sessions, seed, linked):
+    """`linked` false draws a fresh latent for the outcome, so the two numbers of
+    a session are drawn independently."""
+    rng = Random(seed)
+    for s in sessions:
+        if s["outcome_missing"]:
+            s["outcome"] = None
+            continue
+        if s["fixed_outcome"] is not None:
+            s["outcome"] = s["fixed_outcome"]
+            continue
+        u = s["u"] if linked else rng.random()
+        s["outcome"] = outcome_value(rng, s["outcome_mode"], u)
+    repair_outcomes(sessions)
+    return rng
+
+
+def repair_outcomes(sessions):
+    by_repo = {}
+    for s in sessions:
+        by_repo.setdefault(s["repo_label"], []).append(s)
+    for members in by_repo.values():
+        if not members[0]["repair_outcome"]:
+            continue
+        paired = [m for m in members if m["outcome"] is not None]
+        if len(paired) < 2:
+            continue
+        if len(set(m["outcome"] for m in paired)) < 2:
+            last = paired[-1]
+            last["outcome"] = 0.0 if last["outcome"] == 100.0 else 100.0
+
+
+# ----------------------------------------------------------------------- output
+
+def write_set(folder, sessions, rng):
+    os.makedirs(folder, exist_ok=True)
+    signal_lines = ["\t".join(SIGNAL_HEADER)]
+    for s in sessions:
+        signal_lines.append("\t".join([
+            s["path"], s["repo_key"], s["half"], s["month"], s["user_key"],
+            s["model"], str(s["d"]), s["first_time"], str(s["zero"]),
+            str(s["tokens_num"]), str(s["tokens_den"]),
+        ]))
+    outcome_lines = ["\t".join(OUTCOME_HEADER)]
+    for s in sessions:
+        value = "" if s["outcome"] is None else repr(s["outcome"])
+        outcome_lines.append("\t".join([s["path"], value]))
+    # Pool sessions that are not eligible: outcome.tsv has more rows than signal.tsv.
+    for i in range(max(6, len(sessions) // 5)):
+        extra_u = rng.random()
+        outcome_lines.append("\t".join([
+            "pool/not-eligible/session-%03d.jsonl" % i,
+            repr(outcome_value(rng, "linked", extra_u)),
+        ]))
+    with open(os.path.join(folder, "signal.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("\n".join(signal_lines) + "\n")
+    with open(os.path.join(folder, "outcome.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("\n".join(outcome_lines) + "\n")
+
+
+# ------------------------------------------------------------------ set layouts
+
+SHARED_USERS = [hexkey("shared-user-%d" % i) for i in (1, 2, 3)]
+
+
+def planted_specs():
+    specs = []
+    confirmation_sizes = [60, 45, 35, 28, 22, 18, 15, 12, 10, 8, 6, 5, 4, 3]
+    discovery_sizes = [55, 42, 33, 26, 20, 16, 13, 10, 8, 6, 4]
+    shared_in_confirmation = {4: SHARED_USERS[0], 8: SHARED_USERS[1], 11: SHARED_USERS[2]}
+    shared_in_discovery = {2: SHARED_USERS[0], 6: SHARED_USERS[1]}
+
+    for half, sizes, shared in (
+        ("confirmation", confirmation_sizes, shared_in_confirmation),
+        ("discovery", discovery_sizes, shared_in_discovery),
+    ):
+        for index, size in enumerate(sizes):
+            months = [MONTHS[index % 6], MONTHS[(index + 2) % 6]]
+            if index % 5 == 0:
+                models = [MODEL_NAMES[0], MODEL_NAMES[1]]
+            else:
+                models = [MODEL_NAMES[index % len(MODEL_NAMES)]]
+            if index in shared:
+                users = [shared[index], hexkey("%s-local-%d" % (half, index)), ""]
+            elif index >= len(sizes) - 2:
+                users = [""]
+            else:
+                users = [
+                    hexkey("%s-local-%d-a" % (half, index)),
+                    hexkey("%s-local-%d-b" % (half, index)),
+                    "",
+                ]
+            spec = repo(
+                "%s-r%02d" % (half, index), size, months,
+                models=models, users=users,
+            )
+            spec["half"] = half
+            specs.append(spec)
+    return specs
+
+
+def edge_extras(half, shared_users, ordinary_sizes, with_full_edges):
+    """The edge features, plus the ordinary repositories that set the floor."""
+    specs = []
+
+    unknown_specials = dict(
+        model_unknown_at=(0,), blank_month_at=(1,),
+        blank_time_at=(2,), missing_outcome_at=(3,),
+    )
+    if with_full_edges:
+        specs.append(repo("%s-sig-const" % half, 12, [MONTHS[0], MONTHS[1]],
+                          signal="const"))
+        specs.append(repo("%s-out-const" % half, 12, [MONTHS[1], MONTHS[2]],
+                          outcome="const100"))
+        specs.append(repo("%s-endpoints" % half, 20, [MONTHS[2], MONTHS[3]],
+                          outcome="endpoints",
+                          users=[shared_users[0], hexkey("%s-ep" % half), ""]
+                          if shared_users else [hexkey("%s-ep" % half), ""]))
+        specs.append(repo("%s-ties" % half, 24, [MONTHS[3], MONTHS[4]],
+                          signal="ties", outcome="ties"))
+        specs.append(repo(
+            "%s-models17" % half, 28, [MONTHS[4], MONTHS[5]],
+            model_groups=[(MODEL_NAMES[i % len(MODEL_NAMES)] if i < 3 else
+                           "m%d" % i, i + 1) for i in range(7)],
+            tie_d=30, blank_time_at=(0, 5, 9),
+            users=[hexkey("%s-mg" % half), ""],
+        ))
+        specs.append(repo("%s-one-a" % half, 1, [MONTHS[0]]))
+        specs.append(repo("%s-one-b" % half, 1, [MONTHS[5]]))
+        specs.append(repo("%s-unknowns" % half, 10, [MONTHS[0], MONTHS[3]],
+                          **unknown_specials))
+    else:
+        # The unknown labels and the missing outcome sit inside a repository that
+        # carries no weight for the first measure, so the floor stays exact.
+        specs.append(repo("%s-sig-const" % half, 12, [MONTHS[0], MONTHS[1]],
+                          signal="const", **unknown_specials))
+        specs.append(repo("%s-out-const" % half, 10, [MONTHS[1], MONTHS[2]],
+                          outcome="const100"))
+        specs.append(repo("%s-one-a" % half, 1, [MONTHS[0]]))
+        specs.append(repo("%s-one-b" % half, 1, [MONTHS[5]]))
+
+    for index, size in enumerate(ordinary_sizes):
+        months = [MONTHS[index % 6], MONTHS[(index + 3) % 6]]
+        models = ([MODEL_NAMES[0], MODEL_NAMES[2]] if index % 4 == 0
+                  else [MODEL_NAMES[index % len(MODEL_NAMES)]])
+        if shared_users and not with_full_edges and index < len(shared_users):
+            users = [shared_users[index], hexkey("%s-o%d" % (half, index)), ""]
+        else:
+            users = [hexkey("%s-o%d-a" % (half, index)),
+                     hexkey("%s-o%d-b" % (half, index)), ""]
+        specs.append(repo("%s-o%02d" % (half, index), size, months,
+                          models=models, users=users))
+
+    for spec in specs:
+        spec["half"] = half
+    return specs
+
+
+def edge_specs():
+    specs = edge_extras("confirmation", [SHARED_USERS[0]],
+                        [20, 18, 16, 14, 12, 10, 8, 6], with_full_edges=True)
+    # A block whose two midrank vectors have a correlation of exactly 0:
+    # signal midranks 1,2,3,4 against outcome midranks 2,4,1,3.
+    zero_block = repo(
+        "confirmation-zero-rho", 0, [MONTHS[2]],
+        fixed=[
+            (2, 20, 400, 1, 25.0),
+            (5, 20, 500, 1, 75.0),
+            (8, 20, 600, 1, 0.0),
+            (11, 20, 700, 1, 50.0),
+        ],
+    )
+    zero_block["half"] = "confirmation"
+    specs.append(zero_block)
+    other = edge_extras("discovery", [], [8, 6, 4, 2], with_full_edges=False)
+    # The same user id in both halves, so the "without shared users" number moves.
+    for spec in other:
+        if spec["label"] == "discovery-o00":
+            spec["users"] = [SHARED_USERS[0], hexkey("discovery-o0"), ""]
+    return specs + other
+
+
+def floor_specs(ordinary_sizes, shared_users):
+    specs = edge_extras("confirmation", shared_users, ordinary_sizes,
+                        with_full_edges=False)
+    other = edge_extras("discovery", [], [6, 4, 2], with_full_edges=False)
+    if shared_users:
+        for spec in other:
+            if spec["label"] == "discovery-o00":
+                spec["users"] = list(shared_users) + [""]
+    return specs + other
+
+
+# ---------------------------------------------------------------------- driver
+
+def main(argv):
+    root = argv[1] if len(argv) > 1 else os.path.dirname(os.path.abspath(__file__))
+    sets_root = os.path.join(root, "sets")
+
+    structure = build_sessions(planted_specs(), STRUCT_SEED)
+    rng = assign_outcomes(structure, PLANTED_SEED, linked=True)
+    write_set(os.path.join(sets_root, "planted"), structure, rng)
+
+    structure = build_sessions(planted_specs(), STRUCT_SEED)
+    rng = assign_outcomes(structure, NONE_SEED, linked=False)
+    write_set(os.path.join(sets_root, "none"), structure, rng)
+
+    layouts = [
+        ("edge", edge_specs(), EDGE_SEED),
+        ("edge_few9", floor_specs(
+            [24, 22, 20, 20, 18, 18, 16, 14, 12], []), FEW9_SEED),
+        ("edge_ten", floor_specs(
+            [24, 22, 20, 18, 16, 14, 12, 12, 12, 10], []), TEN_SEED),
+        ("edge_eleven", floor_specs(
+            [20, 18, 18, 16, 16, 14, 14, 12, 12, 12, 10],
+            [SHARED_USERS[0], SHARED_USERS[1]]), ELEVEN_SEED),
+    ]
+    for name, specs, seed in layouts:
+        sessions = build_sessions(specs, seed)
+        rng = assign_outcomes(sessions, seed + 1, linked=True)
+        write_set(os.path.join(sets_root, name), sessions, rng)
+
+    for name in ("planted", "none", "edge", "edge_few9", "edge_ten", "edge_eleven"):
+        print(os.path.join(sets_root, name))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

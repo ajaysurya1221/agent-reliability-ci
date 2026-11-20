@@ -1,0 +1,81 @@
+{
+  "checks": {
+    "first_measure_exactly_0": 13,
+    "model_unknown": 1,
+    "month_unknown": 1,
+    "months": {
+      "2026-04": 38,
+      "2026-05": 38,
+      "2026-06": 27,
+      "2026-07": 31,
+      "2026-08": 28,
+      "2026-09": 23
+    },
+    "outcome_at_0": 74,
+    "outcome_at_100": 87,
+    "outcome_between": 24,
+    "outcome_missing": 1
+  },
+  "first_measure_repository": {
+    "above": 11,
+    "below": 0,
+    "loo_formed": true,
+    "loo_max": 0.4153926269612968,
+    "loo_min": 0.3417535633145569,
+    "positive_weight_share": 1.0,
+    "without_shared": null,
+    "without_shared_formed": false,
+    "zero": 0
+  },
+  "half": "confirmation",
+  "measures": {
+    "no_reasoning_share": {
+      "repository": {
+        "W": 151,
+        "formed": true,
+        "m": 11,
+        "rho_bar": 0.373142680038008,
+        "sessions": 162
+      },
+      "repository_model_length": {
+        "W": 112,
+        "formed": false,
+        "m": 11,
+        "rho_bar": null,
+        "sessions": 149
+      },
+      "repository_month": {
+        "W": 140,
+        "formed": false,
+        "m": 11,
+        "rho_bar": null,
+        "sessions": 162
+      }
+    },
+    "reasoning_tokens": {
+      "repository": {
+        "W": 161,
+        "formed": true,
+        "m": 12,
+        "rho_bar": 0.007364561457291677,
+        "sessions": 173
+      },
+      "repository_model_length": {
+        "W": 119,
+        "formed": false,
+        "m": 12,
+        "rho_bar": null,
+        "sessions": 159
+      },
+      "repository_month": {
+        "W": 148,
+        "formed": false,
+        "m": 12,
+        "rho_bar": null,
+        "sessions": 172
+      }
+    }
+  },
+  "repositories": 15,
+  "sessions": 186
+}

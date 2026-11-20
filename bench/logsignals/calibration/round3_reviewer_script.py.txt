@@ -1,0 +1,750 @@
+#!/usr/bin/env python3
+"""Adversarial re-run of the disputed cells of SPEC_E (reviewer's own code).
+
+Synthetic data only. Standard library only. /usr/bin/python3 -I.
+Statistics P, PM, J, JR, JMR exactly as SPEC_E defines them.
+
+Drift strength is parametrised by `lam`, the variance share of a shared
+calendar field that is DEMEANED and SCALED TO UNIT SD OVER THE 180-DAY GRID,
+so that `lam` is the share of the latent's variance carried by variation
+across the window (the quantity that can move two series together inside a
+repository).  Latent:
+
+    lat = sqrt(0.3)*repo + sqrt(lam)*field[day] + sqrt(s_len)*zlog
+          + sqrt(s_mod)*model + sqrt(1-0.3-lam-s_len-s_mod)*within
+
+Nothing written here is a cause, a prediction or a measure of quality.
+"""
+
+import bisect
+import hashlib
+import math
+import os
+import random
+import sys
+from multiprocessing import Pool
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MONTHS_FILE = os.path.join(os.path.dirname(HERE), "calib", "month_structure.txt")
+OUT = os.path.join(HERE, "results_E_review.txt")
+
+WINDOW = 180.0
+MONTH_DAYS = 30.0
+N_MONTHS = 6
+REP_SHARE = 0.3
+REP_CORR = 0.6
+MODEL_CORR = 0.9
+MODEL_POOL = ("m1", "m2", "m3", "m4", "m5")
+LEN_MEDIAN = 60.0
+LEN_SIGMA = 0.6
+LEN_MIN = 20
+N_OUT_ZERO = 79
+N_OUT_MID = 116
+N_SIG_ZERO = 25
+TOL = 1e-9
+ALPHA = 0.05
+EXACT_MAX = 24
+MC_DRAWS = 9999
+W_FLOOR = 150
+REPO_FLOOR = 10
+BLOCK_FLOOR = 10
+
+
+def load_months():
+    sizes, mon = [], []
+    with open(MONTHS_FILE) as fh:
+        for line in fh:
+            parts = line.split()
+            if not parts or parts[0] == "n":
+                continue
+            sizes.append(int(parts[0]))
+            mon.append([int(x) for x in parts[1:]])
+    return sizes, mon
+
+
+SIZES, MONCOUNT = load_months()
+NREP = len(SIZES)
+NSESS = sum(SIZES)
+
+
+# --------------------------------------------------------------- helpers
+
+def standardize(v):
+    n = len(v)
+    m = sum(v) / n
+    s = math.sqrt(sum((x - m) ** 2 for x in v) / n)
+    if s <= 0:
+        return [0.0] * n
+    return [(x - m) / s for x in v]
+
+
+def norm_pair(rnd, rho):
+    a = rnd.gauss(0.0, 1.0)
+    b = rnd.gauss(0.0, 1.0)
+    return a, rho * a + math.sqrt(1.0 - rho * rho) * b
+
+
+def ar_series(rnd, n, phi, inno=None):
+    c = math.sqrt(1.0 - phi * phi)
+    out = []
+    x = rnd.gauss(0.0, 1.0) if inno is None else inno[0] / c * c
+    if inno is None:
+        x = rnd.gauss(0.0, 1.0)
+        for _ in range(n):
+            x = phi * x + c * rnd.gauss(0.0, 1.0)
+            out.append(x)
+        return out
+    x = inno[0]
+    for t in range(n):
+        x = phi * x + c * inno[t]
+        out.append(x)
+    return out
+
+
+def regime_series(rnd, n, meanlen, noise):
+    out = []
+    a = math.sqrt(1.0 - noise)
+    b = math.sqrt(noise)
+    while len(out) < n:
+        ln = 1
+        while rnd.random() > 1.0 / meanlen:
+            ln += 1
+        lev = rnd.gauss(0.0, 1.0)
+        for _ in range(min(ln, n - len(out))):
+            out.append(a * lev + b * rnd.gauss(0.0, 1.0))
+    return out
+
+
+SIG_CURVE = ((0.0, 0.005), (0.25, 0.08), (0.50, 0.16), (0.75, 0.26),
+             (0.95, 0.55), (1.0, 0.90))
+
+
+def share_at(q):
+    pts = SIG_CURVE
+    for i in range(1, len(pts)):
+        if q <= pts[i][0]:
+            q0, v0 = pts[i - 1]
+            q1, v1 = pts[i]
+            if q1 == q0:
+                return v1
+            return v0 + (v1 - v0) * (q - q0) / (q1 - q0)
+    return pts[-1][1]
+
+
+def map_outcome(lat):
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: (lat[i], i))
+    out = [0] * n
+    for pos, i in enumerate(order):
+        if pos < N_OUT_ZERO:
+            out[i] = 0
+        elif pos >= N_OUT_ZERO + N_OUT_MID:
+            out[i] = 100
+        else:
+            k = pos - N_OUT_ZERO
+            out[i] = 1 + int(round(98.0 * k / float(N_OUT_MID - 1)))
+    return out
+
+
+def map_signal(lat, dlen):
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: (lat[i], i))
+    sig = [0.0] * n
+    nn = n - N_SIG_ZERO
+    for pos, i in enumerate(order):
+        if pos < N_SIG_ZERO:
+            sig[i] = 0.0
+        else:
+            q = (pos - N_SIG_ZERO + 0.5) / nn
+            s = share_at(q)
+            k = int(s * dlen[i] + 0.5)
+            if k > dlen[i]:
+                k = dlen[i]
+            sig[i] = k / float(dlen[i])
+    return sig
+
+
+# ------------------------------------------------------- shared fields
+
+def field_walk(rnd):
+    grid, cur = [], 0.0
+    for _ in range(int(WINDOW)):
+        cur += rnd.gauss(0.0, 1.0)
+        grid.append(cur)
+    return standardize(grid)
+
+
+def field_month(rnd):
+    lv = [rnd.gauss(0.0, 1.0) for _ in range(N_MONTHS)]
+    g = [lv[min(int(d // MONTH_DAYS), N_MONTHS - 1)] for d in range(int(WINDOW))]
+    return g
+
+
+def field_break(rnd, signed=False):
+    tau = rnd.random() * WINDOW
+    z = [1.0 if d >= tau else 0.0 for d in range(int(WINDOW))]
+    g = standardize(z)
+    if signed and rnd.random() < 0.5:
+        g = [-x for x in g]
+    return g
+
+
+# ------------------------------------------------------------ generator
+
+def gen_dataset(cfg, seed):
+    rnd = random.Random(seed)
+    whole = cfg.get("dates") == "whole"
+    rep, day = [], []
+    for r in range(NREP):
+        ds = []
+        if whole:
+            ds = [rnd.random() * WINDOW for _ in range(SIZES[r])]
+        else:
+            for m in range(N_MONTHS):
+                for _ in range(MONCOUNT[r][m]):
+                    ds.append(m * MONTH_DAYS + rnd.random() * MONTH_DAYS)
+        ds.sort()
+        rep.extend([r] * SIZES[r])
+        day.extend(ds)
+    month = [min(int(d // MONTH_DAYS), N_MONTHS - 1) for d in day]
+
+    dlen = []
+    for _ in range(NSESS):
+        d = int(round(LEN_MEDIAN * math.exp(LEN_SIGMA * rnd.gauss(0.0, 1.0))))
+        dlen.append(max(d, LEN_MIN))
+    zlog = standardize([math.log(d) for d in dlen])
+
+    # model names: 1..3 per repository in contiguous runs over the date order,
+    # or (cal variant) three names at two shared change days
+    model = [None] * NSESS
+    if cfg.get("models") == "cal":
+        cuts = sorted([rnd.random() * WINDOW, rnd.random() * WINDOW])
+        for i in range(NSESS):
+            model[i] = (MODEL_POOL[0] if day[i] < cuts[0] else
+                        (MODEL_POOL[1] if day[i] < cuts[1] else MODEL_POOL[2]))
+    else:
+        start = 0
+        for r in range(NREP):
+            n = SIZES[r]
+            if n >= 11:
+                k = 1 if rnd.random() < 0.5 else rnd.choice((2, 3))
+            else:
+                k = 1 if rnd.random() < 0.5 else 2
+            k = min(k, n)
+            names = rnd.sample(MODEL_POOL, k)
+            if k == 1:
+                for pos in range(n):
+                    model[start + pos] = names[0]
+            else:
+                cuts = sorted(rnd.sample(range(1, n), k - 1))
+                b = [0] + cuts + [n]
+                for j in range(k):
+                    for pos in range(b[j], b[j + 1]):
+                        model[start + pos] = names[j]
+            start += n
+
+    lam = cfg.get("lam", 0.0)
+    s_len = cfg.get("s_len", 0.0)
+    s_mod = cfg.get("s_mod", 0.0)
+    kind = cfg.get("field")
+    fu = fv = None
+    if kind:
+        mk = {"walk": field_walk, "month": field_month,
+              "break": lambda r: field_break(r, cfg.get("signed", False))}[kind]
+        fu = mk(rnd)
+        where = cfg.get("where", "both")
+        if where == "both":
+            fv = mk(rnd)
+        elif where == "common":
+            fv = fu
+        else:
+            fv = None
+    lam_v = lam if fv is not None else 0.0
+
+    w_in_u = 1.0 - REP_SHARE - lam - s_len - s_mod
+    w_in_v = 1.0 - REP_SHARE - lam_v - s_len - s_mod
+    k_in_u, k_in_v = math.sqrt(max(w_in_u, 0.0)), math.sqrt(max(w_in_v, 0.0))
+    k_rep = math.sqrt(REP_SHARE)
+    k_u, k_v = math.sqrt(lam), math.sqrt(lam_v)
+    k_len, k_mod = math.sqrt(s_len), math.sqrt(s_mod)
+
+    meff = {}
+    if s_mod > 0:
+        for nm in sorted(set(model)):
+            meff[nm] = norm_pair(rnd, MODEL_CORR)
+
+    corr = cfg.get("corr", 0.0)
+    within = cfg.get("within", "iid")
+    phi = cfg.get("phi", 0.6)
+
+    latu = [0.0] * NSESS
+    latv = [0.0] * NSESS
+    start = 0
+    for r in range(NREP):
+        n = SIZES[r]
+        if within == "iid":
+            e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+            if corr > 0:
+                f = [corr * e[t] + math.sqrt(1 - corr * corr) * rnd.gauss(0, 1)
+                     for t in range(n)]
+            else:
+                f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        elif within == "ar":
+            ia = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+            if corr > 0:
+                ib = [corr * ia[t] + math.sqrt(1 - corr * corr) * rnd.gauss(0, 1)
+                      for t in range(n)]
+            else:
+                ib = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+            e = ar_series(rnd, n, phi, ia)
+            f = ar_series(rnd, n, phi, ib)
+        elif within == "regime":
+            e = regime_series(rnd, n, cfg.get("meanlen", 15), cfg.get("noise", 0.05))
+            f = regime_series(rnd, n, cfg.get("meanlen", 15), cfg.get("noise", 0.05))
+        else:
+            raise ValueError(within)
+        a_r, b_r = norm_pair(rnd, REP_CORR)
+        for pos in range(n):
+            i = start + pos
+            u = k_rep * a_r + k_in_u * e[pos]
+            v = k_rep * b_r + k_in_v * f[pos]
+            if k_u > 0:
+                u += k_u * fu[min(int(day[i]), int(WINDOW) - 1)]
+            if k_v > 0:
+                v += k_v * fv[min(int(day[i]), int(WINDOW) - 1)]
+            if k_len > 0:
+                u += k_len * zlog[i]
+                v += k_len * zlog[i]
+            if k_mod > 0:
+                u += k_mod * meff[model[i]][0]
+                v += k_mod * meff[model[i]][1]
+            latu[i] = u
+            latv[i] = v
+        start += n
+
+    sig = map_signal(latu, dlen)
+    out = map_outcome(latv)
+    return {"rep": rep, "month": month, "model": model, "dlen": dlen,
+            "sig": sig, "out": out}
+
+
+# ------------------------------------------------------------ statistic
+
+def midranks2(vals):
+    n = len(vals)
+    order = sorted(range(n), key=lambda i: vals[i])
+    res = [0] * n
+    i = 0
+    while i < n:
+        j = i
+        vi = vals[order[i]]
+        while j + 1 < n and vals[order[j + 1]] == vi:
+            j += 1
+        m = i + j + 2
+        for k in range(i, j + 1):
+            res[order[k]] = m
+        i = j + 1
+    return res
+
+
+def block_value(sig, out, idxs):
+    n = len(idxs)
+    if n < 2:
+        return None
+    xs = [sig[i] for i in idxs]
+    ys = [out[i] for i in idxs]
+    if min(xs) == max(xs) or min(ys) == max(ys):
+        return None
+    x2 = midranks2(xs)
+    y2 = midranks2(ys)
+    xb = sum(x2) / float(n)
+    yb = sum(y2) / float(n)
+    vx = sum((a - xb) ** 2 for a in x2)
+    vy = sum((b - yb) ** 2 for b in y2)
+    if vx <= 0 or vy <= 0:
+        return None
+    num = sum((a - xb) * (b - yb) for a, b in zip(x2, y2))
+    rho = num / math.sqrt(vx * vy)
+    return (n - 1) * rho, n - 1
+
+
+def terciles_within(idxs, dlen):
+    srt = sorted(idxs, key=lambda i: (dlen[i], i))
+    n = len(srt)
+    c1, c2 = n // 3, (2 * n) // 3
+    lab = {}
+    for pos, i in enumerate(srt):
+        lab[i] = 0 if pos < c1 else (1 if pos < c2 else 2)
+    return lab
+
+
+def group_by(keys):
+    groups, order = {}, []
+    for i, k in enumerate(keys):
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(i)
+    return order, groups
+
+
+def blockset(dat, kind):
+    rep, dlen = dat["rep"], dat["dlen"]
+    n = len(rep)
+    if kind == "P":
+        keys = list(rep)
+    elif kind == "PM":
+        keys = [(rep[i], dat["month"][i]) for i in range(n)]
+    elif kind == "J":
+        order, groups = group_by([(rep[i], dat["model"][i]) for i in range(n)])
+        keys = [None] * n
+        for g in order:
+            lab = terciles_within(groups[g], dlen)
+            for i in groups[g]:
+                keys[i] = (g[0], g[1], lab[i])
+    elif kind == "JMR":
+        order, groups = group_by([(rep[i], dat["month"][i], dat["model"][i])
+                                  for i in range(n)])
+        keys = [None] * n
+        for g in order:
+            lab = terciles_within(groups[g], dlen)
+            for i in groups[g]:
+                keys[i] = (g[0], g[1], g[2], lab[i])
+    else:
+        raise ValueError(kind)
+    order, groups = group_by(keys)
+    res = []
+    for k in order:
+        bv = block_value(dat["sig"], dat["out"], groups[k])
+        if bv is not None:
+            res.append((rep[groups[k][0]], bv[1], bv[0]))
+    return res
+
+
+def summarize(blocks, sign_unit):
+    t, w = 0.0, 0
+    agg = {}
+    for (r, bw, obs) in blocks:
+        t += obs
+        w += bw
+        agg[r] = agg.get(r, 0.0) + obs
+    if sign_unit == "repo":
+        units = [agg[r] for r in sorted(agg)]
+    else:
+        units = [b[2] for b in blocks]
+    rho = t / float(w) if w > 0 else float("nan")
+    return t, w, len(blocks), len(agg), rho, units
+
+
+def partial_sums(vals):
+    lst = [0.0]
+    for v in vals:
+        lst = [s + v for s in lst] + [s - v for s in lst]
+    return lst
+
+
+def exact_p(units):
+    u = len(units)
+    if u == 0:
+        return 1.0
+    t = abs(sum(units)) - TOL
+    h = u // 2
+    aa = sorted(partial_sums(units[:h]))
+    bb = partial_sums(units[h:])
+    cnt = 0
+    for b in bb:
+        cnt += len(aa) - bisect.bisect_left(aa, t - b)
+        cnt += bisect.bisect_right(aa, -t - b)
+    return cnt / float(2 ** u)
+
+
+def brute_p(units):
+    u = len(units)
+    t = abs(sum(units)) - TOL
+    cnt = 0
+    for mask in range(2 ** u):
+        s = 0.0
+        for i in range(u):
+            s += units[i] if (mask >> i) & 1 else -units[i]
+        if abs(s) >= t:
+            cnt += 1
+    return cnt / float(2 ** u)
+
+
+def mc_p(units, rnd, draws=MC_DRAWS):
+    t = abs(sum(units)) - TOL
+    u = len(units)
+    cnt = 0
+    gb = rnd.getrandbits
+    for _ in range(draws):
+        bits = gb(u)
+        s = 0.0
+        for i in range(u):
+            s += units[i] if (bits >> i) & 1 else -units[i]
+        if abs(s) >= t:
+            cnt += 1
+    return (1 + cnt) / float(draws + 1)
+
+
+def pvalue(units, rnd):
+    if len(units) == 0:
+        return 1.0, "none"
+    if len(units) <= EXACT_MAX:
+        return exact_p(units), "exact"
+    return mc_p(units, rnd), "mc"
+
+
+# ------------------------------------------------------------- one run
+
+STATS = ("P", "PM", "J", "JR", "JMR")
+BLK = {"P": "P", "PM": "PM", "J": "J", "JR": "J", "JMR": "JMR"}
+UNIT = {"P": "repo", "PM": "repo", "J": "block", "JR": "repo", "JMR": "repo"}
+
+
+def one(args):
+    name, cfg, idx = args
+    seed = int(hashlib.sha256(("%s|%d" % (name, idx)).encode()).hexdigest()[:12], 16)
+    dat = gen_dataset(cfg, seed)
+    rnd = random.Random(seed ^ 0x5bf03)
+    cache = {}
+    res = {}
+    for st in STATS:
+        bk = BLK[st]
+        if bk not in cache:
+            cache[bk] = blockset(dat, bk)
+        blocks = cache[bk]
+        t, w, nb, nr, rho, units = summarize(blocks, UNIT[st])
+        formed_new = (w >= W_FLOOR and nr >= REPO_FLOOR)
+        formed_old = (w >= W_FLOOR and nb >= BLOCK_FLOOR)
+        if formed_new:
+            p, mode = pvalue(units, rnd)
+        else:
+            p, mode = float("nan"), "none"
+        res[st] = {"p": p, "w": w, "nb": nb, "nr": nr, "rho": rho,
+                   "formed": formed_new, "formed_old": formed_old,
+                   "nunits": len(units), "mode": mode}
+    return res
+
+
+def rate(num, den):
+    return float("nan") if den == 0 else num / float(den)
+
+
+def run_scenario(pool, name, cfg, nsets):
+    out = pool.map(one, [(name, cfg, i) for i in range(nsets)], chunksize=8)
+    agg = {}
+    for st in STATS:
+        rows = [r[st] for r in out]
+        formed = [x for x in rows if x["formed"]]
+        nf = len(formed)
+        rej_c = sum(1 for x in formed if x["p"] <= ALPHA)
+        head = rows[:min(1000, nsets)]
+        hf = [x for x in head if x["formed"]]
+        agg[st] = {
+            "rate_formed": rate(rej_c, nf),
+            "rate_formed_1k": rate(sum(1 for x in hf if x["p"] <= ALPHA), len(hf)),
+            "n_1k": len(head),
+            "rate_uncond": rej_c / float(nsets),
+            "notformed": 1.0 - nf / float(nsets),
+            "notformed_old": 1.0 - sum(1 for x in rows if x["formed_old"]) / float(nsets),
+            "w": sum(x["w"] for x in rows) / float(nsets),
+            "nb": sum(x["nb"] for x in rows) / float(nsets),
+            "nr": sum(x["nr"] for x in rows) / float(nsets),
+            "units": sum(x["nunits"] for x in rows) / float(nsets),
+            "exact": sum(1 for x in formed if x["mode"] == "exact") / float(max(nf, 1)),
+        }
+        rb = [x["rho"] for x in formed if not math.isnan(x["rho"])]
+        if rb:
+            m = sum(rb) / len(rb)
+            sd = math.sqrt(sum((x - m) ** 2 for x in rb) / max(len(rb) - 1, 1))
+        else:
+            m = sd = float("nan")
+        agg[st]["rho_mean"] = m
+        agg[st]["rho_sd"] = sd
+
+    def pair(a, b):
+        c = 0
+        for r in out:
+            xa, xb = r[a], r[b]
+            if not (xa["formed"] and xb["formed"]):
+                continue
+            if math.isnan(xa["p"]) or math.isnan(xb["p"]):
+                continue
+            if xa["p"] <= ALPHA and xb["p"] <= ALPHA:
+                sa = 1 if xa["rho"] > 0 else (-1 if xa["rho"] < 0 else 0)
+                sb = 1 if xb["rho"] > 0 else (-1 if xb["rho"] < 0 else 0)
+                if sa != 0 and sa == sb:
+                    c += 1
+        return c / float(nsets)
+
+    agg["pairs"] = {"P&J": pair("P", "J"), "P&JR": pair("P", "JR"),
+                    "PM&JR": pair("PM", "JR"), "PM&JMR": pair("PM", "JMR")}
+    agg["n"] = nsets
+    return agg
+
+
+# ------------------------------------------------------------ scenarios
+
+def scen():
+    s = []
+    s.append(("E0", dict(within="iid"), 3000))
+    for lam, tag in ((0.05, "l05"), (0.15, "l15"), (0.30, "l30")):
+        s.append(("E1_" + tag, dict(within="iid", field="walk", lam=lam), 2000))
+    s.append(("E1s_l60", dict(within="iid", field="walk", lam=0.60), 2000))
+    for lam, tag in ((0.05, "l05"), (0.15, "l15"), (0.30, "l30")):
+        s.append(("E5_" + tag, dict(within="iid", field="walk", lam=lam,
+                                    dates="whole"), 1000))
+    s.append(("E2_l30", dict(within="iid", field="month", lam=0.30), 2000))
+    s.append(("E2_l15", dict(within="iid", field="month", lam=0.15), 1000))
+    s.append(("E3_l30", dict(within="iid", field="break", lam=0.30), 2000))
+    s.append(("E3r_l30", dict(within="iid", field="break", lam=0.30,
+                              signed=True), 2000))
+    s.append(("E4_l30", dict(within="ar", phi=0.6, field="walk", lam=0.30), 2000))
+    s.append(("E4_l15", dict(within="ar", phi=0.6, field="walk", lam=0.15), 1000))
+    s.append(("E6_l30", dict(within="iid", field="walk", lam=0.30,
+                             where="signal"), 1000))
+    s.append(("E7", dict(within="regime", meanlen=15, noise=0.05), 2000))
+    s.append(("E8", dict(within="ar", phi=0.6), 2000))
+    s.append(("E9_l30", dict(within="iid", field="break", lam=0.30,
+                             where="common"), 1000))
+    s.append(("A18", dict(within="iid", corr=0.18), 1000))
+    s.append(("A25", dict(within="iid", corr=0.25), 1000))
+    s.append(("A18ar", dict(within="ar", phi=0.6, corr=0.18), 1000))
+    s.append(("A25ar", dict(within="ar", phi=0.6, corr=0.25), 1000))
+    s.append(("G1_30", dict(within="iid", s_len=0.30), 600))
+    s.append(("G1_21", dict(within="iid", s_len=0.21), 600))
+    s.append(("G4", dict(within="iid", s_len=0.20, s_mod=0.20), 600))
+    s.append(("G0cal", dict(within="iid", models="cal"), 600))
+    s.append(("E1cal_l30", dict(within="iid", field="walk", lam=0.30,
+                                models="cal"), 600))
+    return s
+
+
+def checks(lines):
+    lines.append("CHECKS")
+    rnd = random.Random(11)
+    cases = []
+    cases.append([1.0] * 16)
+    cases.append([float(rnd.randrange(1, 5)) for _ in range(16)])
+    cases.append([float(rnd.randrange(1, 3)) for _ in range(16)])
+    dat = gen_dataset(dict(within="iid"), 99)
+    blocks = blockset(dat, "P")
+    _, _, _, _, _, units = summarize(blocks, "repo")
+    cases.append(units[:16])
+    worst = 0.0
+    for c in cases:
+        pe, pb = exact_p(c), brute_p(c)
+        worst = max(worst, abs(pe - pb))
+        lines.append("  two-halves %.12f  brute %.12f  diff %.3e  (u=16)"
+                     % (pe, pb, abs(pe - pb)))
+    lines.append("  worst two-halves vs brute-force difference: %.3e" % worst)
+    u16 = [1.0] * 16
+    lines.append("  p at the extreme statistic, 16 equal units: %.3e (2/2^16 = %.3e)"
+                 % (exact_p(u16), 2.0 / 2 ** 16))
+    # MC fallback against exact on 20 real unit vectors
+    d = 0.0
+    r2 = random.Random(5)
+    for i in range(20):
+        dat = gen_dataset(dict(within="iid"), 1000 + i)
+        _, _, _, _, _, uu = summarize(blockset(dat, "P"), "repo")
+        if not uu:
+            continue
+        d = max(d, abs(exact_p(uu) - mc_p(uu, r2)))
+    lines.append("  largest |p_exact - p_mc| over 20 E0 repository vectors: %.4f" % d)
+    lines.append("")
+
+
+def main():
+    nproc = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+    lines = []
+    lines.append("Reviewer re-run of SPEC_E cells. Synthetic data only.")
+    lines.append("python %s, processes %d, exact sign count up to %d units, "
+                 "else %d Monte Carlo draws with the +1 rule."
+                 % (sys.version.split()[0], nproc, EXACT_MAX, MC_DRAWS))
+    lines.append("Sizes: %d repositories, %d sessions." % (NREP, NSESS))
+    lines.append("lam = variance share of the DEMEANED unit-sd calendar field "
+                 "in the latent; within-repository share = 0.7 - lam.")
+    lines.append("")
+    checks(lines)
+
+    res = {}
+    with Pool(nproc) as pool:
+        for name, cfg, n in scen():
+            res[name] = run_scenario(pool, name, cfg, n)
+            sys.stderr.write("done %s\n" % name)
+            sys.stderr.flush()
+
+    order = [x[0] for x in scen()]
+    lines.append("TABLE 1 rejection rate among data sets in which the statistic "
+                 "could be formed")
+    lines.append("scenario            n     P      PM     J      JR     JMR")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %5d  %s" % (k, a["n"], "  ".join(
+            "%.3f" % a[st]["rate_formed"] for st in STATS)))
+    lines.append("")
+    lines.append("TABLE 1a the same on the FIRST 1,000 data sets only "
+                 "(SPEC_E's count; the 0.065 bar applies here)")
+    lines.append("scenario            n     P      PM     J      JR     JMR")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %5d  %s" % (k, a["P"]["n_1k"], "  ".join(
+            "%.3f" % a[st]["rate_formed_1k"] for st in STATS)))
+    lines.append("")
+    lines.append("TABLE 1b the same, a statistic that cannot be formed counted "
+                 "as no rejection")
+    lines.append("scenario            n     P      PM     J      JR     JMR")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %5d  %s" % (k, a["n"], "  ".join(
+            "%.3f" % a[st]["rate_uncond"] for st in STATS)))
+    lines.append("")
+    lines.append("TABLE 2 pairs: primary rejects, gate rejects, same sign")
+    lines.append("scenario            n     P&J   P&JR  PM&JR PM&JMR")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %5d  %.3f %.3f %.3f %.3f"
+                     % (k, a["n"], a["pairs"]["P&J"], a["pairs"]["P&JR"],
+                        a["pairs"]["PM&JR"], a["pairs"]["PM&JMR"]))
+    lines.append("")
+    lines.append("TABLE 3 rho_bar mean and sd, P and PM")
+    lines.append("scenario            P mean    P sd     PM mean   PM sd")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %+8.4f %8.4f %+8.4f %8.4f"
+                     % (k, a["P"]["rho_mean"], a["P"]["rho_sd"],
+                        a["PM"]["rho_mean"], a["PM"]["rho_sd"]))
+    lines.append("")
+    lines.append("TABLE 4 mean weight-carrying repositories, blocks, weight")
+    lines.append("scenario           P rep  P W  PM rep PM blk PM W  J rep "
+                 "J blk  J W  JMRrep JMRblk JMR W")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %5.1f %5.0f %5.1f %6.1f %5.0f %5.1f %6.1f %5.0f "
+                     "%5.1f %6.1f %5.0f"
+                     % (k, a["P"]["nr"], a["P"]["w"], a["PM"]["nr"],
+                        a["PM"]["nb"], a["PM"]["w"], a["J"]["nr"],
+                        a["J"]["nb"], a["J"]["w"], a["JMR"]["nr"],
+                        a["JMR"]["nb"], a["JMR"]["w"]))
+    lines.append("")
+    lines.append("TABLE 5 share of data sets in which the statistic cannot be "
+                 "formed (W>=150 and >=10 repositories); J old rule = >=10 blocks")
+    lines.append("scenario            P     PM    J/JR  J-old JMR   J units "
+                 "mean  J exact share")
+    for k in order:
+        a = res[k]
+        lines.append("%-18s %.3f %.3f %.3f %.3f %.3f  %6.1f  %.2f"
+                     % (k, a["P"]["notformed"], a["PM"]["notformed"],
+                        a["J"]["notformed"], a["J"]["notformed_old"],
+                        a["JMR"]["notformed"], a["J"]["units"],
+                        a["J"]["exact"]))
+    lines.append("")
+    txt = "\n".join(lines) + "\n"
+    with open(OUT, "w") as fh:
+        fh.write(txt)
+    sys.stderr.write("sha256 %s\n" % hashlib.sha256(txt.encode()).hexdigest())
+    print(txt)
+
+
+if __name__ == "__main__":
+    main()

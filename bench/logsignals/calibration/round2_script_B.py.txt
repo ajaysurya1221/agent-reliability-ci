@@ -1,0 +1,1181 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""SPEC_D calibration, implementer B.  Synthetic data only.
+
+Run with /usr/bin/python3 -I .  Standard library only.  Fixed seeds.
+Two runs with the same seed give byte-identical output.
+
+Usage:  calib_B.py checks|nulls|alts|xscen|gate|all  [out_file]
+"""
+
+import math
+import os
+import random
+import sys
+import time
+from fractions import Fraction
+from math import ceil, exp, log, sqrt
+from operator import mul
+from statistics import NormalDist
+
+import multiprocessing as mp
+
+ND = NormalDist()
+
+# ---------------------------------------------------------------- fixed inputs
+
+SIZES = []  # [WITHHELD: the 33 repository session counts of the first half; disclosure rule 2 of the registration]
+NREP = len(SIZES)
+NTOT = sum(SIZES)                      # 423
+N_OUT_ZERO = 79
+N_OUT_MID = 116
+N_OUT_HUND = 228
+Z0 = 25.0 / 423.0                      # share of signal values sent to exactly 0
+
+MASTER = "SPEC_D-calib-B"
+B_DRAWS = 999
+TOL = 1e-9
+ALPHA = 0.05
+ALPHA_HOLD = 0.065
+RHOSTAR = 0.15
+
+REP_SHARE = 0.3                        # variance share of the repository effect
+REP_CORR = 0.6                         # correlation of the two repository effects
+NPROC = 6
+
+N_NULL = 1000
+N_ALT = 400
+N_X = 400
+N_GATE = 400
+N_TRUTH = 2000
+
+TESTS = ["S", "C", "F", "K", "CR"]
+
+# ------------------------------------------------------------ t quantile (std)
+
+
+def _betacf(a, b, x):
+    tiny = 1e-300
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < tiny:
+        d = tiny
+    d = 1.0 / d
+    h = d
+    for m in range(1, 300):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + aa / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + aa / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        de = d * c
+        h *= de
+        if abs(de - 1.0) < 1e-15:
+            break
+    return h
+
+
+def betainc(a, b, x):
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+             + a * log(x) + b * log(1.0 - x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return exp(lbeta) * _betacf(a, b, x) / a
+    return 1.0 - exp(lbeta) * _betacf(b, a, 1.0 - x) / b
+
+
+def t_cdf(t, df):
+    x = df / (df + t * t)
+    tail = 0.5 * betainc(df / 2.0, 0.5, x)
+    return 1.0 - tail if t > 0 else tail
+
+
+_T975 = {}
+
+
+def t975(df):
+    if df < 1:
+        df = 1
+    v = _T975.get(df)
+    if v is not None:
+        return v
+    lo, hi = 0.0, 400.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if t_cdf(mid, df) < 0.975:
+            lo = mid
+        else:
+            hi = mid
+    v = 0.5 * (lo + hi)
+    _T975[df] = v
+    return v
+
+
+# ------------------------------------------------------------------- generator
+
+
+def bvn(rnd, rho):
+    z1 = rnd.gauss(0.0, 1.0)
+    z2 = rnd.gauss(0.0, 1.0)
+    return z1, rho * z1 + sqrt(1.0 - rho * rho) * z2
+
+
+def ar1(rnd, n, phi):
+    c = sqrt(1.0 - phi * phi)
+    out = [0.0] * n
+    e = rnd.gauss(0.0, 1.0)
+    out[0] = e
+    for t in range(1, n):
+        e = phi * e + c * rnd.gauss(0.0, 1.0)
+        out[t] = e
+    return out
+
+
+def rwalk(rnd, n):
+    out = [0.0] * n
+    c = 0.0
+    for t in range(n):
+        c += rnd.gauss(0.0, 1.0)
+        out[t] = c
+    sc = sqrt((n + 1.0) / 2.0)          # average variance of the walk is 1
+    return [v / sc for v in out]
+
+
+def regimes(rnd, n, meanlen=5.0, noise=0.3):
+    a = sqrt(1.0 - noise)
+    b = sqrt(noise)
+    pr = 1.0 / meanlen
+    g = rnd.gauss(0.0, 1.0)
+    out = [0.0] * n
+    for t in range(n):
+        if t > 0 and rnd.random() < pr:
+            g = rnd.gauss(0.0, 1.0)
+        out[t] = a * g + b * rnd.gauss(0.0, 1.0)
+    return out
+
+
+def alt_series(rnd, n, rho, phi):
+    c = sqrt(1.0 - rho * rho)
+    cp = sqrt(1.0 - phi * phi)
+    e = [0.0] * n
+    f = [0.0] * n
+    z1 = rnd.gauss(0.0, 1.0)
+    z2 = rnd.gauss(0.0, 1.0)
+    e[0] = z1
+    f[0] = rho * z1 + c * z2
+    for t in range(1, n):
+        z1 = rnd.gauss(0.0, 1.0)
+        z2 = rnd.gauss(0.0, 1.0)
+        e[t] = phi * e[t - 1] + cp * z1
+        f[t] = phi * f[t - 1] + cp * (rho * z1 + c * z2)
+    return e, f
+
+
+def runs_labels(rnd, n, k):
+    """k contiguous runs in time over 1..n."""
+    k = min(k, n)
+    if k <= 1:
+        return [0] * n
+    cuts = sorted(rnd.sample(range(1, n), k - 1))
+    labs = []
+    lab = 0
+    ci = 0
+    for t in range(n):
+        while ci < len(cuts) and t == cuts[ci]:
+            lab += 1
+            ci += 1
+        labs.append(lab)
+    return labs
+
+
+_SIG_KNOTS = None
+
+
+def sig_knots():
+    global _SIG_KNOTS
+    if _SIG_KNOTS is None:
+        zs = [ND.inv_cdf((q - Z0) / (1.0 - Z0)) for q in (0.25, 0.50, 0.75)]
+        vs = [log(0.08), log(0.16), log(0.26)]
+        _SIG_KNOTS = (zs, vs)
+    return _SIG_KNOTS
+
+
+LOGP_MIN = log(0.004)
+LOGP_MAX = log(0.95)
+
+
+def map_signal(lat, ds):
+    """pooled latent -> share k/d, d >= 20, quartiles near .08/.16/.26."""
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: lat[i])
+    zs, vs = sig_knots()
+    s_lo = (vs[1] - vs[0]) / (zs[1] - zs[0])
+    s_hi = (vs[2] - vs[1]) / (zs[2] - zs[1])
+    share = [0.0] * n
+    for rank, i in enumerate(order):
+        q = (rank + 0.5) / n
+        if q <= Z0:
+            share[i] = 0.0
+            continue
+        qq = (q - Z0) / (1.0 - Z0)
+        if qq < 1e-12:
+            qq = 1e-12
+        elif qq > 1.0 - 1e-12:
+            qq = 1.0 - 1e-12
+        z = ND.inv_cdf(qq)
+        if z <= zs[1]:
+            lp = vs[0] + s_lo * (z - zs[0])
+        elif z <= zs[2]:
+            lp = vs[1] + s_hi * (z - zs[1])
+        else:
+            lp = vs[2] + s_hi * (z - zs[2])
+        if lp < LOGP_MIN:
+            lp = LOGP_MIN
+        elif lp > LOGP_MAX:
+            lp = LOGP_MAX
+        d = ds[i]
+        k = int(exp(lp) * d + 0.5)
+        if k >= d:
+            k = d - 1
+        if k < 0:
+            k = 0
+        share[i] = k / d
+    return share
+
+
+def map_outcome(lat):
+    n = len(lat)
+    order = sorted(range(n), key=lambda i: lat[i])
+    out = [0] * n
+    for rank, i in enumerate(order):
+        if rank < N_OUT_ZERO:
+            out[i] = 0
+        elif rank >= N_OUT_ZERO + N_OUT_MID:
+            out[i] = 100
+        else:
+            j = rank - N_OUT_ZERO
+            out[i] = 1 + (98 * j) // (N_OUT_MID - 1)
+    return out
+
+
+BIG8 = set(range(8))
+BIG11 = set(range(11))
+
+
+def make_series(rnd, n, scen, r, ds, mods, lm, lsd):
+    """unit-scale within-repository series (signal, outcome)."""
+    if scen in ("N0", "G0a"):
+        return ([rnd.gauss(0.0, 1.0) for _ in range(n)],
+                [rnd.gauss(0.0, 1.0) for _ in range(n)])
+    if scen == "N1":
+        return ar1(rnd, n, 0.3), ar1(rnd, n, 0.3)
+    if scen in ("N2", "G0b"):
+        return ar1(rnd, n, 0.6), ar1(rnd, n, 0.6)
+    if scen == "N3":
+        return ar1(rnd, n, 0.9), ar1(rnd, n, 0.9)
+    if scen == "N4":
+        return ar1(rnd, n, 0.9), ar1(rnd, n, 0.3)
+    if scen == "N5":
+        return regimes(rnd, n), regimes(rnd, n)
+    if scen == "N6":
+        return rwalk(rnd, n), rwalk(rnd, n)
+    if scen.startswith("A_"):
+        _, rs, ps = scen.split("_")
+        return alt_series(rnd, n, float(rs), float(ps))
+    if scen == "X1":
+        e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        if r in BIG8 and n >= 2:
+            sd = sqrt((n * n - 1.0) / 12.0)
+            g = [((t + 1) - (n + 1) / 2.0) / sd for t in range(n)]
+            a, b = sqrt(0.7), sqrt(0.3)
+            return ([a * e[t] + b * g[t] for t in range(n)],
+                    [a * f[t] + b * g[t] for t in range(n)])
+        return e, f
+    if scen == "X2":
+        e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        if r in BIG11 and n >= 3:
+            labs = runs_labels(rnd, n, 3)
+            pe = []
+            pf = []
+            for _ in range(3):
+                pa, pb = bvn(rnd, 0.8)
+                pe.append(pa)
+                pf.append(pb)
+            a, b = sqrt(0.7), sqrt(0.3)
+            return ([a * e[t] + b * pe[labs[t]] for t in range(n)],
+                    [a * f[t] + b * pf[labs[t]] for t in range(n)])
+        return e, f
+    if scen == "G1":
+        e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        a, b = sqrt(0.7), sqrt(0.3)
+        ld = [(log(ds[t]) - lm) / lsd for t in range(n)]
+        return ([a * e[t] + b * ld[t] for t in range(n)],
+                [a * f[t] + b * ld[t] for t in range(n)])
+    if scen == "G2":
+        e = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        f = [rnd.gauss(0.0, 1.0) for _ in range(n)]
+        km = max(mods) + 1
+        ma = []
+        mb = []
+        for _ in range(km):
+            pa, pb = bvn(rnd, 0.8)
+            ma.append(pa)
+            mb.append(pb)
+        a, b = sqrt(0.7), sqrt(0.3)
+        return ([a * e[t] + b * ma[mods[t]] for t in range(n)],
+                [a * f[t] + b * mb[mods[t]] for t in range(n)])
+    if scen.startswith("G3_"):
+        rho = float(scen.split("_")[1])
+        e, f = alt_series(rnd, n, rho, 0.0)
+        a, b = sqrt(0.7), sqrt(0.3)
+        ld = [(log(ds[t]) - lm) / lsd for t in range(n)]
+        return ([a * e[t] + b * ld[t] for t in range(n)],
+                [a * f[t] + b * ld[t] for t in range(n)])
+    raise ValueError("unknown scenario " + scen)
+
+
+def gen(rnd, scen):
+    """One synthetic half: 33 repositories, 423 sessions in time order."""
+    ra = []
+    rb = []
+    for _ in range(NREP):
+        a, b = bvn(rnd, REP_CORR)
+        ra.append(a)
+        rb.append(b)
+    ds = []
+    for n in SIZES:
+        ds.append([max(20, int(round(60.0 * exp(0.6 * rnd.gauss(0.0, 1.0)))))
+                   for _ in range(n)])
+    mods = []
+    for r in range(NREP):
+        n = SIZES[r]
+        if n >= 10:
+            k = 1 if rnd.random() < 0.5 else rnd.choice([2, 3])
+        else:
+            k = rnd.choice([1, 2, 3])
+        mods.append(runs_labels(rnd, n, k))
+    alld = [v for row in ds for v in row]
+    lm = sum(log(v) for v in alld) / len(alld)
+    lsd = sqrt(sum((log(v) - lm) ** 2 for v in alld) / len(alld))
+
+    ca = sqrt(REP_SHARE)
+    cb = sqrt(1.0 - REP_SHARE)
+    us = []
+    vs = []
+    for r in range(NREP):
+        n = SIZES[r]
+        ws, wo = make_series(rnd, n, scen, r, ds[r], mods[r], lm, lsd)
+        us.append([ca * ra[r] + cb * ws[t] for t in range(n)])
+        vs.append([ca * rb[r] + cb * wo[t] for t in range(n)])
+
+    flat_u = [v for row in us for v in row]
+    flat_v = [v for row in vs for v in row]
+    flat_d = alld
+    sig = map_signal(flat_u, flat_d)
+    out = map_outcome(flat_v)
+
+    repos = []
+    p = 0
+    for r in range(NREP):
+        n = SIZES[r]
+        repos.append({"sig": sig[p:p + n], "out": out[p:p + n],
+                      "d": ds[r], "mod": mods[r]})
+        p += n
+    return repos
+
+
+# ----------------------------------------------------------------- statistic
+
+
+def midranks(vals):
+    n = len(vals)
+    idx = sorted(range(n), key=lambda i: vals[i])
+    out = [0.0] * n
+    i = 0
+    while i < n:
+        j = i
+        vi = vals[idx[i]]
+        while j + 1 < n and vals[idx[j + 1]] == vi:
+            j += 1
+        m = (i + j) / 2.0 + 1.0
+        for k in range(i, j + 1):
+            out[idx[k]] = m
+        i = j + 1
+    return out
+
+
+def prep_group(sig, out):
+    """-> (x, yscaled, rho, w, n) or None when the group carries no weight."""
+    n = len(sig)
+    if n < 2:
+        return None
+    if min(sig) == max(sig) or min(out) == max(out):
+        return None
+    x = midranks(sig)
+    y = midranks(out)
+    mx = sum(x) / n
+    my = sum(y) / n
+    xc = [v - mx for v in x]
+    yc = [v - my for v in y]
+    sxx = sum(v * v for v in xc)
+    syy = sum(v * v for v in yc)
+    if sxx <= 0.0 or syy <= 0.0:
+        return None
+    sx = sqrt(sxx)
+    sy = sqrt(syy)
+    rho = sum(map(mul, xc, yc)) / (sx * sy)
+    w = float(n - 1)
+    sc = w / (sx * sy)
+    return (x, [v * sc for v in yc], rho, w, n)
+
+
+def groups_repo(repos):
+    g = []
+    for rp in repos:
+        p = prep_group(rp["sig"], rp["out"])
+        if p is not None:
+            g.append(p)
+    return g
+
+
+def _terciles(idxs, ds, n_all):
+    """idxs sorted by (length, time); cut at floor(n/3) and floor(2n/3)."""
+    n = len(idxs)
+    c1 = n // 3
+    c2 = (2 * n) // 3
+    return [idxs[:c1], idxs[c1:c2], idxs[c2:]]
+
+
+def blocks_joint(repos):
+    """repository x model name x length tercile."""
+    out = []
+    for rp in repos:
+        n = len(rp["sig"])
+        bym = {}
+        for t in range(n):
+            bym.setdefault(rp["mod"][t], []).append(t)
+        for key in sorted(bym):
+            idxs = sorted(bym[key], key=lambda t: (rp["d"][t], t))
+            for blk in _terciles(idxs, rp["d"], n):
+                if blk:
+                    blk = sorted(blk)          # keep time order inside a block
+                    out.append(([rp["sig"][t] for t in blk],
+                                [rp["out"][t] for t in blk]))
+    return out
+
+
+def blocks_length(repos):
+    """repository x length tercile."""
+    out = []
+    for rp in repos:
+        n = len(rp["sig"])
+        idxs = sorted(range(n), key=lambda t: (rp["d"][t], t))
+        for blk in _terciles(idxs, rp["d"], n):
+            if blk:
+                blk = sorted(blk)
+                out.append(([rp["sig"][t] for t in blk],
+                            [rp["out"][t] for t in blk]))
+    return out
+
+
+def blocks_model(repos):
+    """repository x model name."""
+    out = []
+    for rp in repos:
+        n = len(rp["sig"])
+        bym = {}
+        for t in range(n):
+            bym.setdefault(rp["mod"][t], []).append(t)
+        for key in sorted(bym):
+            blk = bym[key]
+            out.append(([rp["sig"][t] for t in blk],
+                        [rp["out"][t] for t in blk]))
+    return out
+
+
+def groups_from_blocks(blocks):
+    g = []
+    for sig, out in blocks:
+        p = prep_group(sig, out)
+        if p is not None:
+            g.append(p)
+    return g
+
+
+def stat_T(G):
+    return sum(g[3] * g[2] for g in G)
+
+
+def stat_W(G):
+    return sum(g[3] for g in G)
+
+
+# --------------------------------------------------------------------- tests
+
+
+def pval_S(rnd, G, Tobs, B):
+    thr = abs(Tobs) - TOL
+    xs = [g[0] for g in G]
+    ys = [g[1] for g in G]
+    sh = rnd.shuffle
+    cnt = 0
+    for _ in range(B):
+        s = 0.0
+        for x, y in zip(xs, ys):
+            xx = x[:]
+            sh(xx)
+            s += sum(map(mul, xx, y))
+        if abs(s) >= thr:
+            cnt += 1
+    return (1 + cnt) / (B + 1.0)
+
+
+def pre_C(G):
+    """per group: the n circular-shift values, and the 2n shift+reversal values."""
+    cs = []
+    crs = []
+    for x, y, rho, w, n in G:
+        c = [sum(map(mul, x[o:] + x[:o], y)) for o in range(n)]
+        xr = x[::-1]
+        c2 = [sum(map(mul, xr[o:] + xr[:o], y)) for o in range(n)]
+        cs.append(c)
+        crs.append(c + c2)
+    return cs, crs
+
+
+def pval_table(rnd, tabs, Tobs, B):
+    thr = abs(Tobs) - TOL
+    rr = rnd.randrange
+    lens = [len(t) for t in tabs]
+    cnt = 0
+    for _ in range(B):
+        s = 0.0
+        for t, L in zip(tabs, lens):
+            s += t[rr(L)]
+        if abs(s) >= thr:
+            cnt += 1
+    return (1 + cnt) / (B + 1.0)
+
+
+def pre_K(G):
+    out = []
+    for x, y, rho, w, n in G:
+        L = int(ceil(sqrt(n)))
+        nb = (n + L - 1) // L
+        blocks = [x[i * L:min((i + 1) * L, n)] for i in range(nb)]
+        L2 = len(blocks[-1])
+        starts = set(j * L for j in range(nb))
+        if L2 != L:
+            for j in range(1, nb):
+                starts.add(j * L - (L - L2))
+        tab = []
+        for blk in blocks:
+            lb = len(blk)
+            d = {}
+            for s in starts:
+                if 0 <= s and s + lb <= n:
+                    d[s] = sum(map(mul, blk, y[s:s + lb]))
+            tab.append(d)
+        out.append((tab, [len(b) for b in blocks], nb))
+    return out
+
+
+def pval_K(rnd, pk, Tobs, B):
+    thr = abs(Tobs) - TOL
+    sh = rnd.shuffle
+    cnt = 0
+    for _ in range(B):
+        s = 0.0
+        for tab, lens, nb in pk:
+            perm = list(range(nb))
+            sh(perm)
+            pos = 0
+            for j in perm:
+                s += tab[j][pos]
+                pos += lens[j]
+        if abs(s) >= thr:
+            cnt += 1
+    return (1 + cnt) / (B + 1.0)
+
+
+def pval_F(rnd, G, Tobs, B):
+    thr = abs(Tobs) - TOL
+    ts = [g[3] * g[2] for g in G]
+    m = len(ts)
+    if m == 0:
+        return 1.0
+    gb = rnd.getrandbits
+    cnt = 0
+    for _ in range(B):
+        bits = gb(m)
+        s = 0.0
+        for i in range(m):
+            s = s + ts[i] if (bits >> i) & 1 else s - ts[i]
+        if abs(s) >= thr:
+            cnt += 1
+    return (1 + cnt) / (B + 1.0)
+
+
+def all_pvals(rnd, G, B, which=TESTS):
+    T = stat_T(G)
+    res = {}
+    if not G:
+        return {k: 1.0 for k in which}
+    need_c = "C" in which or "CR" in which
+    cs = crs = None
+    if need_c:
+        cs, crs = pre_C(G)
+    for k in which:
+        if k == "S":
+            res[k] = pval_S(rnd, G, T, B)
+        elif k == "C":
+            res[k] = pval_table(rnd, cs, T, B)
+        elif k == "CR":
+            res[k] = pval_table(rnd, crs, T, B)
+        elif k == "K":
+            res[k] = pval_K(rnd, pre_K(G), T, B)
+        elif k == "F":
+            res[k] = pval_F(rnd, G, T, B)
+    return res
+
+
+def interval(G):
+    W = stat_W(G)
+    T = stat_T(G)
+    m = len(G)
+    if m == 0 or W <= 0:
+        return 0.0, -1.0, 1.0, 0.0, 0
+    rb = T / W
+    if m < 2:
+        se = 1.0 / sqrt(W)
+        h = t975(1) * se
+        return rb, max(-1.0, rb - h), min(1.0, rb + h), W, m
+    vals = [(T - g[3] * g[2]) / (W - g[3]) for g in G]
+    mn = sum(vals) / m
+    se = sqrt((m - 1.0) / m * sum((v - mn) ** 2 for v in vals))
+    fl = 1.0 / sqrt(W)
+    se_used = se if se > fl else fl
+    h = t975(m - 1) * se_used
+    return rb, max(-1.0, rb - h), min(1.0, rb + h), W, m
+
+
+# ------------------------------------------------------------------- workers
+
+
+def task_main(arg):
+    """one data set: p-values for every test, plus the interval."""
+    scen, rep, B = arg
+    rnd = random.Random("%s|%s|%d" % (MASTER, scen, rep))
+    repos = gen(rnd, scen)
+    G = groups_repo(repos)
+    pv = all_pvals(rnd, G, B)
+    rb, lo, hi, W, m = interval(G)
+    nz = sum(1 for rp in repos for v in rp["sig"] if v == 0.0)
+    return (tuple(pv[k] for k in TESTS), rb, lo, hi, W, m, nz)
+
+
+def task_truth(arg):
+    scen, rep = arg
+    rnd = random.Random("%s|truth|%s|%d" % (MASTER, scen, rep))
+    repos = gen(rnd, scen)
+    G = groups_repo(repos)
+    W = stat_W(G)
+    return stat_T(G) / W if W > 0 else 0.0
+
+
+GATE_TESTS = ["S", "C", "CR", "F"]
+
+
+def task_gate(arg):
+    scen, rep, B = arg
+    rnd = random.Random("%s|gate|%s|%d" % (MASTER, scen, rep))
+    repos = gen(rnd, scen)
+    Gp = groups_repo(repos)
+    rb, lo, hi, W, m = interval(Gp)
+    pp = all_pvals(rnd, Gp, B, GATE_TESTS)
+
+    Gj = groups_from_blocks(blocks_joint(repos))
+    Wj = stat_W(Gj)
+    nbj = len(Gj)
+    formed_j = (Wj >= 150.0 and nbj >= 10)
+    rbj = (stat_T(Gj) / Wj) if Wj > 0 else 0.0
+    pj = all_pvals(rnd, Gj, B, GATE_TESTS) if nbj else {k: 1.0 for k in GATE_TESTS}
+
+    Gl = groups_from_blocks(blocks_length(repos))
+    Wl = stat_W(Gl)
+    formed_l = (Wl >= 150.0 and len(Gl) >= 10)
+    rbl = (stat_T(Gl) / Wl) if Wl > 0 else 0.0
+    pl = all_pvals(rnd, Gl, B, GATE_TESTS) if Gl else {k: 1.0 for k in GATE_TESTS}
+
+    Gm = groups_from_blocks(blocks_model(repos))
+    Wm = stat_W(Gm)
+    formed_m = (Wm >= 150.0 and len(Gm) >= 10)
+    rbm = (stat_T(Gm) / Wm) if Wm > 0 else 0.0
+    pm = all_pvals(rnd, Gm, B, GATE_TESTS) if Gm else {k: 1.0 for k in GATE_TESTS}
+
+    return (tuple(pp[k] for k in GATE_TESTS), rb, W, m,
+            tuple(pj[k] for k in GATE_TESTS), rbj, Wj, nbj, formed_j,
+            tuple(pl[k] for k in GATE_TESTS), rbl, Wl, len(Gl), formed_l,
+            tuple(pm[k] for k in GATE_TESTS), rbm, Wm, len(Gm), formed_m)
+
+
+def run_pool(fn, tasks):
+    if len(tasks) < 8 or NPROC <= 1:
+        return [fn(t) for t in tasks]
+    ctx = mp.get_context("fork")
+    with ctx.Pool(NPROC) as pool:
+        return list(pool.map(fn, tasks, chunksize=max(1, len(tasks) // (NPROC * 8))))
+
+
+# --------------------------------------------------------------------- checks
+
+
+def exact_T_single(sig, out, perm):
+    """|sum xc*yc| as an exact Fraction for one repository (denominator fixed)."""
+    x = [Fraction(v).limit_denominator(10 ** 9) for v in midranks(sig)]
+    y = [Fraction(v).limit_denominator(10 ** 9) for v in midranks(out)]
+    n = len(sig)
+    mx = sum(x) / n
+    my = sum(y) / n
+    xc = [v - mx for v in x]
+    yc = [v - my for v in y]
+    return sum(xc[perm[t]] * yc[t] for t in range(n))
+
+
+def perms(n):
+    import itertools
+    return list(itertools.permutations(range(n)))
+
+
+def check_enumeration(lines):
+    lines.append("CHECK 1a  Monte Carlo p of S against full enumeration")
+    sizes = [4, 3, 2]
+    sig = [[0.10, 0.10, 0.25, 0.40], [0.05, 0.30, 0.12], [0.20, 0.08]]
+    out = [[0, 100, 40, 100], [0, 55, 100], [100, 0]]
+    repos = [{"sig": sig[i], "out": out[i], "d": [60] * sizes[i],
+              "mod": [0] * sizes[i]} for i in range(3)]
+    G = groups_repo(repos)
+    T = stat_T(G)
+    ps = [perms(g[4]) for g in G]
+    tot = 1
+    for p in ps:
+        tot *= len(p)
+    cnt = 0
+    import itertools
+    for combo in itertools.product(*ps):
+        s = 0.0
+        for g, pm in zip(G, combo):
+            x, y = g[0], g[1]
+            s += sum(x[pm[t]] * y[t] for t in range(len(y)))
+        if abs(s) >= abs(T) - TOL:
+            cnt += 1
+    p_exact = cnt / tot
+    lines.append("  arrangements enumerated      : %d" % tot)
+    lines.append("  exact two-sided p            : %.6f" % p_exact)
+    for B in (999, 9999, 99999):
+        rnd = random.Random("%s|check1a|%d" % (MASTER, B))
+        p_mc = pval_S(rnd, G, T, B)
+        err = sqrt(max(p_exact * (1 - p_exact), 1e-12) / B)
+        ok = abs(p_mc - p_exact) <= 3.0 * err + 1.0 / (B + 1.0)
+        lines.append("  B=%6d  MC p = %.6f  MC error %.4f  within 3 errors: %s"
+                     % (B, p_mc, err, "yes" if ok else "NO"))
+    lines.append("")
+
+
+def check_tolerance(lines):
+    lines.append("CHECK 1b  the tolerance rule counts mathematically equal T as equal")
+    sig = [0.10, 0.10, 0.25, 0.40]          # two tied signal values
+    out = [0, 100, 40, 90]
+    G = groups_repo([{"sig": sig, "out": out, "d": [60] * 4, "mod": [0] * 4}])
+    g = G[0]
+    x, y = g[0], g[1]
+    import itertools
+    seen = {}
+    for pm in itertools.permutations(range(4)):
+        ex = exact_T_single(sig, out, pm)
+        fl = sum(x[pm[t]] * y[t] for t in range(4))
+        seen.setdefault(ex, []).append((pm, fl))
+    dup = [(k, v) for k, v in seen.items() if len(v) > 1]
+    lines.append("  arrangements                 : 24")
+    lines.append("  distinct exact values of T   : %d" % len(seen))
+    lines.append("  exact values reached by more than one arrangement: %d" % len(dup))
+    worst = 0.0
+    for k, v in dup:
+        for i in range(len(v)):
+            for j in range(i + 1, len(v)):
+                worst = max(worst, abs(v[i][1] - v[j][1]))
+    lines.append("  largest float gap inside such a value  : %.3e" % worst)
+    lines.append("  tolerance                              : %.1e" % TOL)
+    lines.append("  equal arrangements counted as equal    : %s"
+                 % ("yes" if worst < TOL else "NO"))
+    ex0, fl0 = None, None
+    for k, v in dup:
+        ex0, fl0 = k, v[0][1]
+        break
+    if ex0 is not None:
+        pm_a, pm_b = dup[0][1][0][0], dup[0][1][1][0]
+        lines.append("  example pair (two different arrangements, one exact T):")
+        lines.append("    %s and %s, exact |sum xc*yc| = %s"
+                     % (str(pm_a), str(pm_b), str(abs(ex0))))
+    nearmiss = 0
+    for k, v in seen.items():
+        for k2, v2 in seen.items():
+            if k is k2:
+                continue
+            if abs(float(k) - float(k2)) < 1e-9 and k != k2:
+                nearmiss += 1
+    lines.append("  unequal exact values within the tolerance: %d" % (nearmiss // 2))
+
+    # a harder case: equal T from two arrangements that are not a swap of tied values
+    sig2 = [0.10, 0.10, 0.25, 0.40, 0.55]
+    out2 = [0, 100, 100, 40, 0]
+    G2 = groups_repo([{"sig": sig2, "out": out2, "d": [60] * 5, "mod": [0] * 5}])
+    g2 = G2[0]
+    x2, y2 = g2[0], g2[1]
+    tie_class = {}
+    for i, v in enumerate(midranks(sig2)):
+        tie_class.setdefault(v, set()).add(i)
+
+    def same_up_to_ties(pa, pb):
+        xr = midranks(sig2)
+        return all(xr[pa[t]] == xr[pb[t]] for t in range(5))
+
+    seen2 = {}
+    for pm in itertools.permutations(range(5)):
+        ex = exact_T_single(sig2, out2, pm)
+        seen2.setdefault(ex, []).append((pm, sum(x2[pm[t]] * y2[t] for t in range(5))))
+    found = None
+    worst2 = 0.0
+    for k, v in seen2.items():
+        for i in range(len(v)):
+            for j in range(i + 1, len(v)):
+                worst2 = max(worst2, abs(v[i][1] - v[j][1]))
+                if found is None and not same_up_to_ties(v[i][0], v[j][0]):
+                    found = (v[i][0], v[j][0], k, abs(v[i][1] - v[j][1]))
+    lines.append("  harder case, n=5, ties in both numbers: %d arrangements, %d distinct exact T"
+                 % (120, len(seen2)))
+    if found:
+        lines.append("    %s and %s are not a relabelling of tied signal values"
+                     % (str(found[0]), str(found[1])))
+        lines.append("    both give exact sum xc*yc = %s, float gap %.3e, counted as equal: %s"
+                     % (str(found[2]), found[3], "yes" if found[3] < TOL else "NO"))
+    else:
+        lines.append("    no such pair in this case")
+    lines.append("    largest float gap inside one exact value: %.3e" % worst2)
+    lines.append("")
+
+
+def check_variance(lines):
+    lines.append("CHECK 2  Var(rho_r) under S equals 1/(n_r-1), by enumeration, with ties")
+    import itertools
+    for sig, out in ((([0.10, 0.10, 0.25, 0.40, 0.40]), ([0, 100, 100, 40, 0])),
+                     (([0.05, 0.05, 0.05, 0.30, 0.44]), ([0, 50, 100, 100, 7]))):
+        n = len(sig)
+        x = [Fraction(v).limit_denominator(10 ** 9) for v in midranks(sig)]
+        y = [Fraction(v).limit_denominator(10 ** 9) for v in midranks(out)]
+        mx = sum(x) / n
+        my = sum(y) / n
+        xc = [v - mx for v in x]
+        yc = [v - my for v in y]
+        sxx = sum(v * v for v in xc)
+        syy = sum(v * v for v in yc)
+        s1 = Fraction(0)
+        s2 = Fraction(0)
+        cntp = 0
+        for pm in itertools.permutations(range(n)):
+            d = sum(xc[pm[t]] * yc[t] for t in range(n))
+            s1 += d
+            s2 += d * d
+            cntp += 1
+        mean_rho = s1 / cntp
+        var_rho = s2 / cntp / (sxx * syy)
+        target = Fraction(1, n - 1)
+        lines.append("  n=%d  permutations=%d  mean rho = %s  Var(rho) = %s  1/(n-1) = %s  equal: %s"
+                     % (n, cntp, str(mean_rho), str(var_rho), str(target),
+                        "yes" if var_rho == target else "NO"))
+    lines.append("")
+
+
+def check_marginals(lines):
+    lines.append("CHECK 3  the generator's marginals against the fixed inputs")
+    nz = 0
+    nsess = 0
+    q1 = []
+    q2 = []
+    q3 = []
+    one = 0
+    dmin = 10 ** 9
+    dmed = []
+    o0 = o100 = omid = 0
+    ncontrib = []
+    Ws = []
+    for rep in range(200):
+        rnd = random.Random("%s|marg|%d" % (MASTER, rep))
+        repos = gen(rnd, "N0")
+        sig = [v for rp in repos for v in rp["sig"]]
+        out = [v for rp in repos for v in rp["out"]]
+        ds = [v for rp in repos for v in rp["d"]]
+        nz += sum(1 for v in sig if v == 0.0)
+        one += sum(1 for v in sig if v >= 1.0)
+        nsess += len(sig)
+        ss = sorted(sig)
+        q1.append(ss[len(ss) // 4])
+        q2.append(ss[len(ss) // 2])
+        q3.append(ss[(3 * len(ss)) // 4])
+        dmin = min(dmin, min(ds))
+        dmed.append(sorted(ds)[len(ds) // 2])
+        o0 += sum(1 for v in out if v == 0)
+        o100 += sum(1 for v in out if v == 100)
+        omid += sum(1 for v in out if 0 < v < 100)
+        G = groups_repo(repos)
+        ncontrib.append(len(G))
+        Ws.append(stat_W(G))
+    lines.append("  200 data sets, scenario N0")
+    lines.append("  sessions                     : %d per data set" % (nsess // 200))
+    lines.append("  signal at exactly 0          : %.4f of sessions (target about 0.059)"
+                 % (nz / nsess))
+    lines.append("  signal at 1                  : %d (target 0)" % one)
+    lines.append("  signal quartiles (mean)      : %.4f %.4f %.4f (target 0.08 0.16 0.26)"
+                 % (sum(q1) / 200, sum(q2) / 200, sum(q3) / 200))
+    lines.append("  outcome 0 / mid / 100        : %.1f %.1f %.1f (target 79 116 228)"
+                 % (o0 / 200, omid / 200, o100 / 200))
+    lines.append("  length d: minimum %d, median of medians %d (target min 20, median 60)"
+                 % (dmin, sorted(dmed)[100]))
+    lines.append("  contributing repositories m  : min %d  mean %.1f  max %d"
+                 % (min(ncontrib), sum(ncontrib) / 200, max(ncontrib)))
+    lines.append("  total weight W               : min %.0f  mean %.1f  max %.0f"
+                 % (min(Ws), sum(Ws) / 200, max(Ws)))
+    lines.append("")
+
+
+# -------------------------------------------------------------------- tables
+
+
+def fmt_rate(k, n):
+    return "%.3f" % (k / float(n))
+
+
+def mean_sd(v):
+    n = len(v)
+    m = sum(v) / n
+    if n < 2:
+        return m, 0.0
+    return m, sqrt(sum((x - m) ** 2 for x in v) / (n - 1))
+
+
+NULL_SCEN = [("N0", "independent sessions"),
+             ("N1", "AR(1) 0.3 both"),
+             ("N2", "AR(1) 0.6 both"),
+             ("N3", "AR(1) 0.9 both"),
+             ("N4", "AR(1) 0.9 signal, 0.3 outcome"),
+             ("N5", "regimes, mean length 5"),
+             ("N6", "random walk both")]
+
+ALT_SCEN = [("A_0.10_0.0", "innovation corr 0.10, independent sessions"),
+            ("A_0.18_0.0", "innovation corr 0.18, independent sessions"),
+            ("A_0.25_0.0", "innovation corr 0.25, independent sessions"),
+            ("A_0.45_0.0", "innovation corr 0.45, independent sessions"),
+            ("A_0.10_0.6", "innovation corr 0.10, AR(1) 0.6 both"),
+            ("A_0.18_0.6", "innovation corr 0.18, AR(1) 0.6 both"),
+            ("A_0.25_0.6", "innovation corr 0.25, AR(1) 0.6 both"),
+            ("A_0.45_0.6", "innovation corr 0.45, AR(1) 0.6 both")]
+
+X_SCEN = [("X1", "shared linear trend in the 8 largest repositories"),
+          ("X2", "3 hidden people in 11 repositories, effects correlated 0.8")]
+
+GATE_SCEN = [("G0a", "null, independent sessions"),
+             ("G0b", "null, AR(1) 0.6 both"),
+             ("G1", "link carried by length only"),
+             ("G2", "link carried by the model name only"),
+             ("G3_0.18", "length effects plus a direct link 0.18"),
+             ("G3_0.25", "length effects plus a direct link 0.25")]
+
+
+def block_scenarios(scens, nsets, lines, title):
+    lines.append("=" * 78)
+    lines.append(title)
+    lines.append("=" * 78)
+    lines.append("B = %d draws per test, %d data sets per scenario." % (B_DRAWS, nsets))
+    lines.append("Monte Carlo error of a rate near 0.05: %.4f"
+                 % sqrt(0.05 * 0.95 / nsets))
+    lines.append("")
+    store = {}
+    for scen, desc in scens:
+        t0 = time.time()
+        tasks = [(scen, i, B_DRAWS) for i in range(nsets)]
+        res = run_pool(task_main, tasks)
+        truth = run_pool(task_truth, [(scen, i) for i in range(N_TRUTH)])
+        true_mean = sum(truth) / len(truth)
+        rej = {k: 0 for k in TESTS}
+        rbs = []
+        cov = 0
+        inside = 0
+        Ws = []
+        ms = []
+        for pvs, rb, lo, hi, W, m, nz in res:
+            for k, p in zip(TESTS, pvs):
+                if p <= ALPHA:
+                    rej[k] += 1
+            rbs.append(rb)
+            if lo <= true_mean <= hi:
+                cov += 1
+            if lo > -RHOSTAR and hi < RHOSTAR:
+                inside += 1
+            Ws.append(W)
+            ms.append(m)
+        mrb, srb = mean_sd(rbs)
+        store[scen] = {"rej": dict(rej), "n": nsets, "mean": mrb, "sd": srb,
+                       "true": true_mean, "cov": cov / nsets,
+                       "inside": inside / nsets,
+                       "W": sum(Ws) / nsets, "m": sum(ms) / nsets,
+                       "desc": desc, "secs": time.time() - t0}
+        lines.append("%-10s %s" % (scen, desc))
+        lines.append("  rejection rate at alpha 0.05:  " +
+                     "  ".join("%s %s" % (k, fmt_rate(rej[k], nsets)) for k in TESTS))
+        lines.append("  rho_bar: mean %+.4f  SD %.4f   true mean (2000 sets) %+.4f"
+                     % (mrb, srb, true_mean))
+        lines.append("  interval: coverage of the true mean %.3f   lies inside (-0.15,+0.15) %.3f"
+                     % (cov / nsets, inside / nsets))
+        lines.append("  mean W %.1f   mean contributing repositories %.1f"
+                     % (sum(Ws) / nsets, sum(ms) / nsets))
+        lines.append("")
+        sys.stderr.write("[%s %.0f s]\n" % (scen, time.time() - t0))
+    return store
+
+
+def gate_block(lines):
+    lines.append("=" * 78)
+    lines.append("JOINT BASELINE GATE")
+    lines.append("=" * 78)
+    lines.append("B = %d draws, %d data sets per scenario, candidates %s."
+                 % (B_DRAWS, N_GATE, ", ".join(GATE_TESTS)))
+    lines.append("Monte Carlo error of a rate near 0.5: %.4f" % sqrt(0.25 / N_GATE))
+    lines.append("")
+    store = {}
+    for scen, desc in GATE_SCEN:
+        t0 = time.time()
+        tasks = [(scen, i, B_DRAWS) for i in range(N_GATE)]
+        res = run_pool(task_gate, tasks)
+        Wjs = []
+        notformed = 0
+        row = {}
+        for k in GATE_TESTS:
+            row[k] = {"prim": 0, "gate": 0, "both": 0, "sep": 0, "sepboth": 0}
+        nfl = 0
+        nfm = 0
+        for r in res:
+            (pp, rb, W, m, pj, rbj, Wj, nbj, fj,
+             pl, rbl, Wl, nbl, fl, pm, rbm, Wm, nbm, fm) = r
+            Wjs.append(Wj)
+            if not fj:
+                notformed += 1
+            if not fl:
+                nfl += 1
+            if not fm:
+                nfm += 1
+            for i, k in enumerate(GATE_TESTS):
+                d = row[k]
+                prim = pp[i] <= ALPHA
+                if prim:
+                    d["prim"] += 1
+                gate = (fj and pj[i] <= ALPHA and rbj * rb > 0.0)
+                if gate:
+                    d["gate"] += 1
+                if prim and gate:
+                    d["both"] += 1
+                sep = (fl and pl[i] <= ALPHA and rbl * rb > 0.0 and
+                       fm and pm[i] <= ALPHA and rbm * rb > 0.0)
+                if sep:
+                    d["sep"] += 1
+                if prim and sep:
+                    d["sepboth"] += 1
+        Wjs.sort()
+        q = lambda f: Wjs[min(len(Wjs) - 1, int(f * len(Wjs)))]
+        store[scen] = {"row": row, "Wj": (Wjs[0], q(0.10), q(0.50), q(0.90),
+                                          Wjs[-1], sum(Wjs) / len(Wjs)),
+                       "notformed": notformed / N_GATE, "desc": desc,
+                       "nfl": nfl / N_GATE, "nfm": nfm / N_GATE}
+        lines.append("%-10s %s" % (scen, desc))
+        lines.append("  W_J: min %.0f  p10 %.0f  median %.0f  p90 %.0f  max %.0f  mean %.1f"
+                     % store[scen]["Wj"])
+        lines.append("  joint gate cannot be formed: %.3f   length-only gate: %.3f   model-only gate: %.3f"
+                     % (notformed / N_GATE, nfl / N_GATE, nfm / N_GATE))
+        lines.append("  test   primary  joint gate same sign  both (shown)   two separate gates  both (shown)")
+        for k in GATE_TESTS:
+            d = row[k]
+            lines.append("  %-5s  %s     %s                 %s          %s               %s"
+                         % (k, fmt_rate(d["prim"], N_GATE), fmt_rate(d["gate"], N_GATE),
+                            fmt_rate(d["both"], N_GATE), fmt_rate(d["sep"], N_GATE),
+                            fmt_rate(d["sepboth"], N_GATE)))
+        lines.append("")
+        sys.stderr.write("[gate %s %.0f s]\n" % (scen, time.time() - t0))
+    return store
+
+
+# ----------------------------------------------------------------------- main
+
+
+def main():
+    what = sys.argv[1] if len(sys.argv) > 1 else "all"
+    outp = sys.argv[2] if len(sys.argv) > 2 else None
+    lines = []
+    lines.append("SPEC_D calibration, implementer B")
+    lines.append("synthetic data only; /usr/bin/python3 -I; standard library only")
+    lines.append("master seed string: %s" % MASTER)
+    lines.append("B = %d permutation draws per test; alpha = %.2f; rho* = %.2f"
+                 % (B_DRAWS, ALPHA, RHOSTAR))
+    lines.append("tests: S shuffle, C circular shift, F sign flip over repositories,")
+    lines.append("       K block shuffle, CR circular shift with a random time reversal")
+    lines.append("")
+
+    if what in ("checks", "all"):
+        lines.append("=" * 78)
+        lines.append("CODE CHECKS")
+        lines.append("=" * 78)
+        check_enumeration(lines)
+        check_tolerance(lines)
+        check_variance(lines)
+        check_marginals(lines)
+    if what in ("nulls", "all"):
+        block_scenarios(NULL_SCEN, N_NULL, lines,
+                        "NULL SCENARIOS (the two series are independent of each other)")
+    if what in ("xscen", "all"):
+        block_scenarios(X_SCEN, N_X, lines,
+                        "SCENARIOS THAT ARE NOT NULLS FOR A WITHIN-REPOSITORY ESTIMAND")
+    if what in ("alts", "all"):
+        block_scenarios(ALT_SCEN, N_ALT, lines,
+                        "ALTERNATIVES (a session-level link)")
+    if what in ("gate", "all"):
+        gate_block(lines)
+
+    text = "\n".join(lines) + "\n"
+    sys.stdout.write(text)
+    if outp:
+        with open(outp, "w") as fh:
+            fh.write(text)
+
+
+if __name__ == "__main__":
+    main()

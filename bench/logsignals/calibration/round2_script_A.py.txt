@@ -1,0 +1,1198 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""SPEC_D calibration, implementer A.
+
+Synthetic data only. Standard library only. Run with /usr/bin/python3 -I.
+No real data is read. No paired signal and outcome values exist anywhere.
+
+Nothing here claims a cause, a prediction, a measure of quality, or an order in time.
+"Time order" below is only the index that labels the sessions of one repository.
+"""
+
+import hashlib
+import math
+import os
+import random
+import sys
+from operator import mul
+
+# ----------------------------------------------------------------------------
+# Fixed inputs (SPEC_D "Fixed inputs")
+# ----------------------------------------------------------------------------
+
+SIZES = []  # [WITHHELD: the 33 repository session counts of the first half; disclosure rule 2 of the registration]
+N_TOTAL = sum(SIZES)              # 423
+N_OUT_ZERO = 79                   # outcome at 0
+N_OUT_HUND = 228                  # outcome at 100
+N_OUT_MID = N_TOTAL - N_OUT_ZERO - N_OUT_HUND   # 116
+N_SIG_ZERO = 25                   # signal at exactly 0 (about 6%)
+
+MODEL_POOL = ("m1", "m2", "m3", "m4", "m5")
+
+# Generator constants, all chosen here and stated in the report.
+REP_CORR = 0.6          # correlation of the two repository effects
+REP_SHARE = 0.3         # variance share of the repository effect
+LEN_SIGMA = 0.6         # log-normal spread of the session length d
+LEN_MEDIAN = 60.0
+LEN_MIN = 20
+REGIME_MEAN_LEN = 5.0
+REGIME_NOISE = 0.3
+TREND_SHARE = 0.3       # X1: variance share of the shared linear term
+PEOPLE_SHARE = 0.3      # X2: variance share of the hidden-person effect
+PEOPLE_CORR = 0.8
+MODEL_CORR = 0.9        # G2: correlation of the per-model effect on the two latents
+BIG_TREND = 8           # X1 applies to the 8 largest repositories
+BIG_PEOPLE = 11         # X2 applies to the 11 largest repositories
+
+TOL = 1e-9
+
+# Share curve for the signal: piecewise linear in the pooled fraction p.
+# Knots put the quartiles near 0.08 / 0.16 / 0.26 and the lowest 25 sessions at 0.
+SHARE_KNOTS = ((0.0, 0.0), (N_SIG_ZERO / float(N_TOTAL), 0.005),
+               (0.25, 0.08), (0.50, 0.16), (0.75, 0.26), (1.0, 0.80))
+
+T975 = {1: 12.7062, 2: 4.3027, 3: 3.1824, 4: 2.7764, 5: 2.5706, 6: 2.4469,
+        7: 2.3646, 8: 2.3060, 9: 2.2622, 10: 2.2281, 11: 2.2010, 12: 2.1788,
+        13: 2.1604, 14: 2.1448, 15: 2.1314, 16: 2.1199, 17: 2.1098, 18: 2.1009,
+        19: 2.0930, 20: 2.0860, 21: 2.0796, 22: 2.0739, 23: 2.0687, 24: 2.0639,
+        25: 2.0595, 26: 2.0555, 27: 2.0518, 28: 2.0484, 29: 2.0452, 30: 2.0423,
+        31: 2.0395, 32: 2.0369, 33: 2.0345, 34: 2.0322, 35: 2.0301, 36: 2.0281,
+        37: 2.0262, 38: 2.0244, 39: 2.0227, 40: 2.0211}
+
+
+def t975(df):
+    if df <= 0:
+        return float("nan")
+    if df in T975:
+        return T975[df]
+    return 1.9600
+
+
+# ----------------------------------------------------------------------------
+# Scenarios
+# ----------------------------------------------------------------------------
+
+SCEN = {
+    # nulls for the within-repository estimand
+    "N0": dict(kind="indep", cc=0.0),
+    "N1": dict(kind="ar", pu=0.3, pv=0.3, cc=0.0),
+    "N2": dict(kind="ar", pu=0.6, pv=0.6, cc=0.0),
+    "N3": dict(kind="ar", pu=0.9, pv=0.9, cc=0.0),
+    "N4": dict(kind="ar", pu=0.9, pv=0.3, cc=0.0),
+    "N5": dict(kind="regime"),
+    "N6": dict(kind="rw"),
+    # not nulls for the within-repository estimand
+    "X1": dict(kind="indep", cc=0.0, trend=True),
+    "X2": dict(kind="indep", cc=0.0, people=True),
+    # alternatives: a session-level link, independent sessions
+    "A1": dict(kind="indep", cc=0.10),
+    "A2": dict(kind="indep", cc=0.18),
+    "A3": dict(kind="indep", cc=0.25),
+    "A4": dict(kind="indep", cc=0.45),
+    # alternatives: a session-level link on top of AR(1) 0.6 in both
+    "A5": dict(kind="ar", pu=0.6, pv=0.6, cc=0.10),
+    "A6": dict(kind="ar", pu=0.6, pv=0.6, cc=0.18),
+    "A7": dict(kind="ar", pu=0.6, pv=0.6, cc=0.25),
+    "A8": dict(kind="ar", pu=0.6, pv=0.6, cc=0.45),
+    # gate scenarios
+    "G0a": dict(kind="indep", cc=0.0),
+    "G0b": dict(kind="ar", pu=0.6, pv=0.6, cc=0.0),
+    "G1": dict(kind="indep", cc=0.0, lengtheff=0.3),
+    "G2": dict(kind="indep", cc=0.0, modeleff=0.3),
+    "G3a": dict(kind="indep", cc=0.18, lengtheff=0.3),
+    "G3b": dict(kind="indep", cc=0.25, lengtheff=0.3),
+    # added by implementer A: the link is carried by length AND model together,
+    # with no direct link. This is the case that separates the joint gate from
+    # two separate gates, and SPEC_D's G1 and G2 do not cover it.
+    "G4": dict(kind="indep", cc=0.0, lengtheff=0.3, modeleff=0.5),
+}
+
+NULL_SCENS = ["N0", "N1", "N2", "N3", "N4", "N5", "N6"]
+X_SCENS = ["X1", "X2"]
+ALT_SCENS = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]
+GATE_SCENS = ["G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4"]
+
+TESTS = ["S", "C", "F", "K", "K2"]
+
+
+# ----------------------------------------------------------------------------
+# Random series inside one repository
+# ----------------------------------------------------------------------------
+
+def norm_pair(rnd, rho):
+    z1 = rnd.gauss(0.0, 1.0)
+    z2 = rnd.gauss(0.0, 1.0)
+    return z1, rho * z1 + math.sqrt(1.0 - rho * rho) * z2
+
+
+def series_indep(rnd, n, cc):
+    e = []
+    f = []
+    for _ in range(n):
+        a, b = norm_pair(rnd, cc)
+        e.append(a)
+        f.append(b)
+    return e, f
+
+
+def series_ar(rnd, n, pu, pv, cc):
+    su = math.sqrt(1.0 - pu * pu)
+    sv = math.sqrt(1.0 - pv * pv)
+    a, b = norm_pair(rnd, cc)
+    cu, cv = a, b                      # stationary start, unit variance
+    e = [cu]
+    f = [cv]
+    for _ in range(n - 1):
+        a, b = norm_pair(rnd, cc)
+        cu = pu * cu + su * a
+        cv = pv * cv + sv * b
+        e.append(cu)
+        f.append(cv)
+    return e, f
+
+
+def series_regime(rnd, n):
+    p = 1.0 / REGIME_MEAN_LEN
+    k1 = math.sqrt(1.0 - REGIME_NOISE)
+    k2 = math.sqrt(REGIME_NOISE)
+
+    def one():
+        out = []
+        lvl = rnd.gauss(0.0, 1.0)
+        for _ in range(n):
+            out.append(k1 * lvl + k2 * rnd.gauss(0.0, 1.0))
+            if rnd.random() < p:
+                lvl = rnd.gauss(0.0, 1.0)
+        return out
+
+    return one(), one()
+
+
+def series_rw(rnd, n):
+    sc = 1.0 / math.sqrt(n)            # keeps the pooled scale comparable
+
+    def one():
+        out = []
+        cur = 0.0
+        for _ in range(n):
+            cur += rnd.gauss(0.0, 1.0)
+            out.append(cur * sc)
+        return out
+
+    return one(), one()
+
+
+def within_series(rnd, n, cfg):
+    kind = cfg["kind"]
+    if kind == "indep":
+        return series_indep(rnd, n, cfg.get("cc", 0.0))
+    if kind == "ar":
+        return series_ar(rnd, n, cfg["pu"], cfg["pv"], cfg.get("cc", 0.0))
+    if kind == "regime":
+        return series_regime(rnd, n)
+    if kind == "rw":
+        return series_rw(rnd, n)
+    raise ValueError(kind)
+
+
+# ----------------------------------------------------------------------------
+# Lengths, model names
+# ----------------------------------------------------------------------------
+
+def gen_lengths(rnd):
+    out = []
+    for n in SIZES:
+        row = []
+        for _ in range(n):
+            d = int(round(LEN_MEDIAN * math.exp(LEN_SIGMA * rnd.gauss(0.0, 1.0))))
+            if d < LEN_MIN:
+                d = LEN_MIN
+            row.append(d)
+        out.append(row)
+    return out
+
+
+def gen_models(rnd):
+    """1 to 3 names per repository, in contiguous runs over the index order.
+
+    About half of the larger repositories (n >= 11) carry one name only.
+    """
+    out = []
+    for n in SIZES:
+        if n == 1:
+            out.append([rnd.choice(MODEL_POOL)])
+            continue
+        if n >= 11:
+            k = 1 if rnd.random() < 0.5 else rnd.choice((2, 3))
+        else:
+            k = 1 if rnd.random() < 0.5 else 2
+        k = min(k, n)
+        names = rnd.sample(MODEL_POOL, k)
+        if k == 1:
+            out.append([names[0]] * n)
+            continue
+        cuts = sorted(rnd.sample(range(1, n), k - 1))
+        row = []
+        bounds = [0] + cuts + [n]
+        for j in range(k):
+            row.extend([names[j]] * (bounds[j + 1] - bounds[j]))
+        out.append(row)
+    return out
+
+
+def contiguous_runs(rnd, n, k):
+    """Split 0..n-1 into k contiguous runs; returns a list of run labels."""
+    k = min(k, n)
+    if k == 1:
+        return [0] * n
+    cuts = sorted(rnd.sample(range(1, n), k - 1))
+    bounds = [0] + cuts + [n]
+    lab = []
+    for j in range(k):
+        lab.extend([j] * (bounds[j + 1] - bounds[j]))
+    return lab
+
+
+# ----------------------------------------------------------------------------
+# Marginal maps
+# ----------------------------------------------------------------------------
+
+def share_of_p(p):
+    ks = SHARE_KNOTS
+    for i in range(1, len(ks)):
+        if p <= ks[i][0]:
+            p0, s0 = ks[i - 1]
+            p1, s1 = ks[i]
+            if p1 == p0:
+                return s1
+            return s0 + (s1 - s0) * (p - p0) / (p1 - p0)
+    return ks[-1][1]
+
+
+def map_outcome(latv):
+    """Monotone map of the pooled outcome latent to the fixed outcome marginal."""
+    order = sorted(range(len(latv)), key=lambda i: (latv[i], i))
+    out = [0] * len(latv)
+    for pos, i in enumerate(order):
+        if pos < N_OUT_ZERO:
+            out[i] = 0
+        elif pos >= N_OUT_ZERO + N_OUT_MID:
+            out[i] = 100
+        else:
+            j = pos - N_OUT_ZERO
+            out[i] = 1 + int(round(98.0 * j / float(N_OUT_MID - 1)))
+    return out
+
+
+def map_signal(latu, dlist):
+    """Monotone map of the pooled signal latent to a share k/d."""
+    n = len(latu)
+    order = sorted(range(n), key=lambda i: (latu[i], i))
+    out = [0.0] * n
+    for pos, i in enumerate(order):
+        if pos < N_SIG_ZERO:
+            out[i] = 0.0
+            continue
+        p = (pos + 0.5) / float(n)
+        s = share_of_p(p)
+        d = dlist[i]
+        k = int(round(s * d))
+        if k < 1:
+            k = 1
+        if k >= d:
+            k = d - 1
+        out[i] = k / float(d)
+    return out
+
+
+# ----------------------------------------------------------------------------
+# Dataset
+# ----------------------------------------------------------------------------
+
+class Data(object):
+    __slots__ = ("sig", "out", "dlen", "model", "rep", "nrep")
+
+
+def gen_dataset(cfg, seed):
+    rnd = random.Random(seed)
+    nrep = len(SIZES)
+
+    rea = []
+    reb = []
+    for _ in range(nrep):
+        a, b = norm_pair(rnd, REP_CORR)
+        rea.append(a)
+        reb.append(b)
+
+    lengths = gen_lengths(rnd)
+    models = gen_models(rnd)
+
+    all_ld = [math.log(d) for row in lengths for d in row]
+    mld = sum(all_ld) / len(all_ld)
+    vld = sum((x - mld) ** 2 for x in all_ld) / len(all_ld)
+    sld = math.sqrt(vld) if vld > 0 else 1.0
+
+    meff = {}
+    if cfg.get("modeleff"):
+        for name in MODEL_POOL:
+            meff[name] = norm_pair(rnd, MODEL_CORR)
+
+    sa = math.sqrt(REP_SHARE)
+    sw = math.sqrt(1.0 - REP_SHARE)
+
+    latu = []
+    latv = []
+    for i, n in enumerate(SIZES):
+        e, f = within_series(rnd, n, cfg)
+
+        if cfg.get("trend") and i < BIG_TREND:
+            sd = math.sqrt((n * n - 1) / 12.0) if n > 1 else 1.0
+            k1 = math.sqrt(1.0 - TREND_SHARE)
+            k2 = math.sqrt(TREND_SHARE)
+            ct = [((t - (n - 1) / 2.0) / sd) if sd > 0 else 0.0 for t in range(n)]
+            e = [k1 * e[t] + k2 * ct[t] for t in range(n)]
+            f = [k1 * f[t] + k2 * ct[t] for t in range(n)]
+
+        if cfg.get("people") and i < BIG_PEOPLE:
+            lab = contiguous_runs(rnd, n, 3)
+            pe = [norm_pair(rnd, PEOPLE_CORR) for _ in range(3)]
+            k1 = math.sqrt(1.0 - PEOPLE_SHARE)
+            k2 = math.sqrt(PEOPLE_SHARE)
+            e = [k1 * e[t] + k2 * pe[lab[t]][0] for t in range(n)]
+            f = [k1 * f[t] + k2 * pe[lab[t]][1] for t in range(n)]
+
+        if cfg.get("lengtheff"):
+            lam = cfg["lengtheff"]
+            k1 = math.sqrt(1.0 - lam)
+            k2 = math.sqrt(lam)
+            zd = [(math.log(lengths[i][t]) - mld) / sld for t in range(n)]
+            e = [k1 * e[t] + k2 * zd[t] for t in range(n)]
+            f = [k1 * f[t] + k2 * zd[t] for t in range(n)]
+
+        if cfg.get("modeleff"):
+            lam = cfg["modeleff"]
+            k1 = math.sqrt(1.0 - lam)
+            k2 = math.sqrt(lam)
+            e = [k1 * e[t] + k2 * meff[models[i][t]][0] for t in range(n)]
+            f = [k1 * f[t] + k2 * meff[models[i][t]][1] for t in range(n)]
+
+        for t in range(n):
+            latu.append(sa * rea[i] + sw * e[t])
+            latv.append(sa * reb[i] + sw * f[t])
+
+    dflat = [d for row in lengths for d in row]
+    mflat = [m for row in models for m in row]
+    rep = []
+    for i, n in enumerate(SIZES):
+        rep.extend([i] * n)
+
+    dat = Data()
+    dat.out = map_outcome(latv)
+    dat.sig = map_signal(latu, dflat)
+    dat.dlen = dflat
+    dat.model = mflat
+    dat.rep = rep
+    dat.nrep = nrep
+    return dat
+
+
+# ----------------------------------------------------------------------------
+# Statistic
+# ----------------------------------------------------------------------------
+
+def midranks2(vals):
+    """Twice the midrank of each value, as integers."""
+    n = len(vals)
+    order = sorted(range(n), key=lambda i: vals[i])
+    res = [0] * n
+    i = 0
+    while i < n:
+        j = i
+        vi = vals[order[i]]
+        while j + 1 < n and vals[order[j + 1]] == vi:
+            j += 1
+        m2 = i + j + 2                 # 2 * ((i+1)+(j+1))/2
+        for k in range(i, j + 1):
+            res[order[k]] = m2
+        i = j + 1
+    return res
+
+
+class Block(object):
+    """One permutation block: its sessions in index order."""
+    __slots__ = ("n", "x2", "y2", "c", "const", "obs", "w", "rho",
+                 "shifts", "chunks1", "chunks2")
+
+
+def make_block(sig, out, idxs):
+    """Build a weight-carrying block, or return None."""
+    n = len(idxs)
+    if n < 2:
+        return None
+    xs = [sig[i] for i in idxs]
+    ys = [out[i] for i in idxs]
+    if xs.count(xs[0]) == n or ys.count(ys[0]) == n:
+        return None
+    x2 = midranks2(xs)
+    y2 = midranks2(ys)
+    sx = sum(x2)
+    sy = sum(y2)
+    xb = sx / float(n)
+    yb = sy / float(n)
+    vx = sum((a - xb) ** 2 for a in x2)
+    vy = sum((a - yb) ** 2 for a in y2)
+    if vx <= 0.0 or vy <= 0.0:
+        return None
+    b = Block()
+    b.n = n
+    b.x2 = x2
+    b.y2 = y2
+    b.w = n - 1
+    b.c = (n - 1) / math.sqrt(vx * vy)
+    b.const = yb * sx
+    b.obs = b.c * (sum(map(mul, x2, y2)) - b.const)
+    b.rho = b.obs / float(b.w)
+    b.shifts = None
+    b.chunks1 = None
+    b.chunks2 = None
+    return b
+
+
+def blockset_by_key(sig, out, keys):
+    """Group sessions by key, keeping each block's sessions in index order."""
+    groups = {}
+    order = []
+    for i, k in enumerate(keys):
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(i)
+    blocks = []
+    for k in order:
+        b = make_block(sig, out, groups[k])
+        if b is not None:
+            blocks.append(b)
+    return blocks
+
+
+def bs_stats(blocks):
+    """Return (T, W, m, rho_bar)."""
+    t = 0.0
+    w = 0
+    for b in blocks:
+        t += b.obs
+        w += b.w
+    if w == 0:
+        return 0.0, 0, 0, float("nan")
+    return t, w, len(blocks), t / float(w)
+
+
+# ----------------------------------------------------------------------------
+# Block definitions
+# ----------------------------------------------------------------------------
+
+def keys_repo(dat):
+    return list(dat.rep)
+
+
+def terciles_within(idxs, dlen):
+    """Tercile label per session of one group: sort by length, ties by index."""
+    n = len(idxs)
+    srt = sorted(idxs, key=lambda i: (dlen[i], i))
+    c1 = n // 3
+    c2 = (2 * n) // 3
+    lab = {}
+    for pos, i in enumerate(srt):
+        if pos < c1:
+            lab[i] = 0
+        elif pos < c2:
+            lab[i] = 1
+        else:
+            lab[i] = 2
+    return lab
+
+
+def keys_repo_len(dat):
+    """repository x length tercile, terciles cut inside the repository."""
+    groups = {}
+    for i, r in enumerate(dat.rep):
+        groups.setdefault(r, []).append(i)
+    keys = [None] * len(dat.rep)
+    for r, idxs in groups.items():
+        lab = terciles_within(idxs, dat.dlen)
+        for i in idxs:
+            keys[i] = (r, lab[i])
+    return keys
+
+
+def keys_repo_model(dat):
+    return [(r, dat.model[i]) for i, r in enumerate(dat.rep)]
+
+
+def keys_joint(dat):
+    """repository x model name x length tercile, terciles cut inside repo x model."""
+    groups = {}
+    for i, r in enumerate(dat.rep):
+        groups.setdefault((r, dat.model[i]), []).append(i)
+    keys = [None] * len(dat.rep)
+    for g, idxs in groups.items():
+        lab = terciles_within(idxs, dat.dlen)
+        for i in idxs:
+            keys[i] = (g[0], g[1], lab[i])
+    return keys
+
+
+# ----------------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------------
+
+def prep_shifts(blocks):
+    for b in blocks:
+        if b.shifts is None:
+            x2 = b.x2
+            y2 = b.y2
+            n = b.n
+            c = b.c
+            const = b.const
+            vals = []
+            for k in range(n):
+                xs = x2[k:] + x2[:k]
+                vals.append(c * (sum(map(mul, xs, y2)) - const))
+            b.shifts = vals
+
+
+def prep_chunks(blocks, which):
+    for b in blocks:
+        cur = b.chunks1 if which == 1 else b.chunks2
+        if cur is not None:
+            continue
+        n = b.n
+        if which == 1:
+            L = int(math.ceil(math.sqrt(n)))
+        else:
+            L = int(math.ceil(n ** (2.0 / 3.0)))
+        if L < 1:
+            L = 1
+        ch = [b.x2[i:i + L] for i in range(0, n, L)]
+        if which == 1:
+            b.chunks1 = ch
+        else:
+            b.chunks2 = ch
+
+
+def pval_S(blocks, tobs, B, rnd):
+    shuffle = rnd.shuffle
+    lim = abs(tobs) - TOL
+    hit = 0
+    prep = [(list(b.x2), b.y2, b.c, b.const) for b in blocks]
+    for _ in range(B):
+        t = 0.0
+        for x2, y2, c, const in prep:
+            shuffle(x2)
+            t += c * (sum(map(mul, x2, y2)) - const)
+        if abs(t) >= lim:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def pval_C(blocks, tobs, B, rnd):
+    prep_shifts(blocks)
+    lim = abs(tobs) - TOL
+    hit = 0
+    rr = rnd.randrange
+    tab = [(b.shifts, b.n) for b in blocks]
+    for _ in range(B):
+        t = 0.0
+        for vals, n in tab:
+            t += vals[rr(n)]
+        if abs(t) >= lim:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def pval_F(blocks, tobs, B, rnd):
+    lim = abs(tobs) - TOL
+    hit = 0
+    obs = [b.obs for b in blocks]
+    rr = rnd.random
+    for _ in range(B):
+        t = 0.0
+        for o in obs:
+            t += o if rr() < 0.5 else -o
+        if abs(t) >= lim:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def _pval_block_perm(blocks, tobs, B, rnd, which):
+    prep_chunks(blocks, which)
+    shuffle = rnd.shuffle
+    lim = abs(tobs) - TOL
+    hit = 0
+    prep = []
+    for b in blocks:
+        ch = b.chunks1 if which == 1 else b.chunks2
+        prep.append((list(ch), b.y2, b.c, b.const))
+    for _ in range(B):
+        t = 0.0
+        for ch, y2, c, const in prep:
+            shuffle(ch)
+            s = 0
+            pos = 0
+            for part in ch:
+                lp = len(part)
+                s += sum(map(mul, part, y2[pos:pos + lp]))
+                pos += lp
+            t += c * (s - const)
+        if abs(t) >= lim:
+            hit += 1
+    return (1 + hit) / float(B + 1)
+
+
+def pval_K(blocks, tobs, B, rnd):
+    return _pval_block_perm(blocks, tobs, B, rnd, 1)
+
+
+def pval_K2(blocks, tobs, B, rnd):
+    return _pval_block_perm(blocks, tobs, B, rnd, 2)
+
+
+PVAL = {"S": pval_S, "C": pval_C, "F": pval_F, "K": pval_K, "K2": pval_K2}
+
+
+# ----------------------------------------------------------------------------
+# Interval
+# ----------------------------------------------------------------------------
+
+def jack_interval(blocks):
+    """Cluster jackknife over contributing blocks, with the 1/sqrt(W) floor."""
+    t, w, m, rb = bs_stats(blocks)
+    if m < 2:
+        return None
+    loo = []
+    for b in blocks:
+        wd = w - b.w
+        if wd <= 0:
+            return None
+        loo.append((t - b.obs) / float(wd))
+    mean = sum(loo) / m
+    ss = sum((x - mean) ** 2 for x in loo)
+    se = math.sqrt((m - 1) / float(m) * ss)
+    floor = 1.0 / math.sqrt(w)
+    half = t975(m - 1) * max(se, floor)
+    lo = rb - half
+    hi = rb + half
+    if lo < -1.0:
+        lo = -1.0
+    if hi > 1.0:
+        hi = 1.0
+    return rb, lo, hi, m, w, se, floor
+
+
+# ----------------------------------------------------------------------------
+# One data set
+# ----------------------------------------------------------------------------
+
+def seed_for(tag, i):
+    h = hashlib.sha256(("A|" + tag + "|" + str(i)).encode("utf-8")).digest()
+    return int.from_bytes(h[:8], "big")
+
+
+def run_primary_one(scen, i, B, tests):
+    dat = gen_dataset(SCEN[scen], seed_for("prim|" + scen, i))
+    blocks = blockset_by_key(dat.sig, dat.out, keys_repo(dat))
+    t, w, m, rb = bs_stats(blocks)
+    iv = jack_interval(blocks)
+    res = {"rho_bar": rb, "W": w, "m": m}
+    if iv is None:
+        res["lo"] = res["hi"] = float("nan")
+        res["floor_binds"] = 0
+    else:
+        res["lo"] = iv[1]
+        res["hi"] = iv[2]
+        res["floor_binds"] = 1 if iv[5] <= iv[6] else 0
+    for name in tests:
+        rnd = random.Random(seed_for("perm|" + scen + "|" + name, i))
+        res[name] = PVAL[name](blocks, t, B, rnd)
+    return res
+
+
+def run_truth_one(scen, i):
+    dat = gen_dataset(SCEN[scen], seed_for("truth|" + scen, i))
+    blocks = blockset_by_key(dat.sig, dat.out, keys_repo(dat))
+    _, w, _, rb = bs_stats(blocks)
+    return rb
+
+
+def run_gate_one(scen, i, B, tests):
+    dat = gen_dataset(SCEN[scen], seed_for("gate|" + scen, i))
+    sets = {
+        "P": blockset_by_key(dat.sig, dat.out, keys_repo(dat)),
+        "J": blockset_by_key(dat.sig, dat.out, keys_joint(dat)),
+        "L": blockset_by_key(dat.sig, dat.out, keys_repo_len(dat)),
+        "M": blockset_by_key(dat.sig, dat.out, keys_repo_model(dat)),
+    }
+    res = {}
+    for key, blocks in sets.items():
+        t, w, m, rb = bs_stats(blocks)
+        res[key + "_W"] = w
+        res[key + "_m"] = m
+        res[key + "_rho"] = rb
+        for name in tests:
+            rnd = random.Random(seed_for("gperm|" + scen + "|" + key + "|" + name, i))
+            res[key + "_" + name] = PVAL[name](blocks, t, B, rnd) if m > 0 else 1.0
+    return res
+
+
+# ----------------------------------------------------------------------------
+# Workers
+# ----------------------------------------------------------------------------
+
+def _w_primary(arg):
+    scen, lo, hi, B, tests = arg
+    return [run_primary_one(scen, i, B, tests) for i in range(lo, hi)]
+
+
+def _w_truth(arg):
+    scen, lo, hi = arg
+    return [run_truth_one(scen, i) for i in range(lo, hi)]
+
+
+def _w_gate(arg):
+    scen, lo, hi, B, tests = arg
+    return [run_gate_one(scen, i, B, tests) for i in range(lo, hi)]
+
+
+def chunks(scen, n, extra, size):
+    out = []
+    i = 0
+    while i < n:
+        j = min(n, i + size)
+        out.append((scen, i, j) + tuple(extra))
+        i = j
+    return out
+
+
+def run_pool(fn, tasks, nproc):
+    if nproc <= 1:
+        res = []
+        for t in tasks:
+            res.extend(fn(t))
+        return res
+    import multiprocessing as mp
+    ctx = mp.get_context("fork")
+    with ctx.Pool(nproc) as pool:
+        res = []
+        for part in pool.map(fn, tasks, chunksize=1):
+            res.extend(part)
+        return res
+
+
+# ----------------------------------------------------------------------------
+# Required checks
+# ----------------------------------------------------------------------------
+
+def enum_T_values(blocks):
+    """All T values over the product of within-block permutations."""
+    from itertools import permutations, product
+    per = []
+    for b in blocks:
+        vals = []
+        seen = []
+        for p in permutations(range(b.n)):
+            xs = [b.x2[k] for k in p]
+            vals.append((p, b.c * (sum(map(mul, xs, b.y2)) - b.const)))
+        per.append(vals)
+    out = []
+    for combo in product(*per):
+        out.append((tuple(c[0] for c in combo), sum(c[1] for c in combo)))
+    return out
+
+
+def check_tiny(log):
+    """S's Monte Carlo p-value against full enumeration on 3 repositories 4,3,2."""
+    rnd = random.Random(seed_for("check|tiny", 0))
+    # a small synthetic set built by hand; shares k/d and outcomes 0..100
+    sig = [3 / 40.0, 9 / 40.0, 0.0, 17 / 40.0,
+           5 / 30.0, 5 / 30.0, 1 / 30.0,
+           7 / 25.0, 2 / 25.0]
+    out = [0, 100, 44, 12,
+           100, 0, 61,
+           0, 100]
+    keys = [0, 0, 0, 0, 1, 1, 1, 2, 2]
+    blocks = blockset_by_key(sig, out, keys)
+    t, w, m, rb = bs_stats(blocks)
+    allv = enum_T_values(blocks)
+    lim = abs(t) - TOL
+    hit = sum(1 for _, v in allv if abs(v) >= lim)
+    p_exact = hit / float(len(allv))
+    B = 200000
+    p_mc = pval_S(blocks, t, B, random.Random(seed_for("check|tinymc", 0)))
+    mc_err = math.sqrt(max(p_exact * (1 - p_exact), 1e-12) / B)
+    ok = abs(p_mc - p_exact) <= 4.0 * mc_err + 1.0 / (B + 1)
+    log("CHECK 1  S against full enumeration, 3 blocks of sizes 4, 3, 2")
+    log("  arrangements enumerated : %d" % len(allv))
+    log("  T observed              : %.12f   rho_bar %.6f  W %d  m %d" % (t, rb, w, m))
+    log("  p exact (enumeration)   : %.6f" % p_exact)
+    log("  p Monte Carlo B=%d  : %.6f" % (B, p_mc))
+    log("  Monte Carlo error       : %.6f" % mc_err)
+    log("  agree within error      : %s" % ("YES" if ok else "NO"))
+    return ok
+
+
+def check_ties_equal(log):
+    """Mathematically equal statistics from different arrangements count as equal."""
+    # one block of 5 sessions; the signal has a tied pair, the outcome has a tied pair
+    sig = [2 / 40.0, 2 / 40.0, 6 / 40.0, 9 / 40.0, 14 / 40.0]
+    out = [0, 55, 0, 70, 100]
+    blocks = blockset_by_key(sig, out, [0, 0, 0, 0, 0])
+    b = blocks[0]
+    allv = enum_T_values(blocks)
+    # group arrangements by the resulting x2 vector and by T
+    byx = {}
+    byt = {}
+    for perm, v in allv:
+        xv = tuple(b.x2[k] for k in perm[0])
+        byx.setdefault(xv, []).append(v)
+        byt.setdefault(v, []).append(xv)
+    # (a) arrangements that only swap the tied signal pair give byte-equal T
+    same_x_exact = all(len(set(vs)) == 1 for vs in byx.values())
+    # (b) two arrangements with DIFFERENT x2 vectors that give the same T
+    pair = None
+    for v, xvs in byt.items():
+        dis = sorted(set(xvs))
+        if len(dis) >= 2:
+            pair = (v, dis[0], dis[1])
+            break
+    log("CHECK 2  tolerance rule and tied ranks, one block of 5 with ties")
+    log("  signal midranks x2      : %s" % (b.x2,))
+    log("  outcome midranks y2     : %s" % (b.y2,))
+    log("  arrangements            : %d      distinct x2 vectors: %d" %
+        (len(allv), len(byx)))
+    log("  distinct T values       : %d" % len(byt))
+    log("  tie-swap arrangements give byte-equal T : %s" %
+        ("YES" if same_x_exact else "NO"))
+    if pair is None:
+        log("  different x2 with equal T : NONE FOUND")
+        return False
+    v, x1, x2v = pair
+    d = abs(v - v)
+    log("  different x2 with equal T : %s and %s" % (x1, x2v))
+    log("    T both                  : %.17g      difference %.17g" % (v, d))
+    log("    counted as equal by |T*| >= |T| - 1e-9 : %s" %
+        ("YES" if d <= TOL else "NO"))
+    # and the p-value counts every one of them
+    lim = abs(v) - TOL
+    cnt = sum(1 for _, vv in allv if abs(vv) >= lim)
+    cnt_eq = sum(1 for _, vv in allv if abs(abs(vv) - abs(v)) <= TOL)
+    log("  arrangements with |T*| >= |T|-tol at that T : %d   of which equal: %d" %
+        (cnt, cnt_eq))
+    return same_x_exact and d <= TOL and cnt_eq >= 2
+
+
+def check_var_rho(log):
+    """Var(rho_r) under S equals 1/(n_r - 1) by enumeration, with ties."""
+    cases = [
+        ("n=5, ties in both", [1 / 20.0, 1 / 20.0, 3 / 20.0, 7 / 20.0, 9 / 20.0],
+         [0, 100, 0, 44, 100]),
+        ("n=6, heavy ties", [0.0, 0.0, 2 / 25.0, 2 / 25.0, 5 / 25.0, 11 / 25.0],
+         [0, 0, 100, 100, 37, 0]),
+        ("n=4, no ties", [1 / 30.0, 4 / 30.0, 8 / 30.0, 15 / 30.0], [0, 20, 60, 100]),
+    ]
+    ok = True
+    log("CHECK 3  Var(rho_r) under S equals 1/(n_r - 1), full enumeration")
+    for label, sig, out in cases:
+        blocks = blockset_by_key(sig, out, [0] * len(sig))
+        b = blocks[0]
+        allv = enum_T_values(blocks)
+        rhos = [v / float(b.w) for _, v in allv]
+        mean = sum(rhos) / len(rhos)
+        var = sum((x - mean) ** 2 for x in rhos) / len(rhos)
+        target = 1.0 / (b.n - 1)
+        good = abs(var - target) < 1e-12 and abs(mean) < 1e-12
+        ok = ok and good
+        log("  %-20s n=%d  mean rho %.3e  Var %.15f  1/(n-1) %.15f  %s" %
+            (label, b.n, mean, var, target, "YES" if good else "NO"))
+    return ok
+
+
+# ----------------------------------------------------------------------------
+# Reporting helpers
+# ----------------------------------------------------------------------------
+
+def mean_sd(xs):
+    n = len(xs)
+    if n == 0:
+        return float("nan"), float("nan")
+    m = sum(xs) / n
+    if n < 2:
+        return m, 0.0
+    v = sum((x - m) ** 2 for x in xs) / (n - 1)
+    return m, math.sqrt(v)
+
+
+def mcerr(p, n):
+    return math.sqrt(max(p * (1 - p), 1e-12) / n)
+
+
+def quants(xs):
+    s = sorted(xs)
+    n = len(s)
+    if n == 0:
+        return (float("nan"),) * 5
+
+    def q(f):
+        i = int(f * (n - 1))
+        return s[i]
+    return (s[0], q(0.25), q(0.5), q(0.75), s[-1])
+
+
+# ----------------------------------------------------------------------------
+# Main driver
+# ----------------------------------------------------------------------------
+
+RHO_STAR = 0.15
+
+
+def summarise_scen(scen, rows, truth_mu, tests, log):
+    rb = [r["rho_bar"] for r in rows]
+    m_rb, s_rb = mean_sd(rb)
+    n = len(rows)
+    cov = sum(1 for r in rows if r["lo"] <= truth_mu <= r["hi"]) / float(n)
+    inside = sum(1 for r in rows if r["lo"] > -RHO_STAR and r["hi"] < RHO_STAR) / float(n)
+    floorb = sum(r["floor_binds"] for r in rows) / float(n)
+    mm, _ = mean_sd([r["m"] for r in rows])
+    mw, _ = mean_sd([float(r["W"]) for r in rows])
+    rates = {}
+    for t in tests:
+        rates[t] = sum(1 for r in rows if r[t] <= 0.05) / float(n)
+    log("%-4s n=%4d  m %.1f  W %.1f  rho_bar mean %+.4f sd %.4f  true mean %+.4f" %
+        (scen, n, mm, mw, m_rb, s_rb, truth_mu))
+    log("      rejection at alpha 0.05:  " +
+        "  ".join("%s %.3f(+-%.3f)" % (t, rates[t], mcerr(rates[t], n)) for t in tests))
+    log("      interval: coverage of true mean %.3f   entirely inside (-0.15,+0.15) %.3f"
+        "   floor binds %.3f" % (cov, inside, floorb))
+    return {"scen": scen, "n": n, "rates": rates, "mean": m_rb, "sd": s_rb,
+            "truth": truth_mu, "cov": cov, "inside": inside, "floor": floorb,
+            "m": mm, "W": mw}
+
+
+def main():
+    args = sys.argv[1:]
+    mode = args[0] if args else "run"
+    opt = {}
+    for a in args[1:]:
+        if "=" in a:
+            k, v = a.split("=", 1)
+            opt[k] = v
+    nproc = int(opt.get("nproc", "6"))
+    B = int(opt.get("B", "999"))
+    n_null = int(opt.get("nnull", "1000"))
+    n_alt = int(opt.get("nalt", "400"))
+    n_truth = int(opt.get("ntruth", "2000"))
+    n_gate = int(opt.get("ngate", "400"))
+    out_path = opt.get("out", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "results_A.txt"))
+
+    lines = []
+
+    def log(s=""):
+        lines.append(s)
+
+    if mode == "checks":
+        ok1 = check_tiny(log)
+        log()
+        ok2 = check_ties_equal(log)
+        log()
+        ok3 = check_var_rho(log)
+        log()
+        log("ALL THREE CODE CHECKS PASS: %s" % ("YES" if (ok1 and ok2 and ok3) else "NO"))
+        text = "\n".join(lines) + "\n"
+        sys.stdout.write(text)
+        with open(opt.get("out", "checks_A.txt"), "w") as fh:
+            fh.write(text)
+        return
+
+    log("SPEC_D calibration, implementer A")
+    log("python %s   seeds fixed   B = %d draws per test   processes = %d" %
+        (sys.version.split()[0], B, nproc))
+    log("data sets: %d per null scenario, %d per alternative and per X scenario," %
+        (n_null, n_alt))
+    log("           %d per gate scenario, %d further sets per scenario for the true mean" %
+        (n_gate, n_truth))
+    log("Monte Carlo error of a rate near 0.05 with %d sets is about %.4f" %
+        (n_null, mcerr(0.05, n_null)))
+    log()
+    log("GENERATOR CHOICES (all made by implementer A)")
+    log("  repository effect on the two latents: correlation %.1f, variance share %.1f"
+        % (REP_CORR, REP_SHARE))
+    log("  within-repository part carries the remaining share %.1f" % (1 - REP_SHARE))
+    log("  outcome map: pooled monotone rank map to exactly %d at 0, %d strictly between,"
+        % (N_OUT_ZERO, N_OUT_MID))
+    log("              %d at 100; per-repository endpoint mass therefore varies"
+        % N_OUT_HUND)
+    log("  signal map: pooled monotone rank map to a share, lowest %d sessions at exactly 0,"
+        % N_SIG_ZERO)
+    log("              knots at p=0.25,0.50,0.75 -> 0.08,0.16,0.26, then rounded to k/d")
+    log("  session length d: log-normal, median %.0f, sigma of log %.1f, floor %d"
+        % (LEN_MEDIAN, LEN_SIGMA, LEN_MIN))
+    log("  model names: pool of %d; 1 to 3 per repository in contiguous runs over the"
+        % len(MODEL_POOL))
+    log("              index order; a repository with n >= 11 carries one name with"
+        " probability 0.5")
+    log("  N5 regimes: mean regime length %.0f, noise share %.1f, change points drawn"
+        % (REGIME_MEAN_LEN, REGIME_NOISE))
+    log("              independently for the two series")
+    log("  N6 random walk: unit innovations, each repository scaled by 1/sqrt(n_r) so the"
+        " pooled scale stays comparable")
+    log("  X1: shared linear term over the index in the %d largest repositories,"
+        " variance share %.1f" % (BIG_TREND, TREND_SHARE))
+    log("  X2: 3 hidden people in contiguous runs in the %d largest repositories,"
+        % BIG_PEOPLE)
+    log("      per-person effect on the two latents correlated %.1f, variance share %.1f"
+        % (PEOPLE_CORR, PEOPLE_SHARE))
+    log("  G1: both latents load on the standardised log d, share 0.3, no direct link")
+    log("  G2: per-model effect on both latents, correlation %.1f, share 0.3" % MODEL_CORR)
+    log("  G3: G1's length loadings plus an innovation correlation of 0.18 / 0.25")
+    log("  G4 (added by A, not in SPEC_D): no direct link; both latents load on log d")
+    log("      (share 0.15 after the model step) AND on the per-model effect (share 0.50).")
+    log("      This is the case that tells the joint gate apart from two separate gates.")
+    log("  extra candidate K2: block shuffle with block length ceil(n_r ** (2/3))")
+    log()
+
+    tests = TESTS
+
+    # ---- truth means -------------------------------------------------------
+    need = NULL_SCENS + X_SCENS + ALT_SCENS
+    truth = {}
+    for scen in need:
+        vals = run_pool(_w_truth, chunks(scen, n_truth, (), 200), nproc)
+        truth[scen] = sum(vals) / float(len(vals))
+
+    # ---- nulls, X, alternatives -------------------------------------------
+    log("=" * 100)
+    log("TABLE 1  NULL SCENARIOS (the two series are independent of each other)")
+    log("=" * 100)
+    null_sum = []
+    for scen in NULL_SCENS:
+        rows = run_pool(_w_primary, chunks(scen, n_null, (B, tests), 25), nproc)
+        null_sum.append(summarise_scen(scen, rows, truth[scen], tests, log))
+        log()
+
+    log("=" * 100)
+    log("TABLE 2  SCENARIOS THAT ARE NOT NULLS FOR A WITHIN-REPOSITORY ESTIMAND")
+    log("=" * 100)
+    x_sum = []
+    for scen in X_SCENS:
+        rows = run_pool(_w_primary, chunks(scen, n_alt, (B, tests), 25), nproc)
+        x_sum.append(summarise_scen(scen, rows, truth[scen], tests, log))
+        log()
+
+    log("=" * 100)
+    log("TABLE 3  ALTERNATIVES (a session-level link)")
+    log("  A1-A4 independent sessions, innovation correlation 0.10/0.18/0.25/0.45")
+    log("  A5-A8 AR(1) 0.6 in both, innovation correlation 0.10/0.18/0.25/0.45")
+    log("=" * 100)
+    alt_sum = []
+    for scen in ALT_SCENS:
+        rows = run_pool(_w_primary, chunks(scen, n_alt, (B, tests), 25), nproc)
+        alt_sum.append(summarise_scen(scen, rows, truth[scen], tests, log))
+        log()
+
+    # ---- compact matrices --------------------------------------------------
+    log("=" * 100)
+    log("TABLE 4  REJECTION RATE MATRIX, alpha 0.05")
+    log("=" * 100)
+    log("scenario  " + "".join("%8s" % t for t in tests) + "   rho_bar mean   true mean")
+    for row in null_sum + x_sum + alt_sum:
+        log("%-9s " % row["scen"] + "".join("%8.3f" % row["rates"][t] for t in tests) +
+            "   %+.4f      %+.4f" % (row["mean"], row["truth"]))
+    log()
+    log("A test HOLDS alpha under a null scenario if its rate is at most 0.065.")
+    holds = {}
+    for t in tests:
+        bad = [r["scen"] for r in null_sum if r["rates"][t] > 0.065]
+        holds[t] = (len(bad) == 0, bad)
+        log("  %-3s %s" % (t, "holds under N0..N6" if not bad else
+                           "fails under " + ", ".join(bad)))
+    log()
+
+    log("=" * 100)
+    log("TABLE 5  INTERVAL rho_bar +/- t(m-1,0.975) * max(SE_jack, 1/sqrt(W))")
+    log("=" * 100)
+    log("scenario   coverage of the scenario's true mean   entirely inside (-0.15,+0.15)"
+        "   floor binds")
+    for row in null_sum + x_sum + alt_sum:
+        log("%-9s  %8.3f                              %8.3f                    %8.3f" %
+            (row["scen"], row["cov"], row["inside"], row["floor"]))
+    log()
+
+    # ---- gate --------------------------------------------------------------
+    log("=" * 100)
+    log("TABLE 6  JOINT BASELINE GATE")
+    log("  P = primary blocks (repository).  J = repository x model x length tercile.")
+    log("  L = repository x length tercile.  M = repository x model.")
+    log("  A gate can be formed when its total weight >= 150 and >= 10 blocks carry weight.")
+    log("=" * 100)
+    gate_sum = []
+    for scen in GATE_SCENS:
+        rows = run_pool(_w_gate, chunks(scen, n_gate, (B, tests), 20), nproc)
+        n = len(rows)
+        jw = [r["J_W"] for r in rows]
+        q = quants(jw)
+        formed_J = [1 if (r["J_W"] >= 150 and r["J_m"] >= 10) else 0 for r in rows]
+        formed_L = [1 if (r["L_W"] >= 150 and r["L_m"] >= 10) else 0 for r in rows]
+        formed_M = [1 if (r["M_W"] >= 150 and r["M_m"] >= 10) else 0 for r in rows]
+        log("%s  n=%d" % (scen, n))
+        log("  W_J  min %d  q1 %d  median %d  q3 %d  max %d    mean %.1f" %
+            (q[0], q[1], q[2], q[3], q[4], sum(jw) / float(n)))
+        log("  blocks carrying weight in J: mean %.1f" %
+            (sum(r["J_m"] for r in rows) / float(n)))
+        log("  joint gate cannot be formed: %.3f    length-only %.3f    model-only %.3f" %
+            (1 - sum(formed_J) / float(n), 1 - sum(formed_L) / float(n),
+             1 - sum(formed_M) / float(n)))
+        log("  W_L mean %.1f   W_M mean %.1f" %
+            (sum(r["L_W"] for r in rows) / float(n),
+             sum(r["M_W"] for r in rows) / float(n)))
+        ent = {"scen": scen, "n": n, "WJ": q, "formed": sum(formed_J) / float(n),
+               "per": {}}
+        log("  test  primary  jointJ  P&J=shown  lenL  modM  L&M  P&L&M=shown")
+        for t in tests:
+            pr = [1 if r["P_" + t] <= 0.05 else 0 for r in rows]
+            sj = []
+            bo = []
+            sep = []
+            bsep = []
+            gls = []
+            gms = []
+            for i, r in enumerate(rows):
+                gj = (formed_J[i] == 1 and r["J_" + t] <= 0.05 and
+                      r["J_rho"] == r["J_rho"] and r["P_rho"] == r["P_rho"] and
+                      (r["J_rho"] > 0) == (r["P_rho"] > 0))
+                sj.append(1 if gj else 0)
+                bo.append(1 if (pr[i] and gj) else 0)
+                gl = (formed_L[i] == 1 and r["L_" + t] <= 0.05 and
+                      (r["L_rho"] > 0) == (r["P_rho"] > 0))
+                gm = (formed_M[i] == 1 and r["M_" + t] <= 0.05 and
+                      (r["M_rho"] > 0) == (r["P_rho"] > 0))
+                gls.append(1 if gl else 0)
+                gms.append(1 if gm else 0)
+                sep.append(1 if (gl and gm) else 0)
+                bsep.append(1 if (pr[i] and gl and gm) else 0)
+            vals = (sum(pr) / float(n), sum(sj) / float(n), sum(bo) / float(n),
+                    sum(gls) / float(n), sum(gms) / float(n),
+                    sum(sep) / float(n), sum(bsep) / float(n))
+            ent["per"][t] = vals
+            log("  %-4s %7.3f %7.3f %10.3f %5.3f %5.3f %5.3f %12.3f" %
+                ((t,) + vals))
+        gate_sum.append(ent)
+        log()
+
+    text = "\n".join(lines) + "\n"
+    with open(out_path, "w") as fh:
+        fh.write(text)
+    sys.stdout.write(text)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,64 @@
+{
+  "first_measure_repository": {
+    "above": 12,
+    "below": 9,
+    "loo_max": "-0.01",
+    "loo_min": "-0.05",
+    "positive_weight_share": "58%",
+    "without_shared": "+0.00",
+    "zero": 0
+  },
+  "half": "confirmation",
+  "measures": {
+    "no_reasoning_share": {
+      "repository": {
+        "W": 387,
+        "m": 21,
+        "rho_bar": "-0.029",
+        "sessions": 408
+      },
+      "repository_model_length": {
+        "W": 295,
+        "m": 16,
+        "rho_bar": "-0.067",
+        "sessions": 338
+      },
+      "repository_month": {
+        "W": 371,
+        "m": 21,
+        "rho_bar": "-0.040",
+        "sessions": 403
+      }
+    },
+    "reasoning_tokens": {
+      "repository": {
+        "W": 387,
+        "m": 21,
+        "rho_bar": "+0.010",
+        "sessions": 408
+      },
+      "repository_model_length": {
+        "W": 295,
+        "m": 16,
+        "rho_bar": "+0.011",
+        "sessions": 338
+      },
+      "repository_month": {
+        "W": 371,
+        "m": 21,
+        "rho_bar": "-0.022",
+        "sessions": 403
+      }
+    }
+  },
+  "provenance": {
+    "analyze_sha256": "37aa10908e8497d179a2b7e4ae06d9b0b873bceeefd6ecc43e103dbce67fb268",
+    "outcome_sha256": "0207c517088c4b83b67a8a89953ea01badfcfb269d528df9be1726a1677fd29d",
+    "record_commit": "3f7ae3c216de10ed963b9d439240f2a710eb49a3",
+    "registration_commit": "f0ef8db5db19cfb9180a97f05427b1e451c58be8",
+    "signal_sha256": "68f65e4efc6f6c37a8fbbc93a12917b6fc7ed394775892c9528136f409f9a2f6",
+    "start_time": "2026-11-19T18:12:36+00:00"
+  },
+  "repositories": 33,
+  "sessions": 423
+}

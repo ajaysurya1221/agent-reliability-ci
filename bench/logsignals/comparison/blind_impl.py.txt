@@ -1,0 +1,374 @@
+#!/usr/bin/env python3
+"""Blind second implementation of the numbers described in PREREGISTRATION.md.
+
+Written from PREREGISTRATION.md ("The two numbers per session", "What will be computed")
+and INTERFACE.md alone. It computes numbers and nothing else: no cause, no prediction and
+no measure of quality is expressed here or in its output.
+
+Usage:
+    blind_impl.py SIGNAL OUTCOME HALF OUT_JSON
+"""
+
+import json
+import math
+import sys
+from datetime import datetime, timezone
+from fractions import Fraction
+
+MEASURES = ("no_reasoning_share", "reasoning_tokens")
+DEFINITIONS = ("repository", "repository_month", "repository_model_length")
+
+MIN_REPOSITORIES = 10          # "at least 10 repositories carry weight"
+MIN_WEIGHT = 150               # "its `W` is at least 150"
+MIN_REPOSITORIES_LOO = 11      # "at least 11 repositories carry weight"
+
+UNKNOWN = "unknown"
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+# --------------------------------------------------------------------------- input
+
+def load_rows(path):
+    """Read a UTF-8, tab separated table with one header row and `\\n` line ends."""
+    with open(path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+    lines = text.split("\n")
+    while lines and lines[-1] == "":
+        lines.pop()
+    if not lines:
+        raise ValueError("empty table: %s" % path)
+    header = lines[0].split("\t")
+    rows = []
+    for number, line in enumerate(lines[1:], start=2):
+        parts = line.split("\t")
+        if len(parts) != len(header):
+            raise ValueError(
+                "%s line %d: %d fields, header has %d"
+                % (path, number, len(parts), len(header))
+            )
+        rows.append(dict(zip(header, parts)))
+    return rows
+
+
+def parse_instant(text):
+    """ISO 8601 UTC instant, or None when the field is empty."""
+    if text == "":
+        return None
+    return datetime.fromisoformat(text)
+
+
+def load_outcomes(path):
+    outcomes = {}
+    for row in load_rows(path):
+        value = row["agent_percentage"]
+        outcomes[row["path"]] = None if value == "" else float(value)
+    return outcomes
+
+
+def load_sessions(signal_path, outcome_path):
+    outcomes = load_outcomes(outcome_path)
+    sessions = []
+    for row in load_rows(signal_path):
+        d = int(row["d"])
+        zero = int(row["zero"])
+        session = {
+            "path": row["path"],
+            "repo": row["repo_key"],
+            "half": row["half"],
+            "month_label": row["month"] if row["month"] != "" else UNKNOWN,
+            "month_raw": row["month"],
+            "user": row["user_key"],
+            "model": row["model"] if row["model"] != "" else UNKNOWN,
+            "d": d,
+            "first_time": parse_instant(row["first_time"]),
+            "no_reasoning_share": Fraction(zero, d),
+            "reasoning_tokens": Fraction(int(row["tokens_num"]), int(row["tokens_den"])),
+            # A path absent from outcome.tsv is handled like an empty value there.
+            "outcome": outcomes.get(row["path"]),
+        }
+        sessions.append(session)
+    return sessions
+
+
+# ------------------------------------------------------------------------ rho_b
+
+def midranks(values):
+    """Each value replaced by the mean of the ranks its tied group spans."""
+    n = len(values)
+    order = sorted(range(n), key=lambda i: values[i])
+    ranks = [None] * n
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        group = j - i + 1
+        shared = Fraction(sum(range(i + 1, j + 2)), group)
+        for k in range(i, j + 1):
+            ranks[order[k]] = shared
+        i = j + 1
+    return ranks
+
+
+def pearson(x, y):
+    """Pearson's correlation of two exact-rational vectors.
+
+    The sums are exact; one square root in floating point is taken at the end.
+    """
+    n = len(x)
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_xx = sum(a * a for a in x)
+    sum_yy = sum(b * b for b in y)
+    sum_xy = sum(a * b for a, b in zip(x, y))
+    numerator = n * sum_xy - sum_x * sum_y
+    spread_x = n * sum_xx - sum_x * sum_x
+    spread_y = n * sum_yy - sum_y * sum_y
+    if spread_x == 0 or spread_y == 0:
+        raise ZeroDivisionError("a midrank vector is constant")
+    if numerator == 0:
+        return 0.0
+    squared = Fraction(numerator * numerator, spread_x * spread_y)
+    root = math.sqrt(float(squared))
+    return root if numerator > 0 else -root
+
+
+def block_rho(members, measure):
+    signal = midranks([m[measure] for m in members])
+    outcome = midranks([m["outcome"] for m in members])
+    return pearson(signal, outcome)
+
+
+# ----------------------------------------------------------------- block layout
+
+def assign_thirds(sessions):
+    """Session-length thirds inside each repository-and-model group.
+
+    Cut from every eligible session of the half, so the thirds are the same for
+    both measures and do not depend on the outcome side.
+    """
+    groups = {}
+    for session in sessions:
+        groups.setdefault((session["repo"], session["model"]), []).append(session)
+    for members in groups.values():
+        members.sort(
+            key=lambda s: (
+                s["d"],
+                0 if s["first_time"] is not None else 1,
+                s["first_time"] if s["first_time"] is not None else EPOCH,
+                s["path"],
+            )
+        )
+        n = len(members)
+        low_end = n // 3
+        middle_end = (2 * n) // 3
+        for position, session in enumerate(members):
+            if position < low_end:
+                session["third"] = "low"
+            elif position < middle_end:
+                session["third"] = "middle"
+            else:
+                session["third"] = "high"
+
+
+def block_key(session, definition):
+    if definition == "repository":
+        return (session["repo"],)
+    if definition == "repository_month":
+        return (session["repo"], session["month_label"])
+    if definition == "repository_model_length":
+        return (session["repo"], session["model"], session["third"])
+    raise ValueError(definition)
+
+
+def weight_carrying_blocks(sessions, definition, measure):
+    """Blocks with at least 2 sessions and neither number constant inside them."""
+    blocks = {}
+    for session in sessions:
+        blocks.setdefault(block_key(session, definition), []).append(session)
+    carrying = []
+    for key in blocks:
+        members = blocks[key]
+        if len(members) < 2:
+            continue
+        if len(set(m[measure] for m in members)) < 2:
+            continue
+        if len(set(m["outcome"] for m in members)) < 2:
+            continue
+        carrying.append(
+            {
+                "key": key,
+                "repo": members[0]["repo"],
+                "n": len(members),
+                "w": len(members) - 1,
+                "rho": block_rho(members, measure),
+            }
+        )
+    return carrying
+
+
+def summarise(carrying):
+    repositories = set(block["repo"] for block in carrying)
+    weight = sum(block["w"] for block in carrying)
+    sessions = sum(block["n"] for block in carrying)
+    total = math.fsum(block["w"] * block["rho"] for block in carrying)
+    formed = len(repositories) >= MIN_REPOSITORIES and weight >= MIN_WEIGHT
+    return {
+        "m": len(repositories),
+        "W": weight,
+        "sessions": sessions,
+        "T": total,
+        "formed": formed,
+        "rho_bar": (total / weight) if (formed and weight > 0) else None,
+    }
+
+
+# ------------------------------------------------------------- the headline block
+
+def repository_section(carrying, summary, paired, all_sessions, other_half_users):
+    """The extra numbers printed for the repository blocks of the first measure."""
+    empty = {
+        "above": None,
+        "below": None,
+        "zero": None,
+        "positive_weight_share": None,
+        "loo_formed": False,
+        "loo_min": None,
+        "loo_max": None,
+        "without_shared_formed": False,
+        "without_shared": None,
+    }
+    if not summary["formed"]:
+        return empty
+
+    total = summary["T"]
+    weight = summary["W"]
+
+    above = sum(1 for b in carrying if b["rho"] > 0)
+    below = sum(1 for b in carrying if b["rho"] < 0)
+    zero = sum(1 for b in carrying if b["rho"] == 0)
+    positive_weight = sum(b["w"] for b in carrying if b["rho"] > 0)
+
+    section = {
+        "above": above,
+        "below": below,
+        "zero": zero,
+        "positive_weight_share": float(Fraction(positive_weight, weight)),
+    }
+
+    repositories = set(b["repo"] for b in carrying)
+    if len(repositories) >= MIN_REPOSITORIES_LOO:
+        left_out = [
+            (total - b["w"] * b["rho"]) / (weight - b["w"]) for b in carrying
+        ]
+        section["loo_formed"] = True
+        section["loo_min"] = min(left_out)
+        section["loo_max"] = max(left_out)
+    else:
+        section["loo_formed"] = False
+        section["loo_min"] = None
+        section["loo_max"] = None
+
+    # Repositories holding a session whose user id also appears in the other half.
+    shared_repositories = set(
+        s["repo"]
+        for s in all_sessions
+        if s["user"] != "" and s["user"] in other_half_users
+    )
+    kept = [b for b in carrying if b["repo"] not in shared_repositories]
+    kept_repositories = set(b["repo"] for b in kept)
+    kept_weight = sum(b["w"] for b in kept)
+    if len(kept_repositories) >= MIN_REPOSITORIES and kept_weight >= MIN_WEIGHT:
+        kept_total = math.fsum(b["w"] * b["rho"] for b in kept)
+        section["without_shared_formed"] = True
+        section["without_shared"] = kept_total / kept_weight
+    else:
+        section["without_shared_formed"] = False
+        section["without_shared"] = None
+    return section
+
+
+# ------------------------------------------------------------------------ checks
+
+def checks_for(sessions):
+    months = {}
+    for session in sessions:
+        if session["month_raw"] != "":
+            months[session["month_raw"]] = months.get(session["month_raw"], 0) + 1
+    return {
+        "outcome_at_0": sum(1 for s in sessions if s["outcome"] == 0.0),
+        "outcome_at_100": sum(1 for s in sessions if s["outcome"] == 100.0),
+        "outcome_between": sum(
+            1
+            for s in sessions
+            if s["outcome"] is not None and 0.0 < s["outcome"] < 100.0
+        ),
+        "outcome_missing": sum(1 for s in sessions if s["outcome"] is None),
+        "first_measure_exactly_0": sum(
+            1 for s in sessions if s["no_reasoning_share"] == 0
+        ),
+        "months": months,
+        "month_unknown": sum(1 for s in sessions if s["month_raw"] == ""),
+        "model_unknown": sum(1 for s in sessions if s["model"] == UNKNOWN),
+    }
+
+
+# --------------------------------------------------------------------- describe
+
+def describe(signal_path, outcome_path, half):
+    """The full-precision description of one half, as INTERFACE.md fixes it."""
+    every_session = load_sessions(signal_path, outcome_path)
+    here = [s for s in every_session if s["half"] == half]
+    other_half_users = set(
+        s["user"] for s in every_session if s["half"] != half and s["user"] != ""
+    )
+
+    assign_thirds(here)
+    # A session whose outcome is missing cannot be midranked; it is kept in the
+    # counts of the half and in the thirds, and left out of the blocks.
+    paired = [s for s in here if s["outcome"] is not None]
+
+    measures = {}
+    headline_carrying = None
+    headline_summary = None
+    for measure in MEASURES:
+        measures[measure] = {}
+        for definition in DEFINITIONS:
+            carrying = weight_carrying_blocks(paired, definition, measure)
+            summary = summarise(carrying)
+            measures[measure][definition] = {
+                "formed": summary["formed"],
+                "rho_bar": summary["rho_bar"],
+                "m": summary["m"],
+                "W": summary["W"],
+                "sessions": summary["sessions"],
+            }
+            if measure == MEASURES[0] and definition == "repository":
+                headline_carrying = carrying
+                headline_summary = summary
+
+    return {
+        "half": half,
+        "sessions": len(here),
+        "repositories": len(set(s["repo"] for s in here)),
+        "measures": measures,
+        "first_measure_repository": repository_section(
+            headline_carrying, headline_summary, paired, here, other_half_users
+        ),
+        "checks": checks_for(here),
+    }
+
+
+def main(argv):
+    if len(argv) != 5:
+        sys.stderr.write("usage: blind_impl.py SIGNAL OUTCOME HALF OUT_JSON\n")
+        return 2
+    description = describe(argv[1], argv[2], argv[3])
+    text = json.dumps(description, sort_keys=True, indent=2) + "\n"
+    with open(argv[4], "w", encoding="utf-8") as handle:
+        handle.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
