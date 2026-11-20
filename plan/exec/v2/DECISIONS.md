@@ -603,6 +603,6 @@ The orchestrator accepted every change. The plan follows Astra.
 - No benchmark task, no new page, no result form and no picture are built.
 
 **What it does not claim.** That the edit brings users, or that anyone reads the first
-screen. The counts on 21 Nov 2026 are 0 stars, 0 outside issues or discussions and 0 result
-blocks posted by someone else. The stop rule of 14 Dec 2026 is unchanged: engineering stops
+screen. Read on 21 Nov 2026: 0 stars and 0 outside issues or discussions. No result block
+posted by someone else is known; no new search for one was run that day. The stop rule of 14 Dec 2026 is unchanged: engineering stops
 if all three thresholds (15, 2 and 1) are missed.
