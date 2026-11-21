@@ -1,0 +1,23 @@
+{
+  "id": "fault-report",
+  "pre_fix_commit": "c71a0b62b1010cd4b379352c38857add71e14684",
+  "fix_commit": "3023b96ee9b91f8c68cfc59e54dcbfbfb7bd627e",
+  "task": "A fault report misattributes a decision-unavailable event when there are two declared starting occurrences. With starts at 1 and 5, an injection at occurrence 3 belongs to the earlier declaration. Report the observed injection and leave the later declaration unfired. Edit only src/arci/report.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/report.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/suite_report/test_review_fixes.py",
+    "node_ids": [
+      "tests/unit/suite_report/test_review_fixes.py::test_decision_unavailable_matches_later_occurrences",
+      "tests/unit/suite_report/test_review_fixes.py::test_reordered_declarations[starts0-6-1]",
+      "tests/unit/suite_report/test_review_fixes.py::test_reordered_declarations[starts1-8-0]"
+    ],
+    "supplement": "fault_report.py.inc"
+  },
+  "visible_tests": [
+    "tests/unit/report/test_report.py::test_junit_has_candidate_cases_and_a_failing_gate_case",
+    "tests/unit/report/test_report.py::test_markdown_reports_sequential_looks_and_stopping_look"
+  ],
+  "visible_cases": 2
+}

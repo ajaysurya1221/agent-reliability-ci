@@ -1,0 +1,20 @@
+{
+  "id": "snapshot",
+  "pre_fix_commit": "dd380d86cffbaf14af487ba4609c84aa48167e1d",
+  "fix_commit": "92f6ae06d3f203cd4af9691780890b05116e2269",
+  "task": "The MCP toolset can lose its last readable snapshot. Save a valid tool state, then have a later call return state that cannot be written as UTF-8. Report the write failure and leave the preceding complete state readable. Edit only src/arci/mcp_toolset_server.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/mcp_toolset_server.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/mcp_toolset/test_atomic_snapshot.py",
+    "node_ids": [
+      "tests/unit/mcp_toolset/test_atomic_snapshot.py::test_a_failed_write_keeps_the_last_complete_state"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/mcp_toolset/test_server.py::test_subset_exception_mapping_and_snapshot_file",
+    "tests/unit/mcp_toolset/test_server.py::test_snapshot_is_written_at_startup"
+  ],
+  "visible_cases": 2
+}

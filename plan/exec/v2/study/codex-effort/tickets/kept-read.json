@@ -1,0 +1,23 @@
+{
+  "id": "kept-read",
+  "pre_fix_commit": "901e037732d4ebc61a15b0c076a7338ff53d473f",
+  "fix_commit": "074fd7ffbff9b3294f5e03b90dcc08f7f46caf0e",
+  "task": "The kept-table reader can lose an update during startup. A writer replaces an empty placeholder with a valid table just as the reader opens it. Return the rows from the installed table when it is available. Retain the existing handling of absent and malformed tables. Edit only src/arci/logs/kept.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/logs/kept.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/logs/test_kept_read_race.py",
+    "node_ids": [
+      "tests/unit/logs/test_kept_read_race.py::test_table_installed_during_open"
+    ],
+    "supplement": "kept_read.py.inc"
+  },
+  "visible_tests": [
+    "tests/unit/logs/test_logs2.py::test_reader_size_limit[-1]",
+    "tests/unit/logs/test_logs2.py::test_reader_size_limit[0]",
+    "tests/unit/logs/test_logs2.py::test_reader_size_limit[1]",
+    "tests/unit/logs/test_logs2.py::test_order_duplicates_empty_rows_and_codex_edits"
+  ],
+  "visible_cases": 4
+}

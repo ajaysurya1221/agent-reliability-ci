@@ -1,0 +1,29 @@
+{
+  "id": "csv-spaces",
+  "pre_fix_commit": "bebe90060b7d352203949bfc18d7e964f2ac4d82",
+  "fix_commit": "ea19251723e46665c624435803783cc4166bfefc",
+  "task": "Import a CSV of outcomes with empty lines between valid data rows. The importer rejects the file. Accept blank lines while continuing to reject records that have too few columns for the header. Edit only src/arci/outcomes.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/outcomes.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/outcomes/test_review_fixes.py",
+    "node_ids": [
+      "tests/unit/outcomes/test_review_fixes.py::test_m1_csv_blank_lines_skip_but_short_rows_fail"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/outcomes/test_validation.py::test_bom_escaped_csv_jsonl_and_ignored_extra_fields",
+    "tests/unit/outcomes/test_validation.py::test_input_without_records_is_e6[csv-task_id,outcome\\n]",
+    "tests/unit/outcomes/test_validation.py::test_input_without_records_is_e6[csv-task_id,outcome,round\\n]",
+    "tests/unit/outcomes/test_validation.py::test_input_without_records_is_e6[jsonl-\\n\\n]",
+    "tests/unit/outcomes/test_validation.py::test_input_without_records_is_e6[xml-<testsuites><testsuite/></testsuites>]",
+    "tests/unit/outcomes/test_validation.py::test_input_without_records_is_e6[json-source4]"
+  ],
+  "visible_cases": 6,
+  "reference_hunk": {
+    "path": "src/arci/outcomes.py",
+    "before": "            for values in reader:\n                if len(values) != len(header):\n",
+    "after": "            for values in reader:\n                if not values:\n                    continue\n                if len(values) != len(header):\n"
+  }
+}

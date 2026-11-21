@@ -1,0 +1,25 @@
+{
+  "id": "keep-output",
+  "pre_fix_commit": "4a0e1a380ee6cd3cc051d4de14022ebbdc79d991",
+  "fix_commit": "f2674d79720a5d1a395e39497c53484766bafa54",
+  "task": "A successful log report can disappear. With a synthetic input directory, request a kept table and a JSON report named .realornoise-report.json in the same table directory. The requested report must still exist and contain its decision when the command returns. Edit only src/arci/logs/cli.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/logs/cli.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/logs/test_logs2.py",
+    "node_ids": [
+      "tests/unit/logs/test_logs2.py::test_cleanup_keeps_requested_temporary_named_report"
+    ],
+    "preservation": [
+      "tests/unit/logs/test_logs2.py::test_success_cleans_only_regular_temporary_files"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/logs/test_logs2.py::test_seeded_write_use_and_pruning[0]",
+    "tests/unit/logs/test_logs2.py::test_seeded_write_use_and_pruning[330]",
+    "tests/unit/logs/test_logs2.py::test_seeded_write_use_and_pruning[-480]",
+    "tests/unit/logs/test_logs2.py::test_keep_modes_paths_and_canonical_bytes"
+  ],
+  "visible_cases": 4
+}

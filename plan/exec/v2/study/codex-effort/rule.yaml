@@ -1,0 +1,19 @@
+schema_version: arci-outcomes/1
+suite_id: codex-effort-1
+fixed_before_runs: true
+alpha: 1/20
+margin: 1/10
+stakes: [1/4, 1/2]
+max_rounds: 16
+max_errored_pairs: 2
+tasks:
+  - csv-spaces
+  - fault-report
+  - init-write
+  - interrupted-report
+  - keep-output
+  - kept-read
+  - round-label
+  - shorthand
+  - snapshot
+  - store-lines

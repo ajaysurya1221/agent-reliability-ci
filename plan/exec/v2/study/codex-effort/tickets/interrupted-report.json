@@ -1,0 +1,41 @@
+{
+  "id": "interrupted-report",
+  "pre_fix_commit": "973fc3e865983f01da4f69bcf287cd6c078c334c",
+  "fix_commit": "3fc34dd5cece6ee6ecef1a08ff2ebb40e3239a21",
+  "task": "Request several log reports together, with old reports at their destinations. An interrupt during installation can leave a mixture of old and new reports. A handled interrupt must restore the prior contents and modes and remove newly created outputs. Edit only src/arci/logs/cli.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/logs/cli.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/logs/test_logs2.py",
+    "node_ids": [
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-1-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-2-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-4-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-1-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-2-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-4-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-1-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-2-after]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-4-after]"
+    ],
+    "preservation": [
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-1-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-2-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[all-4-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-1-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-2-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[none-4-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-1-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-2-before]",
+      "tests/unit/logs/test_logs2.py::test_interrupt_at_each_move_restores_outputs[mixed-4-before]"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/logs/test_logs2.py::test_transaction_rolls_back[directory]",
+    "tests/unit/logs/test_logs2.py::test_transaction_rolls_back[report]",
+    "tests/unit/logs/test_logs2.py::test_transaction_rolls_back[move]",
+    "tests/unit/logs/test_logs2.py::test_keep_modes_paths_and_canonical_bytes"
+  ],
+  "visible_cases": 4
+}

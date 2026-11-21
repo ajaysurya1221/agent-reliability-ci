@@ -1,0 +1,23 @@
+{
+  "id": "init-write",
+  "pre_fix_commit": "314cbbddd27bb64d91c881cea99d3f3b9f073eac",
+  "fix_commit": "4451a90b65e8baded0b848c2e5cfadce44e25441",
+  "task": "A descriptor can appear after init reports a successful write even when the filesystem cannot flush its data. For a staged-file flush that reports an I/O error, return the normal write diagnostic and exit 3. Leave no destination or temporary file. Edit only src/arci/init.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/init.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/init/test_publish.py",
+    "node_ids": [
+      "tests/unit/init/test_publish.py::test_a_failed_staged_fsync_writes_nothing"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/init/test_publish.py::test_with_links_a_destination_that_appears_before_publication_survives",
+    "tests/unit/init/test_publish.py::test_the_printed_command_parses_back_to_the_written_path[arci.yaml-arci run arci.yaml]",
+    "tests/unit/init/test_publish.py::test_the_printed_command_parses_back_to_the_written_path[-x.yaml-arci run -- -x.yaml]",
+    "tests/unit/init/test_publish.py::test_the_printed_command_parses_back_to_the_written_path[--help.yml-arci run -- --help.yml]",
+    "tests/unit/init/test_publish.py::test_the_printed_command_parses_back_to_the_written_path[-my file.yaml-arci run -- '-my file.yaml']"
+  ],
+  "visible_cases": 5
+}

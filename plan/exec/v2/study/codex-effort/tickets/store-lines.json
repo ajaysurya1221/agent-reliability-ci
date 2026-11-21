@@ -1,0 +1,22 @@
+{
+  "id": "store-lines",
+  "pre_fix_commit": "f3da872ef47a567da889720d61427454d65dfa62",
+  "fix_commit": "1559f90756296256cef798a3bac24571244a80e5",
+  "task": "Save a trial whose label, condition or failure detail contains a Unicode paragraph separator, then load it from the run store. Loading splits a single JSONL record and fails. Round-trip those strings exactly, preserving ordinary multi-record files. Edit only src/arci/storage.py. Leave tests and generated files unchanged.\nUse this working directory as your only source of project information. Run local checks here. Do not consult repository history or external sources.",
+  "allowed_paths": [
+    "src/arci/storage.py"
+  ],
+  "hidden_test": {
+    "path": "tests/unit/storage/test_load_run.py",
+    "node_ids": [
+      "tests/unit/storage/test_load_run.py::test_v1_unicode_separator_round_trip[\\x85]",
+      "tests/unit/storage/test_load_run.py::test_v1_unicode_separator_round_trip[\\u2028]",
+      "tests/unit/storage/test_load_run.py::test_v1_unicode_separator_round_trip[\\u2029]"
+    ]
+  },
+  "visible_tests": [
+    "tests/unit/html_report/test_html_report.py::test_v1_cli_and_reject_non_html_out",
+    "tests/unit/suite_cli/test_reports_diagnostics.py::test_v1_triage_preserves_default_schema_loading"
+  ],
+  "visible_cases": 2
+}
