@@ -1,0 +1,22 @@
+[
+  {
+    "count": 6,
+    "referrer": "github.com",
+    "uniques": 2
+  },
+  {
+    "count": 1,
+    "referrer": "Bing",
+    "uniques": 1
+  },
+  {
+    "count": 1,
+    "referrer": "Google",
+    "uniques": 1
+  },
+  {
+    "count": 1,
+    "referrer": "inspect.aisi.org.uk",
+    "uniques": 1
+  }
+]

@@ -606,3 +606,67 @@ The orchestrator accepted every change. The plan follows Astra.
 screen. Read on 21 Nov 2026: 0 stars and 0 outside issues or discussions. No result block
 posted by someone else is known; no new search for one was run that day. The stop rule of 14 Dec 2026 is unchanged: engineering stops
 if all three thresholds (15, 2 and 1) are missed.
+
+## D-27: seven days on reach; the README stays fixed; a daily traffic record (2026-11-21)
+
+Later on 21 Nov 2026 the maintainer asked for research on why the repository has no stars
+and no forks, and for a plan made from it and carried out, with a general go-ahead for the
+work. In-house research ran first (five topics and one report), then one consult with Astra.
+The working files are private and are not in this repository.
+
+**What was found.**
+
+- GitHub counted 37 unique visitors in the 14 days from 6 to 19 Nov 2026. That figure
+  includes the maintainer and agents, so it is an upper bound on people. 11 opened the front
+  page. 5 came from another site.
+- No large source gives a visitor-to-star rate for small tools. With so few visitors, 0 stars
+  does not separate a weak page from small reach.
+- On 21 Nov, GitHub repository search found this repository for 2 of 9 plain phrases a person
+  with the problem might type.
+- In a sample of 21 repositories created in 2026 (found by search, not a census), each one
+  that grew and had a known dated event had a public post or press coverage. This is an
+  association. No star history by date could be read.
+- No source was found that shows that topics, a description, a README edit or a listing adds
+  stars.
+
+**The views.** The orchestrator drafted a seven-day plan with three README options and
+preferred no README change. Astra said to go ahead, with changes: save the traffic counts
+before any setting changes; leave the README as it is, because its first command is already
+`realornoise` and no recorded visit shows that a pointer to the order-desk study would help
+someone try the log reader; add four topics and a one-offer description; keep D-23; let no
+agent publish a statement in the maintainer's name on another site without his approval of
+the exact text; give priority to people who already compare their own sessions; and treat a
+week spent on listings as the most likely waste. The orchestrator accepted these. One
+difference remains: Astra's description text had no opening question; the orchestrator kept
+the question in front of Astra's sentence, because it matches the README title and holds
+words that people search for.
+
+**The decision.**
+
+- D-23 stays in force to 14 Dec 2026: no new feature, command, option or release.
+- The README edit allowed by D-26 is set aside for this week. The first screen stays fixed
+  from 21 to 28 Nov, so that the visits counted are visits to one page.
+- Repository settings were changed on 21 Nov 2026, after the first traffic record was saved.
+  Description before: "Did your coding agent get worse, or is it noise? Reads the Claude Code
+  and Codex session logs already on your disk and answers REAL DROP, NO DROP or CANNOT TELL.
+  Also regression testing for AI agents in CI with a stated error bound." Description after:
+  "Did your coding agent get worse, or is it noise? realornoise compares recent days with
+  earlier days in your local Claude Code and Codex session logs and reports REAL DROP, NO
+  DROP or CANNOT TELL for recorded measures such as reasoning tokens per response." Website
+  field before: the `agent-reliability-ci` page on PyPI; after: the `realornoise` page. Topics
+  added to the 16 already set: `session-logs`, `quality-drop`, `llm`, `agent-regression`.
+- A daily record keeps what GitHub deletes after 14 days:
+  `plan/exec/scripts/traffic_snapshot.py` writes views, unique visitors, clones, referrers,
+  paths and the public counters under `plan/exec/v2/signals/traffic/`.
+- No pull request to another project is opened this week. The three listing pull requests
+  already open are left to their lists.
+- Texts for one newsletter form and one post in a "Show and tell" discussion category are
+  prepared for the maintainer. He approves the exact wording and sends them. For a Show HN the
+  agents supply facts only; the post is his.
+- Each item records when it went live and where it links. The nine searches are repeated on
+  28 Nov. The review is on 28 Nov, with late traffic read again on 30 Nov. A printed result
+  posted by someone else is tracked with stars and outside issues.
+
+**What it does not claim.** That any of these steps adds a star, a fork or a user. Read on
+21 Nov 2026: 0 stars, 0 forks, 0 watchers, 0 outside issues, 0 discussions. The stop rule of
+14 Dec 2026 is unchanged.
