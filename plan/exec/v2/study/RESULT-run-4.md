@@ -136,6 +136,7 @@ The bound does not apply conditional on these checks passing or averaged over se
   explicit arm ran first in 16 pairs and the neutral arm in 16. The order of the lines in
   the audit file agrees. The consultant found the error; the orchestrator recomputed it.
   The verdict and every count are unchanged. Order effects are still not tested.
+- The log shows battery power at the start and the end of the run.
 - One trial per arm never called `lookup_order`. Both were in round 2, explicit desk-24
   and neutral desk-12. Both failed and stayed in the analysis. With only 4 rounds,
   each task has 4 trials per arm. The table cannot establish a result for any one task.
