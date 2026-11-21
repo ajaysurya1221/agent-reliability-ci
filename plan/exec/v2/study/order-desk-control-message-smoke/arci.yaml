@@ -1,0 +1,33 @@
+suite_id: order-desk-qwen3.5-4b-empty-lookup-control-smoke-not-evidence
+tasks: tasks.jsonl
+toolset: agent:toolset
+oracle: check:check
+baseline:
+  label: explicit-retry-text
+  agent: agent:baseline
+  candidate_id: ollama:qwen3.5:4b-mlx-ctx32k+empty-lookup-text
+candidate:
+  label: neutral-text
+  agent: agent:candidate
+  candidate_id: ollama:qwen3.5:4b-mlx-ctx32k+neutral-lookup-text
+conditions:
+- id: empty_result
+  faults:
+  - name: empty_result
+    tool: lookup_order
+    occurrence: 0
+rule:
+  alpha: 1/2
+  delta: 1/2
+  stakes:
+  - 1/4
+  - 1/2
+  max_rounds: 1
+  acknowledge_single_round: true
+  max_errored_pairs: 0
+  scenario_seeds: per_round
+budgets:
+  max_tool_calls: 12
+  max_model_steps: 12
+  max_seconds: 120
+  grader_seconds: 20

@@ -1,0 +1,58 @@
+mode: smoke
+start: 2026-11-21T11:13:00Z
+records commit: 592b8f50fe466e62f528ded9d45ac9f3532a7a30
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message-smoke/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGCHAIN_TRACING_V2=false
+LANGSMITH_TRACING=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-4-smoke-audit.jsonl
+ollama: ollama version is 0.32.14
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'AC Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message/agent.py
+preflight: baseline middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline message 'lookup_order returned an empty result. Call lookup_order again with the same order_id.'
+preflight: candidate middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: candidate message 'lookup_order returned an empty result. This lookup_order result is for the supplied order_id.'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+run start: 2026-11-21T11:13:01Z
+max_rounds below 3: few looks
+run store: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/runs-run-4-smoke/order-desk-qwen3.5-4b-empty-lookup-control-smoke-not-evidence@ed8765b4dc32b5bf29c12b7f7e45675625db1580ed600c3b6c6bc7c1e9a2441b
+VERDICT: INCONCLUSIVE (exit 2)
+reason: no test crossed
+stopping round: 1
+pairs: 8 (16 trials)
+baseline 7/8 passed, candidate 4/8 passed
+counts: minus=3, zero=5, plus=0, errored=0
+PASS wealth: 1.11833e+00; threshold: 4/1; crossed: False
+BLOCK wealth: 7.30529e-01; threshold: 4/1; crossed: False
+errored pairs: 0; tolerance: 0
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/2); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+arci exit 2
+run end: 2026-11-21T11:14:25Z
+ollama ps after:
+NAME                     ID              SIZE     PROCESSOR    CONTEXT    UNTIL              
+qwen3.5:4b-mlx-ctx32k    c01efed5a364    12 GB    100% GPU     32768      4 minutes from now    
+audit lines: 16
+baseline audit lines: 8
+candidate audit lines: 8
+audit sha256: c6b19fe8ceaf573f3ac3de322090ca9a1646c36f860df92164a1eb8d0682d3c0
+power: Now drawing from 'AC Power'

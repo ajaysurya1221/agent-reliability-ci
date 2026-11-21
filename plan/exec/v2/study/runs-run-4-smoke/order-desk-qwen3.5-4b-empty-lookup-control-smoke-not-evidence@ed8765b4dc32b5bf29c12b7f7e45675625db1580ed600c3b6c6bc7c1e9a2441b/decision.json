@@ -1,0 +1,161 @@
+{
+  "record_sha256": "df3abf9458f367c8091c57dd7fb62856acd8a8674052bba581f491be56ca9cf6",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-qwen3.5-4b-empty-lookup-control-smoke-not-evidence@ed8765b4dc32b5bf29c12b7f7e45675625db1580ed600c3b6c6bc7c1e9a2441b",
+  "manifest_sha256": "a4f3ab2736cafe6a235e39e63b3c98efdd8cc31bd0c52b86d823ddd6f660674d",
+  "trials_sha256": "ae1b99c175e987d9f032fa49095ba2caeffd563a2d774266f533ac71110d69ea",
+  "alpha": "1/2",
+  "delta": "1/2",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "4/1",
+  "n_cells": 8,
+  "max_rounds": 1,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 0,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "ae1b99c175e987d9f032fa49095ba2caeffd563a2d774266f533ac71110d69ea",
+      "counts": {
+        "minus": 3,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.11833e+00",
+      "block_wealth": "7.30529e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    }
+  ],
+  "stopped_at_round": 1,
+  "cells": [
+    {
+      "task_id": "desk-03",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "empty_result",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [
+    "no test crossed"
+  ],
+  "prior_runs": []
+}

@@ -1,0 +1,184 @@
+{
+  "record_sha256": "a4f3ab2736cafe6a235e39e63b3c98efdd8cc31bd0c52b86d823ddd6f660674d",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-qwen3.5-4b-empty-lookup-control-smoke-not-evidence@ed8765b4dc32b5bf29c12b7f7e45675625db1580ed600c3b6c6bc7c1e9a2441b",
+  "created_at": "",
+  "suite_id": "order-desk-qwen3.5-4b-empty-lookup-control-smoke-not-evidence",
+  "tasks": [
+    {
+      "task_id": "desk-03",
+      "task": {
+        "input": "Check stock for order ORD-103 and add a stock note.",
+        "order_id": "ORD-103",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-06",
+      "task": {
+        "input": "Check stock for order ORD-106 and add a stock note.",
+        "order_id": "ORD-106",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-09",
+      "task": {
+        "input": "Check stock for order ORD-109 and add a stock note.",
+        "order_id": "ORD-109",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-12",
+      "task": {
+        "input": "Check stock for order ORD-112 and add a stock note.",
+        "order_id": "ORD-112",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-15",
+      "task": {
+        "input": "Check stock for order ORD-115 and add a stock note.",
+        "order_id": "ORD-115",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-18",
+      "task": {
+        "input": "Check stock for order ORD-118 and add a stock note.",
+        "order_id": "ORD-118",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-21",
+      "task": {
+        "input": "Check stock for order ORD-121 and add a stock note.",
+        "order_id": "ORD-121",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    },
+    {
+      "task_id": "desk-24",
+      "task": {
+        "input": "Check stock for order ORD-124 and add a stock note.",
+        "order_id": "ORD-124",
+        "action": "stock_note",
+        "quickstart_settings": {
+          "baseline": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "candidate": "ollama:qwen3.5:4b-mlx-ctx32k",
+          "temperature": 0.7,
+          "baseline_reasoning": false,
+          "candidate_reasoning": false
+        }
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "condition_id": "empty_result",
+      "faults": [
+        {
+          "name": "empty_result",
+          "bucket": "falsify",
+          "tool": "lookup_order",
+          "at_occurrence": 0,
+          "params": {}
+        }
+      ]
+    }
+  ],
+  "toolset": "agent:toolset",
+  "mcp_server": null,
+  "contract": {
+    "oracle": "check:check",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "explicit-retry-text",
+    "agent": "agent:baseline",
+    "command": null,
+    "candidate_id": "ollama:qwen3.5:4b-mlx-ctx32k+empty-lookup-text"
+  },
+  "candidate": {
+    "label": "neutral-text",
+    "agent": "agent:candidate",
+    "command": null,
+    "candidate_id": "ollama:qwen3.5:4b-mlx-ctx32k+neutral-lookup-text"
+  },
+  "alpha": "1/2",
+  "delta": "1/2",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "max_rounds": 1,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 0,
+  "seed_derivation": "sha256-v1",
+  "acknowledge_single_round": true,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 12,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}
