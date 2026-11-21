@@ -732,3 +732,32 @@ questions. The orchestrator agreed. The maintainer approved the rule.
 **What it does not claim.** That a run brings a user, or that any result compares this
 tool with another. A run the project makes for itself is not use by someone else; a
 person outside repeating a run would be.
+
+## D-30: the maintainer sets D-29 aside for one run on the project's own work (2026-11-21)
+
+**What led to it.** About an hour after D-29 the maintainer asked for a run on his own
+machine that uses the tool on real work of the project. The orchestrator and Astra both
+advised against an exception: no one outside asked; the one candidate found needs some
+hundreds of coding-agent runs; and a verdict on the project's own tickets does not show
+that anyone else needs the tool. The maintainer read both views and chose to run it. The
+decision is his.
+
+**The decision.**
+
+- One registered comparison with `arci verdict`: the coding agent the project uses for
+  worker jobs, at the reasoning effort the workers were given on 21 Nov ("high"), against
+  the higher effort used for consults ("xhigh"), on past tickets of this project with a
+  check that runs without a person. The question is the project's own: may worker jobs
+  stay at the lower effort.
+- D-29's second point holds without exception: the question, the arms, the tasks, the
+  check, the rule, the cap and the stopping rule are committed and pushed before any live
+  trial, a smoke trial included. The set-up is checked with a stand-in for the agent that
+  calls no model.
+- One start. The run ends at a verdict, at the registered cap, or when the agent's
+  service refuses further runs; no round is added afterwards.
+- Everything else in D-23, D-27 and D-29 is unchanged. No further run of the project's
+  own choosing follows from this one.
+
+**What it does not claim.** Anything about the vendor's model in general, about other
+people's tasks, or about use of the tool by anyone else. One machine, one period of hours,
+the project's own tickets.
