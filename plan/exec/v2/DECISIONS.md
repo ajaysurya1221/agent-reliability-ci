@@ -703,3 +703,32 @@ about a vendor).
 
 **What it does not claim.** That the run brings a user, a star or a reader. The
 maintainer's own run of the tool is not use by someone else.
+
+## D-29: further study runs only for a question someone outside asks (2026-11-21)
+
+**What led to it.** Run 4 (D-28) answered a reader's question the same day it was asked
+for. The maintainer then asked whether to keep using the tool on the project's own work.
+Astra, consulted, said to hold a fifth run and to adopt a rule, and found a wrong statement
+in run 4's record while answering (which arm ran first; corrected the same day). Its
+warning: each run the project starts by itself raises another question about a model, a
+wording or a task, and the weeks to 14 Dec can be spent answering the project's own
+questions. The orchestrator agreed. The maintainer approved the rule.
+
+**The decision, to 14 Dec 2026.**
+
+- At most one registered run for each new, unanswered question that someone outside the
+  project asks in public (a comment, an issue, a discussion, a reply).
+- The question is answered from existing results first. A run is made only if they do not
+  answer it.
+- Before any live trial, a smoke trial included, the question, the arms, the cap and the
+  stopping rule are committed and pushed. The set-up is checked with a fake model transport
+  and offline tests, which call no model. This closes the fault of run 4, where 16 smoke
+  trials came before the registration.
+- No run is started only to have a run. A comparison on the 12B model and a guide for
+  repeating run 4 on another machine wait until someone asks for them.
+- D-23 and D-27 are unchanged. The reviews of 28 and 30 Nov, the re-runs of 4 and 6 Dec
+  and the stop rule of 14 Dec stand.
+
+**What it does not claim.** That a run brings a user, or that any result compares this
+tool with another. A run the project makes for itself is not use by someone else; a
+person outside repeating a run would be.
