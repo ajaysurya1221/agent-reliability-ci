@@ -6,6 +6,10 @@
   0.171.0. For 2.1.330 and 0.171.0 the check was one short session each; for 2.1.326 it
   was this project's own sessions of that client. `docs/LOG_FORMATS.md` names the three
   versions and says what each check was. No code change.
+- **CI:** the build tool uv that every workflow installs is 0.13.4, up from 0.12.5, with the
+  hashes of all 19 files PyPI lists for that version. Why: an advisory says uv below 0.13.4
+  bundles a certificate store that trusts a root whose intermediate keys are compromised.
+  The installed package is not affected: uv is used to build and test, not at run time.
 
 ## v2.4.1 (2026-11-18)
 
