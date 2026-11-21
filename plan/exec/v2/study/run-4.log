@@ -1,0 +1,96 @@
+mode: real
+start: 2026-11-21T11:34:59Z
+records commit: 142bb23e045465e1abd9d2d627780ad063da0d12
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGCHAIN_TRACING_V2=false
+LANGSMITH_TRACING=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-4-audit.jsonl
+ollama: ollama version is 0.32.14
+ollama server version: 0.32.14
+server model digest: qwen3.5:4b-mlx-ctx32k c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'Battery Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+model manifest sha256: c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+published branch commit: 142bb23e045465e1abd9d2d627780ad063da0d12
+registered files: committed, unchanged and published
+digests:
+order-desk-control-message/agent.py: OK
+order-desk-control-message/arci.yaml: OK
+order-desk-control-message/tasks.jsonl: OK
+order-desk-control-message/tools.py: OK
+order-desk-control-message/check.py: OK
+order-desk-control-message/configuration.py: OK
+order-desk-control-message/offline_model.py: OK
+order-desk-control-message/register.py: OK
+order-desk-control-message/.gitignore: OK
+order-desk-control-message/tests/test_middleware.py: OK
+order-desk-control-message/tests/test_end_to_end.py: OK
+blind-tests-run-4/test_blind_control_message.py: OK
+counts-run-4/SPEC.md: OK
+counts-run-4/count_a.py: OK
+counts-run-4/count_b.py: OK
+run-4.sh: OK
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message/agent.py
+preflight: baseline middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline message 'lookup_order returned an empty result. Call lookup_order again with the same order_id.'
+preflight: candidate middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: candidate message 'lookup_order returned an empty result. This lookup_order result is for the supplied order_id.'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+warm-up call outside the experiment:
+[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠹ [K[?25h[?2026l[?2026h[?25l[1G⠹ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠴ [K[?25h[?2026l[?2026h[?25l[1G⠦ [K[?25h[?2026l[?2026h[?25l[1G⠇ [K[?25h[?2026l[?2026h[?25l[1G⠇ [K[?25h[?2026l[?2026h[?25l[1G⠋ [K[?25h[?2026l[?25l[?2026h[?25l[1G[K[?25h[?2026l[2K[1G[?25hThinking...
+Thinking[?25l[?25h Process[?25l[?25h:[?25l[?25h
+
+1[?25l[?25h.[?25l[?25h  **[?25l[?25hAn[?25l[?25halyze[?25l[?25h the[?25l[?25h Request[?25l[?25h:**[?25l[?25h The[?25l[?25h user[?25l[?25h is[?25l[?25h asking[?25l[?25h me[?25l[?25h to[?25l[?25h reply[?25l[?25h with[?25l[?25h the[?25l[?25h single[?25l[?25h[6D[K
+single word[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+2[?25l[?25h.[?25l[?25h  **[?25l[?25hD[?25l[?25hetermine[?25l[?25h Constraints[?25l[?25h:**[?25l[?25h The[?25l[?25h constraint[?25l[?25h is[?25l[?25h strict[?25l[?25h:[?25l[?25h "[?25l[?25hsingle[?25l[?25h word[?25l[?25h".[?25l[?25h
+3[?25l[?25h.[?25l[?25h  **[?25l[?25hSelect[?25l[?25h Response[?25l[?25h:**[?25l[?25h The[?25l[?25h required[?25l[?25h word[?25l[?25h is[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+4[?25l[?25h.[?25l[?25h  **[?25l[?25hFinal[?25l[?25h Check[?25l[?25h:**[?25l[?25h Does[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h count[?25l[?25h as[?25l[?25h a[?25l[?25h single[?25l[?25h word[?25l[?25h?[?25l[?25h Yes[?25l[?25h.[?25l[?25h Is[?25l[?25h it[?25l[?25h what[?25l[?25h was[?25l[?25h [K
+requested[?25l[?25h?[?25l[?25h Yes[?25l[?25h.[?25l[?25h
+
+Output[?25l[?25h:[?25l[?25h ok[?25l[?25h
+...done thinking.
+
+ok[?25l[?25h
+
+[?25l[?25hrun start: 2026-11-21T11:35:03Z
+run store: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/runs-run-4/order-desk-qwen3.5-4b-empty-lookup-control@2268db685b3425006a9d019ecf2c65a96d47dba71a97c7924df07d13f947b0e1
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 4
+pairs: 32 (64 trials)
+baseline 30/32 passed, candidate 14/32 passed
+counts: minus=16, zero=16, plus=0, errored=0
+PASS wealth: 7.78663e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 6.41754e+01; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+prior runs: order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb, order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb, order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504
+arci exit 1
+run end: 2026-11-21T11:40:09Z
+ollama ps after:
+NAME                     ID              SIZE     PROCESSOR    CONTEXT    UNTIL              
+qwen3.5:4b-mlx-ctx32k    c01efed5a364    12 GB    100% GPU     32768      4 minutes from now    
+audit lines: 62
+baseline audit lines: 31
+candidate audit lines: 31
+audit sha256: c53b18d1468eae9bb02fb88d5c0d2863f9095fbb1ce82027ae9b3502eed275bb
+power: Now drawing from 'Battery Power'

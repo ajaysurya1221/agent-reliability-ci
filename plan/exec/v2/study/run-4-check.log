@@ -1,0 +1,55 @@
+mode: check
+start: 2026-11-21T11:34:50Z
+records commit: 142bb23e045465e1abd9d2d627780ad063da0d12
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGCHAIN_TRACING_V2=false
+LANGSMITH_TRACING=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-4-audit.jsonl
+ollama: ollama version is 0.32.14
+ollama server version: 0.32.14
+server model digest: qwen3.5:4b-mlx-ctx32k c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'Battery Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+model manifest sha256: c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+published branch commit: 142bb23e045465e1abd9d2d627780ad063da0d12
+registered files: committed, unchanged and published
+digests:
+order-desk-control-message/agent.py: OK
+order-desk-control-message/arci.yaml: OK
+order-desk-control-message/tasks.jsonl: OK
+order-desk-control-message/tools.py: OK
+order-desk-control-message/check.py: OK
+order-desk-control-message/configuration.py: OK
+order-desk-control-message/offline_model.py: OK
+order-desk-control-message/register.py: OK
+order-desk-control-message/.gitignore: OK
+order-desk-control-message/tests/test_middleware.py: OK
+order-desk-control-message/tests/test_end_to_end.py: OK
+blind-tests-run-4/test_blind_control_message.py: OK
+counts-run-4/SPEC.md: OK
+counts-run-4/count_a.py: OK
+counts-run-4/count_b.py: OK
+run-4.sh: OK
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-control-message/agent.py
+preflight: baseline middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline message 'lookup_order returned an empty result. Call lookup_order again with the same order_id.'
+preflight: candidate middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: candidate message 'lookup_order returned an empty result. This lookup_order result is for the supplied order_id.'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+check: every guard passed; nothing was started

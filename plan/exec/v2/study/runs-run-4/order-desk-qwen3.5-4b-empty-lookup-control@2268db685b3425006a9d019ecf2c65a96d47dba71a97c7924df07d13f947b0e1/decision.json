@@ -1,0 +1,225 @@
+{
+  "record_sha256": "6570b0ddf196b78811e2b950e03cdf2dfc26ec72c7834dd8dc688499ffec32cf",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-qwen3.5-4b-empty-lookup-control@2268db685b3425006a9d019ecf2c65a96d47dba71a97c7924df07d13f947b0e1",
+  "manifest_sha256": "07495e6fd7cab8a930b05472827daf96b898787d1081348a4df2cd213280a30d",
+  "trials_sha256": "aa8f6ad38f443dfff54783c84370d82534adbaa83a36bd2ca0a7ae4090390fa4",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 30,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "9590a4a98d1c98251655b571f7c7a3ecfd19742e98cf2407dde727f1e89f1bf4",
+      "counts": {
+        "minus": 2,
+        "zero": 6,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "5.04403e-01",
+      "block_wealth": "1.38297e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "939bd64054a7d69f3d247859c9291d42a7f9118a5f312bd9f94653054ab60f41",
+      "counts": {
+        "minus": 7,
+        "zero": 9,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "9.17613e-02",
+      "block_wealth": "5.12418e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 24,
+      "trials_sha256": "8ef03bce9e4a878b51e567f658022e45e6cc0eda5532de1328b44e2b627530d0",
+      "counts": {
+        "minus": 12,
+        "zero": 12,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.22372e-02",
+      "block_wealth": "2.10709e+01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 32,
+      "trials_sha256": "4444aed6f21184eb36e999cb00ef735f904c61b1d4317342db9e460f56c11bc9",
+      "counts": {
+        "minus": 16,
+        "zero": 16,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "7.78663e-03",
+      "block_wealth": "6.41754e+01",
+      "pass_crossed": false,
+      "block_crossed": true,
+      "verdict": "BLOCK",
+      "reasons": [
+        "regression established"
+      ]
+    }
+  ],
+  "stopped_at_round": 4,
+  "cells": [
+    {
+      "task_id": "desk-03",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 3,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 1,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 2,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 3,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 2,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 3,
+      "counts": {
+        "minus": 1,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 3,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 4,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 2,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "empty_result",
+      "pairs": 4,
+      "baseline_successes": 3,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 2,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "BLOCK",
+  "exit_code": 1,
+  "reasons": [
+    "regression established"
+  ],
+  "prior_runs": [
+    "order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb",
+    "order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb",
+    "order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504"
+  ]
+}
