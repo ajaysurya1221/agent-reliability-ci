@@ -1,0 +1,44 @@
+diff --git a/clean/src/arci/logs/cli.py b/edited/src/arci/logs/cli.py
+index 902f2b0..2e7ec1a 100644
+--- a/clean/src/arci/logs/cli.py
++++ b/edited/src/arci/logs/cli.py
+@@ -358,7 +358,7 @@ def _write_outputs(
+     """Stage all output and backups before replacement; roll back on a failed move."""
+     staged: dict[Path, Path] = {}
+     backups: dict[Path, Path] = {}
+-    installed: list[Path] = []
++    attempted: dict[Path, os.stat_result] = {}
+     temporary: list[Path] = []
+     placeholders: set[Path] = set()
+     keep: set[Path] = set()
+@@ -435,12 +435,15 @@ def _write_outputs(
+                 backups[target] = temporary_for(target)
+                 shutil.copy2(target, backups[target])
+         for target, _ in outputs:
++            # A keyboard interrupt can arrive after the rename but before replace returns.
++            attempted[target] = staged[target].stat()
+             os.replace(staged[target], target)
+-            installed.append(target)
+         succeeded = True
+     except BaseException:
+-        for target in reversed(installed):
++        for target in reversed(attempted):
+             try:
++                if not os.path.samestat(target.lstat(), attempted[target]):
++                    continue
+                 if target in backups:
+                     os.replace(backups[target], target)
+                 else:
+@@ -450,10 +453,10 @@ def _write_outputs(
+                     keep.add(backups[target])
+         raise
+     finally:
+-        for path in (set(temporary) - keep) | (placeholders - set(installed)):
++        for path in (set(temporary) - keep) | placeholders:
+             with suppress(OSError):
+                 path.unlink(missing_ok=True)
+-        if succeeded and table_path is not None and table_path in installed:
++        if succeeded and table_path is not None and table_path in attempted:
+             with suppress(OSError):
+                 for path in table_path.parent.iterdir():
+                     if path.name.startswith(".realornoise-"):

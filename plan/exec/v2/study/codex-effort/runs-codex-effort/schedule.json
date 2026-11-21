@@ -1,0 +1,674 @@
+[
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "baseline",
+      "candidate"
+    ],
+    "fault-report": [
+      "baseline",
+      "candidate"
+    ],
+    "init-write": [
+      "candidate",
+      "baseline"
+    ],
+    "interrupted-report": [
+      "candidate",
+      "baseline"
+    ],
+    "keep-output": [
+      "baseline",
+      "candidate"
+    ],
+    "kept-read": [
+      "candidate",
+      "baseline"
+    ],
+    "round-label": [
+      "baseline",
+      "candidate"
+    ],
+    "shorthand": [
+      "candidate",
+      "baseline"
+    ],
+    "snapshot": [
+      "candidate",
+      "baseline"
+    ],
+    "store-lines": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  {
+    "csv-spaces": [
+      "candidate",
+      "baseline"
+    ],
+    "fault-report": [
+      "candidate",
+      "baseline"
+    ],
+    "init-write": [
+      "baseline",
+      "candidate"
+    ],
+    "interrupted-report": [
+      "baseline",
+      "candidate"
+    ],
+    "keep-output": [
+      "candidate",
+      "baseline"
+    ],
+    "kept-read": [
+      "baseline",
+      "candidate"
+    ],
+    "round-label": [
+      "candidate",
+      "baseline"
+    ],
+    "shorthand": [
+      "baseline",
+      "candidate"
+    ],
+    "snapshot": [
+      "baseline",
+      "candidate"
+    ],
+    "store-lines": [
+      "candidate",
+      "baseline"
+    ]
+  }
+]

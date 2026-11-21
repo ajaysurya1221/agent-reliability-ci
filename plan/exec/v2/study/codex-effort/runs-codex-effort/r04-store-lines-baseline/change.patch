@@ -1,0 +1,13 @@
+diff --git a/clean/src/arci/storage.py b/edited/src/arci/storage.py
+index a17d793..8f672c2 100644
+--- a/clean/src/arci/storage.py
++++ b/edited/src/arci/storage.py
+@@ -32,7 +32,7 @@ def load_run(run_dir: Path | str) -> tuple[Manifest, tuple[TrialEnvelope, ...]]:
+     path = directory / "trials.jsonl"
+     trials = tuple(
+         TrialEnvelope.model_validate_json(line)
+-        for line in path.read_text().splitlines()
++        for line in path.read_text(encoding="utf-8").split("\n")
+         if line.strip()
+     )
+     if any(not trial.validate_seal() for trial in trials):

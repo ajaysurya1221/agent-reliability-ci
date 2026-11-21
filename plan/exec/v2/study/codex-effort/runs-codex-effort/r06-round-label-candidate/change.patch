@@ -1,0 +1,17 @@
+diff --git a/clean/src/arci/importers/__init__.py b/edited/src/arci/importers/__init__.py
+index 876f2aa..8fd66e6 100644
+--- a/clean/src/arci/importers/__init__.py
++++ b/edited/src/arci/importers/__init__.py
+@@ -80,10 +80,10 @@ def decimal_in_bounds(value: Decimal) -> bool:
+ 
+ 
+ def round_label(value: object) -> int:
+-    """Accept only a plain decimal integer with at most nine digits."""
++    """Accept up to nine decimal digits without padding or a plus sign, including -0."""
+     if type(value) is int and -999_999_999 <= value <= 999_999_999:
+         return value
+-    if isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]{1,9}", value):
++    if isinstance(value, str) and re.fullmatch(r"-?(?:0|[1-9][0-9]{0,8})", value):
+         return int(value)
+     raise ValueError("round or epoch must be a decimal integer of at most 9 digits")
+ 

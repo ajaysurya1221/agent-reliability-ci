@@ -1,0 +1,16 @@
+diff --git a/clean/src/arci/logs/cli.py b/edited/src/arci/logs/cli.py
+index 2e92052..8675687 100644
+--- a/clean/src/arci/logs/cli.py
++++ b/edited/src/arci/logs/cli.py
+@@ -471,7 +471,10 @@ def _write_outputs(
+                 for path in table_path.parent.iterdir():
+                     if path.name.startswith(".realornoise-"):
+                         with suppress(OSError):
+-                            if stat.S_ISREG(path.lstat().st_mode):
++                            info = path.lstat()
++                            if stat.S_ISREG(info.st_mode) and not any(
++                                os.path.samestat(info, target.stat()) for target in installed
++                            ):
+                                 path.unlink()
+         locks.close()
+         if not succeeded:

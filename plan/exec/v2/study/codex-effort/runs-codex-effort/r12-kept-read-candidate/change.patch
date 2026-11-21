@@ -1,0 +1,33 @@
+diff --git a/clean/src/arci/logs/kept.py b/edited/src/arci/logs/kept.py
+index 079557b..b4dfb17 100644
+--- a/clean/src/arci/logs/kept.py
++++ b/edited/src/arci/logs/kept.py
+@@ -86,12 +86,22 @@ def _object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+ 
+ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
+     try:
+-        info = path.stat()
+-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
+-            return "unreadable", ()
+-        with path.open("rb") as stream:
+-            raw = stream.read(MAX_BYTES + 1)
+-        if not raw:
++        # The writer may remove or replace an empty placeholder as we open it.
++        # Retry once by name so we can see the installed table.
++        for attempt in range(2):
++            try:
++                info = path.stat()
++                if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
++                    return "unreadable", ()
++                with path.open("rb") as stream:
++                    raw = stream.read(MAX_BYTES + 1)
++            except FileNotFoundError:
++                if attempt == 1:
++                    raise
++                continue
++            if raw:
++                break
++        else:
+             return "absent", ()
+         if len(raw) > MAX_BYTES:
+             return "unreadable", ()

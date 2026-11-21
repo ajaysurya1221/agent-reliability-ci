@@ -1,0 +1,18 @@
+diff --git a/clean/src/arci/storage.py b/edited/src/arci/storage.py
+index a17d793..1a48839 100644
+--- a/clean/src/arci/storage.py
++++ b/edited/src/arci/storage.py
+@@ -30,11 +30,8 @@ def load_run(run_dir: Path | str) -> tuple[Manifest, tuple[TrialEnvelope, ...]]:
+     if not manifest.validate_seal():
+         raise ValueError("manifest seal is invalid")
+     path = directory / "trials.jsonl"
+-    trials = tuple(
+-        TrialEnvelope.model_validate_json(line)
+-        for line in path.read_text().splitlines()
+-        if line.strip()
+-    )
++    with path.open(encoding="utf-8") as stream:
++        trials = tuple(TrialEnvelope.model_validate_json(line) for line in stream if line.strip())
+     if any(not trial.validate_seal() for trial in trials):
+         raise ValueError("trial seal is invalid")
+     return manifest, trials

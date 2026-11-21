@@ -1,0 +1,172 @@
+diff --git a/clean/src/arci/report.py b/edited/src/arci/report.py
+index 3921c4b..651a709 100644
+--- a/clean/src/arci/report.py
++++ b/edited/src/arci/report.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ import xml.etree.ElementTree as ET
+ from collections import Counter, defaultdict
+ from collections.abc import Sequence
+-from typing import TypedDict, cast
++from typing import NotRequired, TypedDict, cast
+ 
+ from pydantic import JsonValue
+ 
+@@ -25,6 +25,7 @@ from arci.schema import (
+ class FaultAccounting(TypedDict):
+     condition_id: str
+     fault: str
++    at_occurrence: NotRequired[int]
+     arm: str
+     trials: int
+     injections: int
+@@ -32,56 +33,98 @@ class FaultAccounting(TypedDict):
+     status: str
+ 
+ 
++def _observed_faults(
++    trial: TrialEnvelope, unavailable_starts: Sequence[int]
++) -> Counter[tuple[str, int | None]]:
++    observed: Counter[tuple[str, int | None]] = Counter()
++    occurrences: dict[str, int] = {}
++    for event in trial.events:
++        payload = event.payload
++        call_id = payload.get("call_id")
++        if (
++            unavailable_starts
++            and event.kind == "tool_start"
++            and payload.get("tool") == DECISION_TOOL
++        ):
++            occurrence = payload.get("occurrence")
++            if isinstance(call_id, str) and type(occurrence) is int:
++                occurrences[call_id] = occurrence
++        name = payload.get("injected_by")
++        if event.kind != "tool_finish" or not isinstance(name, str) or not name:
++            continue
++        start = None
++        if name == "decision_unavailable" and unavailable_starts:
++            if not isinstance(call_id, str) or call_id not in occurrences:
++                continue
++            # The boundary stops at the first matching before-hook in declaration order.
++            start = next((s for s in unavailable_starts if s <= occurrences[call_id]), None)
++            if start is None:
++                continue
++        observed[name, start] += 1
++    return observed
++
++
+ def fault_accounting(
+     conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]
+ ) -> list[FaultAccounting]:
+-    """Count observed injections by declared name, the identity recorded by injected_by.
+-
+-    Multiple declarations of the same name cannot be distinguished by this field.
+-    Events outside tool_finish never count; a trial counts at most once per name.
+-    """
++    """Count tool_finish injections and distinct trials for each reported fault."""
++    split_starts: dict[str, list[int]] = {}
++    for condition in conditions:
++        starts = dict.fromkeys(
++            fault.at_occurrence or 0
++            for fault in condition.faults
++            if fault.name == "decision_unavailable"
++        )
++        if len(starts) > 1:
++            split_starts[condition.condition_id] = list(starts)
+     totals: Counter[tuple[str, str]] = Counter()
+-    injections: Counter[tuple[str, str, str]] = Counter()
+-    fired: Counter[tuple[str, str, str]] = Counter()
++    injections: Counter[tuple[str, str, str, int | None]] = Counter()
++    fired: Counter[tuple[str, str, str, int | None]] = Counter()
+     for trial in trials:
+         totals[trial.condition_id, trial.arm] += 1
+-        observed: Counter[str] = Counter()
+-        for event in trial.events:
+-            name = event.payload.get("injected_by")
+-            if event.kind == "tool_finish" and isinstance(name, str) and name:
+-                observed[name] += 1
+-        for name, count in observed.items():
+-            key = trial.condition_id, trial.arm, name
++        observed = _observed_faults(trial, split_starts.get(trial.condition_id, ()))
++        for (name, start), count in observed.items():
++            key = trial.condition_id, trial.arm, name, start
+             injections[key] += count
+             fired[key] += 1
+-    return [
+-        FaultAccounting(
+-            condition_id=condition.condition_id,
+-            fault=name,
+-            arm=arm,
+-            trials=totals[condition.condition_id, arm],
+-            injections=injections[condition.condition_id, arm, name],
+-            trials_fired=fired[condition.condition_id, arm, name],
+-            status="observed"
+-            if fired[condition.condition_id, arm, name]
+-            else "declared, never fired",
+-        )
+-        for condition in sorted(conditions, key=lambda c: c.condition_id)
+-        for name in sorted({fault.name for fault in condition.faults})
+-        for arm in ("baseline", "candidate")
+-    ]
++    rows: list[FaultAccounting] = []
++    for condition in sorted(conditions, key=lambda c: c.condition_id):
++        cid = condition.condition_id
++        for name in sorted({fault.name for fault in condition.faults}):
++            thresholds: Sequence[int | None] = (None,)
++            if name == "decision_unavailable" and cid in split_starts:
++                thresholds = split_starts[cid]
++            for start in thresholds:
++                for arm in ("baseline", "candidate"):
++                    key = cid, arm, name, start
++                    row = FaultAccounting(
++                        condition_id=cid,
++                        fault=name,
++                        arm=arm,
++                        trials=totals[cid, arm],
++                        injections=injections[key],
++                        trials_fired=fired[key],
++                        status="observed" if fired[key] else "declared, never fired",
++                    )
++                    if start is not None:
++                        row["at_occurrence"] = start
++                    rows.append(row)
++    return rows
+ 
+ 
+ def fault_markdown(conditions: Sequence[Condition], trials: Sequence[TrialEnvelope]) -> list[str]:
++    rows = fault_accounting(conditions, trials)
+     lines = [
+         "",
+         "## Fault accounting",
+         "",
+-        "Recorded tool_finish injections, grouped by declared fault name; repeated "
++        "Decision-unavailable injections are attributed to the first eligible declared start. "
++        "Counts are descriptive."
++        if any("at_occurrence" in row for row in rows)
++        else "Recorded tool_finish injections, grouped by declared fault name; repeated "
+         "declarations of the same name are indistinguishable. Counts are descriptive.",
+         "",
+     ]
+-    rows = fault_accounting(conditions, trials)
+     if not rows:
+         return [*lines, "No faults declared."]
+     lines.extend(
+@@ -90,11 +133,14 @@ def fault_markdown(conditions: Sequence[Condition], trials: Sequence[TrialEnvelo
+             "|---|---|---|---:|---:|---:|---|",
+         ]
+     )
+-    lines.extend(
+-        f"| `{_cell(row['condition_id'])}` | `{_cell(row['fault'])}` | {row['arm']} | "
+-        f"{row['trials']} | {row['injections']} | {row['trials_fired']} | {row['status']} |"
+-        for row in rows
+-    )
++    for row in rows:
++        fault = _cell(row["fault"])
++        if "at_occurrence" in row:
++            fault += f" (start {row['at_occurrence']})"
++        lines.append(
++            f"| `{_cell(row['condition_id'])}` | `{fault}` | {row['arm']} | "
++            f"{row['trials']} | {row['injections']} | {row['trials_fired']} | {row['status']} |"
++        )
+     return lines
+ 
+ 

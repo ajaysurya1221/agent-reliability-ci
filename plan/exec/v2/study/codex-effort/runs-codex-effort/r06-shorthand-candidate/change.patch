@@ -1,0 +1,90 @@
+diff --git a/clean/src/arci/descriptor.py b/edited/src/arci/descriptor.py
+index be43b9a..38aeb83 100644
+--- a/clean/src/arci/descriptor.py
++++ b/edited/src/arci/descriptor.py
+@@ -30,6 +30,7 @@ from pydantic import (
+     Tag,
+     TypeAdapter,
+     ValidationError,
++    ValidationInfo,
+     field_validator,
+     model_validator,
+ )
+@@ -362,9 +363,8 @@ def parse_yaml(text: str) -> object:
+ 
+ 
+ # --- the shorthand rules -----------------------------------------------------------------------
+-# One function per model, over the keys the input gave: the models' after-validators apply them to
+-# a validated model, and `shorthand_problems` applies them to the raw input, so that a conflict is
+-# reported together with the field errors (see `loads_descriptor`).
++# The models' validators check the keys the input gave. `shorthand_problems` also checks the raw
++# input so that conflicts are reported together with field errors (see `loads_descriptor`).
+ 
+ Problem = tuple[SourcePath, str]
+ 
+@@ -379,18 +379,24 @@ def _fault_rule(given: Mapping[str, object]) -> Problem | None:
+     return None
+ 
+ 
+-def _condition_rule(given: Mapping[str, object]) -> Problem | None:
++_CONDITION_NULL_ERRORS = {
++    "id": "must be a string",
++    "condition_id": "must be a string",
++    "fault": "must be a mapping; omit it for a clean condition",
++}
++
++
++def _condition_id_rule(given: Mapping[str, object]) -> Problem | None:
+     if "id" in given and "condition_id" in given:
+         return ("id",), _both("id", "condition_id")
+     if "id" not in given and "condition_id" not in given:
+         return ("id",), 'missing required key "id" (or "condition_id")'
+-    key = "id" if "id" in given else "condition_id"
+-    if given[key] is None:
+-        return (key,), "must be a string"
++    return None
++
++
++def _condition_fault_rule(given: Mapping[str, object]) -> Problem | None:
+     if "fault" in given and "faults" in given:
+         return ("fault",), '"fault" and "faults" both given; give one, not both'
+-    if "fault" in given and given["fault"] is None:
+-        return ("fault",), "must be a mapping; omit it for a clean condition"
+     return None
+ 
+ 
+@@ -437,8 +443,12 @@ def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
+     check(_contract_rule, (), data)
+     for index, condition in enumerate(_items(data.get("conditions"))):
+         at: SourcePath = ("conditions", index)
+-        check(_condition_rule, at, condition)
++        check(_condition_id_rule, at, condition)
++        check(_condition_fault_rule, at, condition)
+         given = _mapping(condition) or {}
++        for field, message in _CONDITION_NULL_ERRORS.items():
++            if field in given and given[field] is None:
++                found.append(((*at, field), message))
+         check(_fault_rule, (*at, "fault"), given.get("fault"))
+         for position, fault in enumerate(_items(given.get("faults"))):
+             check(_fault_rule, (*at, "faults", position), fault)
+@@ -549,9 +559,19 @@ class DescriptorCondition(_Model):
+         default=(), description="Faults applied together, in order; not with `fault`."
+     )
+ 
++    @field_validator("id", "condition_id", "fault")
++    @classmethod
++    def _explicit_value(cls, value: object, info: ValidationInfo) -> object:
++        if value is None:
++            assert info.field_name is not None
++            raise ValueError(_CONDITION_NULL_ERRORS[info.field_name])
++        return value
++
+     @model_validator(mode="after")
+     def _one_of_each(self) -> Self:
+-        _raise(_condition_rule(_given(self)))
++        given = _given(self)
++        _raise(_condition_id_rule(given))
++        _raise(_condition_fault_rule(given))
+         return self
+ 
+     def to_condition(self) -> Condition:

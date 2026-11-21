@@ -1,0 +1,54 @@
+diff --git a/clean/src/arci/logs/kept.py b/edited/src/arci/logs/kept.py
+index 079557b..1016cc2 100644
+--- a/clean/src/arci/logs/kept.py
++++ b/edited/src/arci/logs/kept.py
+@@ -84,30 +84,36 @@ def _object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+     return result
+ 
+ 
+-def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
++def _read_bytes(path: Path) -> bytes | None:
+     try:
+         info = path.stat()
+         if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
+-            return "unreadable", ()
++            raise ValueError("invalid_table_file")
+         with path.open("rb") as stream:
+-            raw = stream.read(MAX_BYTES + 1)
++            return stream.read(MAX_BYTES + 1)
++    except (FileNotFoundError, NotADirectoryError):
++        # Propagate a missing path. An existing entry could be a dangling link or a new table.
++        path.lstat()
++        return None
++
++
++def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
++    try:
++        raw = _read_bytes(path)
+         if not raw:
+-            return "absent", ()
++            # A writer may have removed or replaced the placeholder while we opened it.
++            raw = _read_bytes(path)
++            if raw is None:
++                return "unreadable", ()
++            if not raw:
++                return "absent", ()
+         if len(raw) > MAX_BYTES:
+             return "unreadable", ()
+         data: object = json.loads(raw.decode("utf-8"), object_pairs_hook=_object)
+         table = KeptTable.model_validate(data)
+         return "read", table.rows
+     except (FileNotFoundError, NotADirectoryError):
+-        # The path is absent when it does not exist, also when a parent is not a
+-        # directory. A dangling symlink is a path that exists but cannot be read.
+-        try:
+-            path.lstat()
+-        except (FileNotFoundError, NotADirectoryError):
+-            return "absent", ()
+-        except OSError:
+-            pass
+-        return "unreadable", ()
++        return "absent", ()
+     except (OSError, ValueError, RecursionError):
+         return "unreadable", ()
+ 

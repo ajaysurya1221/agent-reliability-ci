@@ -1,0 +1,366 @@
+{
+  "record_sha256": "fc9bce239af4eea0d98a7feb1759d093d584faebfc4ba842641bd7f86f719e92",
+  "schema_version": "arci-outcomes/1",
+  "rule_sha256": "bbf58f38f304ddc1396b64f9ee12c30f7e5a59a62113da322563afa45c886bbe",
+  "rule": {
+    "schema_version": "arci-outcomes/1",
+    "suite_id": "codex-effort-1",
+    "tasks": [
+      "csv-spaces",
+      "fault-report",
+      "init-write",
+      "interrupted-report",
+      "keep-output",
+      "kept-read",
+      "round-label",
+      "shorthand",
+      "snapshot",
+      "store-lines"
+    ],
+    "alpha": "1/20",
+    "margin": "1/10",
+    "stakes": [
+      "1/4",
+      "1/2"
+    ],
+    "max_rounds": 16,
+    "max_errored_pairs": 2,
+    "score": null,
+    "pass_at_least": null,
+    "fixed_before_runs": true
+  },
+  "normalisation": 1,
+  "inputs": [
+    {
+      "path": "baseline.csv",
+      "sha256": "fe992eae01eb242723f8eab7347b1e027b10ca23c2fd4df16b952f5dd8903f20",
+      "arm": "baseline",
+      "format": "csv",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "path": "candidate.csv",
+      "sha256": "738e66d4c83309459c8fd442700b489f4351b5e933eee48137e9600692000e02",
+      "arm": "candidate",
+      "format": "csv",
+      "rounds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "rounds_registered": 16,
+  "rounds_supplied": 7,
+  "last_round_evaluated": 7,
+  "round_digests": [
+    {
+      "round": 1,
+      "outcomes_sha256": "1db3fd78ab5e7948b02db64297ad250f1d383310ef617a6ee03019a487e55012"
+    },
+    {
+      "round": 2,
+      "outcomes_sha256": "331447edc2c8e3cdf8872f71bf37d5d8098969bc19c4e04e209d21eaa117f522"
+    },
+    {
+      "round": 3,
+      "outcomes_sha256": "c106344aa42a6cd5c8fb0d405c476368f84f571a06da2457f11e78219d4d2e6d"
+    },
+    {
+      "round": 4,
+      "outcomes_sha256": "7d31e1754404740917391d3a3af525305b439391af0d13e70e91ff6916480d38"
+    },
+    {
+      "round": 5,
+      "outcomes_sha256": "ed26d6ae4011a7867204b8f439373d131c7c39ca739db23edbbf603c0009113f"
+    },
+    {
+      "round": 6,
+      "outcomes_sha256": "ed26d6ae4011a7867204b8f439373d131c7c39ca739db23edbbf603c0009113f"
+    },
+    {
+      "round": 7,
+      "outcomes_sha256": "c106344aa42a6cd5c8fb0d405c476368f84f571a06da2457f11e78219d4d2e6d"
+    }
+  ],
+  "history": [
+    {
+      "round": 1,
+      "pairs": 10,
+      "counts": {
+        "minus": 1,
+        "zero": 9,
+        "plus": 0,
+        "errored": 0
+      },
+      "pass_wealth": "8.86566e-01",
+      "block_wealth": "9.53236e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 20,
+      "counts": {
+        "minus": 1,
+        "zero": 18,
+        "plus": 1,
+        "errored": 0
+      },
+      "pass_wealth": "1.86762e+00",
+      "block_wealth": "4.51115e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 30,
+      "counts": {
+        "minus": 2,
+        "zero": 27,
+        "plus": 1,
+        "errored": 0
+      },
+      "pass_wealth": "1.63643e+00",
+      "block_wealth": "4.33845e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 40,
+      "counts": {
+        "minus": 2,
+        "zero": 37,
+        "plus": 1,
+        "errored": 0
+      },
+      "pass_wealth": "2.50074e+00",
+      "block_wealth": "3.21188e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 50,
+      "counts": {
+        "minus": 3,
+        "zero": 45,
+        "plus": 2,
+        "errored": 0
+      },
+      "pass_wealth": "3.08203e+00",
+      "block_wealth": "2.17801e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 6,
+      "pairs": 60,
+      "counts": {
+        "minus": 4,
+        "zero": 53,
+        "plus": 3,
+        "errored": 0
+      },
+      "pass_wealth": "3.79873e+00",
+      "block_wealth": "1.52239e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 7,
+      "pairs": 70,
+      "counts": {
+        "minus": 5,
+        "zero": 62,
+        "plus": 3,
+        "errored": 0
+      },
+      "pass_wealth": "3.30997e+00",
+      "block_wealth": "1.48009e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "csv-spaces",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "fault-report",
+      "pairs": 7,
+      "baseline_successes": 1,
+      "candidate_successes": 4,
+      "counts": {
+        "minus": 0,
+        "zero": 4,
+        "plus": 3,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "init-write",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "interrupted-report",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "keep-output",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "kept-read",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 5,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "round-label",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "shorthand",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "snapshot",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    },
+    {
+      "task_id": "store-lines",
+      "pairs": 7,
+      "baseline_successes": 7,
+      "candidate_successes": 7,
+      "counts": {
+        "minus": 0,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      }
+    }
+  ],
+  "stopped_at_round": 7,
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [
+    "no test crossed"
+  ],
+  "statements": [
+    "Imported outcomes: ARCI did not run these trials. No fault injection, fault accounting, tool outcomes or replay.",
+    "The error bound depends on six conditions ARCI cannot check: (a) the rule and its task list were fixed before either evaluated arm ran, which the author declares in the rule file; (b) outcomes are independent across tasks and rounds, with no response cache shared across pairs or rounds; (c) each task behaves the same in every round; (d) pairing and logical round order were fixed before outcomes were observed, and no registered round was omitted or replaced; (e) infrastructure failures are labelled error, not fail; (f) the protocol was fixed before execution and both arms were graded by the same criterion.",
+    "ARCI checked the rule, the file structure of every input, the task ids against the rule, and that both arms cover rounds 1 to 7. It did not verify execution or any of those conditions.",
+    "Under (a) to (f) and the assumptions of docs/STATISTICS_SUITE.md, a wrong PASS and a wrong BLOCK each have probability at most alpha/2.",
+    "at alpha = 1/20, a wrong PASS and a wrong BLOCK each have probability at most 1/40"
+  ],
+  "notices": [
+    "7 of 16 registered rounds supplied",
+    "if every further pair is a non-errored tie, PASS is reached after 6 more complete rounds (60 more pairs)"
+  ],
+  "previous_sha256": "24a35b7e6ff85c908c899afe62922714a6885fc59c19cae35e799e82548c5fb7"
+}

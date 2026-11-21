@@ -1,0 +1,28 @@
+diff --git a/clean/src/arci/logs/kept.py b/edited/src/arci/logs/kept.py
+index 079557b..70e828f 100644
+--- a/clean/src/arci/logs/kept.py
++++ b/edited/src/arci/logs/kept.py
+@@ -86,12 +86,17 @@ def _object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+ 
+ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
+     try:
+-        info = path.stat()
+-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
+-            return "unreadable", ()
+-        with path.open("rb") as stream:
+-            raw = stream.read(MAX_BYTES + 1)
+-        if not raw:
++        # A writer may replace the empty placeholder while its old inode is open.
++        # Reopen the path once on an empty read to pick up the installed table.
++        for _ in range(2):
++            info = path.stat()
++            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
++                return "unreadable", ()
++            with path.open("rb") as stream:
++                raw = stream.read(MAX_BYTES + 1)
++            if raw:
++                break
++        else:
+             return "absent", ()
+         if len(raw) > MAX_BYTES:
+             return "unreadable", ()

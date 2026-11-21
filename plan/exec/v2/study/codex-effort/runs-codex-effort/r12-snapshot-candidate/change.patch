@@ -1,0 +1,27 @@
+diff --git a/clean/src/arci/mcp_toolset_server.py b/edited/src/arci/mcp_toolset_server.py
+index 0366130..b11bc66 100644
+--- a/clean/src/arci/mcp_toolset_server.py
++++ b/edited/src/arci/mcp_toolset_server.py
+@@ -8,6 +8,7 @@ import inspect
+ import json
+ import os
+ import sys
++import tempfile
+ from collections.abc import Callable, Mapping, Sequence
+ from contextlib import redirect_stdout
+ from pathlib import Path
+@@ -139,7 +140,13 @@ class ToolSetServer:
+         with redirect_stdout(sys.stderr):
+             snapshot = self._toolset.snapshot()
+         payload = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, allow_nan=False)
+-        (self._workdir / "state.json").write_text(payload, encoding="utf-8")
++        fd, temporary = tempfile.mkstemp(dir=self._workdir, prefix=".state-", suffix=".tmp")
++        try:
++            with os.fdopen(fd, "w", encoding="utf-8") as stream:
++                stream.write(payload)
++            os.replace(temporary, self._workdir / "state.json")
++        finally:
++            Path(temporary).unlink(missing_ok=True)
+ 
+     def handle(self, message: dict[str, JsonValue]) -> dict[str, JsonValue] | None:
+         if "id" not in message:

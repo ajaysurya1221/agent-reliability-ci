@@ -1,0 +1,16 @@
+diff --git a/clean/src/arci/logs/cli.py b/edited/src/arci/logs/cli.py
+index 2e92052..62f2888 100644
+--- a/clean/src/arci/logs/cli.py
++++ b/edited/src/arci/logs/cli.py
+@@ -471,7 +471,10 @@ def _write_outputs(
+                 for path in table_path.parent.iterdir():
+                     if path.name.startswith(".realornoise-"):
+                         with suppress(OSError):
+-                            if stat.S_ISREG(path.lstat().st_mode):
++                            # A requested report can also use the table's temporary-file prefix.
++                            if stat.S_ISREG(path.lstat().st_mode) and not any(
++                                path.samefile(target) for target in installed
++                            ):
+                                 path.unlink()
+         locks.close()
+         if not succeeded:

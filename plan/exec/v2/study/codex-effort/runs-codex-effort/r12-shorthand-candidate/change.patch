@@ -1,0 +1,95 @@
+diff --git a/clean/src/arci/descriptor.py b/edited/src/arci/descriptor.py
+index be43b9a..e14f297 100644
+--- a/clean/src/arci/descriptor.py
++++ b/edited/src/arci/descriptor.py
+@@ -362,7 +362,7 @@ def parse_yaml(text: str) -> object:
+ 
+ 
+ # --- the shorthand rules -----------------------------------------------------------------------
+-# One function per model, over the keys the input gave: the models' after-validators apply them to
++# Rules over the keys the input gave: the models' after-validators apply them to
+ # a validated model, and `shorthand_problems` applies them to the raw input, so that a conflict is
+ # reported together with the field errors (see `loads_descriptor`).
+ 
+@@ -379,19 +379,22 @@ def _fault_rule(given: Mapping[str, object]) -> Problem | None:
+     return None
+ 
+ 
+-def _condition_rule(given: Mapping[str, object]) -> Problem | None:
++def _condition_problems(given: Mapping[str, object]) -> list[tuple[str, str]]:
++    problems: list[tuple[str, str]] = []
+     if "id" in given and "condition_id" in given:
+-        return ("id",), _both("id", "condition_id")
+-    if "id" not in given and "condition_id" not in given:
+-        return ("id",), 'missing required key "id" (or "condition_id")'
+-    key = "id" if "id" in given else "condition_id"
+-    if given[key] is None:
+-        return (key,), "must be a string"
++        problems.append(("id", _both("id", "condition_id")))
++    elif "id" not in given and "condition_id" not in given:
++        problems.append(("id", 'missing required key "id" (or "condition_id")'))
++    else:
++        key = "id" if "id" in given else "condition_id"
++        if given[key] is None:
++            problems.append((key, "must be a string"))
++
+     if "fault" in given and "faults" in given:
+-        return ("fault",), '"fault" and "faults" both given; give one, not both'
+-    if "fault" in given and given["fault"] is None:
+-        return ("fault",), "must be a mapping; omit it for a clean condition"
+-    return None
++        problems.append(("fault", '"fault" and "faults" both given; give one, not both'))
++    elif "fault" in given and given["fault"] is None:
++        problems.append(("fault", "must be a mapping; omit it for a clean condition"))
++    return problems
+ 
+ 
+ def _contract_rule(given: Mapping[str, object]) -> Problem | None:
+@@ -437,8 +440,10 @@ def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
+     check(_contract_rule, (), data)
+     for index, condition in enumerate(_items(data.get("conditions"))):
+         at: SourcePath = ("conditions", index)
+-        check(_condition_rule, at, condition)
+-        given = _mapping(condition) or {}
++        given = _mapping(condition)
++        if given is None:
++            continue
++        found.extend(((*at, key), message) for key, message in _condition_problems(given))
+         check(_fault_rule, (*at, "fault"), given.get("fault"))
+         for position, fault in enumerate(_items(given.get("faults"))):
+             check(_fault_rule, (*at, "faults", position), fault)
+@@ -551,7 +556,21 @@ class DescriptorCondition(_Model):
+ 
+     @model_validator(mode="after")
+     def _one_of_each(self) -> Self:
+-        _raise(_condition_rule(_given(self)))
++        given = _given(self)
++        problems = _condition_problems(given)
++        if problems:
++            raise ValidationError.from_exception_data(
++                type(self).__name__,
++                [
++                    {
++                        "type": "value_error",
++                        "loc": (key,),
++                        "input": given.get(key),
++                        "ctx": {"error": ValueError(message)},
++                    }
++                    for key, message in problems
++                ],
++            )
+         return self
+ 
+     def to_condition(self) -> Condition:
+@@ -814,7 +833,10 @@ def validation_problems(exc: ValidationError, data: object) -> list[Problem]:
+         if data is None:
+             path: SourcePath = tuple(error["loc"])
+         else:
+-            path = source_path(error["loc"], data, keep_last=error["type"] == "missing")
++            # A shorthand value_error can also name a missing key (the condition id).
++            path = source_path(
++                error["loc"], data, keep_last=error["type"] in {"missing", "value_error"}
++            )
+         cause = (error.get("ctx") or {}).get("error")
+         if isinstance(cause, _PathError):
+             found.append(((*path, *cause.path), cause.message, error["type"]))

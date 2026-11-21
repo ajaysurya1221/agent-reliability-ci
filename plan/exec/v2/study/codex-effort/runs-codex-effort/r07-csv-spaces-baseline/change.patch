@@ -1,0 +1,13 @@
+diff --git a/clean/src/arci/outcomes.py b/edited/src/arci/outcomes.py
+index 29c9863..fe74a9c 100644
+--- a/clean/src/arci/outcomes.py
++++ b/edited/src/arci/outcomes.py
+@@ -262,6 +262,8 @@ def _neutral(
+             ):
+                 raise ValueError("invalid header")
+             for values in reader:
++                if not values:
++                    continue
+                 if len(values) != len(header):
+                     raise ValueError("invalid row")
+                 yield dict(zip(header, values, strict=True))

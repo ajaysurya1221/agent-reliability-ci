@@ -1,0 +1,16 @@
+{
+  "start": "2026-11-21T15:52:18.933059+00:00",
+  "published": "8fc255abb4bd24bd44ba7148bff6fc83bd435f82",
+  "digest_list": "04f30ec8181586c456258b40af43f09bfdd03cee40861de86e4b19c7923e3cb9",
+  "codex": "codex-cli 0.167.0",
+  "model": "gpt-6.2-astra",
+  "agent_and_grading_python": "/Users/ajay/Developer/.arci-worktrees/codex-effort-agent-env/bin/python",
+  "shared_marker": "/Users/ajay/Developer/.arci-worktrees/codex-effort.started",
+  "launcher": "/Users/ajay/.local/share/mise/installs/node/24.18.0/lib/node_modules/@openai/codex/bin/codex.js",
+  "native": "/Users/ajay/.local/share/mise/installs/node/24.18.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+  "executable_sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+  "native_executable_sha256": "030316ecfbb41f4e7946e584b0063ef333b7a36cd312ba349f2f6869e39b62cc",
+  "python": "3.13.12 (main, Mar 25 2026, 02:48:22) [Clang 22.1.1 ]",
+  "arci": "2.4.1",
+  "workers": 4
+}

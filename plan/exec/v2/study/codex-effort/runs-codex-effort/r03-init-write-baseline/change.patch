@@ -1,0 +1,13 @@
+diff --git a/clean/src/arci/init.py b/edited/src/arci/init.py
+index d27a13b..321dd7c 100644
+--- a/clean/src/arci/init.py
++++ b/edited/src/arci/init.py
+@@ -648,6 +648,8 @@ def publish(request: InitRequest, text: str) -> None:
+             raise
+         with handle:
+             handle.write(text)
++            handle.flush()
++            os.fsync(handle.fileno())
+         # mkstemp creates 0600; give the descriptor the mode an ordinary new file would get.
+         os.chmod(staged, 0o666 & ~_umask())
+         _verify(request, staged)

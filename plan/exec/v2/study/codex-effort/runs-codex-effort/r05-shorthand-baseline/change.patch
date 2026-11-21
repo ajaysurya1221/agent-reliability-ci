@@ -1,0 +1,100 @@
+diff --git a/clean/src/arci/descriptor.py b/edited/src/arci/descriptor.py
+index be43b9a..699ed54 100644
+--- a/clean/src/arci/descriptor.py
++++ b/edited/src/arci/descriptor.py
+@@ -16,7 +16,7 @@ from __future__ import annotations
+ import json
+ import math
+ import re
+-from collections.abc import Callable, Mapping, Sequence
++from collections.abc import Callable, Iterator, Mapping, Sequence
+ from pathlib import Path
+ from typing import Annotated, Any, Literal, Self, cast
+ 
+@@ -30,6 +30,7 @@ from pydantic import (
+     Tag,
+     TypeAdapter,
+     ValidationError,
++    ValidationInfo,
+     field_validator,
+     model_validator,
+ )
+@@ -362,9 +363,8 @@ def parse_yaml(text: str) -> object:
+ 
+ 
+ # --- the shorthand rules -----------------------------------------------------------------------
+-# One function per model, over the keys the input gave: the models' after-validators apply them to
+-# a validated model, and `shorthand_problems` applies them to the raw input, so that a conflict is
+-# reported together with the field errors (see `loads_descriptor`).
++# The models check the keys the input gave. `shorthand_problems` also checks the raw input so
++# conflicts are reported together with field errors (see `loads_descriptor`).
+ 
+ Problem = tuple[SourcePath, str]
+ 
+@@ -379,19 +379,20 @@ def _fault_rule(given: Mapping[str, object]) -> Problem | None:
+     return None
+ 
+ 
+-def _condition_rule(given: Mapping[str, object]) -> Problem | None:
++_CONDITION_NULL_ERRORS = {
++    "id": "must be a string",
++    "condition_id": "must be a string",
++    "fault": "must be a mapping; omit it for a clean condition",
++}
++
++
++def _condition_key_problems(given: Mapping[str, object]) -> Iterator[Problem]:
+     if "id" in given and "condition_id" in given:
+-        return ("id",), _both("id", "condition_id")
+-    if "id" not in given and "condition_id" not in given:
+-        return ("id",), 'missing required key "id" (or "condition_id")'
+-    key = "id" if "id" in given else "condition_id"
+-    if given[key] is None:
+-        return (key,), "must be a string"
++        yield ("id",), _both("id", "condition_id")
++    elif "id" not in given and "condition_id" not in given:
++        yield ("id",), 'missing required key "id" (or "condition_id")'
+     if "fault" in given and "faults" in given:
+-        return ("fault",), '"fault" and "faults" both given; give one, not both'
+-    if "fault" in given and given["fault"] is None:
+-        return ("fault",), "must be a mapping; omit it for a clean condition"
+-    return None
++        yield ("fault",), '"fault" and "faults" both given; give one, not both'
+ 
+ 
+ def _contract_rule(given: Mapping[str, object]) -> Problem | None:
+@@ -437,8 +438,14 @@ def shorthand_problems(data: Mapping[str, object]) -> list[Problem]:
+     check(_contract_rule, (), data)
+     for index, condition in enumerate(_items(data.get("conditions"))):
+         at: SourcePath = ("conditions", index)
+-        check(_condition_rule, at, condition)
+-        given = _mapping(condition) or {}
++        given = _mapping(condition)
++        if given is None:
++            continue
++        for path, message in _condition_key_problems(given):
++            found.append(((*at, *path), message))
++        for key, message in _CONDITION_NULL_ERRORS.items():
++            if key in given and given[key] is None:
++                found.append(((*at, key), message))
+         check(_fault_rule, (*at, "fault"), given.get("fault"))
+         for position, fault in enumerate(_items(given.get("faults"))):
+             check(_fault_rule, (*at, "faults", position), fault)
+@@ -549,9 +556,16 @@ class DescriptorCondition(_Model):
+         default=(), description="Faults applied together, in order; not with `fault`."
+     )
+ 
++    @field_validator("id", "condition_id", "fault", mode="before")
++    @classmethod
++    def _reject_explicit_null(cls, value: object, info: ValidationInfo) -> object:
++        if value is None and info.field_name is not None:
++            raise ValueError(_CONDITION_NULL_ERRORS[info.field_name])
++        return value
++
+     @model_validator(mode="after")
+     def _one_of_each(self) -> Self:
+-        _raise(_condition_rule(_given(self)))
++        _raise(next(_condition_key_problems(_given(self)), None))
+         return self
+ 
+     def to_condition(self) -> Condition:

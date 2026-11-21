@@ -1,0 +1,33 @@
+diff --git a/clean/src/arci/logs/kept.py b/edited/src/arci/logs/kept.py
+index 079557b..35c0941 100644
+--- a/clean/src/arci/logs/kept.py
++++ b/edited/src/arci/logs/kept.py
+@@ -84,13 +84,23 @@ def _object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+     return result
+ 
+ 
++def _read_bytes(path: Path) -> bytes:
++    info = path.stat()
++    if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
++        raise ValueError("invalid_kept_file")
++    with path.open("rb") as stream:
++        return stream.read(MAX_BYTES + 1)
++
++
+ def read(path: Path) -> tuple[KeptState, tuple[KeptRow, ...]]:
+     try:
+-        info = path.stat()
+-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
+-            return "unreadable", ()
+-        with path.open("rb") as stream:
+-            raw = stream.read(MAX_BYTES + 1)
++        try:
++            raw = _read_bytes(path)
++        except FileNotFoundError:
++            raw = b""
++        if not raw:
++            # A writer can replace an open placeholder or briefly remove it before installation.
++            raw = _read_bytes(path)
+         if not raw:
+             return "absent", ()
+         if len(raw) > MAX_BYTES:
