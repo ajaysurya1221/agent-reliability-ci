@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Docs:** the readers are checked against Claude Code 2.1.326 and 2.1.330 and Codex CLI
+  0.171.0. For 2.1.330 and 0.171.0 the check was one short session each; for 2.1.326 it
+  was this project's own sessions of that client. `docs/LOG_FORMATS.md` names the three
+  versions and says what each check was. No code change.
+
 ## v2.4.1 (2026-11-18)
 
 - **Fixed:** at the end of a command trial the boundary now waits for its MCP tool server when
