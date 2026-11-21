@@ -128,8 +128,14 @@ The bound does not apply conditional on these checks passing or averaged over se
   passed 7 of 8 and neutral passed 4 of 8. This broke decision D-28's “before any trial”
   wording. The registration discloses it. The smoke trials had their own store and none
   entered this decision.
-- Explicit ran first in all 32 pairs on one shared local server. An order effect remains
-  possible. The log shows battery power at the start and the end.
+- Both arms ran on one shared local server, one after the other within a pair.
+  **Corrected later on 21 Nov 2026:** this point first said that the explicit arm ran
+  first in all 32 pairs. That was wrong. The store lists the explicit arm first in every
+  pair, but the tool chooses which arm runs first from the rule digest, the cell and the
+  round (`arm_order` in `suite_schedule.py`, release 2.4.1). Recomputed for this run: the
+  explicit arm ran first in 16 pairs and the neutral arm in 16. The order of the lines in
+  the audit file agrees. The consultant found the error; the orchestrator recomputed it.
+  The verdict and every count are unchanged. Order effects are still not tested.
 - One trial per arm never called `lookup_order`. Both were in round 2, explicit desk-24
   and neutral desk-12. Both failed and stayed in the analysis. With only 4 rounds,
   each task has 4 trials per arm. The table cannot establish a result for any one task.
