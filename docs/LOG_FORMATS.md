@@ -1,11 +1,22 @@
 # Session logs read by `arci logs`
 
 These formats are not documented by their vendors as public interfaces and can change.
-The readers were checked against Claude Code client versions 2.1.309, 2.1.321 and 2.1.325
-and Codex CLI versions 0.154.0, 0.167.0 and 0.169.0 on one machine.
+The readers were checked against Claude Code client versions 2.1.309, 2.1.321, 2.1.325,
+2.1.326 and 2.1.330 and Codex CLI versions 0.154.0, 0.167.0, 0.169.0
+and 0.171.0 on one machine.
 For 0.169.0 the check was one short session written for it (two responses): its record
 types and the fields the reader uses equal those of the 0.167.0 sessions, and the reader
 read it with no line lacking a field.
+For 0.171.0 and 2.1.330 the check was the same kind: one short session written for each
+(two responses each), read with no line lacking a field, each response with a model, an
+effort and a reasoning count. The 0.171.0 session was compared with a 0.167.0 session of
+the same prompt: the same record types, and three more keys, none read by the reader.
+Every record type in the 2.1.330 session had been seen in this project's earlier sessions;
+one top-level key, `dataFlowOn`, was not in the 2.1.326 lines, and the reader does not
+read it. Neither short session had a sub-agent response.
+For 2.1.326 the check was this project's own sessions of that client: no line lacking a
+field, each response with a model, an effort and a reasoning count, and the same record
+types as 2.1.325.
 `arci logs` is untested on Windows; Windows case rules are unchanged.
 This describes the readers in [the repository](../src/arci/logs/), not a vendor contract.
 The [statistics](STATISTICS_LOGS.md) define the day table and comparison;
