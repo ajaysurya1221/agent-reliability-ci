@@ -670,3 +670,36 @@ words that people search for.
 **What it does not claim.** That any of these steps adds a star, a fork or a user. Read on
 21 Nov 2026: 0 stars, 0 forks, 0 watchers, 0 outside issues, 0 discussions. The stop rule of
 14 Dec 2026 is unchanged.
+
+## D-28: one more study run on the order-desk question; no change to the product (2026-11-21)
+
+**What led to it.** On 21 Nov the maintainer asked whether the project could use its own
+tool to show something sooner. Read that day: the only outside comments the project has
+had came from a result made with the tool (the order-desk study), and one reader's question
+about run 3 is unanswered: run 3 tested one message that names the next step against the
+text `null`, so it cannot tell "a message" from "this message". Run 3's registration says
+so, and says that telling them apart needs a control message that names no next step.
+
+**The views.** Astra, consulted, said to do this run before 28 Nov and no other form of
+use of the tool on the project's own work: the model, the eight tasks, the fault and the
+check already exist, and a reader asked the question. It said that D-23 allowed one named
+study, which is finished, so this run needs its own decision. The orchestrator agreed, and
+set aside a comparison of coding-agent settings (more cost, and it invites statements
+about a vendor).
+
+**The decision.**
+
+- One registered run, run 4 of the order-desk study: on the eight stock-note tasks, with
+  the first lookup returning the injected empty result, run 3's message that names the next
+  step against a message of similar length that names none. One local model in both arms.
+- The registration (both texts, the rule, the cap, the conditions for reading the verdict,
+  the predictions) is committed and pushed before any trial. One start.
+- The result is published whatever it is, under `plan/exec/v2/study/`. A reply to the
+  reader who asked is prepared; the maintainer approves the exact wording and posts it.
+- D-23 is otherwise unchanged: no feature, command, option or release before 14 Dec 2026.
+  D-27 is unchanged: the README stays fixed to 28 Nov and the review dates stand.
+- Stop: the work is dropped if the set-up takes more than two agent-hours. The run ends at
+  the registered cap, at an error, or at a failed delivery check, and no round is added.
+
+**What it does not claim.** That the run brings a user, a star or a reader. The
+maintainer's own run of the tool is not use by someone else.
