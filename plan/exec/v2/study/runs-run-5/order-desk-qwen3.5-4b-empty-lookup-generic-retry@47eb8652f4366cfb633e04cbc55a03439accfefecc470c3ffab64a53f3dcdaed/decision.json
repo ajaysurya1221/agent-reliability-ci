@@ -1,0 +1,406 @@
+{
+  "record_sha256": "e390b8ae7dce141fa7a2ae023f770418992a1c53bb92894de2503bfe8634dfa2",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "order-desk-qwen3.5-4b-empty-lookup-generic-retry@47eb8652f4366cfb633e04cbc55a03439accfefecc470c3ffab64a53f3dcdaed",
+  "manifest_sha256": "0426ea30c6dcb2a108e8c0bfab390f9f491cae4d304b980f496c31217752306b",
+  "trials_sha256": "34876478a7330da71c2d4265885c60c065816497cf020d03c0a101099e72e2cd",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 30,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "b38b8af81577befdd3658b8d9b7b1071c660fd5fafd1a58654b5bf341e5e0a29",
+      "counts": {
+        "minus": 3,
+        "zero": 4,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.32294e-01",
+      "block_wealth": "1.17849e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "5f97da8832fcb8258371ea001b38ac505b02566758e1da53f3520d66da9efa7f",
+      "counts": {
+        "minus": 3,
+        "zero": 9,
+        "plus": 4,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.46923e+00",
+      "block_wealth": "2.82338e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 24,
+      "trials_sha256": "edd9ea96346a1ebde8c99a48e957792619d4a7153f8969485360cb43937e1732",
+      "counts": {
+        "minus": 4,
+        "zero": 15,
+        "plus": 5,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.66836e+00",
+      "block_wealth": "2.07588e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 32,
+      "trials_sha256": "51776e56327c2566b807316b7806fa93058ac1883a13599d0b7d81d12482e4e7",
+      "counts": {
+        "minus": 5,
+        "zero": 21,
+        "plus": 6,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.89506e+00",
+      "block_wealth": "1.55585e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 40,
+      "trials_sha256": "0c7720299e80082378eedea2b7cb2df50c3674f4b6feb385ca62787b0b6b5dc8",
+      "counts": {
+        "minus": 6,
+        "zero": 28,
+        "plus": 6,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.56993e+00",
+      "block_wealth": "1.59420e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 6,
+      "pairs": 48,
+      "trials_sha256": "9f314537145caa876a63fd6de55f91c08c29ded83247505495c3cc2909d2cc74",
+      "counts": {
+        "minus": 6,
+        "zero": 36,
+        "plus": 6,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.13852e+00",
+      "block_wealth": "1.30265e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 7,
+      "pairs": 56,
+      "trials_sha256": "25a963e8d05093222d0cafa828faea4d4b8a19f735f172daf57aae066208332e",
+      "counts": {
+        "minus": 7,
+        "zero": 42,
+        "plus": 7,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.42996e+00",
+      "block_wealth": "9.96091e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 8,
+      "pairs": 64,
+      "trials_sha256": "61cf474d0c02966f1be289231ecde601c015714aab2c3b28303cd4b3b4666e6f",
+      "counts": {
+        "minus": 8,
+        "zero": 48,
+        "plus": 8,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.76195e+00",
+      "block_wealth": "7.68417e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 9,
+      "pairs": 72,
+      "trials_sha256": "3179dac910f00496cba1b0a83e11481cfd8fa0614db0bfec938192ffb11d3cd2",
+      "counts": {
+        "minus": 9,
+        "zero": 54,
+        "plus": 9,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.14026e+00",
+      "block_wealth": "5.96482e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 10,
+      "pairs": 80,
+      "trials_sha256": "5f2e027fbc7137a72d933e5a1aa6f9c58ce029ad7fedde61ba26d8d039fd428c",
+      "counts": {
+        "minus": 10,
+        "zero": 59,
+        "plus": 11,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.91439e+00",
+      "block_wealth": "3.54631e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 11,
+      "pairs": 88,
+      "trials_sha256": "aa407dd9cd5f58d5ac24ec48f4c3c55e19d390326db6dba78fca5d03c74c49d0",
+      "counts": {
+        "minus": 10,
+        "zero": 65,
+        "plus": 13,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.34332e+01",
+      "block_wealth": "1.72320e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 12,
+      "pairs": 96,
+      "trials_sha256": "d85c8e21626ebc45d4773e758018cad12c2cdd11c2a789ee3bccc15a5e641a4f",
+      "counts": {
+        "minus": 10,
+        "zero": 71,
+        "plus": 15,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.97696e+01",
+      "block_wealth": "8.41658e-03",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 13,
+      "pairs": 104,
+      "trials_sha256": "1e2539c39fa19f8b697dd231da23838aba9a3658fbe8f3858f7a1df9dd9a42d1",
+      "counts": {
+        "minus": 10,
+        "zero": 78,
+        "plus": 16,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "8.52657e+01",
+      "block_wealth": "5.36931e-03",
+      "pass_crossed": true,
+      "block_crossed": false,
+      "verdict": "PASS",
+      "reasons": [
+        "non-inferiority established"
+      ]
+    }
+  ],
+  "stopped_at_round": 13,
+  "cells": [
+    {
+      "task_id": "desk-03",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 10,
+      "candidate_successes": 11,
+      "counts": {
+        "minus": 2,
+        "zero": 8,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-06",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 12,
+      "candidate_successes": 11,
+      "counts": {
+        "minus": 2,
+        "zero": 10,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-09",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 9,
+      "candidate_successes": 11,
+      "counts": {
+        "minus": 2,
+        "zero": 7,
+        "plus": 4,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-12",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 8,
+      "candidate_successes": 9,
+      "counts": {
+        "minus": 2,
+        "zero": 8,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-15",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 13,
+      "candidate_successes": 13,
+      "counts": {
+        "minus": 0,
+        "zero": 13,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-18",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 11,
+      "candidate_successes": 13,
+      "counts": {
+        "minus": 0,
+        "zero": 11,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-21",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 11,
+      "candidate_successes": 11,
+      "counts": {
+        "minus": 2,
+        "zero": 9,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "desk-24",
+      "condition_id": "empty_result",
+      "pairs": 13,
+      "baseline_successes": 12,
+      "candidate_successes": 13,
+      "counts": {
+        "minus": 0,
+        "zero": 12,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "PASS",
+  "exit_code": 0,
+  "reasons": [
+    "non-inferiority established"
+  ],
+  "prior_runs": [
+    "order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb",
+    "order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb",
+    "order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504",
+    "order-desk-qwen3.5-4b-empty-lookup-control@2268db685b3425006a9d019ecf2c65a96d47dba71a97c7924df07d13f947b0e1"
+  ]
+}

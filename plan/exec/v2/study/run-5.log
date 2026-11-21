@@ -1,0 +1,111 @@
+mode: real
+start: 2026-11-21T15:28:33Z
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-generic-retry
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-generic-retry/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGSMITH_TRACING=false
+LANGCHAIN_TRACING_V2=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-5-audit.jsonl
+NO_PROXY=127.0.0.1,localhost
+ollama: ollama version is 0.32.14
+ollama server version: 0.32.14
+server model digest: qwen3.5:4b-mlx-ctx32k c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'AC Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+model manifest sha256: c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+records commit (HEAD): 6c0a5a04af4e9f782289bea84f5a606e512dd8d1
+published branch commit: 6c0a5a04af4e9f782289bea84f5a606e512dd8d1
+registered files: committed, unchanged and published
+digests:
+order-desk-generic-retry/agent.py: OK
+order-desk-generic-retry/arci.yaml: OK
+order-desk-generic-retry/tasks.jsonl: OK
+order-desk-generic-retry/tools.py: OK
+order-desk-generic-retry/check.py: OK
+order-desk-generic-retry/configuration.py: OK
+order-desk-generic-retry/offline_model.py: OK
+order-desk-generic-retry/register.py: OK
+order-desk-generic-retry/.gitignore: OK
+order-desk-generic-retry/tests/test_middleware.py: OK
+order-desk-generic-retry/tests/test_end_to_end.py: OK
+blind-tests-run-5/test_blind_generic_retry.py: OK
+counts-run-5/SPEC.md: OK
+counts-run-5/count_a.py: OK
+counts-run-5/count_b.py: OK
+run-5.sh: OK
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-generic-retry/agent.py
+preflight: baseline middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline message 'lookup_order returned an empty result. Call lookup_order again with the same order_id.'
+preflight: candidate middleware ['ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: candidate message 'The previous tool call returned an empty result. Repeat that call with the same input.'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+warm-up call outside the experiment:
+[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠸ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠴ [K[?25h[?2026l[?2026h[?25l[1G⠦ [K[?25h[?2026l[?2026h[?25l[1G⠧ [K[?25h[?2026l[?2026h[?25l[1G⠇ [K[?25h[?2026l[?2026h[?25l[1G⠏ [K[?25h[?2026l[?2026h[?25l[1G⠋ [K[?25h[?2026l[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠹ [K[?25h[?2026l[?25l[?2026h[?25l[1G[K[?25h[?2026l[2K[1G[?25hThinking...
+Thinking[?25l[?25h Process[?25l[?25h:[?25l[?25h
+
+1[?25l[?25h.[?25l[?25h  **[?25l[?25hAn[?25l[?25halyze[?25l[?25h the[?25l[?25h Request[?25l[?25h:**[?25l[?25h The[?25l[?25h user[?25l[?25h is[?25l[?25h asking[?25l[?25h me[?25l[?25h to[?25l[?25h reply[?25l[?25h with[?25l[?25h the[?25l[?25h single[?25l[?25h[6D[K
+single word[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+2[?25l[?25h.[?25l[?25h  **[?25l[?25hIdent[?25l[?25hify[?25l[?25h Constraints[?25l[?25h:**[?25l[?25h The[?25l[?25h constraint[?25l[?25h is[?25l[?25h strict[?25l[?25h:[?25l[?25h "[?25l[?25hReply[?25l[?25h with[?25l[?25h the[?25l[?25h sin[3D[K
+single[?25l[?25h word[?25l[?25h ok[?25l[?25h."[?25l[?25h
+3[?25l[?25h.[?25l[?25h  **[?25l[?25hCheck[?25l[?25h for[?25l[?25h Safety[?25l[?25h/[?25l[?25hPolicy[?25l[?25h Issues[?25l[?25h:**[?25l[?25h There[?25l[?25h are[?25l[?25h no[?25l[?25h safety[?25l[?25h or[?25l[?25h policy[?25l[?25h viola[5D[K
+violations[?25l[?25h in[?25l[?25h this[?25l[?25h request[?25l[?25h.[?25l[?25h It[?25l[?25h's[?25l[?25h a[?25l[?25h simple[?25l[?25h instruction[?25l[?25h following[?25l[?25h test[?25l[?25h.[?25l[?25h
+4[?25l[?25h.[?25l[?25h  **[?25l[?25hForm[?25l[?25hulate[?25l[?25h Output[?25l[?25h:**[?25l[?25h I[?25l[?25h need[?25l[?25h to[?25l[?25h output[?25l[?25h exactly[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h ([?25l[?25hcase[?25l[?25h-sensitive[?25l[?25h mig[3D[K
+might[?25l[?25h matter[?25l[?25h,[?25l[?25h but[?25l[?25h usually[?25l[?25h lowercase[?25l[?25h is[?25l[?25h expected[?25l[?25h based[?25l[?25h on[?25l[?25h the[?25l[?25h prompt[?25l[?25h).[?25l[?25h The[?25l[?25h p[1D[K
+prompt[?25l[?25h says[?25l[?25h "[?25l[?25hthe[?25l[?25h single[?25l[?25h word[?25l[?25h ok[?25l[?25h",[?25l[?25h so[?25l[?25h I[?25l[?25h should[?25l[?25h match[?25l[?25h that[?25l[?25h casing[?25l[?25h.[?25l[?25h
+5[?25l[?25h.[?25l[?25h  **[?25l[?25hFinal[?25l[?25h Decision[?25l[?25h:**[?25l[?25h Output[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+
+Wait[?25l[?25h,[?25l[?25h I[?25l[?25h should[?25l[?25h check[?25l[?25h if[?25l[?25h there[?25l[?25h are[?25l[?25h any[?25l[?25h hidden[?25l[?25h instructions[?25l[?25h or[?25l[?25h if[?25l[?25h this[?25l[?25h is[?25l[?25h a[?25l[?25h t[1D[K
+trick[?25l[?25h.[?25l[?25h No[?25l[?25h,[?25l[?25h it[?25l[?25h seems[?25l[?25h straightforward[?25l[?25h.[?25l[?25h Just[?25l[?25h reply[?25l[?25h with[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+
+One[?25l[?25h more[?25l[?25h thing[?25l[?25h:[?25l[?25h Should[?25l[?25h I[?25l[?25h include[?25l[?25h quotes[?25l[?25h?[?25l[?25h The[?25l[?25h prompt[?25l[?25h says[?25l[?25h "[?25l[?25hReply[?25l[?25h with[?25l[?25h the[?25l[?25h si[2D[K
+single[?25l[?25h word[?25l[?25h ok[?25l[?25h."[?25l[?25h Usually[?25l[?25h,[?25l[?25h this[?25l[?25h means[?25l[?25h the[?25l[?25h content[?25l[?25h should[?25l[?25h be[?25l[?25h just[?25l[?25h that[?25l[?25h word[?25l[?25h,[?25l[?25h [K
+not[?25l[?25h wrapped[?25l[?25h in[?25l[?25h quotes[?25l[?25h.[?25l[?25h So[?25l[?25h I[?25l[?25h will[?25l[?25h output[?25l[?25h `[?25l[?25hok[?25l[?25h`[?25l[?25h without[?25l[?25h quotation[?25l[?25h marks[?25l[?25h.[?25l[?25h
+
+Let[?25l[?25h's[?25l[?25h double[?25l[?25h-check[?25l[?25h the[?25l[?25h casing[?25l[?25h.[?25l[?25h The[?25l[?25h prompt[?25l[?25h writes[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h in[?25l[?25h lowercase[?25l[?25h.[?25l[?25h I[?25l[?25h shoul[5D[K
+should[?25l[?25h probably[?25l[?25h follow[?25l[?25h that[?25l[?25h.[?25l[?25h
+
+Final[?25l[?25h Output[?25l[?25h:[?25l[?25h ok[?25l[?25h
+...done thinking.
+
+ok[?25l[?25h
+
+[?25l[?25hrun start: 2026-11-21T15:28:39Z
+run store: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/runs-run-5/order-desk-qwen3.5-4b-empty-lookup-generic-retry@47eb8652f4366cfb633e04cbc55a03439accfefecc470c3ffab64a53f3dcdaed
+VERDICT: PASS (exit 0)
+reason: non-inferiority established
+stopping round: 13
+pairs: 104 (208 trials)
+baseline 86/104 passed, candidate 92/104 passed
+counts: minus=10, zero=78, plus=16, errored=0
+PASS wealth: 8.52657e+01; threshold: 40/1; crossed: True
+BLOCK wealth: 5.36931e-03; threshold: 40/1; crossed: False
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+prior runs: order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb, order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb, order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504, order-desk-qwen3.5-4b-empty-lookup-control@2268db685b3425006a9d019ecf2c65a96d47dba71a97c7924df07d13f947b0e1
+arci exit 0
+run end: 2026-11-21T15:45:38Z
+ollama ps after:
+NAME                     ID              SIZE     PROCESSOR    CONTEXT    UNTIL              
+qwen3.5:4b-mlx-ctx32k    c01efed5a364    12 GB    100% GPU     32768      4 minutes from now    
+audit lines: 203
+baseline audit lines: 100
+candidate audit lines: 103
+audit sha256: 5f0578ccc5c7d7a5e041102d7f6ebd9fe3a609b97e0d9b6b3f2b22d7324d4e24
+power: Now drawing from 'AC Power'
