@@ -1,0 +1,1 @@
+run-6.sh: line 253: 11696 Terminated: 15          ollama run "$MODEL" "Reply with the single word ok." >> "$LOG" 2>&1

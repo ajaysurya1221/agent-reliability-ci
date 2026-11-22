@@ -1,0 +1,63 @@
+mode: real
+start: 2026-11-22T06:02:57Z
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGSMITH_TRACING=false
+LANGCHAIN_TRACING_V2=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-6-audit.jsonl
+ORDER_DESK_FIRST_EXCHANGE_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-6-first-exchanges.jsonl
+NO_PROXY=127.0.0.1,localhost
+ollama: ollama version is 0.32.14
+ollama server version: 0.32.14
+server model digest: qwen3.5:4b-mlx-ctx32k c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'Battery Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+model manifest sha256: c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+records commit (HEAD): 0ca504d311b343a3d7e000fbd1e2cffad9881df3
+published branch commit: 0ca504d311b343a3d7e000fbd1e2cffad9881df3
+registered files: committed, unchanged and published
+digests:
+order-desk-compound/.gitignore: OK
+order-desk-compound/agent.py: OK
+order-desk-compound/arci.yaml: OK
+order-desk-compound/check.py: OK
+order-desk-compound/configuration.py: OK
+order-desk-compound/exposure.py: OK
+order-desk-compound/offline_model.py: OK
+order-desk-compound/register.py: OK
+order-desk-compound/tasks.jsonl: OK
+order-desk-compound/tests/test_end_to_end.py: OK
+order-desk-compound/tests/test_exposure.py: OK
+order-desk-compound/tests/test_middleware.py: OK
+order-desk-compound/tools.py: OK
+blind-tests-run-6/INTERFACE.md: OK
+blind-tests-run-6/test_blind_compound.py: OK
+counts-run-6/SPEC.md: OK
+counts-run-6/count_a.py: OK
+counts-run-6/count_b.py: OK
+counts-run-6/test_counts.py: OK
+run-6.sh: OK
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound/agent.py
+preflight: baseline middleware ['ScriptedOpening', 'ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline opening check_stock(order_id as sku), lookup_order(order_id)
+preflight: baseline lookup reply 'The previous tool call returned an empty result. Repeat that call with the same input.'
+preflight: candidate middleware ['ScriptedOpening', 'ToolRetryMiddleware', 'ReturnToolErrors']
+preflight: candidate opening check_stock(order_id as sku), lookup_order(order_id)
+preflight: candidate lookup reply 'null'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+warm-up call outside the experiment:
