@@ -1,0 +1,120 @@
+mode: real
+start: 2026-11-22T06:59:22Z
+working directory: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound
+descriptor: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound/arci.yaml
+environment variables:
+ARCI_QUICKSTART_BASELINE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_CANDIDATE=ollama:qwen3.5:4b-mlx-ctx32k
+ARCI_QUICKSTART_TEMPERATURE=0.7
+LANGSMITH_TRACING=false
+LANGCHAIN_TRACING_V2=false
+ORDER_DESK_EMPTY_TEXT_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-6-audit.jsonl
+ORDER_DESK_FIRST_EXCHANGE_AUDIT=/Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/run-6-first-exchanges.jsonl
+NO_PROXY=127.0.0.1,localhost
+ollama: ollama version is 0.32.14
+ollama server version: 0.32.14
+server model digest: qwen3.5:4b-mlx-ctx32k c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+ollama ps before:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+power: Now drawing from 'AC Power'
+model id as listed: qwen3.5:4b-mlx-ctx32k c01efed5a364
+model manifest sha256: c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430
+records commit (HEAD): 80cb4b8c9c603a8d8772090a62ea278bfbea1f5c
+published branch commit: 80cb4b8c9c603a8d8772090a62ea278bfbea1f5c
+registered files: committed, unchanged and published
+digests:
+order-desk-compound/.gitignore: OK
+order-desk-compound/agent.py: OK
+order-desk-compound/arci.yaml: OK
+order-desk-compound/check.py: OK
+order-desk-compound/configuration.py: OK
+order-desk-compound/exposure.py: OK
+order-desk-compound/offline_model.py: OK
+order-desk-compound/register.py: OK
+order-desk-compound/tasks.jsonl: OK
+order-desk-compound/tests/test_end_to_end.py: OK
+order-desk-compound/tests/test_exposure.py: OK
+order-desk-compound/tests/test_middleware.py: OK
+order-desk-compound/tools.py: OK
+blind-tests-run-6/INTERFACE.md: OK
+blind-tests-run-6/test_blind_compound.py: OK
+counts-run-6/SPEC.md: OK
+counts-run-6/count_a.py: OK
+counts-run-6/count_b.py: OK
+counts-run-6/test_counts.py: OK
+run-6b.sh: OK
+preflight: agent module /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/order-desk-compound/agent.py
+preflight: baseline middleware ['ScriptedOpening', 'ToolRetryMiddleware', 'ReturnToolErrors', 'ReplaceEmptyLookup']
+preflight: baseline opening check_stock(order_id as sku), lookup_order(order_id)
+preflight: baseline lookup reply 'The previous tool call returned an empty result. Repeat that call with the same input.'
+preflight: candidate middleware ['ScriptedOpening', 'ToolRetryMiddleware', 'ReturnToolErrors']
+preflight: candidate opening check_stock(order_id as sku), lookup_order(order_id)
+preflight: candidate lookup reply 'null'
+preflight: agent-reliability-ci 2.4.1
+preflight: langchain 1.4.10
+preflight: langchain-core 1.7.7
+preflight: langgraph 1.2.20
+preflight: langgraph-prebuilt 1.1.1
+preflight: langchain-ollama 1.1.0
+preflight: ollama 0.6.3
+preflight: pydantic 2.14.3
+preflight: arci module /Users/ajay/Developer/.arci-worktrees/run4-env/lib/python3.13/site-packages/arci/__init__.py
+preflight: python 3.13.12
+warm-up call outside the experiment:
+[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠹ [K[?25h[?2026l[?2026h[?25l[1G⠸ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠴ [K[?25h[?2026l[?2026h[?25l[1G⠧ [K[?25h[?2026l[?2026h[?25l[1G⠧ [K[?25h[?2026l[?2026h[?25l[1G⠇ [K[?25h[?2026l[?2026h[?25l[1G⠏ [K[?25h[?2026l[?2026h[?25l[1G⠙ [K[?25h[?2026l[?2026h[?25l[1G⠹ [K[?25h[?2026l[?2026h[?25l[1G⠸ [K[?25h[?2026l[?2026h[?25l[1G⠼ [K[?25h[?2026l[?2026h[?25l[1G⠴ [K[?25h[?2026l[?2026h[?25l[1G⠦ [K[?25h[?2026l[?25l[?2026h[?25l[1G[K[?25h[?2026l[2K[1G[?25hThinking...
+Thinking[?25l[?25h Process[?25l[?25h:[?25l[?25h
+
+1[?25l[?25h.[?25l[?25h  **[?25l[?25hAn[?25l[?25halyze[?25l[?25h the[?25l[?25h Request[?25l[?25h:**[?25l[?25h
+    *[?25l[?25h   Input[?25l[?25h:[?25l[?25h "[?25l[?25hReply[?25l[?25h with[?25l[?25h the[?25l[?25h single[?25l[?25h word[?25l[?25h ok[?25l[?25h."[?25l[?25h
+    *[?25l[?25h   Constraint[?25l[?25h:[?25l[?25h The[?25l[?25h response[?25l[?25h must[?25l[?25h be[?25l[?25h exactly[?25l[?25h one[?25l[?25h word[?25l[?25h.[?25l[?25h
+    *[?25l[?25h   Desired[?25l[?25h Output[?25l[?25h:[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h ([?25l[?25hor[?25l[?25h a[?25l[?25h variation[?25l[?25h like[?25l[?25h "[?25l[?25hOkay[?25l[?25h",[?25l[?25h but[?25l[?25h strictly[?25l[?25h adhe[4D[K
+adher[?25l[?25hing[?25l[?25h to[?25l[?25h "[?25l[?25hsingle[?25l[?25h word[?25l[?25h ok[?25l[?25h"[?25l[?25h implies[?25l[?25h the[?25l[?25h word[?25l[?25h itself[?25l[?25h).[?25l[?25h
+    *[?25l[?25h   Instruction[?25l[?25h:[?25l[?25h "[?25l[?25hReply[?25l[?25h with[?25l[?25h the[?25l[?25h single[?25l[?25h word[?25l[?25h ok[?25l[?25h."[?25l[?25h ->[?25l[?25h This[?25l[?25h is[?25l[?25h a[?25l[?25h command[?25l[?25h [K
+to[?25l[?25h output[?25l[?25h the[?25l[?25h specific[?25l[?25h word[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+
+2[?25l[?25h.[?25l[?25h  **[?25l[?25hEvaluate[?25l[?25h Constraints[?25l[?25h:**[?25l[?25h
+    *[?25l[?25h   Single[?25l[?25h word[?25l[?25h only[?25l[?25h.[?25l[?25h
+    *[?25l[?25h   Content[?25l[?25h should[?25l[?25h be[?25l[?25h "[?25l[?25hok[?25l[?25h".[?25l[?25h
+
+3[?25l[?25h.[?25l[?25h  **[?25l[?25hForm[?25l[?25hulate[?25l[?25h Response[?25l[?25h:**[?25l[?25h
+    *[?25l[?25h   Option[?25l[?25h 1[?25l[?25h:[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h
+    *[?25l[?25h   Option[?25l[?25h 2[?25l[?25h:[?25l[?25h "[?25l[?25hOkay[?25l[?25h"[?25l[?25h ([?25l[?25hTechn[?25l[?25hically[?25l[?25h one[?25l[?25h word[?25l[?25h,[?25l[?25h but[?25l[?25h the[?25l[?25h prompt[?25l[?25h asks[?25l[?25h for[?25l[?25h "[?25l[?25hok[?25l[?25h[3D[K
+"ok").[?25l[?25h
+    *[?25l[?25h   Decision[?25l[?25h:[?25l[?25h "[?25l[?25hok[?25l[?25h"[?25l[?25h is[?25l[?25h safest[?25l[?25h and[?25l[?25h most[?25l[?25h direct[?25l[?25h.[?25l[?25h
+
+4[?25l[?25h.[?25l[?25h  **[?25l[?25hFinal[?25l[?25h Check[?25l[?25h:**[?25l[?25h Does[?25l[?25h this[?25l[?25h violate[?25l[?25h any[?25l[?25h safety[?25l[?25h policies[?25l[?25h?[?25l[?25h No[?25l[?25h.[?25l[?25h Is[?25l[?25h it[?25l[?25h helpf[5D[K
+helpful[?25l[?25h?[?25l[?25h Yes[?25l[?25h,[?25l[?25h it[?25l[?25h follows[?25l[?25h instructions[?25l[?25h.[?25l[?25h
+
+5[?25l[?25h.[?25l[?25h  **[?25l[?25hOutput[?25l[?25h Generation[?25l[?25h:**[?25l[?25h ok[?25l[?25h
+...done thinking.
+
+ok[?25l[?25h
+
+[?25l[?25hrun start: 2026-11-22T06:59:29Z
+run store: /Users/ajay/Developer/agent-reliability-ci/plan/exec/v2/study/runs-run-6/order-desk-qwen3.5-4b-compound-generic-retry@1399fb1d45ce14c2bdf8c973a77291a4f9dcdfc1b350c95259808b96855ab838
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 3
+pairs: 24 (48 trials)
+baseline 18/24 passed, candidate 0/24 passed
+counts: minus=18, zero=6, plus=0, errored=0
+PASS wealth: 3.32516e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 1.93819e+02; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+prior runs: order-desk-gemma4-12b-vs-qwen3.5-4b@533c6d1a78ccc1a201eb7e265a61873244d48c2ac0e26cde5a50bc7dfd5f83bb, order-desk-gemma4-12b-vs-qwen3.5-4b-recoverable@eaa438b195f418b66878a57422ab6229b2171c74dd8d6eb7ba097ec4a09b96fb, order-desk-qwen3.5-4b-empty-lookup-text@4413b7e2f81abc51d3576fce3d0de4974f5c25c820af06c62a5e0d0f6e969504, order-desk-qwen3.5-4b-empty-lookup-control@2268db685b3425006a9d019ecf2c65a96d47dba71a97c7924df07d13f947b0e1, order-desk-qwen3.5-4b-empty-lookup-generic-retry@47eb8652f4366cfb633e04cbc55a03439accfefecc470c3ffab64a53f3dcdaed
+arci exit 1
+run end: 2026-11-22T07:01:42Z
+first exchanges sha256: a4a1d61daa61628ff1c13dce5c9fe0fae1c541375e9fea19a1944c983216cfb3
+48 assignments with a matching first request and assistant response
+ollama ps after:
+NAME                     ID              SIZE     PROCESSOR    CONTEXT    UNTIL              
+qwen3.5:4b-mlx-ctx32k    c01efed5a364    12 GB    100% GPU     32768      4 minutes from now    
+audit lines: 24
+baseline audit lines: 24
+candidate audit lines: 0
+audit sha256: d1ee8514d8e06c66bae55d19c65370e3696aaa3d7dfa5247a720700d1e96a435
+power: Now drawing from 'AC Power'
