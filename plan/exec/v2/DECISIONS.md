@@ -761,3 +761,29 @@ decision is his.
 **What it does not claim.** Anything about the vendor's model in general, about other
 people's tasks, or about use of the tool by anyone else. One machine, one period of hours,
 the project's own tickets.
+
+## D-31: one benchmark of the verdict rule against other release gates, before 14 Dec (2026-11-25)
+
+**What led to it.** The maintainer asked what large companies lack for reliable agents and where
+ARCI fits. Two research rounds (private) found the most-named obstacles are cost, value,
+governance, integration and data quality, which ARCI does not serve, and one narrow fit: a release
+decision for an agent change with the rule and thresholds fixed in advance and a record a reviewer
+can recompute. No buyer was found asking for exactly this, and other gates come close (a fixed
+score threshold as in AWS AgentCore and Braintrust, McNemar's test as in NVIDIA NeMo `nel compare`,
+bootstrap intervals, evalsig's sequential monitoring). Astra proposed two benchmarks and advised
+waiting until 14 Dec to run them. The orchestrator advised running the first now, since it changes
+no product code. The maintainer chose to run it now.
+
+**The decision.**
+
+- One registered benchmark, B1: simulated paired pass/fail results with a known true difference,
+  fed to the released `arci verdict` rule (2.4.1) and to rival gates rebuilt from their public
+  documentation, to measure wrong decisions and the number of trials each needs.
+- The protocol, every setting, the pass and fail criteria and the rule that says "stop this
+  direction" are committed and pushed before any registered simulation runs. Code is checked with
+  hand-made inputs only.
+- No product code changes; nothing is released. D-23, D-27 and D-29 are otherwise unchanged; the
+  stop rule of 14 Dec stands. B2 (recomputation by a second party) waits until after 14 Dec.
+
+**What it does not claim.** That any company wants this, or that a benchmark result brings users.
+A simulation measures the rule, not agents or their graders.
