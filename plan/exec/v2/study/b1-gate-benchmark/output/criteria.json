@@ -1,0 +1,205 @@
+{
+  "C1": true,
+  "C1_failures": {
+    "arci": [],
+    "score_margin": [
+      "I/85/wrong_BLOCK",
+      "P/85/wrong_BLOCK"
+    ],
+    "bootstrap_margin": [
+      "P/85/wrong_PASS"
+    ],
+    "cs_margin": []
+  },
+  "C2": true,
+  "C3": true,
+  "calibrated_rivals": [
+    "cs_margin"
+  ],
+  "comparisons": [
+    {
+      "cell": [
+        "I",
+        75
+      ],
+      "rival": "score_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -116.582,
+      "simultaneous_95": [
+        -123.25843135740733,
+        -109.90556864259266
+      ],
+      "correct_rate_difference": -0.0604,
+      "meets_contrast": false
+    },
+    {
+      "cell": [
+        "I",
+        75
+      ],
+      "rival": "bootstrap_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -116.582,
+      "simultaneous_95": [
+        -123.25843135740733,
+        -109.90556864259266
+      ],
+      "correct_rate_difference": -0.0579,
+      "meets_contrast": false
+    },
+    {
+      "cell": [
+        "I",
+        75
+      ],
+      "rival": "cs_margin",
+      "calibrated": true,
+      "mean_contrast_pairs": -115.8492,
+      "simultaneous_95": [
+        -127.86677644333321,
+        -103.83162355666678
+      ],
+      "correct_rate_difference": 0.9118,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        75
+      ],
+      "rival": "score_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -166.996,
+      "simultaneous_95": [
+        -173.67243135740733,
+        -160.31956864259269
+      ],
+      "correct_rate_difference": -0.0014,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        75
+      ],
+      "rival": "bootstrap_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -166.996,
+      "simultaneous_95": [
+        -173.67243135740733,
+        -160.31956864259269
+      ],
+      "correct_rate_difference": -0.0013,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        75
+      ],
+      "rival": "cs_margin",
+      "calibrated": true,
+      "mean_contrast_pairs": -166.7768,
+      "simultaneous_95": [
+        -178.79437644333322,
+        -154.7592235566668
+      ],
+      "correct_rate_difference": 0.9931,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "I",
+        95
+      ],
+      "rival": "score_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -193.898,
+      "simultaneous_95": [
+        -200.57443135740732,
+        -187.22156864259267
+      ],
+      "correct_rate_difference": -0.0002,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "I",
+        95
+      ],
+      "rival": "bootstrap_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -193.898,
+      "simultaneous_95": [
+        -200.57443135740732,
+        -187.22156864259267
+      ],
+      "correct_rate_difference": -0.0002,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "I",
+        95
+      ],
+      "rival": "cs_margin",
+      "calibrated": true,
+      "mean_contrast_pairs": -193.89320000000006,
+      "simultaneous_95": [
+        -205.91077644333328,
+        -181.87562355666685
+      ],
+      "correct_rate_difference": 0.9995,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        95
+      ],
+      "rival": "score_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -240.0,
+      "simultaneous_95": [
+        -246.67643135740732,
+        -233.32356864259268
+      ],
+      "correct_rate_difference": 0.0,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        95
+      ],
+      "rival": "bootstrap_margin",
+      "calibrated": false,
+      "mean_contrast_pairs": -240.0,
+      "simultaneous_95": [
+        -246.67643135740732,
+        -233.32356864259268
+      ],
+      "correct_rate_difference": 0.0,
+      "meets_contrast": true
+    },
+    {
+      "cell": [
+        "P",
+        95
+      ],
+      "rival": "cs_margin",
+      "calibrated": true,
+      "mean_contrast_pairs": -240.0,
+      "simultaneous_95": [
+        -252.0175764433332,
+        -227.9824235566668
+      ],
+      "correct_rate_difference": 1.0,
+      "meets_contrast": true
+    }
+  ],
+  "efficiency_claim": "supported",
+  "matches_or_beats_correctness": [],
+  "stop": false,
+  "conclusion": "The registered stop rule did not trigger."
+}

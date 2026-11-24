@@ -1,0 +1,35 @@
+{
+  "schema_version": "arci-outcomes/1",
+  "suite_id": "b1",
+  "tasks": [
+    "task-01",
+    "task-02",
+    "task-03",
+    "task-04",
+    "task-05",
+    "task-06",
+    "task-07",
+    "task-08",
+    "task-09",
+    "task-10",
+    "task-11",
+    "task-12",
+    "task-13",
+    "task-14",
+    "task-15",
+    "task-16",
+    "task-17",
+    "task-18",
+    "task-19",
+    "task-20"
+  ],
+  "alpha": "1/20",
+  "margin": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "max_rounds": 20,
+  "max_errored_pairs": 0,
+  "fixed_before_runs": true
+}

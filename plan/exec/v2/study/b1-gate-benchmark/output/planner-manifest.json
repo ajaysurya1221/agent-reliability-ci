@@ -1,0 +1,136 @@
+{
+  "record_sha256": "febccfe7411c34941d7c819ef56dcab083cd8efa46fad8aa3655e12260a1d90b",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "b1@42c23bb3cbab8b8be26e00c6c51a2b80fe0520ea7cf56f39091b7343350feedf",
+  "created_at": "",
+  "suite_id": "b1",
+  "tasks": [
+    {
+      "task_id": "task-01",
+      "task": {}
+    },
+    {
+      "task_id": "task-02",
+      "task": {}
+    },
+    {
+      "task_id": "task-03",
+      "task": {}
+    },
+    {
+      "task_id": "task-04",
+      "task": {}
+    },
+    {
+      "task_id": "task-05",
+      "task": {}
+    },
+    {
+      "task_id": "task-06",
+      "task": {}
+    },
+    {
+      "task_id": "task-07",
+      "task": {}
+    },
+    {
+      "task_id": "task-08",
+      "task": {}
+    },
+    {
+      "task_id": "task-09",
+      "task": {}
+    },
+    {
+      "task_id": "task-10",
+      "task": {}
+    },
+    {
+      "task_id": "task-11",
+      "task": {}
+    },
+    {
+      "task_id": "task-12",
+      "task": {}
+    },
+    {
+      "task_id": "task-13",
+      "task": {}
+    },
+    {
+      "task_id": "task-14",
+      "task": {}
+    },
+    {
+      "task_id": "task-15",
+      "task": {}
+    },
+    {
+      "task_id": "task-16",
+      "task": {}
+    },
+    {
+      "task_id": "task-17",
+      "task": {}
+    },
+    {
+      "task_id": "task-18",
+      "task": {}
+    },
+    {
+      "task_id": "task-19",
+      "task": {}
+    },
+    {
+      "task_id": "task-20",
+      "task": {}
+    }
+  ],
+  "conditions": [
+    {
+      "condition_id": "binary",
+      "faults": []
+    }
+  ],
+  "toolset": "b1:unused",
+  "mcp_server": null,
+  "contract": {
+    "oracle": "b1:unused",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "baseline",
+    "agent": "b1:unused",
+    "command": null,
+    "candidate_id": ""
+  },
+  "candidate": {
+    "label": "candidate",
+    "agent": "b1:unused",
+    "command": null,
+    "candidate_id": ""
+  },
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "max_rounds": 20,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 0,
+  "seed_derivation": "sha256-v1",
+  "acknowledge_single_round": false,
+  "budgets": {
+    "max_tool_calls": 30,
+    "max_model_steps": 50,
+    "max_seconds": 30.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

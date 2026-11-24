@@ -1,0 +1,3 @@
+# results.jsonl is about 108 MB, over the host limit of 100 MB per file.
+# It is kept as output/results.jsonl.gz (gzip -9 -n); its sha256 before compression is in output/digests.sha256.
+output/results.jsonl
