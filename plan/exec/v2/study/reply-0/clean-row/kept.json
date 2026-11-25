@@ -1,0 +1,961 @@
+{
+  "12B": {
+    "C0": {
+      "held_out": {
+        "kept": [],
+        "rounds": null,
+        "seconds_per_trial": null,
+        "status": "not run",
+        "tasks": {}
+      },
+      "main": {
+        "kept": [
+          "C0-c1",
+          "C0-c2",
+          "C0-c3",
+          "C0-c4",
+          "C0-c5",
+          "C0-c6",
+          "C0-c7",
+          "C0-c8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 1.3399311978128026,
+        "status": "eligible",
+        "tasks": {
+          "C0-c1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.542396020500746
+          },
+          "C0-c2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1788428540021414
+          },
+          "C0-c3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.5028336459945422
+          },
+          "C0-c4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1737052500029677
+          },
+          "C0-c5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1646418125019409
+          },
+          "C0-c6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.5335134790002485
+          },
+          "C0-c7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4806576455011964
+          },
+          "C0-c8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1428588749986375
+          }
+        }
+      }
+    },
+    "F1": {
+      "held_out": {
+        "kept": [
+          "F1-d1",
+          "F1-d2",
+          "F1-d3",
+          "F1-d4",
+          "F1-d5",
+          "F1-d6",
+          "F1-d7",
+          "F1-d8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.7996820728722014,
+        "status": "eligible",
+        "tasks": {
+          "F1-d1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 6.452021229495585
+          },
+          "F1-d2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.500409749998653
+          },
+          "F1-d3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.211340604502766
+          },
+          "F1-d4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2540134789960575
+          },
+          "F1-d5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1544016454936354
+          },
+          "F1-d6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.242975249995652
+          },
+          "F1-d7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.196356291497068
+          },
+          "F1-d8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.385938332998194
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "F1-n1",
+          "F1-n2",
+          "F1-n3",
+          "F1-n4",
+          "F1-n5",
+          "F1-n6",
+          "F1-n7",
+          "F1-n8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.9252134349380867,
+        "status": "eligible",
+        "tasks": {
+          "F1-n1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 6.534702208504314
+          },
+          "F1-n2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.5142261875007534
+          },
+          "F1-n3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.628308104001917
+          },
+          "F1-n4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2037505415064516
+          },
+          "F1-n5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.6732189584945445
+          },
+          "F1-n6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.413327895999828
+          },
+          "F1-n7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2420124794953153
+          },
+          "F1-n8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1921611040015705
+          }
+        }
+      }
+    },
+    "F2": {
+      "held_out": {
+        "kept": [
+          "F2-d1",
+          "F2-d2",
+          "F2-d3",
+          "F2-d4",
+          "F2-d5",
+          "F2-d6",
+          "F2-d7",
+          "F2-d8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.2529881198133808,
+        "status": "eligible",
+        "tasks": {
+          "F2-d1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.111835916999553
+          },
+          "F2-d2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1052675414975965
+          },
+          "F2-d3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.067095958504069
+          },
+          "F2-d4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1892237915017176
+          },
+          "F2-d5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.753119749999314
+          },
+          "F2-d6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1972480625045137
+          },
+          "F2-d7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2960299585029134
+          },
+          "F2-d8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.304083978997369
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "F2-n1",
+          "F2-n2",
+          "F2-n3",
+          "F2-n4",
+          "F2-n5",
+          "F2-n6",
+          "F2-n7",
+          "F2-n8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 3.9232453697477467,
+        "status": "eligible",
+        "tasks": {
+          "F2-n1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 6.763619478995679
+          },
+          "F2-n2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 6.300869521001005
+          },
+          "F2-n3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 6.488622749995557
+          },
+          "F2-n4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1591034374941955
+          },
+          "F2-n5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.5226667709939647
+          },
+          "F2-n6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.547321604004537
+          },
+          "F2-n7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.234887582999363
+          },
+          "F2-n8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.368871812497673
+          }
+        }
+      }
+    },
+    "G1": {
+      "held_out": {
+        "kept": [
+          "G1-h1",
+          "G1-h2",
+          "G1-h3",
+          "G1-h4",
+          "G1-h5",
+          "G1-h6",
+          "G1-h7",
+          "G1-h8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.1441272396887143,
+        "status": "eligible",
+        "tasks": {
+          "G1-h1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.4637194164970424
+          },
+          "G1-h2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.539160145504866
+          },
+          "G1-h3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1408327919998555
+          },
+          "G1-h4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2627396044990746
+          },
+          "G1-h5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1099242295022123
+          },
+          "G1-h6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8710334165007225
+          },
+          "G1-h7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8916323545054183
+          },
+          "G1-h8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8739759585005231
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "G1-g1",
+          "G1-g2",
+          "G1-g3",
+          "G1-g4",
+          "G1-g5",
+          "G1-g6",
+          "G1-g7",
+          "G1-g8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.8104232186879017,
+        "status": "eligible",
+        "tasks": {
+          "G1-g1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 4.618442624996533
+          },
+          "G1-g2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 4.592349416998331
+          },
+          "G1-g3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.5034755829983624
+          },
+          "G1-g4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.51686860400514
+          },
+          "G1-g5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.146037229002104
+          },
+          "G1-g6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2483951459944365
+          },
+          "G1-g7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.9596002290054457
+          },
+          "G1-g8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8982169165028608
+          }
+        }
+      }
+    }
+  },
+  "4B": {
+    "C0": {
+      "held_out": {
+        "kept": [],
+        "rounds": null,
+        "seconds_per_trial": null,
+        "status": "not run",
+        "tasks": {}
+      },
+      "main": {
+        "kept": [
+          "C0-c1",
+          "C0-c2",
+          "C0-c3",
+          "C0-c4",
+          "C0-c5",
+          "C0-c6",
+          "C0-c7",
+          "C0-c8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 1.059169528687562,
+        "status": "eligible",
+        "tasks": {
+          "C0-c1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1944991249984014
+          },
+          "C0-c2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1820184999960475
+          },
+          "C0-c3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 0.9647795000055339
+          },
+          "C0-c4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.2791212919983082
+          },
+          "C0-c5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 0.9435079584945925
+          },
+          "C0-c6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 0.9738543125058641
+          },
+          "C0-c7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 0.9657565415036515
+          },
+          "C0-c8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 0.9698189999980968
+          }
+        }
+      }
+    },
+    "F0": {
+      "held_out": {
+        "kept": [],
+        "rounds": null,
+        "seconds_per_trial": null,
+        "status": "not run",
+        "tasks": {}
+      },
+      "main": {
+        "kept": [
+          "F0-n1",
+          "F0-n2",
+          "F0-n3",
+          "F0-n4",
+          "F0-n5",
+          "F0-n6",
+          "F0-n8"
+        ],
+        "rounds": 18,
+        "seconds_per_trial": 1.090398697873752,
+        "status": "eligible",
+        "tasks": {
+          "F0-n1": {
+            "errors": 0,
+            "passes": 1,
+            "seconds_per_trial": 1.1548679164989153
+          },
+          "F0-n2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.0398582289999467
+          },
+          "F0-n3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1289042919961503
+          },
+          "F0-n4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.008897874999093
+          },
+          "F0-n5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.0676872289986932
+          },
+          "F0-n6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.1178754579959786
+          },
+          "F0-n7": {
+            "errors": 0,
+            "passes": 0,
+            "seconds_per_trial": 1.1396071039998787
+          },
+          "F0-n8": {
+            "errors": 0,
+            "passes": 1,
+            "seconds_per_trial": 1.065491479501361
+          }
+        }
+      }
+    },
+    "F1": {
+      "held_out": {
+        "kept": [
+          "F1-d1",
+          "F1-d2",
+          "F1-d5",
+          "F1-d6",
+          "F1-d7",
+          "F1-d8"
+        ],
+        "rounds": 20,
+        "seconds_per_trial": 1.7694281589983802,
+        "status": "eligible",
+        "tasks": {
+          "F1-d1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6401968124991981
+          },
+          "F1-d2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6109201459985343
+          },
+          "F1-d3": {
+            "errors": 0,
+            "passes": 0,
+            "seconds_per_trial": 1.764562083495548
+          },
+          "F1-d4": {
+            "errors": 0,
+            "passes": 0,
+            "seconds_per_trial": 1.7350323334976565
+          },
+          "F1-d5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.1097778545008623
+          },
+          "F1-d6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.9786197709981934
+          },
+          "F1-d7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6785988749979879
+          },
+          "F1-d8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6377173959990614
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "F1-n1",
+          "F1-n2",
+          "F1-n3",
+          "F1-n4",
+          "F1-n5",
+          "F1-n6",
+          "F1-n7",
+          "F1-n8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.065687760561559,
+        "status": "eligible",
+        "tasks": {
+          "F1-n1": {
+            "errors": 0,
+            "passes": 1,
+            "seconds_per_trial": 3.608056500001112
+          },
+          "F1-n2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.176287083493662
+          },
+          "F1-n3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.869858625002962
+          },
+          "F1-n4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.7018464584980393
+          },
+          "F1-n5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.873033479503647
+          },
+          "F1-n6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.819847270999162
+          },
+          "F1-n7": {
+            "errors": 0,
+            "passes": 1,
+            "seconds_per_trial": 1.79111681249924
+          },
+          "F1-n8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6854558544946485
+          }
+        }
+      }
+    },
+    "F2": {
+      "held_out": {
+        "kept": [
+          "F2-d1",
+          "F2-d2",
+          "F2-d3",
+          "F2-d5",
+          "F2-d6",
+          "F2-d7"
+        ],
+        "rounds": 20,
+        "seconds_per_trial": 1.7500688723130224,
+        "status": "eligible",
+        "tasks": {
+          "F2-d1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6169358545012074
+          },
+          "F2-d2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6303528330026893
+          },
+          "F2-d3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.957643020505202
+          },
+          "F2-d4": {
+            "errors": 0,
+            "passes": 0,
+            "seconds_per_trial": 2.0975578334982856
+          },
+          "F2-d5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.7567119999948773
+          },
+          "F2-d6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6971840830010478
+          },
+          "F2-d7": {
+            "errors": 0,
+            "passes": 1,
+            "seconds_per_trial": 1.3458354789981968
+          },
+          "F2-d8": {
+            "errors": 0,
+            "passes": 0,
+            "seconds_per_trial": 1.8983298750026734
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "F2-n1",
+          "F2-n2",
+          "F2-n3",
+          "F2-n4",
+          "F2-n5",
+          "F2-n6",
+          "F2-n7",
+          "F2-n8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 2.321849359374937,
+        "status": "eligible",
+        "tasks": {
+          "F2-n1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 3.2462609374997555
+          },
+          "F2-n2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 3.1383963960033725
+          },
+          "F2-n3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 3.338187082998047
+          },
+          "F2-n4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6867932085006032
+          },
+          "F2-n5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.891012749998481
+          },
+          "F2-n6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8118290834972868
+          },
+          "F2-n7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.7816606665001018
+          },
+          "F2-n8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6806547500018496
+          }
+        }
+      }
+    },
+    "G1": {
+      "held_out": {
+        "kept": [
+          "G1-h1",
+          "G1-h2",
+          "G1-h3",
+          "G1-h4",
+          "G1-h5",
+          "G1-h6",
+          "G1-h7",
+          "G1-h8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 1.6253375858759682,
+        "status": "eligible",
+        "tasks": {
+          "G1-h1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8350559580067056
+          },
+          "G1-h2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8377566460039816
+          },
+          "G1-h3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6216912500021863
+          },
+          "G1-h4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6355724374952842
+          },
+          "G1-h5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6354728954975144
+          },
+          "G1-h6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4786068125031306
+          },
+          "G1-h7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4748569795046933
+          },
+          "G1-h8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4836877079942496
+          }
+        }
+      },
+      "main": {
+        "kept": [
+          "G1-g1",
+          "G1-g2",
+          "G1-g3",
+          "G1-g4",
+          "G1-g5",
+          "G1-g6",
+          "G1-g7",
+          "G1-g8"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 1.9195826483728524,
+        "status": "eligible",
+        "tasks": {
+          "G1-g1": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.874599124996166
+          },
+          "G1-g2": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.7682933124960982
+          },
+          "G1-g3": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.8386232705015573
+          },
+          "G1-g4": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6173502704987186
+          },
+          "G1-g5": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6167714789989986
+          },
+          "G1-g6": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.6990207499984535
+          },
+          "G1-g7": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4818454169944744
+          },
+          "G1-g8": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.4601575624983525
+          }
+        }
+      }
+    },
+    "G2": {
+      "held_out": {
+        "kept": [],
+        "rounds": null,
+        "seconds_per_trial": null,
+        "status": "not run",
+        "tasks": {}
+      },
+      "main": {
+        "kept": [
+          "G2-b1-everything",
+          "G2-b2-everything",
+          "G2-b3-everything",
+          "G2-b4-everything",
+          "G2-b1-both",
+          "G2-b2-both",
+          "G2-b3-both",
+          "G2-b4-both"
+        ],
+        "rounds": 15,
+        "seconds_per_trial": 1.7190813411243653,
+        "status": "eligible",
+        "tasks": {
+          "G2-b1-both": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.2474095209981897
+          },
+          "G2-b1-everything": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.6473766039998736
+          },
+          "G2-b2-both": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.2614748749983846
+          },
+          "G2-b2-everything": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.3136389374994906
+          },
+          "G2-b3-both": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.2553610830000252
+          },
+          "G2-b3-everything": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.421524187499017
+          },
+          "G2-b4-both": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 1.327525250002509
+          },
+          "G2-b4-everything": {
+            "errors": 0,
+            "passes": 2,
+            "seconds_per_trial": 2.2783402709974325
+          }
+        }
+      }
+    }
+  }
+}

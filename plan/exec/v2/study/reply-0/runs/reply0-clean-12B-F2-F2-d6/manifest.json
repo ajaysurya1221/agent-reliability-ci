@@ -1,0 +1,147 @@
+{
+  "record_sha256": "c7a53e2668335f9c57382da244281d91d49df75ba73bda5f57bbcd0cb0160553",
+  "schema_version": "arci/0.5",
+  "experiment_id": "reply0-clean-12B-F2-F2-d6",
+  "created_at": "",
+  "task_id": "F2-d6",
+  "task": {
+    "ask": "A file somewhere under /Users/Shared/arci-reply0/fx/files answers this question: Which supplier sells oak and pine? Reply with the answer only.",
+    "bad": {
+      "arguments": {
+        "path": "/Users/Shared/arci-reply0/fx/files",
+        "pattern": "suppliers.txt"
+      },
+      "name": "search_files"
+    },
+    "cell": "F2",
+    "clean": {
+      "arguments": {
+        "path": "/Users/Shared/arci-reply0/fx/files",
+        "pattern": "**/*suppliers.txt*"
+      },
+      "name": "search_files"
+    },
+    "key_id": "F2-d6"
+  },
+  "toolset": null,
+  "mcp_server": {
+    "name": "env",
+    "argv": [
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/relay.py",
+      "--ledger",
+      "--env",
+      "HOME=/Users/Shared/arci-reply0/env/home",
+      "--env",
+      "LC_ALL=C",
+      "--env",
+      "TZ=UTC",
+      "--env",
+      "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+      "--env",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "--",
+      "/Users/Shared/arci-reply0/env/node/bin/node",
+      "/Users/Shared/arci-reply0/env/node/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+      "/Users/Shared/arci-reply0/fx/files"
+    ],
+    "env": {},
+    "snapshot": "reply0_oracle:snapshot"
+  },
+  "decisions": null,
+  "contract": {
+    "oracle": "reply0_oracle:passed",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-12B-F2-F2-d6"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "candidate": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-12B-F2-F2-d6"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "conditions": [
+    {
+      "condition_id": "F2",
+      "faults": []
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 1,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 0,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 50,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

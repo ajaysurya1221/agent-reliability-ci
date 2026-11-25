@@ -856,3 +856,34 @@ on anyone else's tracker.
 **Set aside by this decision.** The gate for coding-agent settings (the orchestrator's first
 leaning; Astra showed that the hard part is tasks that separate two settings, and a tool for it
 exists), record-and-replay "worlds", a second version of the decision rule, and plug-ins.
+
+## D-34: Reply-0 failed on criterion (c); the failure-reply direction ends with no product code; Board-0 is next (2026-11-25)
+
+**What led to it.** Reply-0 ran on 25 Nov as registered (`cd8f77a`, `3e54310`, `394d396`): 1,868
+trials on two local models, one start, no error, every run verified by two counts, a blind recount
+and the consultant's regrade. Result page: [study/reply-0/result.md](study/reply-0/result.md).
+
+- (a) met: the control gave BLOCK on the 4B model (sentence 16 of 16, blanked result 0 of 16).
+- (b) met: the git server's bare `Commit history:` reply gave BLOCK on both models (2 of 16 and
+  0 of 16 against 16 of 16).
+- (c) missed: the filesystem server's "no such file" reply gave CANNOT TELL on 4B (91 of 120
+  against 106 of 120) and PASS on 12B (80 of 80 each). On 4B the corrected read was made in every
+  trial of both arms; the failed answers held the right text with extra words.
+- (d) not run: nothing qualified.
+
+**The decision.** D-33's rule applies as written: any missed criterion ends the direction. No code
+under `src/arci` is written for a failure-reply check. Board-0, the corrected recovery-board
+benchmark of the panel, is the next step; it is registered before any trial, and its criteria K1
+to K3 can end feature work.
+
+**What is kept from Reply-0, with its limits.** The git result is the strongest measured finding:
+a reply that looks like an empty success stopped both models. The shown-only follow-up limits it:
+on 4B a generic "check the arguments and call again" sentence did as well as the sentence that
+names the call (80 of 80 each), so the comparison supports "bare header against a sentence" and
+not "naming the call". Unprompted, neither model made any of the wrong calls (0 of 16 in each of
+six model and cell combinations), so nothing here says how often this happens. Two small local
+models; nothing carries to hosted models. Nothing is claimed as new and nothing is filed on anyone
+else's tracker.
+
+**Predictions.** Both written predictions (the consultant's about 10% chance of a pass; the
+orchestrator's "(a) and (b) met, (c) missed, (d) not run") matched the outcome.

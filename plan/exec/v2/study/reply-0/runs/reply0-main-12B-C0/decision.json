@@ -1,0 +1,201 @@
+{
+  "record_sha256": "ac23ceb2369bc418165a27dee32cffd2d3ecb680035984dfa3d1ac2ef74119fc",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "reply0-main-12B-C0@338bbf8a27b5301961aa40d6b5ca36029b6a0a558b95c7e771a7b88dfb8e94ef",
+  "manifest_sha256": "376f025a457a20e8b06c4ad0431a304057da217b179c819a2c7970b8cdbcacfe",
+  "trials_sha256": "154c240bdaf71eec4e7322cf7917aaa29914aef605e4555803b87dedc0aca429",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 15,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "e57e7e4700a455b2103f87eead36f99081bef1a6fa1cdbe97f9fcdf329e99dbc",
+      "counts": {
+        "minus": 6,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.02706e-01",
+      "block_wealth": "5.02474e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "2c470d3665d96ab5a531cbd85a13cc8a07554d2a1ea3096284918e98f4f21fb2",
+      "counts": {
+        "minus": 12,
+        "zero": 4,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.78242e-02",
+      "block_wealth": "2.96896e+01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 24,
+      "trials_sha256": "eff60d0efb111da9eef7e973d6d4ae5bfa82d26c191d60b09a351a805007c2fd",
+      "counts": {
+        "minus": 18,
+        "zero": 6,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.32516e-03",
+      "block_wealth": "1.93819e+02",
+      "pass_crossed": false,
+      "block_crossed": true,
+      "verdict": "BLOCK",
+      "reasons": [
+        "regression established"
+      ]
+    }
+  ],
+  "stopped_at_round": 3,
+  "cells": [
+    {
+      "task_id": "C0-c1",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 3,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c2",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 3,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c3",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 2,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c4",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 3,
+      "counts": {
+        "minus": 0,
+        "zero": 3,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c5",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 3,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c6",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 3,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c7",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 3,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "C0-c8",
+      "condition_id": "C0",
+      "pairs": 3,
+      "baseline_successes": 3,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 1,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "BLOCK",
+  "exit_code": 1,
+  "reasons": [
+    "regression established"
+  ],
+  "prior_runs": []
+}

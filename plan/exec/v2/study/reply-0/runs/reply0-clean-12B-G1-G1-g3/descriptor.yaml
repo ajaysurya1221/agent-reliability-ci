@@ -1,0 +1,131 @@
+{
+  "baseline": {
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-12B-G1-G1-g3"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "label": "clean"
+  },
+  "budgets": {
+    "grader_seconds": 20,
+    "max_seconds": 120,
+    "max_tool_calls": 12
+  },
+  "candidate": {
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-12B-G1-G1-g3"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "label": "clean"
+  },
+  "conditions": [
+    {
+      "id": "G1"
+    }
+  ],
+  "experiment_id": "reply0-clean-12B-G1-G1-g3",
+  "mcp_server": {
+    "argv": [
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/relay.py",
+      "--ledger",
+      "--env",
+      "HOME=/Users/Shared/arci-reply0/env/home",
+      "--env",
+      "LC_ALL=C",
+      "--env",
+      "TZ=UTC",
+      "--env",
+      "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+      "--env",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "--env",
+      "GIT_CONFIG_GLOBAL=/dev/null",
+      "--env",
+      "GIT_CONFIG_NOSYSTEM=1",
+      "--env",
+      "GIT_OPTIONAL_LOCKS=0",
+      "--",
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "-m",
+      "mcp_server_git",
+      "--repository",
+      "/Users/Shared/arci-reply0/fx/repo"
+    ],
+    "name": "env",
+    "snapshot": "reply0_oracle:snapshot"
+  },
+  "n_per_arm": 1,
+  "oracle": "reply0_oracle:passed",
+  "prior_runs": [],
+  "task": {
+    "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 11 January 2026? Reply with their commit messages only, one per line.",
+    "bad": {
+      "arguments": {
+        "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+        "start_timestamp": "20260111"
+      },
+      "name": "git_log"
+    },
+    "cell": "G1",
+    "clean": {
+      "arguments": {
+        "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+        "start_timestamp": "2026-01-11"
+      },
+      "name": "git_log"
+    },
+    "key_id": "G1-g3"
+  },
+  "task_id": "G1-g3"
+}

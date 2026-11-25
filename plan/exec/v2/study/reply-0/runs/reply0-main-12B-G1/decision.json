@@ -1,0 +1,181 @@
+{
+  "record_sha256": "f6e6f1f2f355a0dab32abb278bcaf3a6e643241571fb6288bccba1659bc87ad4",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "reply0-main-12B-G1@c6e0e4fecfc9851e059b2d3e0df82162e3db3a83be3b778712035586ebc79850",
+  "manifest_sha256": "8d7c63f25be84b14f8814d787ce8c05b7a7b87712903aef9e88d734301546c5a",
+  "trials_sha256": "987626b57e05943001252b226eb8947f94de209b6b6ec1616122196e4db02027",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 15,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "9ec08e16f75c69a14090692946e20224b381ce755b364a5a68df995d9268482f",
+      "counts": {
+        "minus": 8,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "5.20095e-02",
+      "block_wealth": "9.98702e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "6d15b9c54b40887cbf5fb7da77a3925b8b6da276ecfc9d1473410129cfdb930c",
+      "counts": {
+        "minus": 16,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "5.01892e-03",
+      "block_wealth": "1.30600e+02",
+      "pass_crossed": false,
+      "block_crossed": true,
+      "verdict": "BLOCK",
+      "reasons": [
+        "regression established"
+      ]
+    }
+  ],
+  "stopped_at_round": 2,
+  "cells": [
+    {
+      "task_id": "G1-g1",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g2",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g3",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g4",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g5",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g6",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g7",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G1-g8",
+      "condition_id": "G1",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "BLOCK",
+  "exit_code": 1,
+  "reasons": [
+    "regression established"
+  ],
+  "prior_runs": []
+}

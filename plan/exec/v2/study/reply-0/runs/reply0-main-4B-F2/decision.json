@@ -1,0 +1,441 @@
+{
+  "record_sha256": "b369aa14d95e6683b8efd3f583edde4b71b314141e72ffe47ea201213719563b",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "reply0-main-4B-F2@a73965e107f8e3fc8cb8e4ead027a065d9bf4924c49a759f5abb8fc8d53830dc",
+  "manifest_sha256": "5b475f5a331495477a23fee6f882d323cc70054dcbaacb503b295640e6ce83ca",
+  "trials_sha256": "f9410d161284e3ae9ecb9222ac6e95a3c977d691d5a02fa826d406dc09544236",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 15,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "320078bcb126cd998054d0d8d31836eff2f83fce7f95abe0f342a81c2325dc2f",
+      "counts": {
+        "minus": 1,
+        "zero": 7,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "8.19294e-01",
+      "block_wealth": "1.02147e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "af3f11e3b0fa6cbd7794c6a88e9b9a22d29643d308684b33ef5d79b17fc8565a",
+      "counts": {
+        "minus": 1,
+        "zero": 15,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.12815e+00",
+      "block_wealth": "7.77246e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 24,
+      "trials_sha256": "a30e9fc4375d3bf3395e93f2d969ecfddf04d829d845b42a674f0a1138010462",
+      "counts": {
+        "minus": 1,
+        "zero": 23,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.57120e+00",
+      "block_wealth": "5.96615e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 32,
+      "trials_sha256": "a7b8ef27c0ed95b464b792071d08114ac0a567c0294c3decc7c04cc160b5e451",
+      "counts": {
+        "minus": 3,
+        "zero": 28,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.05068e+00",
+      "block_wealth": "5.34439e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 40,
+      "trials_sha256": "30ff6c5f021ca8a5221b7bd414809f8829d6fe90846fca8bf5f0a2dd0be39083",
+      "counts": {
+        "minus": 4,
+        "zero": 35,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "8.72920e-01",
+      "block_wealth": "5.46536e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 6,
+      "pairs": 48,
+      "trials_sha256": "4b5cf4bfe4d526ca66992cc2b2d657a559181859ba36e6012515533c806c7239",
+      "counts": {
+        "minus": 5,
+        "zero": 42,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "7.33463e-01",
+      "block_wealth": "5.58915e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 7,
+      "pairs": 56,
+      "trials_sha256": "e4a221a3704e51c5652a39f4ba01d7b0558c707beb14e94778cf948191a61857",
+      "counts": {
+        "minus": 7,
+        "zero": 48,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.08935e-01",
+      "block_wealth": "7.53299e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 8,
+      "pairs": 64,
+      "trials_sha256": "d8a353e19581938d2894613a63f8d62babd8c42d00644dd72686d264f047716c",
+      "counts": {
+        "minus": 9,
+        "zero": 54,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.44377e-01",
+      "block_wealth": "1.02251e+00",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 9,
+      "pairs": 72,
+      "trials_sha256": "aca95ad812a92d5d21f5ccb9f20b934d142f2c7d8a90769a9dc5d8209c4d8f3b",
+      "counts": {
+        "minus": 9,
+        "zero": 62,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.12901e-01",
+      "block_wealth": "7.87344e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 10,
+      "pairs": 80,
+      "trials_sha256": "f7443660fd4db55ba8fe53b41bdffbc4509ffa0894151e283a8b7f81a55c4c59",
+      "counts": {
+        "minus": 10,
+        "zero": 68,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.59334e-01",
+      "block_wealth": "5.41895e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 11,
+      "pairs": 88,
+      "trials_sha256": "7384c4935f3673b74c40c1206b61dde0db6afb7d331b605437c62d5d9a85e0d9",
+      "counts": {
+        "minus": 10,
+        "zero": 75,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "6.06909e-01",
+      "block_wealth": "3.00749e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 12,
+      "pairs": 96,
+      "trials_sha256": "eb8b089acafe56e7805fafbfd963b24dc64d87c8f3db138d20f6ccf50935129f",
+      "counts": {
+        "minus": 11,
+        "zero": 82,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "5.30385e-01",
+      "block_wealth": "3.07943e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 13,
+      "pairs": 104,
+      "trials_sha256": "4870c9a62a79613eb1e8ffd6d8904585e37dee542d1b0e77cdd204792ee2911a",
+      "counts": {
+        "minus": 12,
+        "zero": 89,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.66536e-01",
+      "block_wealth": "3.15313e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 14,
+      "pairs": 112,
+      "trials_sha256": "81654b2025bc97f0cc4163b9521ba4c034c8cffde9922a93c8ce07080a45ffcb",
+      "counts": {
+        "minus": 14,
+        "zero": 93,
+        "plus": 5,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.82521e-01",
+      "block_wealth": "2.14473e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 15,
+      "pairs": 120,
+      "trials_sha256": "682b079c612b8f398757d52463e61fc463d26f9b0fc0b07afb71da4b21641808",
+      "counts": {
+        "minus": 16,
+        "zero": 99,
+        "plus": 5,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.03873e-01",
+      "block_wealth": "2.77068e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    }
+  ],
+  "stopped_at_round": 15,
+  "cells": [
+    {
+      "task_id": "F2-n1",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 12,
+      "candidate_successes": 6,
+      "counts": {
+        "minus": 8,
+        "zero": 5,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n2",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 12,
+      "counts": {
+        "minus": 3,
+        "zero": 12,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n3",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 15,
+      "counts": {
+        "minus": 0,
+        "zero": 15,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n4",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 15,
+      "counts": {
+        "minus": 0,
+        "zero": 15,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n5",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 15,
+      "counts": {
+        "minus": 0,
+        "zero": 15,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n6",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 14,
+      "counts": {
+        "minus": 1,
+        "zero": 14,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n7",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 11,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 4,
+        "zero": 8,
+        "plus": 3,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "F2-n8",
+      "condition_id": "F2",
+      "pairs": 15,
+      "baseline_successes": 15,
+      "candidate_successes": 15,
+      "counts": {
+        "minus": 0,
+        "zero": 15,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [
+    "no test crossed"
+  ],
+  "prior_runs": []
+}

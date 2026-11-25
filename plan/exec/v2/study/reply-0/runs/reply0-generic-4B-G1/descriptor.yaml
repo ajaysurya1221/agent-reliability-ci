@@ -1,0 +1,287 @@
+{
+  "baseline": {
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "naming-sentence",
+        "--opening",
+        "bad",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-generic-4B-G1"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "label": "naming-sentence"
+  },
+  "budgets": {
+    "grader_seconds": 20,
+    "max_seconds": 120,
+    "max_tool_calls": 12
+  },
+  "candidate": {
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "generic-sentence",
+        "--opening",
+        "bad",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-generic-4B-G1"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "label": "generic-sentence"
+  },
+  "conditions": [
+    {
+      "id": "G1"
+    }
+  ],
+  "mcp_server": {
+    "argv": [
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/relay.py",
+      "--ledger",
+      "--env",
+      "HOME=/Users/Shared/arci-reply0/env/home",
+      "--env",
+      "LC_ALL=C",
+      "--env",
+      "TZ=UTC",
+      "--env",
+      "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+      "--env",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "--env",
+      "GIT_CONFIG_GLOBAL=/dev/null",
+      "--env",
+      "GIT_CONFIG_NOSYSTEM=1",
+      "--env",
+      "GIT_OPTIONAL_LOCKS=0",
+      "--rules",
+      "naming=/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/rules/G1-naming.json",
+      "--rules",
+      "generic=/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/rules/G1-generic.json",
+      "--",
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "-m",
+      "mcp_server_git",
+      "--repository",
+      "/Users/Shared/arci-reply0/fx/repo"
+    ],
+    "name": "env",
+    "snapshot": "reply0_oracle:snapshot"
+  },
+  "oracle": "reply0_oracle:passed",
+  "prior_runs": [],
+  "rule": {
+    "alpha": "1/20",
+    "delta": "1/10",
+    "max_errored_pairs": 4,
+    "max_rounds": 15,
+    "scenario_seeds": "per_round",
+    "stakes": [
+      "1/4",
+      "1/2"
+    ]
+  },
+  "suite_id": "reply0-generic-4B-G1",
+  "tasks": [
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 7 January 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260107"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-01-07"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g1",
+      "key_id": "G1-g1"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 9 January 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260109"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-01-09"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g2",
+      "key_id": "G1-g2"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 11 January 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260111"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-01-11"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g3",
+      "key_id": "G1-g3"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 15 January 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260115"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-01-15"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g4",
+      "key_id": "G1-g4"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 25 January 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260125"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-01-25"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g5",
+      "key_id": "G1-g5"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 1 February 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260201"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-02-01"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g6",
+      "key_id": "G1-g6"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 10 February 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260210"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-02-10"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g7",
+      "key_id": "G1-g7"
+    },
+    {
+      "ask": "Which commits in the git repository at /Users/Shared/arci-reply0/fx/repo were made on or after 20 February 2026? Reply with their commit messages only, one per line.",
+      "bad": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "20260220"
+        },
+        "name": "git_log"
+      },
+      "cell": "G1",
+      "clean": {
+        "arguments": {
+          "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+          "start_timestamp": "2026-02-20"
+        },
+        "name": "git_log"
+      },
+      "id": "G1-g8",
+      "key_id": "G1-g8"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{"context":32768,"descriptor":"ecc788ab29bc476d5c9e4849f89d1b10cd96c2cd7404ac9a21ad6ce2c357bcee","descriptor_commit":"394d39663952060b08c29df8d8e0052ecf010d13","model_digest":"c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430","ollama_version":"0.32.14","registration":"3e5431082cc0d7f5b94dff1e871fa1c6cff136ce","run":"reply0-main-4B-C0"}
+run store: /Users/Shared/arci-reply0/claims/reply0-main-4B-C0/stores/reply0-main-4B-C0@44a4e0756e7c29190e4b0eefda16317bf528fd7486b7b4bf57af561f1c3d7eb9
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 2
+pairs: 16 (32 trials)
+baseline 16/16 passed, candidate 0/16 passed
+counts: minus=16, zero=0, plus=0, errored=0
+PASS wealth: 5.01892e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 1.30600e+02; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+arci exit 1
+recomputed verdict: BLOCK
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 2
+pairs: 16 (32 trials)
+baseline 16/16 passed, candidate 0/16 passed
+counts: minus=16, zero=0, plus=0, errored=0
+PASS wealth: 5.01892e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 1.30600e+02; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+stored decision: MATCH
+
+audit/count exit codes {"audit":0,"count_a":0,"count_b":0} counts agree True

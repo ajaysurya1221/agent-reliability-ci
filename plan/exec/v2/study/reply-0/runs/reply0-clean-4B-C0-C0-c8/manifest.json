@@ -1,0 +1,163 @@
+{
+  "record_sha256": "24958ebc7c564e78ffaaa237b0668bdc4bf8750f024fa73d0849a1fd36ec6ee5",
+  "schema_version": "arci/0.5",
+  "experiment_id": "reply0-clean-4B-C0-C0-c8",
+  "created_at": "",
+  "task_id": "C0-c8",
+  "task": {
+    "ask": "How many cents were paid in total for order ORD-124? Reply with the number only.",
+    "bad": {
+      "arguments": {
+        "order_id": "ORD-124"
+      },
+      "name": "lookup_order"
+    },
+    "cell": "C0",
+    "clean": {
+      "arguments": {
+        "order_id": "ORD-124"
+      },
+      "name": "lookup_order"
+    },
+    "key_id": "C0-c8",
+    "order_id": "ORD-124"
+  },
+  "toolset": null,
+  "mcp_server": {
+    "name": "env",
+    "argv": [
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/relay.py",
+      "--ledger",
+      "--allow-tool",
+      "lookup_order",
+      "--allow-tool",
+      "check_stock",
+      "--env",
+      "HOME=/Users/Shared/arci-reply0/env/home",
+      "--env",
+      "LC_ALL=C",
+      "--env",
+      "TZ=UTC",
+      "--env",
+      "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+      "--env",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "--env",
+      "PYTHONPATH=/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/orderdesk",
+      "--",
+      "/Users/Shared/arci-reply0/env/py/bin/python",
+      "-P",
+      "-m",
+      "arci.mcp_toolset_server",
+      "--toolset",
+      "orderdesk_world:make_tools",
+      "--workdir",
+      "{workdir}",
+      "--task-file",
+      "{task_file}",
+      "--seed",
+      "{seed}",
+      "--tools",
+      "lookup_order,check_stock"
+    ],
+    "env": {},
+    "snapshot": "reply0_oracle:snapshot"
+  },
+  "decisions": null,
+  "contract": {
+    "oracle": "reply0_oracle:passed",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-4B-C0-C0-c8"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "candidate": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "/Users/Shared/arci-reply0/env/py/bin/python",
+        "-P",
+        "/Users/Shared/arci-reply0/checkout/plan/exec/v2/study/reply-0/harness/agent.py",
+        "--mcp-config",
+        "{mcp_config}",
+        "--task-file",
+        "{task_file}",
+        "--arm",
+        "clean",
+        "--opening",
+        "clean",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--prompt",
+        "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+        "--run-id",
+        "reply0-clean-4B-C0-C0-c8"
+      ],
+      "env": {
+        "REPLY0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "conditions": [
+    {
+      "condition_id": "C0",
+      "faults": []
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 1,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 0,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 50,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

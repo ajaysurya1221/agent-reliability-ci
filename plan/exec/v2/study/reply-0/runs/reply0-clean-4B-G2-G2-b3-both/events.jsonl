@@ -1,0 +1,8 @@
+{"trial_id":"G2:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":0,"variant":"clean"},"at_ms":0.03333299537189305}
+{"trial_id":"G2:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"branch_type":"local","contains":"25018bef76af977432b507d764ac7f5123fa9752","repo_path":"/Users/Shared/arci-reply0/fx/repo"},"call_id":"c-0000","occurrence":0,"tool":"git_branch"},"at_ms":574.0645420009969}
+{"trial_id":"G2:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"git_branch","value":{"content":[{"text":"* main\n  release-1","type":"text"}],"isError":false}},"at_ms":610.0855830009095}
+{"trial_id":"G2:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"G2:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":0,"variant":"clean"},"at_ms":0.03416699473746121}
+{"trial_id":"G2:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"branch_type":"local","contains":"25018bef76af977432b507d764ac7f5123fa9752","repo_path":"/Users/Shared/arci-reply0/fx/repo"},"call_id":"c-0000","occurrence":0,"tool":"git_branch"},"at_ms":578.039792002528}
+{"trial_id":"G2:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"git_branch","value":{"content":[{"text":"* main\n  release-1","type":"text"}],"isError":false}},"at_ms":613.9287919941125}
+{"trial_id":"G2:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

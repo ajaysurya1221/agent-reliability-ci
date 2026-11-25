@@ -1,0 +1,341 @@
+{
+  "record_sha256": "301eb1ea276a761e44e224ba4fed1bd35e8bddca73a18b3ecbe7b39bfed6602e",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "reply0-main-4B-G2@527f1256b5635d93c099da09ea8aaced63c4da8013c6819fc2fe3b4256696d93",
+  "manifest_sha256": "80601527564b5f78ad9a18a64f6e6ff06a22daf7c1311750f4c64801c1336986",
+  "trials_sha256": "63819f0bf0e426c281a96047c8770d12ab041c6bc0335a8e1d1c35a01588673a",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 8,
+  "max_rounds": 15,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 8,
+      "trials_sha256": "6f4513f11b42fc40680a41f97f927040f465410c30368d7a7845bd4405535668",
+      "counts": {
+        "minus": 0,
+        "zero": 8,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.39311e+00",
+      "block_wealth": "7.60624e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 16,
+      "trials_sha256": "1d98b3b7956b06fbe5ebbb963491eecdf544fede988acba1d970a3e90b910bfa",
+      "counts": {
+        "minus": 0,
+        "zero": 16,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.96269e+00",
+      "block_wealth": "5.83645e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 24,
+      "trials_sha256": "ee15ee1d7f3588cbfd4bbbfe47d4b4de5ed82c721ef8d12640fa30c2b8eb8585",
+      "counts": {
+        "minus": 0,
+        "zero": 24,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.79532e+00",
+      "block_wealth": "4.51686e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 32,
+      "trials_sha256": "409cc7fdf72d97b0cec22f24e059f885d8988d8318b45fab0941b0b6d552dc6e",
+      "counts": {
+        "minus": 0,
+        "zero": 32,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.02231e+00",
+      "block_wealth": "3.52433e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 40,
+      "trials_sha256": "2c200f7f5507cd6fce110639e199de4c57cdd17833acb80fe28464591c85e25e",
+      "counts": {
+        "minus": 0,
+        "zero": 40,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "5.84326e+00",
+      "block_wealth": "2.77117e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 6,
+      "pairs": 48,
+      "trials_sha256": "992fd6826816d91aa2c44d9dbd68c36aa9a75504f016597e7e0d73ccf27de1d6",
+      "counts": {
+        "minus": 0,
+        "zero": 48,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "8.56246e+00",
+      "block_wealth": "2.19459e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 7,
+      "pairs": 56,
+      "trials_sha256": "2e6992044a574396b93c70f3b2fe9582b8b53c4afc01b523e3c958ea74932bb9",
+      "counts": {
+        "minus": 0,
+        "zero": 56,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.26446e+01",
+      "block_wealth": "1.74939e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 8,
+      "pairs": 64,
+      "trials_sha256": "5d642584b9e90a166f09f232422ff60dc4ee518d3ee73f9e7ca252177a14b8e7",
+      "counts": {
+        "minus": 0,
+        "zero": 64,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.88007e+01",
+      "block_wealth": "1.40275e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 9,
+      "pairs": 72,
+      "trials_sha256": "6b3870edb022077d96f8fce49a29f8eb6aeabc92321ee3a531aca5a02da460dc",
+      "counts": {
+        "minus": 0,
+        "zero": 72,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.81201e+01",
+      "block_wealth": "1.13074e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 10,
+      "pairs": 80,
+      "trials_sha256": "b5afd5769636c2ae63e0300eb25e013f9ed03e6dce90be37703f63b9b08ec3de",
+      "counts": {
+        "minus": 0,
+        "zero": 80,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.22732e+01",
+      "block_wealth": "9.15729e-02",
+      "pass_crossed": true,
+      "block_crossed": false,
+      "verdict": "PASS",
+      "reasons": [
+        "non-inferiority established"
+      ]
+    }
+  ],
+  "stopped_at_round": 10,
+  "cells": [
+    {
+      "task_id": "G2-b1-both",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b1-everything",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b2-both",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b2-everything",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b3-both",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b3-everything",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b4-both",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "G2-b4-everything",
+      "condition_id": "G2",
+      "pairs": 10,
+      "baseline_successes": 10,
+      "candidate_successes": 10,
+      "counts": {
+        "minus": 0,
+        "zero": 10,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "PASS",
+  "exit_code": 0,
+  "reasons": [
+    "non-inferiority established"
+  ],
+  "prior_runs": []
+}

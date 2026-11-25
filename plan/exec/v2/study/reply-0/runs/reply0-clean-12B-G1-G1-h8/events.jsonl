@@ -1,0 +1,8 @@
+{"trial_id":"G1:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":0,"variant":"clean"},"at_ms":0.037290999898687005}
+{"trial_id":"G1:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"repo_path":"/Users/Shared/arci-reply0/fx/repo","start_timestamp":"2026-02-25"},"call_id":"c-0000","occurrence":0,"tool":"git_log"},"at_ms":580.1062500104308}
+{"trial_id":"G1:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"git_log","value":{"content":[{"text":"Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n","type":"text"}],"isError":false}},"at_ms":627.591875003418}
+{"trial_id":"G1:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"G1:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":0,"variant":"clean"},"at_ms":0.04012499994132668}
+{"trial_id":"G1:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"repo_path":"/Users/Shared/arci-reply0/fx/repo","start_timestamp":"2026-02-25"},"call_id":"c-0000","occurrence":0,"tool":"git_log"},"at_ms":583.1580410012975}
+{"trial_id":"G1:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"git_log","value":{"content":[{"text":"Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n","type":"text"}],"isError":false}},"at_ms":629.4742909958586}
+{"trial_id":"G1:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
