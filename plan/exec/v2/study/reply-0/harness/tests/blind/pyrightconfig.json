@@ -1,0 +1,6 @@
+{
+  "typeCheckingMode": "strict",
+  "include": ["../../count_b.py", "test_count_b.py"],
+  "extraPaths": ["../.."],
+  "pythonVersion": "3.11"
+}

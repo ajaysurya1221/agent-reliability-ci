@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+    "text_matches": "^Error executing tool git_branch: Invalid branch type: ",
+    "tool": "git_branch",
+    "when": {}
+  }
+]

@@ -1,0 +1,1872 @@
+[
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c1",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-103"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c2",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-106"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c3",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-109"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c4",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-112"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c5",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-115"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c6",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-118"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c7",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-121"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "C0",
+  "set": "main",
+  "id": "C0-c8",
+  "seed": 0,
+  "bad_call": {
+   "name": "lookup_order",
+   "arguments": {
+    "order_id": "ORD-124"
+   }
+  },
+  "original_result": {
+   "resultType": "complete",
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}"
+    }
+   ],
+   "isError": false
+  },
+  "last_good_reply": "{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-7311\", \"total_cents\": 14781}",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g1",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260107"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260107\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n\nCommit: 25018bef76af977432b507d764ac7f5123fa9752\nAuthor: Asha Verma\nDate: 2026-01-12 14:15:00+00:00\nMessage: Add brackets and wall plugs to the price list\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g2",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260109"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260109\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n\nCommit: 25018bef76af977432b507d764ac7f5123fa9752\nAuthor: Asha Verma\nDate: 2026-01-12 14:15:00+00:00\nMessage: Add brackets and wall plugs to the price list\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g3",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260111"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260111\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n\nCommit: 25018bef76af977432b507d764ac7f5123fa9752\nAuthor: Asha Verma\nDate: 2026-01-12 14:15:00+00:00\nMessage: Add brackets and wall plugs to the price list\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g4",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260115"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260115\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g5",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260125"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260125\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g6",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260201"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260201\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g7",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260210"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260210\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "main",
+  "id": "G1-g8",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260220"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260220\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h1",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260108"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260108\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n\nCommit: 25018bef76af977432b507d764ac7f5123fa9752\nAuthor: Asha Verma\nDate: 2026-01-12 14:15:00+00:00\nMessage: Add brackets and wall plugs to the price list\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h2",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260110"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260110\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n\nCommit: 25018bef76af977432b507d764ac7f5123fa9752\nAuthor: Asha Verma\nDate: 2026-01-12 14:15:00+00:00\nMessage: Add brackets and wall plugs to the price list\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h3",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260114"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260114\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h4",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260120"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260120\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h5",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260130"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260130\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n\nCommit: 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2\nAuthor: Bram de Wit\nDate: 2026-02-02 08:45:00+00:00\nMessage: Round totals to whole cents\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h6",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260205"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260205\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h7",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260215"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260215\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G1",
+  "set": "held_out",
+  "id": "G1-h8",
+  "bad_call": {
+   "name": "git_log",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "start_timestamp": "20260225"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Commit history:\n",
+     "type": "text"
+    }
+   ],
+   "isError": false
+  },
+  "bad_reply": "Commit history:\n",
+  "bad_is_error": false,
+  "sentence": "No commit matched start_timestamp \"20260225\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+  "last_good_reply": "Commit history:\nCommit: 220e18235909e69ffa83b5ad59d3a05739598c15\nAuthor: Asha Verma\nDate: 2026-03-01 07:00:00+00:00\nMessage: Raise the oak shelf to 135\n\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n1",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "todo"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"todo\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*todo*\".",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n2",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "todo.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"todo.txt\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*todo.txt*\".",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n3",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "contact"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"contact\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*contact*\".",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n4",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "contacts.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"contacts.txt\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*contacts.txt*\".",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n5",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "meeting-2026-01-05"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"meeting-2026-01-05\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*meeting-2026-01-05*\".",
+  "last_good_reply": "Meeting 5 January 2026\nPresent: Asha, Bram, Chidi\nDecision: the warehouse move is on 14 February.\nAction: Bram books the lorry, reference LRY-4417.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n6",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "meeting-2026-01-12.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"meeting-2026-01-12.txt\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*meeting-2026-01-12.txt*\".",
+  "last_good_reply": "Meeting 12 January 2026\nPresent: Asha, Chidi, Dana\nDecision: the price of the oak shelf goes from 120 to 135 on 1 March.\nAction: Dana updates the price list.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n7",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "glossary"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"glossary\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*glossary*\".",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "main",
+  "id": "F2-n8",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "glossary.md"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"glossary.md\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*glossary.md*\".",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d1",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "price"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"price\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*price*\".",
+  "last_good_reply": "sku,name,price\nSKU-1001,oak shelf,120\nSKU-1002,pine shelf,80\nSKU-1003,steel bracket,6\nSKU-1004,wall plug (100),4\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d2",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "prices.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"prices.csv\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*prices.csv*\".",
+  "last_good_reply": "sku,name,price\nSKU-1001,oak shelf,120\nSKU-1002,pine shelf,80\nSKU-1003,steel bracket,6\nSKU-1004,wall plug (100),4\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d3",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "order"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"order\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*order*\".",
+  "last_good_reply": "order_id,sku,quantity,status\nORD-501,SKU-1001,2,shipped\nORD-502,SKU-1003,40,packed\nORD-503,SKU-1002,1,waiting for stock\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d4",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "orders.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"orders.csv\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*orders.csv*\".",
+  "last_good_reply": "order_id,sku,quantity,status\nORD-501,SKU-1001,2,shipped\nORD-502,SKU-1003,40,packed\nORD-503,SKU-1002,1,waiting for stock\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d5",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "supplier"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"supplier\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*supplier*\".",
+  "last_good_reply": "Norden Timber, oak and pine, lead time 12 days\nFastfix, brackets and plugs, lead time 3 days\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d6",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "suppliers.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"suppliers.txt\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*suppliers.txt*\".",
+  "last_good_reply": "Norden Timber, oak and pine, lead time 12 days\nFastfix, brackets and plugs, lead time 3 days\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d7",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "config"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"config\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*config*\".",
+  "last_good_reply": "{\n  \"warehouse\": \"Larch Street\",\n  \"bays\": 9,\n  \"currency\": \"EUR\",\n  \"open_days\": [\"mon\", \"tue\", \"wed\", \"thu\", \"fri\"]\n}\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F2",
+  "set": "held_out",
+  "id": "F2-d8",
+  "bad_call": {
+   "name": "search_files",
+   "arguments": {
+    "path": "$FX/files",
+    "pattern": "stock.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "No matches found"
+    }
+   ],
+   "structuredContent": {
+    "content": "No matches found"
+   }
+  },
+  "bad_reply": "No matches found",
+  "bad_is_error": false,
+  "sentence": "No entry matched the pattern \"stock.csv\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*stock.csv*\".",
+  "last_good_reply": "sku,bay,quantity\nSKU-1001,3,14\nSKU-1002,3,0\nSKU-1003,7,260\nSKU-1004,7,35\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n1",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/todo-list.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/todo-list.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/todo-list.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/todo-list.txt. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n2",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/to-do.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/to-do.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/to-do.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/to-do.txt. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n3",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/contacts.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/contacts.csv'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/contacts.csv'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/contacts.csv. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n4",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/contact-list.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/contact-list.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/contact-list.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/contact-list.txt. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n5",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/meeting-2026-01-05.md"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/meeting-2026-01-05.md'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/meeting-2026-01-05.md'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/meeting-2026-01-05.md. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Meeting 5 January 2026\nPresent: Asha, Bram, Chidi\nDecision: the warehouse move is on 14 February.\nAction: Bram books the lorry, reference LRY-4417.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n6",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/meeting-01-12.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/meeting-01-12.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/meeting-01-12.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/meeting-01-12.txt. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Meeting 12 January 2026\nPresent: Asha, Chidi, Dana\nDecision: the price of the oak shelf goes from 120 to 135 on 1 March.\nAction: Dana updates the price list.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n7",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/glossary.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/glossary.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/glossary.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/glossary.txt. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "main",
+  "id": "F1-n8",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/notes/glossary.markdown"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/notes/glossary.markdown'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/notes/glossary.markdown'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/notes/glossary.markdown. Call list_directory with path \"$FX/files/notes\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d1",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/price-list.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/price-list.csv'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/price-list.csv'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/price-list.csv. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "sku,name,price\nSKU-1001,oak shelf,120\nSKU-1002,pine shelf,80\nSKU-1003,steel bracket,6\nSKU-1004,wall plug (100),4\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d2",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/prices.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/prices.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/prices.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/prices.txt. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "sku,name,price\nSKU-1001,oak shelf,120\nSKU-1002,pine shelf,80\nSKU-1003,steel bracket,6\nSKU-1004,wall plug (100),4\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d3",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/order-list.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/order-list.csv'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/order-list.csv'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/order-list.csv. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "order_id,sku,quantity,status\nORD-501,SKU-1001,2,shipped\nORD-502,SKU-1003,40,packed\nORD-503,SKU-1002,1,waiting for stock\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d4",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/orders.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/orders.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/orders.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/orders.txt. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "order_id,sku,quantity,status\nORD-501,SKU-1001,2,shipped\nORD-502,SKU-1003,40,packed\nORD-503,SKU-1002,1,waiting for stock\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d5",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/supplier-list.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/supplier-list.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/supplier-list.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/supplier-list.txt. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Norden Timber, oak and pine, lead time 12 days\nFastfix, brackets and plugs, lead time 3 days\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d6",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/suppliers.csv"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/suppliers.csv'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/suppliers.csv'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/suppliers.csv. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "Norden Timber, oak and pine, lead time 12 days\nFastfix, brackets and plugs, lead time 3 days\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d7",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/config.yaml"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/config.yaml'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/config.yaml'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/config.yaml. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "{\n  \"warehouse\": \"Larch Street\",\n  \"bays\": 9,\n  \"currency\": \"EUR\",\n  \"open_days\": [\"mon\", \"tue\", \"wed\", \"thu\", \"fri\"]\n}\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F1",
+  "set": "held_out",
+  "id": "F1-d8",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "path": "$FX/files/data/stock.txt"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "ENOENT: no such file or directory, lstat '$FX/files/data/stock.txt'"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "ENOENT: no such file or directory, lstat '$FX/files/data/stock.txt'",
+  "bad_is_error": true,
+  "sentence": "There is no file at $FX/files/data/stock.txt. Call list_directory with path \"$FX/files/data\" to see the files that exist, then call read_text_file with the full path of the right one.",
+  "last_good_reply": "sku,bay,quantity\nSKU-1001,3,14\nSKU-1002,3,0\nSKU-1003,7,260\nSKU-1004,7,35\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n1",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n2",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "1. Order packing tape (40 rolls)\n2. Renew the fire certificate before 30 April\n3. Count the stock in bay 7\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n3",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n4",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "Asha Verma, operations, extension 201\nBram de Wit, transport, extension 214\nChidi Okeke, accounts, extension 230\nDana Lind, sales, extension 245\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n5",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "Meeting 5 January 2026\nPresent: Asha, Bram, Chidi\nDecision: the warehouse move is on 14 February.\nAction: Bram books the lorry, reference LRY-4417.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n6",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "Meeting 12 January 2026\nPresent: Asha, Chidi, Dana\nDecision: the price of the oak shelf goes from 120 to 135 on 1 March.\nAction: Dana updates the price list.\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n7",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "F0",
+  "set": "main",
+  "id": "F0-n8",
+  "bad_call": {
+   "name": "read_text_file",
+   "arguments": {
+    "head": 20
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "type": "text",
+     "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+  "bad_is_error": true,
+  "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+  "last_good_reply": "# Glossary\n\n- bay: a numbered storage area\n- SKU: the code of one product\n- pick list: the items to collect for one order\n",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b1-everything",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "everything"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: everything",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: everything",
+  "bad_is_error": true,
+  "sentence": "branch_type \"everything\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b2-everything",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "everything",
+    "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: everything",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: everything",
+  "bad_is_error": true,
+  "sentence": "branch_type \"everything\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b3-everything",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "everything",
+    "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: everything",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: everything",
+  "bad_is_error": true,
+  "sentence": "branch_type \"everything\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b4-everything",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "everything",
+    "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: everything",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: everything",
+  "bad_is_error": true,
+  "sentence": "branch_type \"everything\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "  release-1",
+  "pasting_last_reply_passes": true
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b1-both",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "both"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: both",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: both",
+  "bad_is_error": true,
+  "sentence": "branch_type \"both\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b2-both",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "both",
+    "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: both",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: both",
+  "bad_is_error": true,
+  "sentence": "branch_type \"both\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b3-both",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "both",
+    "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: both",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: both",
+  "bad_is_error": true,
+  "sentence": "branch_type \"both\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "* main\n  release-1",
+  "pasting_last_reply_passes": false
+ },
+ {
+  "cell": "G2",
+  "set": "main",
+  "id": "G2-b4-both",
+  "bad_call": {
+   "name": "git_branch",
+   "arguments": {
+    "repo_path": "$FX/repo",
+    "branch_type": "both",
+    "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+   }
+  },
+  "original_result": {
+   "content": [
+    {
+     "text": "Error executing tool git_branch: Invalid branch type: both",
+     "type": "text"
+    }
+   ],
+   "isError": true
+  },
+  "bad_reply": "Error executing tool git_branch: Invalid branch type: both",
+  "bad_is_error": true,
+  "sentence": "branch_type \"both\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+  "last_good_reply": "  release-1",
+  "pasting_last_reply_passes": true
+ }
+]

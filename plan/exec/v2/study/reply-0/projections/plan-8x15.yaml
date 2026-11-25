@@ -1,0 +1,88 @@
+{
+  "suite_id": "reply0-plan-8x15",
+  "tasks": [
+    {
+      "id": "t01",
+      "key_id": "t01"
+    },
+    {
+      "id": "t02",
+      "key_id": "t02"
+    },
+    {
+      "id": "t03",
+      "key_id": "t03"
+    },
+    {
+      "id": "t04",
+      "key_id": "t04"
+    },
+    {
+      "id": "t05",
+      "key_id": "t05"
+    },
+    {
+      "id": "t06",
+      "key_id": "t06"
+    },
+    {
+      "id": "t07",
+      "key_id": "t07"
+    },
+    {
+      "id": "t08",
+      "key_id": "t08"
+    }
+  ],
+  "oracle": "reply0_plan_stub:passed",
+  "baseline": {
+    "label": "naming-sentence",
+    "command": {
+      "argv": [
+        "/usr/bin/true",
+        "{mcp_config}",
+        "{task_file}"
+      ]
+    }
+  },
+  "candidate": {
+    "label": "reply-as-given",
+    "command": {
+      "argv": [
+        "/usr/bin/true",
+        "{mcp_config}",
+        "{task_file}"
+      ]
+    }
+  },
+  "mcp_server": {
+    "name": "srv",
+    "argv": [
+      "/usr/bin/true"
+    ],
+    "env": {},
+    "snapshot": "reply0_plan_stub:snapshot"
+  },
+  "conditions": [
+    {
+      "id": "clean"
+    }
+  ],
+  "rule": {
+    "alpha": "1/20",
+    "delta": "1/10",
+    "stakes": [
+      "1/4",
+      "1/2"
+    ],
+    "max_rounds": 15,
+    "max_errored_pairs": 4,
+    "scenario_seeds": "per_round"
+  },
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 12,
+    "max_seconds": 120,
+    "grader_seconds": 20
+  }
+}

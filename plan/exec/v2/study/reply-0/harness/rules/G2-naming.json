@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "branch_type \"{arg:branch_type}\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+    "text_matches": "^Error executing tool git_branch: Invalid branch type: ",
+    "tool": "git_branch",
+    "when": {}
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "is_error": false,
+    "replace_text": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+    "text_matches": "^No matches found$",
+    "tool": "search_files",
+    "when": {
+      "arg_matches": {
+        "pattern": "^[A-Za-z0-9._-]+$"
+      }
+    }
+  }
+]

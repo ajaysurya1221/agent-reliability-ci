@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "There is no file at {arg:path}. Call list_directory with path \"{parent:path}\" to see the files that exist, then call read_text_file with the full path of the right one.",
+    "text_matches": "^ENOENT: no such file or directory, ",
+    "tool": "read_text_file",
+    "when": {}
+  }
+]

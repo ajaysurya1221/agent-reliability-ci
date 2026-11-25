@@ -1,0 +1,708 @@
+{
+  "C0-c1": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c2": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c3": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c4": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c5": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c6": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c7": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "C0-c8": {
+    "decoys": [],
+    "expect": [],
+    "world_key": "order.total_cents"
+  },
+  "F0-n1": {
+    "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+    ],
+    "expect": [
+      "Renew the fire certificate before 30 April"
+    ],
+    "world_key": null
+  },
+  "F0-n2": {
+    "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+    ],
+    "expect": [
+      "Count the stock in bay 7"
+    ],
+    "world_key": null
+  },
+  "F0-n3": {
+    "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Bram de Wit"
+    ],
+    "world_key": null
+  },
+  "F0-n4": {
+    "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Chidi Okeke"
+    ],
+    "world_key": null
+  },
+  "F0-n5": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "LRY-4417"
+    ],
+    "world_key": null
+  },
+  "F0-n6": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "Dana"
+    ],
+    "world_key": null
+  },
+  "F0-n7": {
+    "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+    ],
+    "expect": [
+      "the items to collect for one order"
+    ],
+    "world_key": null
+  },
+  "F0-n8": {
+    "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+    ],
+    "expect": [
+      "a numbered storage area"
+    ],
+    "world_key": null
+  },
+  "F1-d1": {
+    "decoys": [
+      "oak shelf",
+      "pine shelf",
+      "wall plug"
+    ],
+    "expect": [
+      "steel bracket"
+    ],
+    "world_key": null
+  },
+  "F1-d2": {
+    "decoys": [
+      "oak shelf",
+      "steel bracket",
+      "wall plug"
+    ],
+    "expect": [
+      "pine shelf"
+    ],
+    "world_key": null
+  },
+  "F1-d3": {
+    "decoys": [
+      "shipped",
+      "packed"
+    ],
+    "expect": [
+      "waiting for stock"
+    ],
+    "world_key": null
+  },
+  "F1-d4": {
+    "decoys": [
+      "shipped",
+      "waiting for stock"
+    ],
+    "expect": [
+      "packed"
+    ],
+    "world_key": null
+  },
+  "F1-d5": {
+    "decoys": [
+      "Norden Timber"
+    ],
+    "expect": [
+      "Fastfix"
+    ],
+    "world_key": null
+  },
+  "F1-d6": {
+    "decoys": [
+      "Fastfix"
+    ],
+    "expect": [
+      "Norden Timber"
+    ],
+    "world_key": null
+  },
+  "F1-d7": {
+    "decoys": [
+      "Larch Street",
+      "open_days"
+    ],
+    "expect": [
+      "EUR"
+    ],
+    "world_key": null
+  },
+  "F1-d8": {
+    "decoys": [
+      "14",
+      "0",
+      "35"
+    ],
+    "expect": [
+      "260"
+    ],
+    "world_key": null
+  },
+  "F1-n1": {
+    "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+    ],
+    "expect": [
+      "Renew the fire certificate before 30 April"
+    ],
+    "world_key": null
+  },
+  "F1-n2": {
+    "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+    ],
+    "expect": [
+      "Count the stock in bay 7"
+    ],
+    "world_key": null
+  },
+  "F1-n3": {
+    "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Bram de Wit"
+    ],
+    "world_key": null
+  },
+  "F1-n4": {
+    "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Chidi Okeke"
+    ],
+    "world_key": null
+  },
+  "F1-n5": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "LRY-4417"
+    ],
+    "world_key": null
+  },
+  "F1-n6": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "Dana"
+    ],
+    "world_key": null
+  },
+  "F1-n7": {
+    "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+    ],
+    "expect": [
+      "the items to collect for one order"
+    ],
+    "world_key": null
+  },
+  "F1-n8": {
+    "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+    ],
+    "expect": [
+      "a numbered storage area"
+    ],
+    "world_key": null
+  },
+  "F2-d1": {
+    "decoys": [
+      "oak shelf",
+      "pine shelf",
+      "wall plug"
+    ],
+    "expect": [
+      "steel bracket"
+    ],
+    "world_key": null
+  },
+  "F2-d2": {
+    "decoys": [
+      "oak shelf",
+      "steel bracket",
+      "wall plug"
+    ],
+    "expect": [
+      "pine shelf"
+    ],
+    "world_key": null
+  },
+  "F2-d3": {
+    "decoys": [
+      "shipped",
+      "packed"
+    ],
+    "expect": [
+      "waiting for stock"
+    ],
+    "world_key": null
+  },
+  "F2-d4": {
+    "decoys": [
+      "shipped",
+      "waiting for stock"
+    ],
+    "expect": [
+      "packed"
+    ],
+    "world_key": null
+  },
+  "F2-d5": {
+    "decoys": [
+      "Norden Timber"
+    ],
+    "expect": [
+      "Fastfix"
+    ],
+    "world_key": null
+  },
+  "F2-d6": {
+    "decoys": [
+      "Fastfix"
+    ],
+    "expect": [
+      "Norden Timber"
+    ],
+    "world_key": null
+  },
+  "F2-d7": {
+    "decoys": [
+      "Larch Street",
+      "open_days"
+    ],
+    "expect": [
+      "EUR"
+    ],
+    "world_key": null
+  },
+  "F2-d8": {
+    "decoys": [
+      "14",
+      "0",
+      "35"
+    ],
+    "expect": [
+      "260"
+    ],
+    "world_key": null
+  },
+  "F2-n1": {
+    "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+    ],
+    "expect": [
+      "Renew the fire certificate before 30 April"
+    ],
+    "world_key": null
+  },
+  "F2-n2": {
+    "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+    ],
+    "expect": [
+      "Count the stock in bay 7"
+    ],
+    "world_key": null
+  },
+  "F2-n3": {
+    "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Bram de Wit"
+    ],
+    "world_key": null
+  },
+  "F2-n4": {
+    "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+    ],
+    "expect": [
+      "Chidi Okeke"
+    ],
+    "world_key": null
+  },
+  "F2-n5": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "LRY-4417"
+    ],
+    "world_key": null
+  },
+  "F2-n6": {
+    "decoys": [
+      "Present:",
+      "Decision:"
+    ],
+    "expect": [
+      "Dana"
+    ],
+    "world_key": null
+  },
+  "F2-n7": {
+    "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+    ],
+    "expect": [
+      "the items to collect for one order"
+    ],
+    "world_key": null
+  },
+  "F2-n8": {
+    "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+    ],
+    "expect": [
+      "a numbered storage area"
+    ],
+    "world_key": null
+  },
+  "G1-g1": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+    ],
+    "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g2": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+    ],
+    "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g3": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+    ],
+    "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g4": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g5": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g6": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g7": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+    ],
+    "expect": [
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-g8": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+    ],
+    "expect": [
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h1": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+    ],
+    "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h2": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+    ],
+    "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h3": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h4": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h5": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+    ],
+    "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h6": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+    ],
+    "expect": [
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h7": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+    ],
+    "expect": [
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G1-h8": {
+    "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+    ],
+    "expect": [
+      "Raise the oak shelf to 135"
+    ],
+    "world_key": null
+  },
+  "G2-b1-both": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b1-everything": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b2-both": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b2-everything": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b3-both": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b3-everything": {
+    "decoys": [],
+    "expect": [
+      "main",
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b4-both": {
+    "decoys": [
+      "main"
+    ],
+    "expect": [
+      "release-1"
+    ],
+    "world_key": null
+  },
+  "G2-b4-everything": {
+    "decoys": [
+      "main"
+    ],
+    "expect": [
+      "release-1"
+    ],
+    "world_key": null
+  }
+}

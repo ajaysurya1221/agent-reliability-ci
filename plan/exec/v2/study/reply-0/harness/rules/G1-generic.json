@@ -1,0 +1,13 @@
+[
+  {
+    "is_error": false,
+    "replace_text": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+    "text_matches": "^Commit history:\\n?$",
+    "tool": "git_log",
+    "when": {
+      "arg_present": [
+        "start_timestamp"
+      ]
+    }
+  }
+]

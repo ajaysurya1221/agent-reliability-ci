@@ -1,0 +1,2806 @@
+{
+ "note": "Reply-0 registered tasks. Written by make_tasks.py; do not edit by hand.",
+ "variables": {
+  "FX": "the fixture directory built by fixture.py"
+ },
+ "system_prompt": "You answer questions by using the tools you are given. Call a tool when you need information. Never invent a tool result. When you know the answer, reply with the answer only.",
+ "generic_sentence": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+ "matching": {
+  "normalise": "Per line: NFKC, casefold, collapse whitespace, strip outer quotes, backticks and brackets, one final period, then outer wrappers again. Remove commas only in a complete correctly grouped unsigned integer.",
+  "pass": "At most 600 raw characters. Trim the answer. Its normalised lines must equal the complete expected lines once each in any order. No commentary, negations, extra values or internal blank lines."
+ },
+ "run_order": [
+  "clean",
+  "unscripted",
+  "C0/4B",
+  "F1/4B",
+  "F1/12B if needed",
+  "one eligible F1 confirmation",
+  "measured and descriptive rows"
+ ],
+ "cells": {
+  "C0": {
+   "server": "orderdesk",
+   "kind": "injected_empty",
+   "role": "control",
+   "tool": "lookup_order",
+   "fault": {
+    "name": "empty_result",
+    "tool": "lookup_order",
+    "occurrence": 0
+   },
+   "reply_as_given": "",
+   "sentence": "lookup_order returned an empty result. Call lookup_order again with the same order_id.",
+   "sentence_applied_by": "agent",
+   "main": [
+    {
+     "id": "C0-c1",
+     "key_id": "C0-c1",
+     "ask": "How many cents were paid in total for order ORD-103? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-103"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-103"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-103"
+    },
+    {
+     "id": "C0-c2",
+     "key_id": "C0-c2",
+     "ask": "How many cents were paid in total for order ORD-106? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-106"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-106"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-106"
+    },
+    {
+     "id": "C0-c3",
+     "key_id": "C0-c3",
+     "ask": "How many cents were paid in total for order ORD-109? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-109"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-109"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-109"
+    },
+    {
+     "id": "C0-c4",
+     "key_id": "C0-c4",
+     "ask": "How many cents were paid in total for order ORD-112? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-112"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-112"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-112"
+    },
+    {
+     "id": "C0-c5",
+     "key_id": "C0-c5",
+     "ask": "How many cents were paid in total for order ORD-115? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-115"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-115"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-115"
+    },
+    {
+     "id": "C0-c6",
+     "key_id": "C0-c6",
+     "ask": "How many cents were paid in total for order ORD-118? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-118"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-118"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-118"
+    },
+    {
+     "id": "C0-c7",
+     "key_id": "C0-c7",
+     "ask": "How many cents were paid in total for order ORD-121? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-121"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-121"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-121"
+    },
+    {
+     "id": "C0-c8",
+     "key_id": "C0-c8",
+     "ask": "How many cents were paid in total for order ORD-124? Reply with the number only.",
+     "bad": {
+      "name": "lookup_order",
+      "arguments": {
+       "order_id": "ORD-124"
+      }
+     },
+     "good": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "ORD-124"
+       }
+      }
+     ],
+     "expect": [],
+     "decoys": [],
+     "source": {
+      "kind": "world_state",
+      "field": "order.total_cents"
+     },
+     "order_id": "ORD-124"
+    }
+   ],
+   "held_out": []
+  },
+  "G1": {
+   "server": "git",
+   "kind": "unknown_value",
+   "role": "eligible",
+   "tool": "git_log",
+   "reply_pattern": "^Commit history:\\n?$",
+   "reply_is_error": false,
+   "sentence": "No commit matched start_timestamp \"{arg:start_timestamp}\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+   "sentence_applied_by": "relay",
+   "sentence_when": {
+    "arg_present": [
+     "start_timestamp"
+    ]
+   },
+   "main": [
+    {
+     "id": "G1-g1",
+     "key_id": "G1-g1",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 7 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260107"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-07"
+       }
+      }
+     ],
+     "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-07",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g2",
+     "key_id": "G1-g2",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 9 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260109"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-09"
+       }
+      }
+     ],
+     "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-09",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g3",
+     "key_id": "G1-g3",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 11 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260111"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-11"
+       }
+      }
+     ],
+     "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-11",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g4",
+     "key_id": "G1-g4",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 15 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260115"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-15"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-15",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g5",
+     "key_id": "G1-g5",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 25 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260125"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-25"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-25",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g6",
+     "key_id": "G1-g6",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 1 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260201"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-01"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-01",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g7",
+     "key_id": "G1-g7",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 10 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260210"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-10"
+       }
+      }
+     ],
+     "expect": [
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-10",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-g8",
+     "key_id": "G1-g8",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 20 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260220"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-20"
+       }
+      }
+     ],
+     "expect": [
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-20",
+       "--format=%s",
+       "main"
+      ]
+     }
+    }
+   ],
+   "held_out": [
+    {
+     "id": "G1-h1",
+     "key_id": "G1-h1",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 8 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260108"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-08"
+       }
+      }
+     ],
+     "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-08",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h2",
+     "key_id": "G1-h2",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 10 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260110"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-10"
+       }
+      }
+     ],
+     "expect": [
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-10",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h3",
+     "key_id": "G1-h3",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 14 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260114"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-14"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-14",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h4",
+     "key_id": "G1-h4",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 20 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260120"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-20"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-20",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h5",
+     "key_id": "G1-h5",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 30 January 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260130"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-01-30"
+       }
+      }
+     ],
+     "expect": [
+      "Round totals to whole cents",
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-01-30",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h6",
+     "key_id": "G1-h6",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 5 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260205"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-05"
+       }
+      }
+     ],
+     "expect": [
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-05",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h7",
+     "key_id": "G1-h7",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 15 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260215"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-15"
+       }
+      }
+     ],
+     "expect": [
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-15",
+       "--format=%s",
+       "main"
+      ]
+     }
+    },
+    {
+     "id": "G1-h8",
+     "key_id": "G1-h8",
+     "ask": "Which commits in the git repository at {FX}/repo were made on or after 25 February 2026? Reply with their commit messages only, one per line.",
+     "bad": {
+      "name": "git_log",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "start_timestamp": "20260225"
+      }
+     },
+     "good": [
+      {
+       "name": "git_log",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "start_timestamp": "2026-02-25"
+       }
+      }
+     ],
+     "expect": [
+      "Raise the oak shelf to 135"
+     ],
+     "decoys": [
+      "Add the price list",
+      "Add the total calculator",
+      "Add brackets and wall plugs to the price list",
+      "Round totals to whole cents"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "log",
+       "--since=2026-02-25",
+       "--format=%s",
+       "main"
+      ]
+     }
+    }
+   ]
+  },
+  "F2": {
+   "server": "filesystem",
+   "kind": "unknown_value",
+   "role": "eligible",
+   "tool": "search_files",
+   "reply_pattern": "^No matches found$",
+   "reply_is_error": false,
+   "sentence": "No entry matched the pattern \"{arg:pattern}\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*{arg:pattern}*\".",
+   "sentence_applied_by": "relay",
+   "sentence_when": {
+    "arg_matches": {
+     "pattern": "^[A-Za-z0-9._-]+$"
+    }
+   },
+   "main": [
+    {
+     "id": "F2-n1",
+     "key_id": "F2-n1",
+     "ask": "A file somewhere under {FX}/files answers this question: What is the second item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "todo"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*todo*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Renew the fire certificate before 30 April"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "2\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F2-n2",
+     "key_id": "F2-n2",
+     "ask": "A file somewhere under {FX}/files answers this question: What is the third item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "todo.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*todo.txt*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Count the stock in bay 7"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "3\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F2-n3",
+     "key_id": "F2-n3",
+     "ask": "A file somewhere under {FX}/files answers this question: Who on the contact list works in transport? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "contact"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*contact*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Bram de Wit"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), transport, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F2-n4",
+     "key_id": "F2-n4",
+     "ask": "A file somewhere under {FX}/files answers this question: Who on the contact list works in accounts? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "contacts.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*contacts.txt*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Chidi Okeke"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), accounts, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F2-n5",
+     "key_id": "F2-n5",
+     "ask": "A file somewhere under {FX}/files answers this question: What is the reference of the lorry booked at the meeting of 5 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "meeting-2026-01-05"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*meeting-2026-01-05*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-05.txt"
+       }
+      }
+     ],
+     "expect": [
+      "LRY-4417"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-05.txt",
+      "selector": {
+       "line": "Action: .+ books the lorry, reference ([\\w-]+)\\."
+      }
+     }
+    },
+    {
+     "id": "F2-n6",
+     "key_id": "F2-n6",
+     "ask": "A file somewhere under {FX}/files answers this question: Who was asked to update the price list at the meeting of 12 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "meeting-2026-01-12.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*meeting-2026-01-12.txt*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-12.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Dana"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-12.txt",
+      "selector": {
+       "line": "Action: (\\w+) updates the price list\\."
+      }
+     }
+    },
+    {
+     "id": "F2-n7",
+     "key_id": "F2-n7",
+     "ask": "A file somewhere under {FX}/files answers this question: What does the glossary say a pick list is? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "glossary"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*glossary*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "the items to collect for one order"
+     ],
+     "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- pick list: (.+)"
+      }
+     }
+    },
+    {
+     "id": "F2-n8",
+     "key_id": "F2-n8",
+     "ask": "A file somewhere under {FX}/files answers this question: What does the glossary say a bay is? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "glossary.md"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*glossary.md*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "a numbered storage area"
+     ],
+     "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- bay: (.+)"
+      }
+     }
+    }
+   ],
+   "held_out": [
+    {
+     "id": "F2-d1",
+     "key_id": "F2-d1",
+     "ask": "A file somewhere under {FX}/files answers this question: Which product has the code SKU-1003 in the price list? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "price"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*price*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/prices.csv"
+       }
+      }
+     ],
+     "expect": [
+      "steel bracket"
+     ],
+     "decoys": [
+      "oak shelf",
+      "pine shelf",
+      "wall plug"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/prices.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1003",
+       "field": "name"
+      }
+     }
+    },
+    {
+     "id": "F2-d2",
+     "key_id": "F2-d2",
+     "ask": "A file somewhere under {FX}/files answers this question: Which product has the code SKU-1002 in the price list? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "prices.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*prices.csv*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/prices.csv"
+       }
+      }
+     ],
+     "expect": [
+      "pine shelf"
+     ],
+     "decoys": [
+      "oak shelf",
+      "steel bracket",
+      "wall plug"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/prices.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1002",
+       "field": "name"
+      }
+     }
+    },
+    {
+     "id": "F2-d3",
+     "key_id": "F2-d3",
+     "ask": "A file somewhere under {FX}/files answers this question: What is the status of order ORD-503? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "order"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*order*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/orders.csv"
+       }
+      }
+     ],
+     "expect": [
+      "waiting for stock"
+     ],
+     "decoys": [
+      "shipped",
+      "packed"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/orders.csv",
+      "selector": {
+       "where": "order_id",
+       "equals": "ORD-503",
+       "field": "status"
+      }
+     }
+    },
+    {
+     "id": "F2-d4",
+     "key_id": "F2-d4",
+     "ask": "A file somewhere under {FX}/files answers this question: What is the status of order ORD-502? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "orders.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*orders.csv*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/orders.csv"
+       }
+      }
+     ],
+     "expect": [
+      "packed"
+     ],
+     "decoys": [
+      "shipped",
+      "waiting for stock"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/orders.csv",
+      "selector": {
+       "where": "order_id",
+       "equals": "ORD-502",
+       "field": "status"
+      }
+     }
+    },
+    {
+     "id": "F2-d5",
+     "key_id": "F2-d5",
+     "ask": "A file somewhere under {FX}/files answers this question: Which supplier sells brackets and plugs? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "supplier"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*supplier*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/suppliers.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Fastfix"
+     ],
+     "decoys": [
+      "Norden Timber"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/suppliers.txt",
+      "selector": {
+       "line": "([^,]+), brackets and plugs, .+"
+      }
+     }
+    },
+    {
+     "id": "F2-d6",
+     "key_id": "F2-d6",
+     "ask": "A file somewhere under {FX}/files answers this question: Which supplier sells oak and pine? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "suppliers.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*suppliers.txt*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/suppliers.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Norden Timber"
+     ],
+     "decoys": [
+      "Fastfix"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/suppliers.txt",
+      "selector": {
+       "line": "([^,]+), oak and pine, .+"
+      }
+     }
+    },
+    {
+     "id": "F2-d7",
+     "key_id": "F2-d7",
+     "ask": "A file somewhere under {FX}/files answers this question: Which currency does the configuration file name? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "config"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*config*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/config.json"
+       }
+      }
+     ],
+     "expect": [
+      "EUR"
+     ],
+     "decoys": [
+      "Larch Street",
+      "open_days"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/config.json",
+      "selector": {
+       "field": "currency"
+      }
+     }
+    },
+    {
+     "id": "F2-d8",
+     "key_id": "F2-d8",
+     "ask": "A file somewhere under {FX}/files answers this question: How many of SKU-1003 are in stock? Reply with the answer only.",
+     "bad": {
+      "name": "search_files",
+      "arguments": {
+       "path": "{FX}/files",
+       "pattern": "stock.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "search_files",
+       "arguments": {
+        "path": "{FX}/files",
+        "pattern": "**/*stock.csv*"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/stock.csv"
+       }
+      }
+     ],
+     "expect": [
+      "260"
+     ],
+     "decoys": [
+      "14",
+      "0",
+      "35"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/stock.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1003",
+       "field": "quantity"
+      }
+     }
+    }
+   ]
+  },
+  "F1": {
+   "server": "filesystem",
+   "kind": "unknown_value",
+   "role": "eligible",
+   "tool": "read_text_file",
+   "reply_pattern": "^ENOENT: no such file or directory, ",
+   "reply_is_error": true,
+   "sentence": "There is no file at {arg:path}. Call list_directory with path \"{parent:path}\" to see the files that exist, then call read_text_file with the full path of the right one.",
+   "sentence_applied_by": "relay",
+   "main": [
+    {
+     "id": "F1-n1",
+     "key_id": "F1-n1",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: What is the second item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/todo-list.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Renew the fire certificate before 30 April"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "2\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F1-n2",
+     "key_id": "F1-n2",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: What is the third item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/to-do.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Count the stock in bay 7"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "3\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F1-n3",
+     "key_id": "F1-n3",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: Who on the contact list works in transport? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/contacts.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Bram de Wit"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), transport, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F1-n4",
+     "key_id": "F1-n4",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: Who on the contact list works in accounts? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/contact-list.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Chidi Okeke"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), accounts, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F1-n5",
+     "key_id": "F1-n5",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: What is the reference of the lorry booked at the meeting of 5 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/meeting-2026-01-05.md"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-05.txt"
+       }
+      }
+     ],
+     "expect": [
+      "LRY-4417"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-05.txt",
+      "selector": {
+       "line": "Action: .+ books the lorry, reference ([\\w-]+)\\."
+      }
+     }
+    },
+    {
+     "id": "F1-n6",
+     "key_id": "F1-n6",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: Who was asked to update the price list at the meeting of 12 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/meeting-01-12.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-12.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Dana"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-12.txt",
+      "selector": {
+       "line": "Action: (\\w+) updates the price list\\."
+      }
+     }
+    },
+    {
+     "id": "F1-n7",
+     "key_id": "F1-n7",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: What does the glossary say a pick list is? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/glossary.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "the items to collect for one order"
+     ],
+     "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- pick list: (.+)"
+      }
+     }
+    },
+    {
+     "id": "F1-n8",
+     "key_id": "F1-n8",
+     "ask": "One of the files in the folder {FX}/files/notes answers this question: What does the glossary say a bay is? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/notes/glossary.markdown"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/notes"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "a numbered storage area"
+     ],
+     "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- bay: (.+)"
+      }
+     }
+    }
+   ],
+   "held_out": [
+    {
+     "id": "F1-d1",
+     "key_id": "F1-d1",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: Which product has the code SKU-1003 in the price list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/price-list.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/prices.csv"
+       }
+      }
+     ],
+     "expect": [
+      "steel bracket"
+     ],
+     "decoys": [
+      "oak shelf",
+      "pine shelf",
+      "wall plug"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/prices.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1003",
+       "field": "name"
+      }
+     }
+    },
+    {
+     "id": "F1-d2",
+     "key_id": "F1-d2",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: Which product has the code SKU-1002 in the price list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/prices.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/prices.csv"
+       }
+      }
+     ],
+     "expect": [
+      "pine shelf"
+     ],
+     "decoys": [
+      "oak shelf",
+      "steel bracket",
+      "wall plug"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/prices.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1002",
+       "field": "name"
+      }
+     }
+    },
+    {
+     "id": "F1-d3",
+     "key_id": "F1-d3",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: What is the status of order ORD-503? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/order-list.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/orders.csv"
+       }
+      }
+     ],
+     "expect": [
+      "waiting for stock"
+     ],
+     "decoys": [
+      "shipped",
+      "packed"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/orders.csv",
+      "selector": {
+       "where": "order_id",
+       "equals": "ORD-503",
+       "field": "status"
+      }
+     }
+    },
+    {
+     "id": "F1-d4",
+     "key_id": "F1-d4",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: What is the status of order ORD-502? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/orders.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/orders.csv"
+       }
+      }
+     ],
+     "expect": [
+      "packed"
+     ],
+     "decoys": [
+      "shipped",
+      "waiting for stock"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/orders.csv",
+      "selector": {
+       "where": "order_id",
+       "equals": "ORD-502",
+       "field": "status"
+      }
+     }
+    },
+    {
+     "id": "F1-d5",
+     "key_id": "F1-d5",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: Which supplier sells brackets and plugs? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/supplier-list.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/suppliers.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Fastfix"
+     ],
+     "decoys": [
+      "Norden Timber"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/suppliers.txt",
+      "selector": {
+       "line": "([^,]+), brackets and plugs, .+"
+      }
+     }
+    },
+    {
+     "id": "F1-d6",
+     "key_id": "F1-d6",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: Which supplier sells oak and pine? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/suppliers.csv"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/suppliers.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Norden Timber"
+     ],
+     "decoys": [
+      "Fastfix"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/suppliers.txt",
+      "selector": {
+       "line": "([^,]+), oak and pine, .+"
+      }
+     }
+    },
+    {
+     "id": "F1-d7",
+     "key_id": "F1-d7",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: Which currency does the configuration file name? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/config.yaml"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/config.json"
+       }
+      }
+     ],
+     "expect": [
+      "EUR"
+     ],
+     "decoys": [
+      "Larch Street",
+      "open_days"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/config.json",
+      "selector": {
+       "field": "currency"
+      }
+     }
+    },
+    {
+     "id": "F1-d8",
+     "key_id": "F1-d8",
+     "ask": "One of the files in the folder {FX}/files/data answers this question: How many of SKU-1003 are in stock? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "path": "{FX}/files/data/stock.txt"
+      }
+     },
+     "good": [
+      {
+       "name": "list_directory",
+       "arguments": {
+        "path": "{FX}/files/data"
+       }
+      },
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/data/stock.csv"
+       }
+      }
+     ],
+     "expect": [
+      "260"
+     ],
+     "decoys": [
+      "14",
+      "0",
+      "35"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/data/stock.csv",
+      "selector": {
+       "where": "sku",
+       "equals": "SKU-1003",
+       "field": "quantity"
+      }
+     }
+    }
+   ]
+  },
+  "F0": {
+   "server": "filesystem",
+   "kind": "missing_required",
+   "role": "descriptive",
+   "tool": "read_text_file",
+   "reply_pattern": "^Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined$",
+   "reply_is_error": true,
+   "sentence": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+   "sentence_applied_by": "relay",
+   "main": [
+    {
+     "id": "F0-n1",
+     "key_id": "F0-n1",
+     "ask": "The file {FX}/files/notes/todo.txt answers this question: What is the second item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Renew the fire certificate before 30 April"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Count the stock in bay 7"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "2\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F0-n2",
+     "key_id": "F0-n2",
+     "ask": "The file {FX}/files/notes/todo.txt answers this question: What is the third item on the to-do list? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/todo.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Count the stock in bay 7"
+     ],
+     "decoys": [
+      "Order packing tape",
+      "Renew the fire certificate"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/todo.txt",
+      "selector": {
+       "line": "3\\. (.+)"
+      }
+     }
+    },
+    {
+     "id": "F0-n3",
+     "key_id": "F0-n3",
+     "ask": "The file {FX}/files/notes/contacts.txt answers this question: Who on the contact list works in transport? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Bram de Wit"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Chidi Okeke",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), transport, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F0-n4",
+     "key_id": "F0-n4",
+     "ask": "The file {FX}/files/notes/contacts.txt answers this question: Who on the contact list works in accounts? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/contacts.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Chidi Okeke"
+     ],
+     "decoys": [
+      "Asha Verma",
+      "Bram de Wit",
+      "Dana Lind"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/contacts.txt",
+      "selector": {
+       "line": "([^,]+), accounts, extension [0-9]+"
+      }
+     }
+    },
+    {
+     "id": "F0-n5",
+     "key_id": "F0-n5",
+     "ask": "The file {FX}/files/notes/meeting-2026-01-05.txt answers this question: What is the reference of the lorry booked at the meeting of 5 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-05.txt"
+       }
+      }
+     ],
+     "expect": [
+      "LRY-4417"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-05.txt",
+      "selector": {
+       "line": "Action: .+ books the lorry, reference ([\\w-]+)\\."
+      }
+     }
+    },
+    {
+     "id": "F0-n6",
+     "key_id": "F0-n6",
+     "ask": "The file {FX}/files/notes/meeting-2026-01-12.txt answers this question: Who was asked to update the price list at the meeting of 12 January 2026? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/meeting-2026-01-12.txt"
+       }
+      }
+     ],
+     "expect": [
+      "Dana"
+     ],
+     "decoys": [
+      "Present:",
+      "Decision:"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/meeting-2026-01-12.txt",
+      "selector": {
+       "line": "Action: (\\w+) updates the price list\\."
+      }
+     }
+    },
+    {
+     "id": "F0-n7",
+     "key_id": "F0-n7",
+     "ask": "The file {FX}/files/notes/glossary.md answers this question: What does the glossary say a pick list is? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "the items to collect for one order"
+     ],
+     "decoys": [
+      "a numbered storage area",
+      "the code of one product"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- pick list: (.+)"
+      }
+     }
+    },
+    {
+     "id": "F0-n8",
+     "key_id": "F0-n8",
+     "ask": "The file {FX}/files/notes/glossary.md answers this question: What does the glossary say a bay is? Reply with the answer only.",
+     "bad": {
+      "name": "read_text_file",
+      "arguments": {
+       "head": 20
+      }
+     },
+     "good": [
+      {
+       "name": "read_text_file",
+       "arguments": {
+        "path": "{FX}/files/notes/glossary.md"
+       }
+      }
+     ],
+     "expect": [
+      "a numbered storage area"
+     ],
+     "decoys": [
+      "the code of one product",
+      "the items to collect for one order"
+     ],
+     "source": {
+      "kind": "file_field",
+      "path": "files/notes/glossary.md",
+      "selector": {
+       "line": "- bay: (.+)"
+      }
+     }
+    }
+   ],
+   "held_out": []
+  },
+  "G2": {
+   "server": "git",
+   "kind": "bad_enum",
+   "role": "descriptive",
+   "tool": "git_branch",
+   "reply_pattern": "^Error executing tool git_branch: Invalid branch type: ",
+   "reply_is_error": true,
+   "sentence": "branch_type \"{arg:branch_type}\" is not allowed. The allowed values are \"local\", \"remote\" and \"all\". Call git_branch again with the same other arguments and branch_type set to one of them.",
+   "sentence_applied_by": "relay",
+   "main": [
+    {
+     "id": "G2-b1-everything",
+     "key_id": "G2-b1-everything",
+     "ask": "Which local branches does the git repository at {FX}/repo have? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "everything"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)"
+      ]
+     }
+    },
+    {
+     "id": "G2-b2-everything",
+     "key_id": "G2-b2-everything",
+     "ask": "Which local branches of the git repository at {FX}/repo contain commit 0b956b19a23106abe9fdf3d48ef021b56dd1b33a? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "everything",
+       "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--contains=0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+      ]
+     }
+    },
+    {
+     "id": "G2-b3-everything",
+     "key_id": "G2-b3-everything",
+     "ask": "Which local branches of the git repository at {FX}/repo contain commit 25018bef76af977432b507d764ac7f5123fa9752? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "everything",
+       "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--contains=25018bef76af977432b507d764ac7f5123fa9752"
+      ]
+     }
+    },
+    {
+     "id": "G2-b4-everything",
+     "key_id": "G2-b4-everything",
+     "ask": "Which local branch of the git repository at {FX}/repo does not contain commit 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "everything",
+       "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+       }
+      }
+     ],
+     "expect": [
+      "release-1"
+     ],
+     "decoys": [
+      "main"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--no-contains=911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+      ]
+     }
+    },
+    {
+     "id": "G2-b1-both",
+     "key_id": "G2-b1-both",
+     "ask": "Which local branches does the git repository at {FX}/repo have? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "both"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)"
+      ]
+     }
+    },
+    {
+     "id": "G2-b2-both",
+     "key_id": "G2-b2-both",
+     "ask": "Which local branches of the git repository at {FX}/repo contain commit 0b956b19a23106abe9fdf3d48ef021b56dd1b33a? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "both",
+       "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--contains=0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+      ]
+     }
+    },
+    {
+     "id": "G2-b3-both",
+     "key_id": "G2-b3-both",
+     "ask": "Which local branches of the git repository at {FX}/repo contain commit 25018bef76af977432b507d764ac7f5123fa9752? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "both",
+       "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+       }
+      }
+     ],
+     "expect": [
+      "main",
+      "release-1"
+     ],
+     "decoys": [],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--contains=25018bef76af977432b507d764ac7f5123fa9752"
+      ]
+     }
+    },
+    {
+     "id": "G2-b4-both",
+     "key_id": "G2-b4-both",
+     "ask": "Which local branch of the git repository at {FX}/repo does not contain commit 911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2? Reply with the branch names only, one per line.",
+     "bad": {
+      "name": "git_branch",
+      "arguments": {
+       "repo_path": "{FX}/repo",
+       "branch_type": "both",
+       "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+      }
+     },
+     "good": [
+      {
+       "name": "git_branch",
+       "arguments": {
+        "repo_path": "{FX}/repo",
+        "branch_type": "local",
+        "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+       }
+      }
+     ],
+     "expect": [
+      "release-1"
+     ],
+     "decoys": [
+      "main"
+     ],
+     "source": {
+      "kind": "git_lines",
+      "args": [
+       "branch",
+       "--format=%(refname:short)",
+       "--no-contains=911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+      ]
+     }
+    }
+   ],
+   "held_out": []
+  }
+ }
+}

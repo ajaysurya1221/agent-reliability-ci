@@ -1,0 +1,194 @@
+[
+  {
+    "id": "G1/main/G1-g1",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g2",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g3",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g4",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g5",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g6",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g7",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/main/G1-g8",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h1",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h2",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h3",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h4",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h5",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h6",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h7",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G1/held_out/G1-h8",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b1-everything",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b2-everything",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b3-everything",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b4-everything",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b1-both",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b2-both",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b3-both",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  },
+  {
+    "id": "G2/main/G2-b4-both",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "tool_error",
+    "verdict": "pass",
+    "worst_severity": null,
+    "issues": []
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "is_error": false,
+    "replace_text": "No commit matched start_timestamp \"{arg:start_timestamp}\". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.",
+    "text_matches": "^Commit history:\\n?$",
+    "tool": "git_log",
+    "when": {
+      "arg_present": [
+        "start_timestamp"
+      ]
+    }
+  }
+]

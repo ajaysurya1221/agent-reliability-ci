@@ -1,0 +1,292 @@
+{
+ "tools": [
+  "git_status",
+  "git_diff_unstaged",
+  "git_diff_staged",
+  "git_diff",
+  "git_commit",
+  "git_add",
+  "git_reset",
+  "git_log",
+  "git_create_branch",
+  "git_checkout",
+  "git_merge",
+  "git_show",
+  "git_branch",
+  "git_remote"
+ ],
+ "replies": [
+  {
+   "id": "G1/main/G1-g1#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260107"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g2#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260109"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g3#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260111"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g4#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260115"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g5#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260125"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g6#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260201"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g7#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260210"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g8#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260220"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h1#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260108"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h2#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260110"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h3#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260114"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h4#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260120"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h5#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260130"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h6#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260205"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h7#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260215"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h8#not-excused",
+   "tool": "git_log",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260225"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  }
+ ]
+}

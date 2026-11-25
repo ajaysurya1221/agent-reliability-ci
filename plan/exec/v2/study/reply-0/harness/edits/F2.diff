@@ -1,0 +1,13 @@
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -732,6 +732,10 @@
+                     "and any matches inside are missing:\n" +
+                     unreadable.join("\n");
+         }
++        if (new RegExp("^No matches found$").exec(text)?.[0] === text &&
++            new RegExp("^[A-Za-z0-9._-]+$").exec(args.pattern)?.[0] === args.pattern) {
++            text = "No entry matched the pattern \"{arg:pattern}\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*{arg:pattern}*\".".replaceAll("{arg:pattern}", () => args.pattern);
++        }
+         return {
+             content: [{ type: "text", text }],
+             structuredContent: { content: text },

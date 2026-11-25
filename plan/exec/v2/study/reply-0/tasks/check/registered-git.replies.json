@@ -1,0 +1,434 @@
+{
+ "tools": [
+  "git_status",
+  "git_diff_unstaged",
+  "git_diff_staged",
+  "git_diff",
+  "git_commit",
+  "git_add",
+  "git_reset",
+  "git_log",
+  "git_create_branch",
+  "git_checkout",
+  "git_merge",
+  "git_show",
+  "git_branch",
+  "git_remote"
+ ],
+ "replies": [
+  {
+   "id": "G1/main/G1-g1",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260107"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g2",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260109"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g3",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260111"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g4",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260115"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g5",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260125"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g6",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260201"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g7",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260210"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/main/G1-g8",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260220"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h1",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260108"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h2",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260110"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h3",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260114"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h4",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260120"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h5",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260130"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h6",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260205"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h7",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260215"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G1/held_out/G1-h8",
+   "tool": "git_log",
+   "bad_call": "unknown_value",
+   "what": "cell G1, unknown_value",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "start_timestamp": "20260225"
+   },
+   "target": "start_timestamp",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Commit history:\n",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b1-everything",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "everything"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: everything",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b2-everything",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "everything",
+    "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: everything",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b3-everything",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "everything",
+    "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: everything",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b4-everything",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "everything",
+    "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: everything",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b1-both",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "both"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: both",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b2-both",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "both",
+    "contains": "0b956b19a23106abe9fdf3d48ef021b56dd1b33a"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: both",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b3-both",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "both",
+    "contains": "25018bef76af977432b507d764ac7f5123fa9752"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: both",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "G2/main/G2-b4-both",
+   "tool": "git_branch",
+   "bad_call": "bad_enum",
+   "what": "cell G2, bad_enum",
+   "args": {
+    "repo_path": "/Users/Shared/arci-reply0/fx/repo",
+    "branch_type": "both",
+    "not_contains": "911021e1ef1ae2a50fbf18ce67fb7fdd84aadce2"
+   },
+   "target": "branch_type",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Error executing tool git_branch: Invalid branch type: both",
+   "structured": null,
+   "duration_ms": 0
+  }
+ ]
+}

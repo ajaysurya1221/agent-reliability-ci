@@ -1,0 +1,226 @@
+[
+  {
+    "id": "G1/main/G1-g1#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g2#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g3#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g4#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g5#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g6#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g7#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/main/G1-g8#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h1#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h2#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h3#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h4#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h5#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h6#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h7#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  },
+  {
+    "id": "G1/held_out/G1-h8#not-excused",
+    "checker": "mcp-linter 1.2.0 P4",
+    "status": "ok",
+    "verdict": "flagged",
+    "worst_severity": "info",
+    "issues": [
+      {
+        "kind": "accepted",
+        "severity": "info",
+        "meaning": "accepted invalid arguments without an error"
+      }
+    ]
+  }
+]

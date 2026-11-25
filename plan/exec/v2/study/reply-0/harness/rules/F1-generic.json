@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+    "text_matches": "^ENOENT: no such file or directory, ",
+    "tool": "read_text_file",
+    "when": {}
+  }
+]

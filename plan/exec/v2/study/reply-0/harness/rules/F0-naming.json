@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "read_text_file needs the argument \"path\". Call read_text_file again with path set to the full path of the file.",
+    "text_matches": "^Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined$",
+    "tool": "read_text_file",
+    "when": {}
+  }
+]

@@ -1,0 +1,678 @@
+{
+ "tools": [
+  "read_file",
+  "read_text_file",
+  "read_media_file",
+  "read_multiple_files",
+  "write_file",
+  "append_file",
+  "edit_file",
+  "create_directory",
+  "list_directory",
+  "list_directory_with_sizes",
+  "directory_tree",
+  "move_file",
+  "copy_file",
+  "search_files",
+  "get_file_info",
+  "list_allowed_directories"
+ ],
+ "replies": [
+  {
+   "id": "F2/main/F2-n1",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "todo"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n2",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "todo.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n3",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "contact"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n4",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "contacts.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n5",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "meeting-2026-01-05"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n6",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "meeting-2026-01-12.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n7",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "glossary"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n8",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "glossary.md"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d1",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "price"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d2",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "prices.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d3",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "order"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d4",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "orders.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d5",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "supplier"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d6",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "suppliers.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d7",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "config"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d8",
+   "tool": "search_files",
+   "bad_call": "unknown_value",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "stock.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n1",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/todo-list.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/todo-list.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n2",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/to-do.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/to-do.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n3",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/contacts.csv"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/contacts.csv'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n4",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/contact-list.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/contact-list.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n5",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/meeting-2026-01-05.md"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/meeting-2026-01-05.md'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n6",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/meeting-01-12.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/meeting-01-12.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n7",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/glossary.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/glossary.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/main/F1-n8",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/notes/glossary.markdown"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/notes/glossary.markdown'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d1",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/price-list.csv"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/price-list.csv'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d2",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/prices.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/prices.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d3",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/order-list.csv"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/order-list.csv'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d4",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/orders.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/orders.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d5",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/supplier-list.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/supplier-list.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d6",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/suppliers.csv"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/suppliers.csv'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d7",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/config.yaml"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/config.yaml'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F1/held_out/F1-d8",
+   "tool": "read_text_file",
+   "bad_call": "unknown_value",
+   "what": "cell F1, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files/data/stock.txt"
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "ENOENT: no such file or directory, lstat '/Users/Shared/arci-reply0/fx/files/data/stock.txt'",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n1",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n2",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n3",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n4",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n5",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n6",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n7",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F0/main/F0-n8",
+   "tool": "read_text_file",
+   "bad_call": "missing",
+   "what": "cell F0, missing_required",
+   "args": {
+    "head": 20
+   },
+   "target": "path",
+   "is_error": true,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined",
+   "structured": null,
+   "duration_ms": 0
+  }
+ ]
+}

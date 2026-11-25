@@ -1,0 +1,11 @@
+--- a/server.py
++++ b/server.py
+@@ -1651,6 +1651,8 @@
+         entries = git_log(
+             open_repo(repo_path), max_count, start_timestamp, end_timestamp
+         )
++        if not entries and start_timestamp is not None:
++            return 'No commit matched start_timestamp "{arg:start_timestamp}". If that is meant as a date, write it as YYYY-MM-DD (for example 2024-01-15) and call git_log again with the same repo_path.'.replace("{arg:start_timestamp}", start_timestamp)
+         return "Commit history:\n" + "\n".join(entries)
+ 
+     @server.tool(

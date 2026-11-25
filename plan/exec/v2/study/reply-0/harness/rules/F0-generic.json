@@ -1,0 +1,9 @@
+[
+  {
+    "is_error": true,
+    "replace_text": "The previous tool call did not return a usable result. Check its arguments against the tool descriptions and make a corrected call.",
+    "text_matches": "^Input validation error: Invalid arguments for tool read_text_file: path: Invalid input: expected string, received undefined$",
+    "tool": "read_text_file",
+    "when": {}
+  }
+]

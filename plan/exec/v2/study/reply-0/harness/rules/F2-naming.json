@@ -1,0 +1,13 @@
+[
+  {
+    "is_error": false,
+    "replace_text": "No entry matched the pattern \"{arg:pattern}\". A pattern with no wildcard matches only an entry whose path below the given path is exactly that text. Call search_files again with the same path and the pattern \"**/*{arg:pattern}*\".",
+    "text_matches": "^No matches found$",
+    "tool": "search_files",
+    "when": {
+      "arg_matches": {
+        "pattern": "^[A-Za-z0-9._-]+$"
+      }
+    }
+  }
+]

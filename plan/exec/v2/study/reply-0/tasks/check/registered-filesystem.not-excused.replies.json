@@ -1,0 +1,294 @@
+{
+ "tools": [
+  "read_file",
+  "read_text_file",
+  "read_media_file",
+  "read_multiple_files",
+  "write_file",
+  "append_file",
+  "edit_file",
+  "create_directory",
+  "list_directory",
+  "list_directory_with_sizes",
+  "directory_tree",
+  "move_file",
+  "copy_file",
+  "search_files",
+  "get_file_info",
+  "list_allowed_directories"
+ ],
+ "replies": [
+  {
+   "id": "F2/main/F2-n1#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "todo"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n2#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "todo.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n3#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "contact"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n4#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "contacts.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n5#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "meeting-2026-01-05"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n6#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "meeting-2026-01-12.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n7#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "glossary"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/main/F2-n8#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "glossary.md"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d1#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "price"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d2#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "prices.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d3#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "order"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d4#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "orders.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d5#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "supplier"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d6#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "suppliers.txt"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d7#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "config"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  },
+  {
+   "id": "F2/held_out/F2-d8#not-excused",
+   "tool": "search_files",
+   "bad_call": "unknown_value_not_excused",
+   "what": "cell F2, unknown_value",
+   "args": {
+    "path": "/Users/Shared/arci-reply0/fx/files",
+    "pattern": "stock.csv"
+   },
+   "target": "pattern",
+   "is_error": false,
+   "protocol_error": false,
+   "expect_error": true,
+   "text": "No matches found",
+   "structured": null,
+   "duration_ms": 0
+  }
+ ]
+}
