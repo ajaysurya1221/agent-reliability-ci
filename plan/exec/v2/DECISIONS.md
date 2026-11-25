@@ -787,3 +787,26 @@ no product code. The maintainer chose to run it now.
 
 **What it does not claim.** That any company wants this, or that a benchmark result brings users.
 A simulation measures the rule, not agents or their graders.
+
+## D-32: the maintainer sets the 14 Dec checkpoint aside; building resumes (2026-11-25)
+
+**What led to it.** After the result of benchmark B1, the maintainer wrote on 25 Nov 2026:
+"Ignore 14 Dec checkpoint and let's keep on improvising. Taking a big leap is okay too."
+
+**The decision.**
+
+- D-23's rule "no new feature and no release before 14 Dec" no longer holds, and the stop rule of
+  14 Dec is no longer a checkpoint. The counts it named (stars, outside issues or discussions, an
+  outside posted result) are still recorded in `signals/`, as facts and not as a gate.
+- D-29's limit of one registered run per outside question is lifted with it. What stays from D-29
+  and D-31: any run whose result will be stated in public is registered and pushed before its first
+  live trial or registered simulation, and is counted again by an agent that reads no write-up.
+- A larger change of direction is allowed. Before one is chosen, the consultant (Astra) is asked
+  and independent proposals are judged against the evidence already gathered (the two research
+  rounds of 25 Nov, B1, the reader trial of 24 Nov); the choice is recorded here as its own
+  decision, with what would count as failure.
+
+**What does not change.** Merging to `main`, opening pull requests and publishing releases stay
+with the maintainer. The pinned files, the privacy rule for local logs, and the wording rules
+(never "first" or "only"; B1 is quoted with its weakness; simulated results say nothing about
+real agents) stand.
