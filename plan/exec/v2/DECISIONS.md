@@ -810,3 +810,49 @@ A simulation measures the rule, not agents or their graders.
 with the maintainer. The pinned files, the privacy rule for local logs, and the wording rules
 (never "first" or "only"; B1 is quoted with its weakness; simulated results say nothing about
 real agents) stand.
+
+## D-33: next direction: does a tool server's own failure reply help an agent recover; a three-day benchmark decides before any product code (2026-11-25)
+
+**What led to it.** After D-32 the orchestrator asked for the next direction three ways, all on
+25 Nov: the consultant (Astra) twice, a panel of five independent proposals scored by three judges
+(does anyone want it; does it exist already; can it be built and proven), and a vetting of the
+leading idea by six agents, one of them hostile. No proposal scored above 5 of 10 on demand, and
+the panel wrote that the evidence supports no large leap. Two findings shaped the choice. The only
+outside engagement this project has had is about recovery after a failed or empty tool result
+(runs 3 to 6). And record-and-replay of agent traffic, statistical gates for pull requests, and
+gates for coding-agent settings each have several existing tools.
+
+**The decision.**
+
+- Subject: a tool server (an MCP server) and the text of its own failure replies. The question a
+  maintainer of such a server could act on: "does this reply, as my server sends it, let a model
+  recover, or should I reword it?" The server under test is the real one, run locally on a seeded
+  fixture; no production traffic is needed.
+- Before any code under `src/arci`: one registered benchmark, Reply-0, of at most three laptop
+  days, as study code. The server's own reply to a provoked bad call (missing argument, wrong
+  type, bad enum, unknown value) is the candidate arm; a sentence that names the corrected call,
+  built only from what the server knows, is the baseline arm, so BLOCK means "an edit worth
+  making". Grading is against an answer key fixed beforehand, never "did it retry". Read-only
+  tools only. Two local models. The verdicts of two existing rule-based checkers on the same
+  replies are recorded before the first trial.
+- Pass needs all four: (a) the control (the order desk, raw empty result against the naming
+  sentence) gives BLOCK; (b) at least one decided BLOCK on a server this project did not write;
+  (c) at least one decided cell where the measured verdict contradicts both rule-based checkers;
+  (d) that reply, edited in the server itself with the rewrite switched off and on held-out
+  tasks, gives the same decision. CANNOT TELL counts as a miss.
+- On a pass: build the smallest tool a server maintainer can run, as additive modules. On a fail,
+  or past three laptop days: this direction ends with no product code, and the corrected
+  "recovery board" benchmark of the panel (Board-0) runs instead; its criteria K1 to K3 can end
+  feature work.
+
+**What is not claimed, now or after a pass.** That reply wording changes recovery, or that naming
+the tool or the call helps: that is published (arXiv 2609.35381; also 2609.00072, 2611.11581,
+2610.10062, 2610.32555). That fault proxies, an empty-result test, grading without a judge model or
+provoking real servers are new (tool-eval-bench, AgentCheck, MCP-Injector, mcp-fault-bench, and
+the checkers `mcp-linter` and `mcp-lint` exist). That results on small local models carry to
+hosted models. That anyone who publishes a server has asked for this: none has. Nothing is filed
+on anyone else's tracker.
+
+**Set aside by this decision.** The gate for coding-agent settings (the orchestrator's first
+leaning; Astra showed that the hard part is tasks that separate two settings, and a tool for it
+exists), record-and-replay "worlds", a second version of the decision rule, and plug-ins.
