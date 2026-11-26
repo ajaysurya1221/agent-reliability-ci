@@ -1,0 +1,40 @@
+{
+  "ollama": "0.32.14",
+  "slots": [
+    {
+      "slot": "M1",
+      "tag": "qwen3.5:4b-mlx-ctx32k",
+      "digest": "c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430",
+      "family": "Qwen",
+      "size": "4B"
+    },
+    {
+      "slot": "M2",
+      "tag": "gemma4:12b-mlx-ctx32k",
+      "digest": "a5c533115db870b8db2e39657686a8742a5e7182bd00403b851dd1af28e4efbc",
+      "family": "Gemma",
+      "size": "12B"
+    },
+    {
+      "slot": "M3",
+      "tag": "llama3.1:8b-ctx32k",
+      "digest": "d3d6951729aeb9bbb6a4e89e5b401a3880c215bbf2dd8b22e5ac5809b0e03da5",
+      "family": "Llama",
+      "size": "8B"
+    },
+    {
+      "slot": "M4",
+      "tag": "mistral-nemo:12b-ctx32k",
+      "digest": "5db84f35b28438e5eb4e04f8853c8f4480a87d035b23e2f9228a63b787060869",
+      "family": "Mistral NeMo",
+      "size": "12B"
+    },
+    {
+      "slot": "M5",
+      "tag": "granite3.3:8b-ctx32k",
+      "digest": "dafa440a1f5ba3bd1f636f0c584ed7b8005a1e764ffc4027d08c69e978eb65d9",
+      "family": "Granite",
+      "size": "8B"
+    }
+  ]
+}

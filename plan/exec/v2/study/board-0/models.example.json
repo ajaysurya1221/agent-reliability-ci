@@ -1,0 +1,19 @@
+{
+  "ollama": "0.32.14",
+  "slots": [
+    {
+      "slot": "M1",
+      "tag": "qwen3.5:4b-mlx-ctx32k",
+      "digest": "c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430",
+      "family": "Qwen",
+      "size": "4B"
+    },
+    {
+      "slot": "M2",
+      "tag": "gemma4:12b-mlx-ctx32k",
+      "digest": "a5c533115db870b8db2e39657686a8742a5e7182bd00403b851dd1af28e4efbc",
+      "family": "Gemma",
+      "size": "12B"
+    }
+  ]
+}

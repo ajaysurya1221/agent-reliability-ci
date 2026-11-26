@@ -1,0 +1,157 @@
+{
+  "collisions": [
+    {
+      "key": 15,
+      "path": "rooms.Elm Pavilion.floor",
+      "run": "board0-d1-M1-E",
+      "seed": 3652880183146665,
+      "task": "K-k8",
+      "value": 15
+    },
+    {
+      "key": 382,
+      "path": "rooms.Beech Theatre.capacity",
+      "run": "board0-d1-M2-clean",
+      "seed": 279407589852431,
+      "task": "K-k5",
+      "value": 382
+    },
+    {
+      "key": 54,
+      "path": "events.EVT-2436.duration_minutes",
+      "run": "board0-d1-M2-E",
+      "seed": 583621940701897,
+      "task": "K-k5",
+      "value": 54
+    },
+    {
+      "key": 574,
+      "path": "rooms.Cedar Annex.capacity",
+      "run": "board0-d1-M4-E",
+      "seed": 5685595581097328,
+      "task": "K-k3",
+      "value": 574
+    },
+    {
+      "key": 19,
+      "path": "rooms.Maple Annex.floor",
+      "run": "board0-d1-M4-E",
+      "seed": 2951337892345678,
+      "task": "K-k4",
+      "value": 19
+    },
+    {
+      "key": 222,
+      "path": "events.EVT-4001.attendee_count",
+      "run": "board0-d1-M5-E",
+      "seed": 2683503257265102,
+      "task": "K-k4",
+      "value": 222
+    },
+    {
+      "key": 23,
+      "path": "rooms.Ash Atrium.floor",
+      "run": "board0-d1-M5-E",
+      "seed": 3740252612949720,
+      "task": "K-k4",
+      "value": 23
+    },
+    {
+      "key": 20,
+      "path": "events.EVT-5565.attendee_count",
+      "run": "board0-d1-M5-E",
+      "seed": 1745890190159765,
+      "task": "K-k4",
+      "value": 20
+    },
+    {
+      "key": 20,
+      "path": "rooms.Hazel Suite.floor",
+      "run": "board0-d1-M5-E",
+      "seed": 4147396223953359,
+      "task": "K-k4",
+      "value": 20
+    },
+    {
+      "key": 131,
+      "path": "events.EVT-6295.duration_minutes",
+      "run": "board0-d1-M5-E",
+      "seed": 6465973786319755,
+      "task": "K-k8",
+      "value": 131
+    },
+    {
+      "key": 91,
+      "path": "events.EVT-4137.attendee_count",
+      "run": "board0-d2-M5-E",
+      "seed": 134516406818765,
+      "task": "K-k4",
+      "value": 91
+    },
+    {
+      "key": 488,
+      "path": "rooms.Birch Studio.capacity",
+      "run": "board0-d2-M5-E",
+      "seed": 2155588062300803,
+      "task": "K-k8",
+      "value": 488
+    },
+    {
+      "key": 178,
+      "path": "rooms.Beech Terrace.capacity",
+      "run": "board0-d2-M5-E",
+      "seed": 2919795919743272,
+      "task": "K-k4",
+      "value": 178
+    },
+    {
+      "key": 342,
+      "path": "rooms.Birch Gallery.capacity",
+      "run": "board0-d2-M5-E",
+      "seed": 2455124770758292,
+      "task": "K-k5",
+      "value": 342
+    },
+    {
+      "key": 210,
+      "path": "events.EVT-4857.duration_minutes",
+      "run": "board0-d2-M4-E",
+      "seed": 3930274632666257,
+      "task": "K-k8",
+      "value": 210
+    },
+    {
+      "key": 306,
+      "path": "rooms.Alder Gallery.capacity",
+      "run": "board0-d2-M4-E",
+      "seed": 5685992507068418,
+      "task": "K-k5",
+      "value": 306
+    },
+    {
+      "key": 130,
+      "path": "events.EVT-5172.duration_minutes",
+      "run": "board0-d2-M2-E",
+      "seed": 1233464269695443,
+      "task": "K-k8",
+      "value": 130
+    },
+    {
+      "key": 112,
+      "path": "events.EVT-2436.duration_minutes",
+      "run": "board0-d2-M2-E",
+      "seed": 4131211330271081,
+      "task": "K-k5",
+      "value": 112
+    },
+    {
+      "key": 16,
+      "path": "rooms.Beech Gallery.floor",
+      "run": "board0-d2-M2-E",
+      "seed": 1096859051483313,
+      "task": "K-k4",
+      "value": 16
+    }
+  ],
+  "count": 19
+}

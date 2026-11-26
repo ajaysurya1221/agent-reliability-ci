@@ -887,3 +887,40 @@ else's tracker.
 
 **Predictions.** Both written predictions (the consultant's about 10% chance of a pass; the
 orchestrator's "(a) and (b) met, (c) missed, (d) not run") matched the outcome.
+
+## D-35: Board-0 as it will be registered; a fail stops the Board and nothing else (2026-11-26)
+
+**What led to it.** D-34 made Board-0 the next step and the maintainer wrote "Start Board-0" on
+26 Nov. Before anything was built, the orchestrator ran the day-1 check the panel had asked for
+(four sources read: no published per-model table of recovery after an empty tool result, split by
+reply wording, on local models; two of the papers were not read to the end) and asked the
+consultant (Astra) ten design questions. The maintainer then answered two questions.
+
+**The decision.**
+
+- **One comparison, not two.** After a correct lookup whose result is blanked once, the model
+  gets either the empty text as delivered (candidate) or the stock sentence "The lookup returned
+  no data. Repeat the same call with the same arguments." (baseline). The bare-error cell of the
+  proposal is dropped: arXiv 2611.11581 covers explicit errors on 13 open models.
+- **Five local models, two task families, two days.** The two installed models plus
+  `llama3.1:8b`, `mistral-nemo:12b` and `granite3.3:8b` (downloads approved by the maintainer,
+  about 17 GB). Eight order-desk tasks and eight calendar-desk tasks written by a worker that had
+  not read the earlier runs, equal weight every round. 16 pairs a round, at most 26 rounds: the
+  largest cap for which the released `arci plan` gives exact projections for the whole grid.
+  Everything runs twice, on two calendar days.
+- **The answer is a tool call.** Reply-0 lost many trials to right answers wrapped in extra
+  words. In Board-0 the model ends a trial with `submit_answer(value)`, graded by exact typed
+  match against the seeded key. No retry hint in the prompt.
+- **Study code first.** No `arci board` command under `src/arci` before the benchmark passes.
+- **Criteria K1 to K5** as in the registration: reach beyond the 4B model, a table that is not
+  flat, the same decisions on both days, enough decided runs at a usable cost, and evidence a
+  stranger can check offline.
+- **What a fail stops.** The maintainer chose on 26 Nov: if K1, K2 or K3 misses, the numbers are
+  published and work on the Board stops; any other feature needs its own evidence first. This
+  replaces the wording of D-33 and of the panel ("can end feature work"). A miss of K4 or K5
+  alone allows one registered repair and one rerun.
+
+**Not claimed, now or after a pass.** That reply wording changes recovery (published: arXiv
+2609.35381, 2611.11581, 2610.10062); that a recovery benchmark on local models is new
+(tool-eval-bench has error-recovery scenarios and one on an empty search); that five small local
+models speak for hosted models or for real agents; that anyone asked for this table.

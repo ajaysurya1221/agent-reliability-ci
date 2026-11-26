@@ -1,0 +1,120 @@
+{
+  "suite_id": "board0-plan-16x26",
+  "tasks": [
+    {
+      "id": "t01",
+      "key_id": "t01"
+    },
+    {
+      "id": "t02",
+      "key_id": "t02"
+    },
+    {
+      "id": "t03",
+      "key_id": "t03"
+    },
+    {
+      "id": "t04",
+      "key_id": "t04"
+    },
+    {
+      "id": "t05",
+      "key_id": "t05"
+    },
+    {
+      "id": "t06",
+      "key_id": "t06"
+    },
+    {
+      "id": "t07",
+      "key_id": "t07"
+    },
+    {
+      "id": "t08",
+      "key_id": "t08"
+    },
+    {
+      "id": "t09",
+      "key_id": "t09"
+    },
+    {
+      "id": "t10",
+      "key_id": "t10"
+    },
+    {
+      "id": "t11",
+      "key_id": "t11"
+    },
+    {
+      "id": "t12",
+      "key_id": "t12"
+    },
+    {
+      "id": "t13",
+      "key_id": "t13"
+    },
+    {
+      "id": "t14",
+      "key_id": "t14"
+    },
+    {
+      "id": "t15",
+      "key_id": "t15"
+    },
+    {
+      "id": "t16",
+      "key_id": "t16"
+    }
+  ],
+  "oracle": "board0_plan_stub:passed",
+  "baseline": {
+    "label": "stock-sentence",
+    "command": {
+      "argv": [
+        "/usr/bin/true",
+        "{mcp_config}",
+        "{task_file}"
+      ]
+    }
+  },
+  "candidate": {
+    "label": "empty-as-given",
+    "command": {
+      "argv": [
+        "/usr/bin/true",
+        "{mcp_config}",
+        "{task_file}"
+      ]
+    }
+  },
+  "mcp_server": {
+    "name": "srv",
+    "argv": [
+      "/usr/bin/true"
+    ],
+    "env": {},
+    "snapshot": "board0_plan_stub:snapshot"
+  },
+  "conditions": [
+    {
+      "id": "clean"
+    }
+  ],
+  "rule": {
+    "alpha": "1/20",
+    "delta": "1/10",
+    "stakes": [
+      "1/4",
+      "1/2"
+    ],
+    "max_rounds": 26,
+    "max_errored_pairs": 4,
+    "scenario_seeds": "per_round"
+  },
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 12,
+    "max_seconds": 120,
+    "grader_seconds": 20
+  }
+}

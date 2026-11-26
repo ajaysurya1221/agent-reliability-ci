@@ -1,0 +1,154 @@
+[
+  {
+    "id": "K-k1",
+    "family": "calendar",
+    "ask": "What is the title of event EVT-5821?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-5821"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.title"
+    },
+    "answer_type": "string",
+    "task": {
+      "event_id": "EVT-5821"
+    }
+  },
+  {
+    "id": "K-k2",
+    "family": "calendar",
+    "ask": "Which room is booked for event EVT-4173?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-4173"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.room"
+    },
+    "answer_type": "string",
+    "task": {
+      "event_id": "EVT-4173"
+    }
+  },
+  {
+    "id": "K-k3",
+    "family": "calendar",
+    "ask": "How many minutes after midnight does event EVT-9062 start?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-9062"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.start_minute"
+    },
+    "answer_type": "integer",
+    "task": {
+      "event_id": "EVT-9062"
+    }
+  },
+  {
+    "id": "K-k4",
+    "family": "calendar",
+    "ask": "How many minutes does event EVT-7359 last?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-7359"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.duration_minutes"
+    },
+    "answer_type": "integer",
+    "task": {
+      "event_id": "EVT-7359"
+    }
+  },
+  {
+    "id": "K-k5",
+    "family": "calendar",
+    "ask": "How many people are attending event EVT-2436?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-2436"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.attendee_count"
+    },
+    "answer_type": "integer",
+    "task": {
+      "event_id": "EVT-2436"
+    }
+  },
+  {
+    "id": "K-k6",
+    "family": "calendar",
+    "ask": "Who organised event EVT-8514?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-8514"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.organiser"
+    },
+    "answer_type": "string",
+    "task": {
+      "event_id": "EVT-8514"
+    }
+  },
+  {
+    "id": "K-k7",
+    "family": "calendar",
+    "ask": "What room is event EVT-3647 in?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-3647"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.room"
+    },
+    "answer_type": "string",
+    "task": {
+      "event_id": "EVT-3647"
+    }
+  },
+  {
+    "id": "K-k8",
+    "family": "calendar",
+    "ask": "How many people are coming to event EVT-6295?",
+    "opening": {
+      "name": "lookup_event",
+      "arguments": {
+        "event_id": "EVT-6295"
+      }
+    },
+    "source": {
+      "kind": "world_state",
+      "field": "event.attendee_count"
+    },
+    "answer_type": "integer",
+    "task": {
+      "event_id": "EVT-6295"
+    }
+  }
+]
