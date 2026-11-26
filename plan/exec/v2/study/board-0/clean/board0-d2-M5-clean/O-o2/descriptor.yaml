@@ -14,7 +14,7 @@
         "--arm",
         "clean",
         "--model",
-        "granite3.3:8b-ctx32k",
+        "qwen2.5:7b-ctx32k",
         "--run-id",
         "board0-d2-M5-clean"
       ],
@@ -47,7 +47,7 @@
         "--arm",
         "clean",
         "--model",
-        "granite3.3:8b-ctx32k",
+        "qwen2.5:7b-ctx32k",
         "--run-id",
         "board0-d2-M5-clean"
       ],

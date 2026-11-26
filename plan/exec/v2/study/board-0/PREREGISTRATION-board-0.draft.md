@@ -245,3 +245,19 @@ count as undecided and K5 then cannot hold. The roster that follows from these p
 descriptors of any slot whose model changed, are pushed as amendment 2 before any clean row;
 amendment 2 only applies this rule. Board tasks, arms, grading, the decision rule, K1 to K5
 and the stop rule are unchanged. Both sets of pin outputs are published.
+
+## Amendment 2, 27 November 2026: the roster that follows from the corrected pins
+
+Corrected pin, one run per original model, as committed in amendment 1:
+`pins/board0-pin2-M1.json` 20 of 20, `pins/board0-pin2-M2.json` 20 of 20,
+`pins/board0-pin2-M3.json` 20 of 20, `pins/board0-pin2-M4.json` 18 of 20,
+`pins/board0-pin2-M5.json` 0 of 20 (no native tool call in any probe). One slot failed, so by
+the rule of amendment 1 the first spare was pinned once: `pins/board0-pin2-S1.json`,
+`qwen2.5:7b-ctx32k`, 20 of 20. The second spare was not needed and was not run.
+
+Roster for both days: M1 `qwen3.5:4b-mlx-ctx32k`, M2 `gemma4:12b-mlx-ctx32k`,
+M3 `llama3.1:8b-ctx32k`, M4 `mistral-nemo:12b-ctx32k`, M5 `qwen2.5:7b-ctx32k`. Four makers;
+M1 and M5 are both Qwen models. The harness wrote `models.json` from the pin outputs
+(`roster`) and regenerated the 34 descriptors of slot M5 for both days; the other 136
+descriptors are byte-identical. No Board task has been shown to any model. Nothing else
+changes.

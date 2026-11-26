@@ -13,7 +13,7 @@
         "--arm",
         "stock-sentence",
         "--model",
-        "granite3.3:8b-ctx32k",
+        "qwen2.5:7b-ctx32k",
         "--run-id",
         "board0-d1-M5-E"
       ],
@@ -46,7 +46,7 @@
         "--arm",
         "empty-as-given",
         "--model",
-        "granite3.3:8b-ctx32k",
+        "qwen2.5:7b-ctx32k",
         "--run-id",
         "board0-d1-M5-E"
       ],
