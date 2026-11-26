@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from common import LIST, NOTE, REG, ROOT, Row, models, need, read, schedule, sha
+from common import LIST, NOTE, REG, ROOT, SPARES, Row, models, need, pin_name, read, schedule, sha
 from inputs import descriptors, digests, file, outputs, sources
 from suite_process import alive
 
@@ -68,39 +68,82 @@ def registration() -> str:
     return commit
 
 
+def pin_record(claims: Path, slot: str) -> tuple[Row, bool]:
+    run = pin_name(slot)
+    need((claims / run / "finished.json").is_file(), f"unfinished pin {run}")
+    record = read(file(claims, run + "/finished.json"))
+    model = read(file(claims, run + "/claim.json"))["model"]
+    need(
+        record["run"] == run
+        and type(record["ok"]) is bool
+        and model["slot"] == slot
+        and model["pin"] == run,
+        f"invalid pin claim {run}",
+    )
+    return model, record["ok"]
+
+
+def final_slots(slots: list[Row], claims: Path) -> list[Row]:
+    originals = [pin_record(claims, m["slot"]) for m in slots]
+    spares = iter(SPARES)
+    result = []
+    for original, passed in originals:
+        model = original
+        if not passed:
+            spare = next(spares, None)
+            if spare:
+                substitute, passed = pin_record(claims, spare)
+                if passed:
+                    model = substitute | {"slot": original["slot"]}
+            if not passed:
+                model = original | {"vacant": True}
+        result.append(model)
+    return result
+
+
 def order_guard(run: str, slots: list[Row], claims: Path, today: date) -> None:
     order = schedule(slots)
     need(run in order, "unregistered run")
-    if "-pin-" in run:
-        return
-    for model in slots:
-        need(
-            (claims / f"board0-pin-{model['slot']}" / "finished.json").is_file(),
-            "complete pins before board tasks",
-        )
     slot = run.split("-")[2]
-    pin = read(claims / f"board0-pin-{slot}" / "finished.json")
-    need(pin["ok"] is True, "failed or missing model pin")
+    if "-pin2-" in run:
+        need(not (claims / run).exists(), f"already claimed {run}")
+        if slot in SPARES:
+            failures = sum(not pin_record(claims, m["slot"])[1] for m in slots)
+            need(failures >= int(slot[1:]), f"spare {slot} not required")
+        return
+    need(slots == final_slots(slots, claims), "roster differs from completed pins")
+    vacant = {m["slot"] for m in slots if m.get("vacant")}
+    need(slot not in vacant, f"vacant slot {slot}")
     for prev in order[: order.index(run)]:
-        if "-pin-" not in prev:
-            other = prev.split("-")[2]
-            prior_pin = claims / f"board0-pin-{other}" / "finished.json"
-            if prior_pin.is_file() and read(prior_pin)["ok"] is False:
-                continue
+        if "-pin2-" not in prev and prev.split("-")[2] not in vacant:
             need((claims / prev / "finished.json").is_file(), f"unfinished predecessor {prev}")
     if "-d2-" in run:
         first = read(claims / f"board0-d1-{slot}-clean" / "claim.json")
         need(today > date.fromisoformat(first["date"]), "day 2 requires a later local date")
 
 
-def finished(run: str, claims: Path, commit: str) -> None:
+def finished(run: str, claims: Path, commit: str, *, board: bool = False) -> None:
     record = read(file(claims, run + "/finished.json"))
-    need(
-        read(file(claims, run + "/claim.json"))["registration"] == commit,
-        f"registration differs from prior claim {run}",
-    )
-    if record["ok"]:
-        need(record["files"] == digests(outputs(run)), f"completed evidence differs: {run}")
+    claim = read(file(claims, run + "/claim.json"))
+    prior = claim["registration"]
+    if board and "-pin2-" in run and commit != "FIFO stand-in":
+        need(
+            prior != commit and git("merge-base", prior, commit).decode().strip() == prior,
+            "push amendment 2 before board tasks",
+        )
+        first = read(file(claims, pin_name("M1") + "/claim.json"))
+        need(first["registration"] == prior, "corrected pin registrations differ")
+    else:
+        need(prior == commit, f"registration differs from prior claim {run}")
+    need(record["files"] == digests(outputs(run)), f"completed evidence differs: {run}")
+    if "-pin2-" in run:
+        evidence = read(file(ROOT, outputs(run)[0]))
+        need(
+            evidence["run"] == run
+            and evidence["model"] == claim["model"]
+            and evidence["ok"] is record["ok"],
+            f"pin evidence differs: {run}",
+        )
 
 
 def binding(task: object, side: str, seed: int, label: str, model: str, prompt: str) -> str:
@@ -112,7 +155,7 @@ def binding(task: object, side: str, seed: int, label: str, model: str, prompt: 
 
 
 def active(run: str) -> Row:
-    need(re.fullmatch(r"board0-(pin-M[1-5]|d[12]-M[1-5]-(clean|E))", run), "invalid RUN")
+    need(re.fullmatch(r"board0-(pin2-(?:M[1-5]|S[12])|d[12]-M[1-5]-(clean|E))", run), "invalid RUN")
     directory = CLAIMS / run
     active_suite = read(file(CLAIMS, "active-suite.json"))
     need(active_suite["claim"] == run and alive(active_suite["launcher"]), "inactive suite")

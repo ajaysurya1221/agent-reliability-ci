@@ -12,15 +12,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline_model
 import pin
-from common import ROOT, Row, models, read
+from common import ROOT, Row, read, registry
 
 
 class FakeOllama:
     def __init__(self) -> None:
         config = ROOT / "models.json"
         self.version = read(config)["ollama"]
-        slots = models(config)
-        self.tags = [{"name": s["tag"], "digest": s["digest"]} for s in slots]
+        registered = registry(config)
+        slots = registered["slots"]
+        self.tags = [
+            {"name": s["tag"], "digest": s["digest"]} for s in slots + registered["spares"]
+        ]
         self.echo_tag = slots[-1]["tag"]
         self.loaded: str | None = None
         self.tasks = {

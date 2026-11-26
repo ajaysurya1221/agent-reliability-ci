@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from common import EXPORTS, LIST, NOTE, REG, ROOT, Row, need, schedule, sha
+from common import EXPORTS, LIST, NOTE, REG, ROOT, SPARES, Row, need, pin_name, schedule, sha
 
 SOURCE_NAMES = (
     "agent.py",
@@ -29,6 +29,7 @@ SOURCE_NAMES = (
     "INTERFACE.md",
     "DEVIATIONS.md",
     "tests/test_board.py",
+    "tests/test_amendment.py",
     "tests/test_grade.py",
     "tests/planted.py",
     "tests/rehearsal.py",
@@ -89,7 +90,7 @@ def descriptors(slots: list[Row]) -> list[str]:
     return [
         name
         for r in schedule(slots)
-        if "-pin-" not in r
+        if "-pin2-" not in r
         for name in (
             [f"clean/{r}/{task}/descriptor.yaml" for task in rows()]
             if r.endswith("-clean")
@@ -99,7 +100,7 @@ def descriptors(slots: list[Row]) -> list[str]:
 
 
 def outputs(run: str) -> list[str]:
-    if "-pin-" in run:
+    if "-pin2-" in run:
         return [f"pins/{run}.json"]
     if run.endswith("-clean"):
         from worlds import rows
@@ -111,7 +112,31 @@ def outputs(run: str) -> list[str]:
     return [f"runs/{run}/{name}" for name in EXPORTS]
 
 
+def evidence_runs(slots: list[Row]) -> list[str]:
+    vacant = {m["slot"] for m in slots if m.get("vacant")}
+    failures = sum(bool(m.get("vacant")) or m["pin"] != pin_name(m["slot"]) for m in slots)
+    required_spares = SPARES[:failures]
+    runs = []
+    for run in schedule(slots):
+        slot = run.split("-")[2]
+        if slot in SPARES and slot not in required_spares:
+            need(not (ROOT / "pins" / (run + ".json")).exists(), f"unexpected spare pin {run}")
+            continue
+        if "-pin2-" not in run and slot in vacant:
+            continue
+        runs.append(run)
+    return runs
+
+
 def inventory(slots: list[Row]) -> list[str]:
     return sorted(
-        [*sources(), LIST, NOTE, "result.md", *(p for run in schedule(slots) for p in outputs(run))]
+        {
+            *sources(),
+            LIST,
+            NOTE,
+            "result.md",
+            *descriptors(slots),
+            *(f"pins/board0-pin-M{i}.json" for i in range(1, 6)),
+            *(p for run in evidence_runs(slots) for p in outputs(run)),
+        }
     )

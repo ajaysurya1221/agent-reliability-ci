@@ -17,6 +17,8 @@ def test_metadata_and_native_pins() -> None:
     server = FakeOllama()
     slots = models(ROOT / "models.json")
 
+    all_models = slots + read(ROOT / "models.json")["spares"]
+
     def request(method: str, path: str, body: Row | None = None) -> Row:
         status, raw = server.handle(
             method, "/api/" + path, json.dumps(body).encode() if body else b""
@@ -26,10 +28,10 @@ def test_metadata_and_native_pins() -> None:
 
     assert request("GET", "version") == {"version": read(ROOT / "models.json")["ollama"]}
     assert request("GET", "tags") == {
-        "models": [{"name": m["tag"], "digest": m["digest"]} for m in slots]
+        "models": [{"name": m["tag"], "digest": m["digest"]} for m in all_models]
     }
     assert request("GET", "ps") == {"models": []}
-    for slot in slots:
+    for slot in all_models:
         tag = slot["tag"]
         assert request("POST", "show", {"model": tag}) == {"parameters": "num_ctx 32768"}
         history = pin.question(3)
@@ -49,11 +51,18 @@ def test_metadata_and_native_pins() -> None:
         else:
             assert pin.called(msg, 3)
             history.extend(
-                [msg, {"role": "tool", "tool_name": "read_pebble", "content": "pebble-abc"}]
+                [
+                    msg,
+                    {
+                        "role": "tool",
+                        "tool_name": "read_pebble",
+                        "content": "1234567890abcdef12345678",
+                    },
+                ]
             )
             assert request("POST", "chat", payload)["message"] == {
                 "role": "assistant",
-                "content": "pebble-abc",
+                "content": "1234567890abcdef12345678",
             }
         assert request("GET", "ps") == {
             "models": [{"name": tag, "digest": slot["digest"], "context_length": 32768}]

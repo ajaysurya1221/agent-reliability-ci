@@ -577,6 +577,7 @@ SOURCE_FILES = (
     "harness/INTERFACE.md",
     "harness/DEVIATIONS.md",
     "harness/tests/test_board.py",
+    "harness/tests/test_amendment.py",
     "harness/tests/test_grade.py",
     "harness/tests/planted.py",
     "harness/tests/rehearsal.py",
@@ -593,6 +594,9 @@ def members(slots: list[Row], rows: dict[str, Row]) -> tuple[set[str], set[str]]
         "descriptor-digests.sha256",
         "result.md",
     }
+    expected.update(f"pins/board0-pin-M{i}.json" for i in range(1, 6))
+    failed = sum(bool(m.get("vacant")) or m["pin"] != f"board0-pin2-{m['slot']}" for m in slots)
+    expected.update(f"pins/board0-pin2-S{i}.json" for i in range(1, min(2, failed) + 1))
     descriptors = set()
     files = (
         "descriptor.yaml",
@@ -609,14 +613,16 @@ def members(slots: list[Row], rows: dict[str, Row]) -> tuple[set[str], set[str]]
     )
     for m in slots:
         slot = m["slot"]
-        expected.add(f"pins/board0-pin-{slot}.json")
+        expected.add(f"pins/board0-pin2-{slot}.json")
         for day in (1, 2):
             name = f"board0-d{day}-{slot}"
-            expected.add(f"clean/{name}-clean.json")
+            if not m.get("vacant"):
+                expected.add(f"clean/{name}-clean.json")
             for prefix in [f"runs/{name}-E", *(f"clean/{name}-clean/{tid}" for tid in rows)]:
-                expected.update(f"{prefix}/{f}" for f in files)
+                if not m.get("vacant"):
+                    expected.update(f"{prefix}/{f}" for f in files)
                 descriptors.add(f"{prefix}/descriptor.yaml")
-    return expected, descriptors
+    return expected | descriptors, descriptors
 
 
 def check_inventory(names: list[str], slots: list[Row], rows: dict[str, Row]) -> None:
@@ -691,7 +697,7 @@ def verify_probe(probe: Row, tag: str, number: int) -> bool:
                 and (
                     token == ""
                     if delivery
-                    else re.fullmatch(r"pebble-[0-9a-f]{24}", token)
+                    else re.fullmatch(r"[0-9a-f]{24}", token)
                     and token not in json.dumps([prefix, schema])
                 ),
                 "pin tool delivery",
@@ -737,6 +743,15 @@ def check_report(report: str, slots: list[Row], results: dict[str, Row], rehears
     ]
     for m in slots:
         for day in (1, 2):
+            if m.get("vacant"):
+                expected.extend(
+                    [
+                        f"## {m['slot']} · day {day} · {m['tag']}",
+                        "vacant: pin failed. Model-day undecided.",
+                    ]
+                )
+                criteria.append(f"| {m['slot']} | {day} | undecided | — | — | — | — | — | — |")
+                continue
             run = results[f"board0-d{day}-{m['slot']}-E"]
             clean, audit, counts = run["clean"], run["audit"], run["counts"]
             elapsed = seconds(clean) + seconds(audit)
@@ -785,6 +800,67 @@ def check_report(report: str, slots: list[Row], results: dict[str, Row], rehears
     )
 
 
+def verify_pins(z: zipfile.ZipFile, config: Row, rehearsal: bool) -> None:
+    for i in range(1, 6):
+        run = f"board0-pin-M{i}"
+        require(json.loads(z.read(f"pins/{run}.json"))["run"] == run, f"historical pin {run}")
+
+    def corrected(slot: str) -> tuple[Row, bool]:
+        run = f"board0-pin2-{slot}"
+        pin = json.loads(z.read(f"pins/{run}.json"))
+        model = pin["model"]
+        require(
+            pin["run"] == run
+            and pin["ollama"] == config["ollama"]
+            and model["slot"] == slot
+            and model["pin"] == run
+            and set(model) == {"slot", "tag", "digest", "pin", "family", "size"}
+            and re.fullmatch("[0-9a-f]{64}", model["digest"])
+            and len(pin["trials"]) == 20
+            and len(pin["delivery"]) == 2
+            and pin["transport"] == ("stand-in" if rehearsal else "Ollama"),
+            f"model pin {run}",
+        )
+        passed = sum(verify_probe(x, model["tag"], i) for i, x in enumerate(pin["trials"], 1))
+        delivery = [verify_probe(x, model["tag"], i) for i, x in enumerate(pin["delivery"], 21)]
+        require(
+            passed == pin["passed"] and pin["ok"] is (passed >= 16 and all(delivery)),
+            f"corrected pin grade {run}",
+        )
+        return model, pin["ok"]
+
+    spares = config["spares"]
+    require([s["slot"] for s in spares] == ["S1", "S2"], "spare inventory")
+    # models.json contains the final roster. The registration retains the identities
+    # of originals even when neither model-day carries their tag or digest.
+    registration = "" if rehearsal else z.read("PREREGISTRATION-board-0.draft.md").decode()
+    if not rehearsal:
+        prose = " ".join(registration.split())
+        for spare in spares:
+            run = f"board0-pin2-{spare['slot']}"
+            identity = f"`{spare['tag']}` (`{spare['digest']}`, pin run `{run}`)"
+            require(spare["pin"] == run and identity in prose, f"registered spare differs: {run}")
+    remaining = iter(spares)
+    for slot in config["slots"]:
+        model, passed = corrected(slot["slot"])
+        if not rehearsal:
+            require(
+                f"| {model['slot']} | `{model['tag']}` | `{model['digest']}` |" in registration,
+                f"registered model differs for {model['slot']}",
+            )
+        expected = model
+        if not passed:
+            spare = next(remaining, None)
+            if spare is not None:
+                substitute, passed = corrected(spare["slot"])
+                require(substitute == spare, "spare pin model differs")
+                if passed:
+                    expected = substitute | {"slot": slot["slot"]}
+            if not passed:
+                expected = model | {"vacant": True}
+        require(equal_json(slot, expected), f"roster differs for {slot['slot']}")
+
+
 def verify(path: Path, sidecar: Path, *, rehearsal: bool = False) -> int:
     fields = sidecar.read_text().split(maxsplit=1)
     with path.open("rb") as f:
@@ -806,25 +882,7 @@ def verify(path: Path, sidecar: Path, *, rehearsal: bool = False) -> int:
             rehearsal or (registration.strip() and b"PLACEHOLDER" not in registration),
             "unfinished registration",
         )
-        for model in slots:
-            pin = json.loads(z.read(f"pins/board0-pin-{model['slot']}.json"))
-            require(
-                pin["ok"] is True
-                and pin["ollama"] == config["ollama"]
-                and pin["model"] == model
-                and len(pin["trials"]) == 20
-                and pin["transport"] == ("stand-in" if rehearsal else "Ollama"),
-                "model pin",
-            )
-            passed = sum(verify_probe(x, model["tag"], i) for i, x in enumerate(pin["trials"], 1))
-            require(passed == pin["passed"] and passed >= 16, "pin threshold")
-            require(
-                len(pin["delivery"]) == 2
-                and all(
-                    verify_probe(x, model["tag"], i) for i, x in enumerate(pin["delivery"], 21)
-                ),
-                "empty pin delivery",
-            )
+        verify_pins(z, config, rehearsal)
         tasks = json.loads(z.read("tasks/tasks.json"))["tasks"]
         rows = {r["id"]: r for r in tasks}
         require(
@@ -847,9 +905,17 @@ def verify(path: Path, sidecar: Path, *, rehearsal: bool = False) -> int:
                 listed == (descriptors if fn.startswith("descriptor") else set(SOURCE_FILES)),
                 "digest inventory",
             )
-        expected = {f"board0-d{d}-{m['slot']}-E" for m in slots for d in (1, 2)}
+        expected = {
+            f"board0-d{d}-{m['slot']}-E" for m in slots if not m.get("vacant") for d in (1, 2)
+        }
         require(
-            expected == {n.split("/")[1] for n in names if n.startswith("runs/")}, "run inventory"
+            expected
+            == {
+                n.split("/")[1]
+                for n in names
+                if n.startswith("runs/") and n.endswith("/decision.json")
+            },
+            "run inventory",
         )
         results: dict[str, Row] = {}
         for run in sorted(expected):
@@ -914,7 +980,7 @@ def verify(path: Path, sidecar: Path, *, rehearsal: bool = False) -> int:
                     f"{clean}: local date",
                 )
         check_report(z.read("result.md").decode(), slots, results, rehearsal)
-    return size * 2
+    return len(results)
 
 
 if __name__ == "__main__":
@@ -927,4 +993,8 @@ if __name__ == "__main__":
         n = verify(args.zip, args.digestfile, rehearsal=args.rehearsal)
     except (ValueError, KeyError, TypeError, OSError, zipfile.BadZipFile) as exc:
         sys.exit(f"evidence differs: {exc}")
-    print(f"{n} measured suites and {n} clean rows matched; every trial regraded")
+    print(
+        f"{n} measured suites and {n} clean rows matched; corrected pins and Board trials regraded"
+    )
+    if not args.rehearsal and n < 10:
+        print("K5 cannot hold with vacant model-days.")

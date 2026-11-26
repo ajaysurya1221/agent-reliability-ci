@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 
 from common import ROOT, SIDES, Row, need, read
-from inputs import file, inventory
+from inputs import evidence_runs, file, inventory
 from privacy import operator_identifiers, safe_bytes
 
 
@@ -34,6 +34,10 @@ def report(slots: list[Row], *, offline: bool = False) -> str:
             c = ROOT / "clean" / (prefix + "-clean.json")
             e = ROOT / "runs" / (prefix + "-E")
             out.extend([f"## {m['slot']} · day {d} · {m['tag']}", ""])
+            if m.get("vacant"):
+                out.extend(["vacant: pin failed. Model-day undecided.", ""])
+                criteria.append(f"| {m['slot']} | {d} | undecided | — | — | — | — | — | — |")
+                continue
             if not c.exists():
                 out.extend(["Incomplete model-day.", ""])
                 continue
@@ -110,13 +114,16 @@ def report(slots: list[Row], *, offline: bool = False) -> str:
 
 
 def assemble(dest: Path, slots: list[Row], *, offline: bool = False) -> None:
-    from admission import CLAIMS, finished, registration
-    from common import schedule
+    from admission import CLAIMS, final_slots, finished, registration
 
     claims = ROOT / ".offline-claims" if offline else CLAIMS
     commit = "FIFO stand-in" if offline else registration()
-    for run in schedule(slots):
-        finished(run, claims, commit)
+    need(slots == final_slots(slots, claims), "roster differs from completed pins")
+    for i in range(1, 6):
+        run = f"board0-pin-M{i}"
+        need(read(file(ROOT, f"pins/{run}.json"))["run"] == run, f"historical pin name {run}")
+    for run in evidence_runs(slots):
+        finished(run, claims, commit, board=True)
     dest.mkdir(parents=True, exist_ok=False)
     ids = operator_identifiers()
     for name in inventory(slots):

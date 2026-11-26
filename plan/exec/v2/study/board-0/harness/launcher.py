@@ -9,6 +9,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import date
 from importlib import import_module
@@ -31,16 +32,79 @@ from common import (
     ROOT,
     Row,
     descriptor,
+    dump,
     lines,
     models,
     need,
+    pin_name,
     read,
+    registry,
     schedule,
     sha,
     write,
 )
-from inputs import descriptors, digests, outputs, sources
+from inputs import descriptors, digests, file, outputs, sources
 from worlds import collisions, rows
+
+
+def replace_bytes(path: Path, data: bytes) -> None:
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+        tmp = Path(stream.name)
+        try:
+            stream.write(data)
+            stream.flush()
+            os.replace(tmp, path)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
+def prepare_descriptors(slots: list[Row], doc: Row, *, offline: bool) -> list[str]:
+    names = descriptors(slots)
+    note = ROOT / NOTE
+    claims = ROOT / ".offline-claims" if offline else admission.CLAIMS
+    if (
+        any(m.get("vacant") or m["pin"] != pin_name(m["slot"]) for m in slots)
+        or (claims / pin_name("M1") / "finished.json").exists()
+    ):
+        need(note.is_file(), "missing frozen descriptor list")
+        need(slots == admission.final_slots(slots, claims), "prepare requires final roster")
+    frozen = {}
+    if note.exists():
+        for line in file(ROOT, NOTE).read_text().splitlines():
+            digest, name = line.split("  ", 1)
+            need(name not in frozen, "duplicate frozen descriptor")
+            frozen[name] = digest
+        need(set(frozen) == set(names), "descriptor inventory differs")
+    models_by_slot = {m["slot"]: m for m in slots}
+    pending: dict[Path, bytes] = {}
+    for name in names:
+        path = ROOT / name
+        need(path.resolve() == path, f"linked descriptor {name}")
+        task_id = path.parent.name if name.startswith("clean/") else None
+        run = path.parents[1].name if task_id else path.parent.name
+        model = models_by_slot[run.split("-")[2]]
+        desired = dump(descriptor(doc, model, run, offline=offline, task_id=task_id))
+        existing = file(ROOT, name).read_bytes() if frozen or path.exists() else None
+        if frozen and frozen[name] != sha(desired):
+            need(
+                not model.get("vacant") and model["pin"] != pin_name(model["slot"]),
+                f"changed prepared descriptor {name}",
+            )
+            original, passed = admission.pin_record(claims, model["slot"])
+            before = dump(descriptor(doc, original, run, offline=offline, task_id=task_id))
+            need(
+                not passed and sha(before) == frozen[name] and existing in (before, desired),
+                f"changed prepared descriptor {name}",
+            )
+        else:
+            need(existing is None or existing == desired, f"conflicting descriptor {name}")
+        if existing != desired:
+            pending[path] = desired
+    # Check the entire board before replacing even the first descriptor.
+    for path, data in pending.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        replace_bytes(path, data)
+    return names
 
 
 def prepare(slots: list[Row], *, offline: bool = False) -> None:
@@ -50,13 +114,11 @@ def prepare(slots: list[Row], *, offline: bool = False) -> None:
     findings: list[Row] = []
     index = rows()
     seen: dict[str, set[int]] = {}
-    for name in descriptors(slots):
+    for name in prepare_descriptors(slots, doc, offline=offline):
         path = ROOT / name
         task_id = path.parent.name if name.startswith("clean/") else None
         run = path.parents[1].name if task_id else path.parent.name
         slot = run.split("-")[2]
-        model = next(m for m in slots if m["slot"] == slot)
-        write(path, descriptor(doc, model, run, offline=offline, task_id=task_id))
         m = audit.compiled(path)
         specs = audit.specs(m, getattr(m, "max_rounds", 1))
         seeds = {s.seed for s in specs}
@@ -70,12 +132,51 @@ def prepare(slots: list[Row], *, offline: bool = False) -> None:
         prior = seen.setdefault(slot, set())
         need(prior.isdisjoint(seeds), "day or clean seeds overlap")
         prior.update(seeds)
-    write(ROOT / "scenario-collisions.json", {"count": len(findings), "collisions": findings})
-    note = digests(descriptors(slots))
-    if (ROOT / NOTE).exists():
-        need((ROOT / NOTE).read_text() == note, "changed prepared descriptor digest")
+    report = ROOT / "scenario-collisions.json"
+    collision_report = {"count": len(findings), "collisions": findings}
+    if report.exists() and report.read_bytes() != dump(collision_report):
+        previous = read(file(ROOT, report.name))
+        changed_runs = {
+            f"board0-d{day}-{m['slot']}-E"
+            for day in (1, 2)
+            for m in slots
+            if not m.get("vacant") and m["pin"] != pin_name(m["slot"])
+        }
+        need(
+            changed_runs
+            and previous["count"] == len(previous["collisions"])
+            and [r for r in previous["collisions"] if r["run"] not in changed_runs]
+            == [r for r in findings if r["run"] not in changed_runs],
+            "changed collisions outside substituted measured suites",
+        )
+        replace_bytes(report, dump(collision_report))
     else:
-        (ROOT / NOTE).write_text(note)
+        write(report, collision_report)
+    if not (ROOT / NOTE).exists():
+        (ROOT / NOTE).write_text(digests(descriptors(slots)))
+
+
+def roster(*, offline: bool = False) -> list[Row]:
+    path = ROOT / "models.json"
+    claims = ROOT / ".offline-claims" if offline else admission.CLAIMS
+    need(claims.is_dir(), "unfinished corrected pins")
+    with suite_process.locked_file(claims / "suite.lock", 0):
+        config = registry(path, offline=offline)
+        final = admission.final_slots(config["slots"], claims)
+        commit = read(file(claims, pin_name("M1") + "/claim.json"))["registration"]
+        for run in schedule(final):
+            if "-pin2-" in run and (claims / run).exists():
+                admission.finished(run, claims, commit)
+        for model in final:
+            if model["pin"] != pin_name(model["slot"]):
+                need(
+                    any(model == s | {"slot": model["slot"]} for s in config["spares"]),
+                    "substitute differs from registry",
+                )
+        data = dump(config | {"slots": final})
+        if path.read_bytes() != data:
+            replace_bytes(path, data)
+        return final
 
 
 def jsonl(path: Path, data: list[Row]) -> None:
@@ -212,16 +313,20 @@ def execute(
     claims = ROOT / ".offline-claims" if offline else admission.CLAIMS
     need(claims == claims.resolve(), "linked claims root")
     claims.mkdir(mode=0o700, parents=True, exist_ok=True)
-    model = next(m for m in slots if m["slot"] in run.split("-"))
     need(offline or today is None, "live clock override")
     with suite_process.locked_file(claims / "suite.lock", 0):
+        config = registry(ROOT / "models.json", offline=offline)
+        need(config["slots"] == slots, "registry changed")
+        model = next(m for m in slots + config["spares"] if m["slot"] == run.split("-")[2])
+        if "-pin2-" in run:
+            need(model["pin"] == run and not model.get("vacant"), "pin requires original model")
         suite_process.clear(claims)
         day = today or date.today()
         commit = "FIFO stand-in" if offline else admission.registration()
         admission.order_guard(run, slots, claims, day)
         for prior in schedule(slots):
             if (claims / prior / "finished.json").is_file():
-                admission.finished(prior, claims, commit)
+                admission.finished(prior, claims, commit, board="-pin2-" not in run)
         directory = claims / run
         claim_ns = time.monotonic_ns()
         directory.mkdir()
@@ -236,7 +341,7 @@ def execute(
             "registration_sha256": sha((ROOT / REG).read_bytes()),
             "token_sha256": sha(token.encode()),
         }
-        if "-pin-" not in run:
+        if "-pin2-" not in run:
             names = [n for n in descriptors(slots) if run in Path(n).parts]
             claim["descriptors"] = {n: sha((ROOT / n).read_bytes()) for n in names}
         write(directory / "claim.json", claim)
@@ -247,7 +352,7 @@ def execute(
                 create=True,
             )
             try:
-                if "-pin-" in run:
+                if "-pin2-" in run:
                     pin.execute(run, model, ROOT / "pins" / (run + ".json"), offline=offline)
                     files = digests(outputs(run))
                 elif run.endswith("-clean"):
@@ -269,9 +374,11 @@ def execute(
                     directory / "finished.json",
                     {"run": run, "ok": True, "files": files},
                 )
-            except Exception:
-                if "-pin-" in run:
-                    write(directory / "finished.json", {"run": run, "ok": False})
+            except pin.PinFailed:
+                write(
+                    directory / "finished.json",
+                    {"run": run, "ok": False, "files": digests(outputs(run))},
+                )
                 raise
             finally:
                 suite_process.clear(claims, finishing=directory)
@@ -282,7 +389,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "verb",
-        choices=("list", "check", "digests", "prepare", "real", "report", "assemble", "pack"),
+        choices=(
+            "list",
+            "check",
+            "digests",
+            "descriptor-digests",
+            "roster",
+            "prepare",
+            "real",
+            "report",
+            "assemble",
+            "pack",
+        ),
     )
     parser.add_argument("arg", nargs="?")
     args = parser.parse_args()
@@ -291,6 +409,10 @@ def main() -> None:
     slots = models(ROOT / "models.json")
     if args.verb == "list":
         print("\n".join(schedule(slots)))
+    elif args.verb == "roster":
+        print(json.dumps(roster(), indent=2))
+    elif args.verb == "descriptor-digests":
+        print(digests(descriptors(slots)), end="")
     elif args.verb == "digests":
         print(digests(sources()), end="")
     elif args.verb == "prepare":

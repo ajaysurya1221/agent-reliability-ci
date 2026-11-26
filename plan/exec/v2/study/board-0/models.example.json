@@ -6,14 +6,34 @@
       "tag": "qwen3.5:4b-mlx-ctx32k",
       "digest": "c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430",
       "family": "Qwen",
-      "size": "4B"
+      "size": "4B",
+      "pin": "board0-pin2-M1"
     },
     {
       "slot": "M2",
       "tag": "gemma4:12b-mlx-ctx32k",
       "digest": "a5c533115db870b8db2e39657686a8742a5e7182bd00403b851dd1af28e4efbc",
       "family": "Gemma",
-      "size": "12B"
+      "size": "12B",
+      "pin": "board0-pin2-M2"
+    }
+  ],
+  "spares": [
+    {
+      "slot": "S1",
+      "tag": "qwen2.5:7b-ctx32k",
+      "digest": "f759aa2396a5da471ca8ed42905e8bd39deb9c96c949998b9fe4710329b9bf76",
+      "family": "Qwen",
+      "size": "7B",
+      "pin": "board0-pin2-S1"
+    },
+    {
+      "slot": "S2",
+      "tag": "llama3.2:3b-ctx32k",
+      "digest": "f8094074aeb4f0c7d9b6d75828c87b0572e3d1af1546732f7822804cab23c5d6",
+      "family": "Llama",
+      "size": "3B",
+      "pin": "board0-pin2-S2"
     }
   ]
 }

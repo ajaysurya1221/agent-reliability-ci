@@ -18,7 +18,7 @@ from typing import Any
 
 from admission import active
 from agent import Capture, JsonObject, JsonValue, Receipt, atomic_json
-from common import OLLAMA, Row, assistant, need
+from common import OLLAMA, Row, assistant, need, pin_name
 from grade import grade
 
 TOY_PROMPT = "Use the pebble reader to answer the question."
@@ -71,7 +71,7 @@ def request(
     )
     payload = json.loads(body) if body is not None else None
     if endpoint == "chat":
-        need(run == f"board0-pin-{model['slot']}" and payload is not None, "pin chat claim")
+        need(run == pin_name(model["slot"]) and payload is not None, "pin chat claim")
         assert payload is not None
         from admission import CLAIMS
 
@@ -158,7 +158,7 @@ def admit_probe(directory: Path, tag: str, payload: Row) -> None:
             and (
                 result == ""
                 if delivery
-                else isinstance(result, str) and re.fullmatch(r"pebble-[0-9a-f]{24}", result)
+                else isinstance(result, str) and re.fullmatch(r"[0-9a-f]{24}", result)
             ),
             "unexpected pin delivery",
         )
@@ -257,7 +257,7 @@ def run_probe(run: str, model: Row, tmp: Path, i: int, offline: bool) -> Row:
                 else chat()
             )
             if called(message, i):
-                token = "" if delivery else "pebble-" + os.urandom(12).hex()
+                token = "" if delivery else os.urandom(12).hex()
                 need(
                     delivery or token not in json.dumps([*history, message, TOY_TOOLS]),
                     "pin token leaked",
@@ -287,6 +287,10 @@ def run_probe(run: str, model: Row, tmp: Path, i: int, offline: bool) -> Row:
     }
 
 
+class PinFailed(ValueError):
+    """All probes completed and the model did not qualify."""
+
+
 def execute(run: str, model: Row, path: Path, *, offline: bool) -> None:
     result: Row = {
         "run": run,
@@ -313,10 +317,8 @@ def execute(run: str, model: Row, path: Path, *, offline: bool) -> None:
             atomic_json(path, result)
     result["passed"] = sum(p["passed"] for p in result["trials"])
     atomic_json(path, result)
-    need(
-        result["passed"] >= 16 and all(p["passed"] for p in result["delivery"]),
-        "pin threshold or empty delivery failed",
-    )
+    if result["passed"] < 16 or not all(p["passed"] for p in result["delivery"]):
+        raise PinFailed("pin threshold or empty delivery failed")
     if not offline:
         metadata(run, model, loaded=True)
     result["ok"] = True

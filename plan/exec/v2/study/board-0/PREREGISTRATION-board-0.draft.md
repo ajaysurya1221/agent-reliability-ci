@@ -210,3 +210,38 @@ the digest lists, `models.json`, `tasks/`, `orderdesk/`, the three calendar file
 of each scheduled `runs/RUN/`, and `result.md`. Scan everything for personal paths first.
 Report every scheduled, missed, refused and interrupted run. No retries, extra rounds or tasks.
 A blind recount by an agent that reads no write-up precedes the result.
+
+## Amendment 1, 27 November 2026: the pin's token, before any corrected probe or Board task
+
+Written with the results of all five first pins known, and before any model has seen a Board
+task in this study. First pin outputs (kept and published as they are):
+
+- `pins/board0-pin-M1.json` and `pins/board0-pin-M2.json`: 20 of 20 each.
+- `pins/board0-pin-M3.json`: 8 passes. In 11 probes the model called the tool and answered with
+  the random part of the token without its `pebble-` prefix; in 1 it gave a different value.
+- `pins/board0-pin-M4.json`: 7 passes; 6 prefix omissions; 2 answers with the random part in
+  upper case; 5 answers with a different value.
+- `pins/board0-pin-M5.json`: 0 passes; no native tool call in any of the 20 probes.
+
+The fault is in the pin, not in the registration's wording: the toy tool returned
+`pebble-<24 hex>` and the question was "What token is on pebble stone-N?", so the prefix reads
+like a label. The only change: the toy tool now returns the bare 24 random lower-case hex
+characters. The question, the tool, the grading of the answer, the threshold of 16 of 20 and
+both empty-delivery probes stay as they were.
+
+Commitment: before any corrected probe or Board task, we commit to testing all five original
+models once on the corrected pin (`board0-pin2-M1` to `board0-pin2-M5`) and using that result
+alone for eligibility, even if a model that passed the first pin fails or fewer than five
+slots qualify.
+
+Slots that fail the corrected pin are filled in slot order, with at most one spare attempt per
+slot: the first failing slot gets `qwen2.5:7b-ctx32k`
+(`f759aa2396a5da471ca8ed42905e8bd39deb9c96c949998b9fe4710329b9bf76`, pin run `board0-pin2-S1`),
+the second gets `llama3.2:3b-ctx32k`
+(`f8094074aeb4f0c7d9b6d75828c87b0572e3d1af1546732f7822804cab23c5d6`, pin run `board0-pin2-S2`),
+each on the same
+corrected pin. A third failing slot, or a slot whose spare fails, stays empty; its model-days
+count as undecided and K5 then cannot hold. The roster that follows from these pins, and the
+descriptors of any slot whose model changed, are pushed as amendment 2 before any clean row;
+amendment 2 only applies this rule. Board tasks, arms, grading, the decision rule, K1 to K5
+and the stop rule are unchanged. Both sets of pin outputs are published.

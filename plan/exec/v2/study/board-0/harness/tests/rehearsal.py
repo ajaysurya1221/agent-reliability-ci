@@ -11,11 +11,13 @@ import sys
 import zipfile
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import LIST, ROOT, lines, models, need, read, schedule
-from inputs import digests, sources
-from launcher import execute, prepare
+import pin
+from common import LIST, NOTE, ROOT, lines, models, need, read, schedule
+from inputs import descriptors, digests, sources
+from launcher import execute, prepare, roster
 from publication import assemble, pack, report
 
 
@@ -85,7 +87,39 @@ def main() -> None:
     os.environ["BOARD0_REHEARSAL_FAULTS"] = json.dumps(
         {s.task_id: s.seed for s in first if s.task_id in ("O-o1", "O-o2", "O-o3", "O-o5", "K-k8")}
     )
+    # Historical fixtures intentionally contain no gradeable transcripts.
+    (ROOT / "pins").mkdir()
+    for i in range(1, 6):
+        run = f"board0-pin-M{i}"
+        (ROOT / "pins" / (run + ".json")).write_text(json.dumps({"run": run}))
+    execute(slots[0]["pin"], slots, offline=True)
+
+    def echo(body: bytes) -> tuple[int, bytes]:
+        req = json.loads(body)
+        return 200, json.dumps(
+            {
+                "model": req["model"],
+                "done": True,
+                "message": {"role": "assistant", "content": req["messages"][1]["content"]},
+            }
+        ).encode()
+
+    with patch.object(pin, "toy_chat", echo):
+        try:
+            execute(slots[1]["pin"], slots, offline=True)
+        except pin.PinFailed:
+            pass
+        else:
+            raise AssertionError("echo passed the corrected pin")
+    execute("board0-pin2-S1", slots, offline=True)
+    slots = roster(offline=True)
+    need(slots[1]["pin"] == "board0-pin2-S1", "spare did not take second slot")
+    prepare(slots, offline=True)
+    (ROOT / NOTE).write_text(digests(descriptors(slots)))
+    (ROOT / LIST).write_text(digests(sources()))
     for run in schedule(slots):
+        if "-pin2-" in run:
+            continue
         day = date(2000, 1, 2 if "-d2-" in run else 1)
         execute(run, slots, offline=True, today=day)
     measured = lines(ROOT / "runs/board0-d1-M1-E/trials.jsonl")

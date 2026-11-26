@@ -72,35 +72,63 @@ def write(path: Path, value: object) -> None:
             f.write(data)
 
 
-def models(path: Path, *, offline: bool = False) -> list[Row]:
+SPARES = ("S1", "S2")
+
+
+def pin_name(slot: str) -> str:
+    return f"board0-pin2-{slot}"
+
+
+def registry(path: Path, *, offline: bool = False) -> Row:
     config = read(path)
     need(
         isinstance(config, dict)
-        and set(config) == {"ollama", "slots"}
+        and set(config) == {"ollama", "slots", "spares"}
         and config["ollama"] == OLLAMA,
         "registered Ollama version",
     )
-    rows = config["slots"]
+    slots, spares = config["slots"], config["spares"]
     size = 2 if offline else 5
-    need(isinstance(rows, list) and len(rows) == size, f"expected {size} model slots")
-    for i, r in enumerate(rows, 1):
+    need(isinstance(slots, list) and len(slots) == size, f"expected {size} model slots")
+    need(isinstance(spares, list) and len(spares) == 2, "expected two spares")
+    fields = {"slot", "tag", "digest", "family", "size", "pin"}
+    ids = [*(f"M{i + 1}" for i in range(size)), *SPARES]
+    for slot, row in zip(ids, [*slots, *spares], strict=True):
         need(
-            isinstance(r, dict)
-            and set(r) == {"slot", "tag", "digest", "family", "size"}
-            and all(isinstance(s, str) and s.strip() == s and s for s in r.values())
-            and r["slot"] == f"M{i}"
-            and re.fullmatch(r"[a-zA-Z0-9][\w./:-]*", r["tag"])
-            and re.fullmatch("[a-f0-9]{64}", r["digest"]),
-            f"invalid model M{i}",
+            isinstance(row, dict)
+            and fields <= row.keys() <= fields | ({"vacant"} if slot.startswith("M") else set())
+            and isinstance(row.get("vacant", False), bool)
+            and all(isinstance(row[k], str) and row[k].strip() == row[k] and row[k] for k in fields)
+            and row["slot"] == slot
+            and re.fullmatch(r"[a-zA-Z0-9][\w./:-]*", row["tag"])
+            and re.fullmatch("[a-f0-9]{64}", row["digest"]),
+            f"invalid model {slot}",
         )
+    for row in spares:
+        need(row["pin"] == pin_name(row["slot"]), f"invalid spare pin {row['slot']}")
+    originals = []
+    for row in slots:
+        if row["pin"] == pin_name(row["slot"]):
+            originals.append(row)
+        else:
+            need(
+                any(row == spare | {"slot": row["slot"]} for spare in spares),
+                f"invalid substitute for {row['slot']}",
+            )
+    registered = originals + spares
     for field in ("tag", "digest"):
-        need(len({r[field] for r in rows}) == len(rows), f"duplicate model {field}")
-    return rows
+        need(len({m[field] for m in registered}) == len(registered), f"duplicate model {field}")
+        need(len({m[field] for m in slots}) == size, f"duplicate slot {field}")
+    return config
+
+
+def models(path: Path, *, offline: bool = False) -> list[Row]:
+    return registry(path, offline=offline)["slots"]
 
 
 def schedule(slots: list[Row]) -> list[str]:
     names = [s["slot"] for s in slots]
-    return [f"board0-pin-{s}" for s in names] + [
+    return [pin_name(s) for s in [*names, *SPARES]] + [
         f"board0-d{d}-{s}-{phase}"
         for d, order in [(1, names), (2, list(reversed(names)))]
         for s in order

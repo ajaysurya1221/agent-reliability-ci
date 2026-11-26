@@ -40,8 +40,10 @@ for folder in ("harness","tasks","orderdesk","calendardesk"):
 PY
     ;;
 esac
-if [ -n "$dest" ]; then
-    exec "$py" -PB harness/launcher.py "$1" "$dest"
-fi
-exec "$py" -PB harness/launcher.py "$@"
+case "${1:-}" in
+    assemble|pack) exec "$py" -PB harness/launcher.py "$1" "$dest" ;;
+    list|check|digests|descriptor-digests|roster|prepare|real|report)
+        exec "$py" -PB harness/launcher.py "$@" ;;
+    *) echo "unknown Board-0 verb" >&2; exit 2 ;;
+esac
 

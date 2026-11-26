@@ -63,12 +63,14 @@ def test_models(tmp_path: Path) -> None:
         {"tag": ""},
         {"family": 3},
         {"size": ""},
+        {"pin": "board0-pin-M2"},
+        {"vacant": "yes"},
         {"tag": example()[0]["tag"]},
         {"extra": True},
     ]:
         model = example()
         model[1].update(changes)
-        path.write_text(json.dumps({"ollama": "0.32.14", "slots": model}))
+        path.write_text(json.dumps(read(ROOT / "models.example.json") | {"slots": model}))
         with pytest.raises(ValueError):
             models(path, offline=True)
 
@@ -87,9 +89,10 @@ def test_rated() -> None:
 def test_date_and_order(tmp_path: Path) -> None:
     slots = example()
     order = schedule(slots)
-    for run in order[:6]:
-        write(tmp_path / run / "claim.json", {"date": "2002-01-01"})
-        write(tmp_path / run / "finished.json", {"ok": True})
+    for run in [*order[:2], *order[4:8]]:
+        model = next(m for m in slots if m["slot"] in run.split("-"))
+        write(tmp_path / run / "claim.json", {"model": model, "date": "2002-01-01"})
+        write(tmp_path / run / "finished.json", {"run": run, "ok": True})
     with pytest.raises(ValueError, match="later local date"):
         order_guard("board0-d2-M2-clean", slots, tmp_path, date(2002, 1, 1))
     with pytest.raises(ValueError, match="predecessor"):
@@ -354,7 +357,7 @@ def test_registered_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(pin, "request", response)
     with pytest.raises(ValueError, match="version"):
-        pin.metadata("board0-pin-M1", example()[0])
+        pin.metadata("board0-pin2-M1", example()[0])
 
 
 def test_pushed_blobs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -403,7 +406,7 @@ def test_pin_user_echo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pin, "toy_chat", echo)
     path = tmp_path / "pin.json"
     with pytest.raises(ValueError, match="threshold"):
-        pin.execute("board0-pin-M1", example()[0], path, offline=True)
+        pin.execute("board0-pin2-M1", example()[0], path, offline=True)
     assert read(path)["passed"] == 0
 
 
@@ -429,13 +432,18 @@ def test_pin_threshold_and_delivery(
     monkeypatch.setattr(pin, "toy_chat", backend)
     path = tmp_path / "pin.json"
     if qualifies:
-        pin.execute("board0-pin-M1", example()[0], path, offline=True)
+        pin.execute("board0-pin2-M1", example()[0], path, offline=True)
     else:
         with pytest.raises(ValueError, match="threshold"):
-            pin.execute("board0-pin-M1", example()[0], path, offline=True)
+            pin.execute("board0-pin2-M1", example()[0], path, offline=True)
     result = read(path)
     assert result["ok"] is qualifies and result["passed"] == 20 - bad
     tag = example()[0]["tag"]
+    import re
+
+    for trial in result["trials"][bad:]:
+        request = json.loads(base64.b64decode(trial["exchanges"][1]["request_b64"]))
+        assert re.fullmatch("[0-9a-f]{24}", request["messages"][-1]["content"])
     assert (
         sum(check_evidence.verify_probe(p, tag, i) for i, p in enumerate(result["trials"], 1))
         == 20 - bad
@@ -455,6 +463,7 @@ def test_pin_threshold_and_delivery(
         "user_echo_after_call",
         "wrong_case",
         "scripted_initial",
+        "prefixed_token",
         "nonempty_delivery",
         "incomplete_delivery",
     ],
@@ -471,8 +480,10 @@ def test_pin_receipt_faults(tmp_path: Path, fault: str) -> None:
     assert check_evidence.verify_probe(probe, model["tag"], number)
     x = probe["exchanges"][-1]
     req = json.loads(base64.b64decode(x["request_b64"]))
-    if fault in ("nonempty_delivery", "scripted_initial"):
-        if delivery:
+    if fault in ("nonempty_delivery", "scripted_initial", "prefixed_token"):
+        if fault == "prefixed_token":
+            req["messages"][-1]["content"] = "pebble-" + req["messages"][-1]["content"]
+        elif delivery:
             req["messages"][-1]["content"] = " "
         else:
             probe["exchanges"] = [x]
@@ -623,10 +634,16 @@ def test_registration_before_admission(
     rev = "a" * 40
     (claims / "push-receipt.txt").write_text(rev + " refs/heads/v2/phase0")
     slots = [
-        example()[0] | {"slot": f"M{i}", "tag": f"model{i}", "digest": sha(str(i).encode())}
+        example()[0]
+        | {
+            "slot": f"M{i}",
+            "pin": f"board0-pin2-M{i}",
+            "tag": f"model{i}",
+            "digest": sha(str(i).encode()),
+        }
         for i in range(1, 6)
     ]
-    write(root / "models.json", {"ollama": "0.32.14", "slots": slots})
+    write(root / "models.json", read(ROOT / "models.json") | {"slots": slots})
     write(root / REG, "registered")
     descriptor = "runs/test/descriptor.yaml"
     write(root / descriptor, {"rule": "frozen"})
@@ -663,8 +680,8 @@ def test_registration_before_admission(
     monkeypatch.setattr(launcher, "ROOT", root)
     monkeypatch.setenv("BOARD0_ENV", str(tmp_path))
     monkeypatch.setattr(
-        sys, "argv", ["launcher", verb] + (["board0-pin-M1"] if verb == "real" else [])
+        sys, "argv", ["launcher", verb] + (["board0-pin2-M1"] if verb == "real" else [])
     )
     with pytest.raises(ValueError, match="missing pushed blob") as caught:
         launcher.main()
-    assert broken in str(caught.value) and not (claims / "board0-pin-M1").exists()
+    assert broken in str(caught.value) and not (claims / "board0-pin2-M1").exists()

@@ -54,7 +54,7 @@ def fake_server(study: Path, python: str, env: dict[str, str]) -> Generator[None
                 proc.kill()
 
 
-def register(study: Path, claims: Path, env: dict[str, str]) -> None:
+def register(study: Path, claims: Path, env: dict[str, str], amendment: int) -> None:
     def git(*args: str) -> str:
         return subprocess.check_output(
             ["git", *args], cwd=study, env=env, text=True, stdin=subprocess.DEVNULL
@@ -62,9 +62,10 @@ def register(study: Path, claims: Path, env: dict[str, str]) -> None:
 
     branch = "v2/phase0"
     remote = study.parent / "remote.git"
-    git("init", "--bare", "--template=", str(remote))
-    git("init", "--template=", "-b", branch)
-    git("remote", "add", "origin", str(remote))
+    if amendment == 1:
+        git("init", "--bare", "--template=", str(remote))
+        git("init", "--template=", "-b", branch)
+        git("remote", "add", "origin", str(remote))
     git("add", "--", *sources(), LIST, NOTE, "clean", "runs")
     git(
         "-c",
@@ -73,7 +74,7 @@ def register(study: Path, claims: Path, env: dict[str, str]) -> None:
         "user.email=board@example.invalid",
         "commit",
         "-m",
-        "Register native Board-0 rehearsal",
+        f"Register Board-0 rehearsal amendment {amendment}",
     )
     git("push", "origin", branch)
     receipt = git("ls-remote", "--exit-code", "origin", f"refs/heads/{branch}").split()
@@ -114,8 +115,7 @@ def rehearse(work: Path) -> None:
             need(result.returncode == 0, result.stderr or result.stdout)
         else:
             need(
-                result.returncode != 0
-                and result.stderr.rstrip().endswith("ValueError: " + rejection),
+                result.returncode != 0 and result.stderr.rstrip().splitlines()[-1:] == [rejection],
                 f"expected {rejection!r}, got exit {result.returncode}: {result.stderr}",
             )
         return result.stdout
@@ -134,17 +134,19 @@ def rehearse(work: Path) -> None:
         with step("Prepare and register with local origin"):
             launcher("prepare")
             (study / LIST).write_text(launcher("digests"))
-            register(study, claims, env)
+            register(study, claims, env, 1)
             launcher("check")
 
         for model in slots:
-            run = f"board0-pin-{model['slot']}"
+            run = model["pin"]
             with step(run):
                 passed = model != slots[-1]
                 launcher(
                     "real",
                     run,
-                    rejection=None if passed else "pin threshold or empty delivery failed",
+                    rejection=None
+                    if passed
+                    else "pin.PinFailed: pin threshold or empty delivery failed",
                 )
                 pin = read(study / "pins" / (run + ".json"))
                 need(
@@ -156,13 +158,25 @@ def rehearse(work: Path) -> None:
                     "unexpected probe results",
                 )
 
-        refused = f"board0-d1-{slots[-1]['slot']}-clean"
-        with step(f"Refuse {refused}"):
-            launcher("real", refused, rejection="failed or missing model pin")
-            need(not (claims / refused).exists(), "refusal created a claim")
+        with step("Pin S1 and refuse S2"):
+            launcher("real", "board0-pin2-S1")
+            launcher("real", "board0-pin2-S2", rejection="ValueError: spare S2 not required")
+            need(not (claims / "board0-pin2-S2").exists(), "refusal created a claim")
+
+        with step("Apply and push amendment 2"):
+            launcher("roster")
+            slots = models(study / "models.json")
+            spare = read(study / "models.json")["spares"][0]
+            need(slots[-1] == spare | {"slot": "M5"}, "last slot did not receive S1")
+            launcher("prepare")
+            (study / NOTE).write_text(launcher("descriptor-digests"))
+            (study / LIST).write_text(launcher("digests"))
+            register(study, claims, env, 2)
+            launcher("check")
 
         report_rows = []
-        for run in schedule(slots)[len(slots) : len(slots) + 4]:
+        # M2 through M4 must finish before the substituted M5 can be claimed.
+        for run in (r for r in schedule(slots) if "-d1-" in r):
             with step(run):
                 launcher("real", run)
                 need(read(claims / run / "finished.json")["ok"] is True, "unfinished run")
@@ -186,7 +200,8 @@ def rehearse(work: Path) -> None:
                     audit = read(dest / "audit.json")
                     verdict = read(dest / "decision.json")["verdict"]
                     need(
-                        audit["transport"] == "native Ollama"
+                        audit["model_digest"] == slots[int(run.split("-")[2][1:]) - 1]["digest"]
+                        and audit["transport"] == "native Ollama"
                         and audit["counts_agree"]
                         and audit["verdict"] == verdict
                         and verdict in ("BLOCK", "PASS", "INCONCLUSIVE")
