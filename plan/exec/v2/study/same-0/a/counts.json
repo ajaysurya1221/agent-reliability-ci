@@ -1,0 +1,884 @@
+{
+  "primary_totals": {
+    "drop": 0,
+    "gain": 3,
+    "neither": 11
+  },
+  "primary_rows": [
+    {
+      "run": "size0-d1-g12-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 24,
+      "candidate_passes": 24,
+      "trials_per_side": 24,
+      "difference": 0,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-g12-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 24,
+      "candidate_passes": 24,
+      "trials_per_side": 24,
+      "difference": 0,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-q2-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 5,
+      "candidate_passes": 4,
+      "trials_per_side": 24,
+      "difference": -1,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-q2-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 1,
+      "candidate_passes": 0,
+      "trials_per_side": 24,
+      "difference": -1,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-q4-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 20,
+      "candidate_passes": 24,
+      "trials_per_side": 24,
+      "difference": 4,
+      "result": "gain"
+    },
+    {
+      "run": "size0-d1-q4-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 0,
+      "candidate_passes": 0,
+      "trials_per_side": 24,
+      "difference": 0,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-q9-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 16,
+      "candidate_passes": 17,
+      "trials_per_side": 24,
+      "difference": 1,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d1-q9-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 5,
+      "candidate_passes": 9,
+      "trials_per_side": 24,
+      "difference": 4,
+      "result": "gain"
+    },
+    {
+      "run": "size0-d2-q2-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 2,
+      "candidate_passes": 2,
+      "trials_per_side": 24,
+      "difference": 0,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d2-q2-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 1,
+      "candidate_passes": 0,
+      "trials_per_side": 24,
+      "difference": -1,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d2-q4-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 20,
+      "candidate_passes": 22,
+      "trials_per_side": 24,
+      "difference": 2,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d2-q4-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 0,
+      "candidate_passes": 0,
+      "trials_per_side": 24,
+      "difference": 0,
+      "result": "neither"
+    },
+    {
+      "run": "size0-d2-q9-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 13,
+      "candidate_passes": 18,
+      "trials_per_side": 24,
+      "difference": 5,
+      "result": "gain"
+    },
+    {
+      "run": "size0-d2-q9-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 7,
+      "candidate_passes": 9,
+      "trials_per_side": 24,
+      "difference": 2,
+      "result": "neither"
+    }
+  ],
+  "secondary": [
+    {
+      "width": 1,
+      "trials_per_side": 8,
+      "threshold_passes": 1,
+      "overall": {
+        "blocks": 135,
+        "fewer": 30,
+        "same": 71,
+        "more": 34,
+        "drop": 30,
+        "gain": 34
+      },
+      "by_condition": {
+        "clean": {
+          "blocks": 66,
+          "fewer": 19,
+          "same": 22,
+          "more": 25,
+          "drop": 19,
+          "gain": 25
+        },
+        "null": {
+          "blocks": 69,
+          "fewer": 11,
+          "same": 49,
+          "more": 9,
+          "drop": 11,
+          "gain": 9
+        }
+      },
+      "by_model": {
+        "q2": {
+          "blocks": 40,
+          "fewer": 12,
+          "same": 20,
+          "more": 8,
+          "drop": 12,
+          "gain": 8
+        },
+        "q4": {
+          "blocks": 35,
+          "fewer": 3,
+          "same": 22,
+          "more": 10,
+          "drop": 3,
+          "gain": 10
+        },
+        "q9": {
+          "blocks": 40,
+          "fewer": 15,
+          "same": 9,
+          "more": 16,
+          "drop": 15,
+          "gain": 16
+        },
+        "g12": {
+          "blocks": 20,
+          "fewer": 0,
+          "same": 20,
+          "more": 0,
+          "drop": 0,
+          "gain": 0
+        }
+      }
+    },
+    {
+      "width": 3,
+      "trials_per_side": 24,
+      "threshold_passes": 3,
+      "overall": {
+        "blocks": 41,
+        "fewer": 12,
+        "same": 17,
+        "more": 12,
+        "drop": 3,
+        "gain": 4
+      },
+      "by_condition": {
+        "clean": {
+          "blocks": 20,
+          "fewer": 5,
+          "same": 7,
+          "more": 8,
+          "drop": 0,
+          "gain": 3
+        },
+        "null": {
+          "blocks": 21,
+          "fewer": 7,
+          "same": 10,
+          "more": 4,
+          "drop": 3,
+          "gain": 1
+        }
+      },
+      "by_model": {
+        "q2": {
+          "blocks": 12,
+          "fewer": 6,
+          "same": 4,
+          "more": 2,
+          "drop": 0,
+          "gain": 0
+        },
+        "q4": {
+          "blocks": 11,
+          "fewer": 0,
+          "same": 6,
+          "more": 5,
+          "drop": 0,
+          "gain": 1
+        },
+        "q9": {
+          "blocks": 12,
+          "fewer": 6,
+          "same": 1,
+          "more": 5,
+          "drop": 3,
+          "gain": 3
+        },
+        "g12": {
+          "blocks": 6,
+          "fewer": 0,
+          "same": 6,
+          "more": 0,
+          "drop": 0,
+          "gain": 0
+        }
+      }
+    },
+    {
+      "width": 5,
+      "trials_per_side": 40,
+      "threshold_passes": 4,
+      "overall": {
+        "blocks": 26,
+        "fewer": 8,
+        "same": 12,
+        "more": 6,
+        "drop": 1,
+        "gain": 4
+      },
+      "by_condition": {
+        "clean": {
+          "blocks": 13,
+          "fewer": 3,
+          "same": 6,
+          "more": 4,
+          "drop": 0,
+          "gain": 3
+        },
+        "null": {
+          "blocks": 13,
+          "fewer": 5,
+          "same": 6,
+          "more": 2,
+          "drop": 1,
+          "gain": 1
+        }
+      },
+      "by_model": {
+        "q2": {
+          "blocks": 8,
+          "fewer": 4,
+          "same": 3,
+          "more": 1,
+          "drop": 0,
+          "gain": 0
+        },
+        "q4": {
+          "blocks": 6,
+          "fewer": 0,
+          "same": 4,
+          "more": 2,
+          "drop": 0,
+          "gain": 1
+        },
+        "q9": {
+          "blocks": 8,
+          "fewer": 4,
+          "same": 1,
+          "more": 3,
+          "drop": 1,
+          "gain": 3
+        },
+        "g12": {
+          "blocks": 4,
+          "fewer": 0,
+          "same": 4,
+          "more": 0,
+          "drop": 0,
+          "gain": 0
+        }
+      }
+    }
+  ],
+  "per_run": [
+    {
+      "run": "size0-d1-g12-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d1-g12-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d1-q2-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d1-q2-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d1-q4-clean",
+      "rounds": 6,
+      "blocks_by_width": {
+        "1": 6,
+        "3": 2,
+        "5": 1
+      }
+    },
+    {
+      "run": "size0-d1-q4-null",
+      "rounds": 9,
+      "blocks_by_width": {
+        "1": 9,
+        "3": 3,
+        "5": 1
+      }
+    },
+    {
+      "run": "size0-d1-q9-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d1-q9-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q2-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q2-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q4-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q4-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q9-clean",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    },
+    {
+      "run": "size0-d2-q9-null",
+      "rounds": 10,
+      "blocks_by_width": {
+        "1": 10,
+        "3": 3,
+        "5": 2
+      }
+    }
+  ],
+  "three_round_blocks": [
+    {
+      "run": "size0-d1-g12-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-g12-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-g12-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-g12-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-g12-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-g12-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 24,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-q2-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 5,
+      "candidate_passes": 4
+    },
+    {
+      "run": "size0-d1-q2-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 4,
+      "candidate_passes": 3
+    },
+    {
+      "run": "size0-d1-q2-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 3,
+      "candidate_passes": 3
+    },
+    {
+      "run": "size0-d1-q2-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 1,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d1-q2-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 1,
+      "candidate_passes": 2
+    },
+    {
+      "run": "size0-d1-q2-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 1,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d1-q4-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 20,
+      "candidate_passes": 24
+    },
+    {
+      "run": "size0-d1-q4-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 20,
+      "candidate_passes": 22
+    },
+    {
+      "run": "size0-d1-q4-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d1-q4-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d1-q4-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 0,
+      "candidate_passes": 1
+    },
+    {
+      "run": "size0-d1-q9-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 16,
+      "candidate_passes": 17
+    },
+    {
+      "run": "size0-d1-q9-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 17,
+      "candidate_passes": 16
+    },
+    {
+      "run": "size0-d1-q9-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 18,
+      "candidate_passes": 17
+    },
+    {
+      "run": "size0-d1-q9-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 5,
+      "candidate_passes": 9
+    },
+    {
+      "run": "size0-d1-q9-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 9,
+      "candidate_passes": 6
+    },
+    {
+      "run": "size0-d1-q9-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 11,
+      "candidate_passes": 5
+    },
+    {
+      "run": "size0-d2-q2-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 2,
+      "candidate_passes": 2
+    },
+    {
+      "run": "size0-d2-q2-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 3,
+      "candidate_passes": 1
+    },
+    {
+      "run": "size0-d2-q2-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 2,
+      "candidate_passes": 3
+    },
+    {
+      "run": "size0-d2-q2-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 1,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d2-q2-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 1,
+      "candidate_passes": 1
+    },
+    {
+      "run": "size0-d2-q2-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d2-q4-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 20,
+      "candidate_passes": 22
+    },
+    {
+      "run": "size0-d2-q4-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 20,
+      "candidate_passes": 22
+    },
+    {
+      "run": "size0-d2-q4-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 21,
+      "candidate_passes": 21
+    },
+    {
+      "run": "size0-d2-q4-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d2-q4-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d2-q4-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 0,
+      "candidate_passes": 0
+    },
+    {
+      "run": "size0-d2-q9-clean",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 13,
+      "candidate_passes": 18
+    },
+    {
+      "run": "size0-d2-q9-clean",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 17,
+      "candidate_passes": 17
+    },
+    {
+      "run": "size0-d2-q9-clean",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 16,
+      "candidate_passes": 19
+    },
+    {
+      "run": "size0-d2-q9-null",
+      "first_round": 1,
+      "last_round": 3,
+      "baseline_passes": 7,
+      "candidate_passes": 9
+    },
+    {
+      "run": "size0-d2-q9-null",
+      "first_round": 4,
+      "last_round": 6,
+      "baseline_passes": 10,
+      "candidate_passes": 7
+    },
+    {
+      "run": "size0-d2-q9-null",
+      "first_round": 7,
+      "last_round": 9,
+      "baseline_passes": 9,
+      "candidate_passes": 8
+    }
+  ],
+  "board0_clean": {
+    "overall": {
+      "pairs": 160,
+      "different": 5
+    },
+    "by_slot": {
+      "M1": {
+        "pairs": 32,
+        "different": 0
+      },
+      "M2": {
+        "pairs": 32,
+        "different": 2
+      },
+      "M3": {
+        "pairs": 32,
+        "different": 0
+      },
+      "M4": {
+        "pairs": 32,
+        "different": 3
+      },
+      "M5": {
+        "pairs": 32,
+        "different": 0
+      }
+    },
+    "by_day": {
+      "d1": {
+        "pairs": 80,
+        "different": 4
+      },
+      "d2": {
+        "pairs": 80,
+        "different": 1
+      }
+    },
+    "per_run": [
+      {
+        "run": "board0-d1-M1-clean",
+        "day": "d1",
+        "slot": "M1",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d1-M2-clean",
+        "day": "d1",
+        "slot": "M2",
+        "pairs": 16,
+        "different": 1
+      },
+      {
+        "run": "board0-d1-M3-clean",
+        "day": "d1",
+        "slot": "M3",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d1-M4-clean",
+        "day": "d1",
+        "slot": "M4",
+        "pairs": 16,
+        "different": 3
+      },
+      {
+        "run": "board0-d1-M5-clean",
+        "day": "d1",
+        "slot": "M5",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d2-M1-clean",
+        "day": "d2",
+        "slot": "M1",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d2-M2-clean",
+        "day": "d2",
+        "slot": "M2",
+        "pairs": 16,
+        "different": 1
+      },
+      {
+        "run": "board0-d2-M3-clean",
+        "day": "d2",
+        "slot": "M3",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d2-M4-clean",
+        "day": "d2",
+        "slot": "M4",
+        "pairs": 16,
+        "different": 0
+      },
+      {
+        "run": "board0-d2-M5-clean",
+        "day": "d2",
+        "slot": "M5",
+        "pairs": 16,
+        "different": 0
+      }
+    ]
+  },
+  "round_check": {
+    "rounds_checked": 135,
+    "baseline_trials_per_round": 8,
+    "candidate_trials_per_round": 8
+  },
+  "registered_stored_verdicts": {
+    "PASS": 7,
+    "INCONCLUSIVE": 7,
+    "BLOCK": 0
+  },
+  "interpretation": "No ambiguity affects the counts. Size-0 scores a stored PASS as one. Board-0 compares the two stored outcomes within each run and task. Only PASS and FAIL occur in the supplied Board-0 records, so comparing PASS status also gives the same count."
+}
