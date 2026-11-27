@@ -1,0 +1,45 @@
+{
+  "ollama": "0.32.14",
+  "slots": [
+    {
+      "slot": "q2",
+      "tag": "qwen3.5:2b-nvfp4-ctx32k",
+      "digest": "670c67138085e730e549baa1d719101c6db7a7005cf2263f31c601156c5228a6",
+      "family": "qwen3_5",
+      "size": "2.2B",
+      "format": "safetensors",
+      "quantization": "nvfp4",
+      "context": 32768
+    },
+    {
+      "slot": "q4",
+      "tag": "qwen3.5:4b-mlx-ctx32k",
+      "digest": "c01efed5a36459ab6ffffa0b158636a014d8b30b4d5493167cba9916ed558430",
+      "family": "qwen3_5",
+      "size": "4.5B",
+      "format": "safetensors",
+      "quantization": "nvfp4",
+      "context": 32768
+    },
+    {
+      "slot": "q9",
+      "tag": "qwen3.5:9b-nvfp4-ctx32k",
+      "digest": "a798a1bd5ff3a100f02a8e64f209165498fced13219300646b50a560c21c2d65",
+      "family": "qwen3_5",
+      "size": "9.4B",
+      "format": "safetensors",
+      "quantization": "nvfp4",
+      "context": 32768
+    },
+    {
+      "slot": "g12",
+      "tag": "gemma4:12b-mlx-ctx32k",
+      "digest": "a5c533115db870b8db2e39657686a8742a5e7182bd00403b851dd1af28e4efbc",
+      "family": "gemma4_unified",
+      "size": "12.4B",
+      "format": "safetensors",
+      "quantization": "nvfp4",
+      "context": 32768
+    }
+  ]
+}

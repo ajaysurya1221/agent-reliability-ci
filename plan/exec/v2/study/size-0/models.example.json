@@ -1,0 +1,45 @@
+{
+  "ollama": "0.32.14",
+  "slots": [
+    {
+      "slot": "q2",
+      "tag": "fixture-q2:example",
+      "digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "family": "Qwen",
+      "size": "2B",
+      "format": "fixture",
+      "quantization": "fixture-Q4",
+      "context": 32768
+    },
+    {
+      "slot": "q4",
+      "tag": "qwen3.5:4b-mlx-ctx32k",
+      "digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "family": "Qwen",
+      "size": "4B",
+      "format": "fixture",
+      "quantization": "fixture-Q4",
+      "context": 32768
+    },
+    {
+      "slot": "q9",
+      "tag": "fixture-q9:example",
+      "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "family": "Qwen",
+      "size": "9B",
+      "format": "fixture",
+      "quantization": "fixture-Q4",
+      "context": 32768
+    },
+    {
+      "slot": "g12",
+      "tag": "gemma4:12b-mlx-ctx32k",
+      "digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "family": "Gemma",
+      "size": "12B",
+      "format": "fixture",
+      "quantization": "fixture-Q4",
+      "context": 32768
+    }
+  ]
+}

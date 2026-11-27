@@ -1,0 +1,86 @@
+{
+  "size0-d1-q2-clean.yaml": {
+    "sha256": "7d2fb5b7bccdd98dd1b3e1a3a8b262b684381993bf4129ff5eb36df84fb4816b",
+    "manifest": "ecf69be1224a60a346ba480a34d7c38650a62f2b9e030c133a930ac209a8148e",
+    "experiment": "size0-d1-q2-clean@3bfe95b355bfd6d2c469557565d03a27f8130a20783514c7a9fc8a85bf143a27",
+    "assignments": "adad1bc905809a325d239f9634da1d03e2b59fb4b266ffd8142a3fc1af5ac4bd"
+  },
+  "size0-d1-q2-null.yaml": {
+    "sha256": "2597382724694ad23f165bc694342229b687bd087f63218eb9b898230c3b5916",
+    "manifest": "f2fb978132e18ce076f184ad85d76063bd56d754b5a7425ea4c7ed07a5118f21",
+    "experiment": "size0-d1-q2-null@85a55325b8c3a15f1804e3e58a5abed02d54f0371511bf74d9a35278cb253d95",
+    "assignments": "9224376fef924ea5e3d8139daf67636f44b2733bd1f8876d3ffd448b72c765e2"
+  },
+  "size0-d1-q4-clean.yaml": {
+    "sha256": "b81bab6f3157833df5aa9d0cebaa014db179fca01c3199da8985ffb1ea4a7c48",
+    "manifest": "f307605a800e660bf0d06f2a124c98d39664d995a71e010798f410119eb0c138",
+    "experiment": "size0-d1-q4-clean@e51693709ceefd73b875a2dfe47e2ddbb4daa9f7abc3229ff3acc0b68fb38320",
+    "assignments": "77fef3d3eb6d6c3d74e067df1850028e9a69452a59468313bd5da989b92b204c"
+  },
+  "size0-d1-q4-null.yaml": {
+    "sha256": "45ff2ea41a39d7c03b65b9d6c1b77f16f0adaf63a1ed7417970228b9b55ad25e",
+    "manifest": "4c7e5e2df5e5d56b34b76963a810784a61c6aebdd639602d1b31f1bcca9a5df6",
+    "experiment": "size0-d1-q4-null@8846d0bec204a0a42b503d749cb1d6b2c63642b78454d74f509104f60ba4415d",
+    "assignments": "80ae91f9ab5767da59cee01f704943ecce50af02d9cd14b51af3f3151233b473"
+  },
+  "size0-d1-q9-clean.yaml": {
+    "sha256": "ea1f22166b5ef152336abd6f1a9fbf5f987ed2848a5f16233df9c66b3aafbdd0",
+    "manifest": "704d7c0fe1fe120dfd9af319dde58c0df1007e562cbf1dee241f293cd9226be1",
+    "experiment": "size0-d1-q9-clean@e816098caa3f935bbcecab7f9108525a3e70cf4bdf4c67a4278626adcba4a4c4",
+    "assignments": "df974c62fd6715bfb1c8aff6f47568268ebe4c4ec43169cbc33d94968970c73a"
+  },
+  "size0-d1-q9-null.yaml": {
+    "sha256": "84eeff1d0522ee6ba6e11c91cfc55e10f2aedcff0a88cc515af0e604d7538b1e",
+    "manifest": "6540576bef6b761339cfb4f4bc497d4aa52a8d0d5a8cc7bbc3db13754f802a9f",
+    "experiment": "size0-d1-q9-null@9431e6ede4877ed58f9c2a61f45df0a6664dcaf9c6295daf300597c0ec6bb116",
+    "assignments": "ec3b29e57eb06bb86307da9facf94e4a2dc77edced5f68c5407553afa2add234"
+  },
+  "size0-d1-g12-clean.yaml": {
+    "sha256": "6501191aa7dc349b68129550964049f2a22a2947e3490dd8caf8b637d7c9a015",
+    "manifest": "0afb7bb97306779bbb6b9fd11560d282986f75cfcf1f9540fb772ae0c5391493",
+    "experiment": "size0-d1-g12-clean@776e6447aca7a43ce8353ef38a3e8f30b511ca03edb58aa071a72ae56a6ed19a",
+    "assignments": "ab6b73a69c7b426e6144edaa4d453ed8238be60f006f7b7cecfc4249d80a2d79"
+  },
+  "size0-d1-g12-null.yaml": {
+    "sha256": "38555887e656128287e5e22526249c7db172ca0ca28589b8cb37d2f20c919970",
+    "manifest": "530383a9cc94bf1141ebebf887d1ae69a9d05aecfc1f5c65a877a95ed68b731f",
+    "experiment": "size0-d1-g12-null@0419e18efc22793cb7046fdf7ac7cd25876a51fafe034e162f01ea23a5b143c4",
+    "assignments": "d6736d5b8eac855837072cf9776eb4b4f30609a70ed525f687a28710fdc58c55"
+  },
+  "size0-d2-q9-clean.yaml": {
+    "sha256": "8501a068eb13a40be252fe88a76debaca186f3dbb3bcdd08a0267b2c536f9d2a",
+    "manifest": "19b3ba5c5bc6b9bb5c80a48132355d44c60db0013915ba56fcebb7dcda7c0676",
+    "experiment": "size0-d2-q9-clean@f17f51d3ee2a69480738a43507aa42ed835799093a98eec1fc0e3a13e9783024",
+    "assignments": "a1a14c6816e5f9ba281990fbc3bd8e97035ee70983ff881ddf1108fd47df94a4"
+  },
+  "size0-d2-q9-null.yaml": {
+    "sha256": "1b79aa8a622064450ce14d97c4ac32060b25e9107f84c4473fe15f3b132309cd",
+    "manifest": "7a6671a34e434b142446fcc3f5abb761759b8d4824ebe8f9f5b4d4815fb78deb",
+    "experiment": "size0-d2-q9-null@2da492a53b4274bc53c7a414cbf563edc31c6ec7fbd0d964a367a9b35a7c7fc1",
+    "assignments": "ce11d2794e9b97983dc3462238f22c63e30cba58b100f8f2159fadbd6a509508"
+  },
+  "size0-d2-q4-clean.yaml": {
+    "sha256": "8f5de0ce87f28003bf439dd169840da2527b269e63d0fc947b02b2307bf79dff",
+    "manifest": "c63ba50cb152e15ae112860c1e178a34a4ea8f1d6a6452c1de0e4bbe3da206e8",
+    "experiment": "size0-d2-q4-clean@fdbdf62408881f7bfa0a7b20e9055f494004ab4652138519db528744701546f3",
+    "assignments": "faa858975ad66f9258f02d3cffb72090c6617fb2c8ac14843c76aef19b84e353"
+  },
+  "size0-d2-q4-null.yaml": {
+    "sha256": "b7964ed3049bedb438edf2385119f0edac83636e70522e590047ab36a6f3b6b1",
+    "manifest": "7fdde363f913d0a3899fd1ac1225f8c6fba827e08b1dbb729bd4bc2f2cd221d0",
+    "experiment": "size0-d2-q4-null@217ca58bfe9f31d6f78ed4cc1e0b57a530b7b517c532eb62f289df86a59b4caa",
+    "assignments": "e8ce9e4b032616e8e8b0897ec9e10971a7a2faa613474956737929a4eaadc456"
+  },
+  "size0-d2-q2-clean.yaml": {
+    "sha256": "bf29db0f67f0c1ff68ed8384b441b226d830fdb72591d1cafec1e1d1b59d3042",
+    "manifest": "5255ff457526516de718f96ce73960f10a82840199c6bbf4e754b349041ffa5c",
+    "experiment": "size0-d2-q2-clean@cf80f0bae530ac6075cd23e6a96b1c5a4b444b8c8ac24e1021166609668c1bb8",
+    "assignments": "bcd8a3458f694467b3974c627e97de94d5f8dda496f320b4da15e27a797b812e"
+  },
+  "size0-d2-q2-null.yaml": {
+    "sha256": "06a1a5b732385f6a41657063b2e7472eb85889856a09cc08ea65bcd4dd46a4db",
+    "manifest": "0b115c5c549cc3ad516a53fa483646a03c8e5bcf74878a3321319c2d48df1b99",
+    "experiment": "size0-d2-q2-null@316f159ca786dd13ffa61c118e185a72b16ac9b4374d26b067b667a020d57ea7",
+    "assignments": "cecfce60a43148dbde36aa76445008976b5b445d6f3591f39ef76a4b1545d0bd"
+  }
+}

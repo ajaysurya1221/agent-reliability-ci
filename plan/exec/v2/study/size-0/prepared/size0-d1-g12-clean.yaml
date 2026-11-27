@@ -1,0 +1,144 @@
+{
+  "suite_id": "size0-d1-g12-clean",
+  "tasks": [
+    {
+      "id": "desk-03",
+      "input": "Check stock for order ORD-103 and add a stock note.",
+      "order_id": "ORD-103",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-06",
+      "input": "Check stock for order ORD-106 and add a stock note.",
+      "order_id": "ORD-106",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-09",
+      "input": "Check stock for order ORD-109 and add a stock note.",
+      "order_id": "ORD-109",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-12",
+      "input": "Check stock for order ORD-112 and add a stock note.",
+      "order_id": "ORD-112",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-15",
+      "input": "Check stock for order ORD-115 and add a stock note.",
+      "order_id": "ORD-115",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-18",
+      "input": "Check stock for order ORD-118 and add a stock note.",
+      "order_id": "ORD-118",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-21",
+      "input": "Check stock for order ORD-121 and add a stock note.",
+      "order_id": "ORD-121",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    },
+    {
+      "id": "desk-24",
+      "input": "Check stock for order ORD-124 and add a stock note.",
+      "order_id": "ORD-124",
+      "action": "stock_note",
+      "quickstart_settings": {
+        "baseline": "ollama:gemma4:12b-mlx-ctx32k",
+        "candidate": "ollama:gemma4:12b-mlx-ctx32k",
+        "temperature": 0.7,
+        "baseline_reasoning": false,
+        "candidate_reasoning": false
+      }
+    }
+  ],
+  "toolset": "agent:toolset",
+  "oracle": "check:check",
+  "baseline": {
+    "agent": "agent:baseline",
+    "candidate_id": "ollama:gemma4:12b-mlx-ctx32k+compound-raw-null",
+    "label": "raw-null-a"
+  },
+  "candidate": {
+    "agent": "agent:candidate",
+    "candidate_id": "ollama:gemma4:12b-mlx-ctx32k+compound-raw-null",
+    "label": "raw-null-b"
+  },
+  "conditions": [
+    {
+      "id": "clean",
+      "faults": []
+    }
+  ],
+  "rule": {
+    "alpha": "1/20",
+    "delta": "1/10",
+    "stakes": [
+      "1/4",
+      "1/2"
+    ],
+    "max_rounds": 10,
+    "max_errored_pairs": 4,
+    "scenario_seeds": "per_round"
+  },
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 12,
+    "max_seconds": 120,
+    "grader_seconds": 20
+  }
+}

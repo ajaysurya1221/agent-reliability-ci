@@ -1,0 +1,8 @@
+{"id": "desk-03", "input": "Check stock for order ORD-103 and add a stock note.", "order_id": "ORD-103", "action": "stock_note"}
+{"id": "desk-06", "input": "Check stock for order ORD-106 and add a stock note.", "order_id": "ORD-106", "action": "stock_note"}
+{"id": "desk-09", "input": "Check stock for order ORD-109 and add a stock note.", "order_id": "ORD-109", "action": "stock_note"}
+{"id": "desk-12", "input": "Check stock for order ORD-112 and add a stock note.", "order_id": "ORD-112", "action": "stock_note"}
+{"id": "desk-15", "input": "Check stock for order ORD-115 and add a stock note.", "order_id": "ORD-115", "action": "stock_note"}
+{"id": "desk-18", "input": "Check stock for order ORD-118 and add a stock note.", "order_id": "ORD-118", "action": "stock_note"}
+{"id": "desk-21", "input": "Check stock for order ORD-121 and add a stock note.", "order_id": "ORD-121", "action": "stock_note"}
+{"id": "desk-24", "input": "Check stock for order ORD-124 and add a stock note.", "order_id": "ORD-124", "action": "stock_note"}

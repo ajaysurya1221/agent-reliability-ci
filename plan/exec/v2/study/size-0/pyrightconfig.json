@@ -1,0 +1,12 @@
+{
+  "include": ["."],
+  "exclude": ["claims", "prepared", "_offline", "**/__pycache__"],
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.13",
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportMissingModuleSource": false,
+  "extraPaths": ["agent", "../../../../../../.arci-worktrees/run4-env/lib/python3.13/site-packages", "../../../../../.venv/lib/python3.13/site-packages"]
+}

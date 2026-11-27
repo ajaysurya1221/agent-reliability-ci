@@ -1,0 +1,134 @@
+{
+  "model": "",
+  "stream": true,
+  "options": {
+    "temperature": 0.7
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "Use the order desk tools. Read the order first. Refund exactly its total_cents. For stock notes, read its SKU stock and write exactly 'stock: N'. Only add a note when the task asks for one. For refund notes write exactly 'refunded'. A plain refund needs no note. Retry an empty lookup once."
+    },
+    {
+      "role": "user",
+      "content": ""
+    },
+    {
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "name": "check_stock",
+            "arguments": {
+              "sku": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "Error: unknown SKU"
+    },
+    {
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "name": "lookup_order",
+            "arguments": {
+              "order_id": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "null"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Read an order's SKU, paid amount, refund and notes before changing it.",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "order_id"
+          ],
+          "properties": {
+            "order_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "check_stock",
+        "description": "Return the current available quantity for a SKU.",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "sku"
+          ],
+          "properties": {
+            "sku": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Refund the full paid amount; repeating the same refund is idempotent.",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "order_id",
+            "amount_cents"
+          ],
+          "properties": {
+            "order_id": {
+              "type": "string"
+            },
+            "amount_cents": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "add_note",
+        "description": "Append an exact service note once; repeating the same note is idempotent.",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "order_id",
+            "note"
+          ],
+          "properties": {
+            "order_id": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "think": false
+}

@@ -1,0 +1,6 @@
+{
+  "q2": {"family": "qwen", "min_billions": 1.5, "max_billions": 3.0},
+  "q4": {"family": "qwen", "min_billions": 3.0, "max_billions": 6.0},
+  "q9": {"family": "qwen", "min_billions": 7.0, "max_billions": 11.0},
+  "g12": {"family": "gemma", "min_billions": 10.0, "max_billions": 14.0}
+}
