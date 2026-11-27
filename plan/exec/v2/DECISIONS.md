@@ -1061,3 +1061,55 @@ stop rule is sound rested on that wrong premise and is not relied on.
 
 **Not decided here.** Any change to the README, any support for further coding agents, any
 automatic saving of daily counts. Each waits for the test and for the maintainer.
+
+## D-39: Same-0 is published; ARCI is described as a test bench for harness changes, as a hypothesis with a fail rule (2026-11-28)
+
+**What led to it.** With Board-0 and Size-0 published, the maintainer wrote on 28 Nov before
+going away for the night: "have you proved anything? ... any new benchmarks to run? do we need
+to pivot (approved)? ... Prove something in the morning!" The consultant (Astra) was asked what
+could honestly be shown by morning and whether a pivot is supported. Its answer: no new live
+run; one count on published records with a single primary question; and the pivot recorded as a
+positioning hypothesis, with D-38 unchanged as the gate for building.
+
+**Same-0, the count.** Registered and pushed before any of its numbers were computed
+(`e95fe53`), then counted by two agents separately with equal results (`b59c859`). Size-0's 14
+runs compare an agent with an identical copy. The registered sentence: "With identical
+configurations, 0 of 14 three-round comparisons showed the second copy ten points or more behind
+the first, and 3 of 14 showed it ten points or more ahead." Secondary: the two copies' scores
+differed in 64 of 135 single rounds. The orchestrator predicted two drops and saw none. The
+released rule's stored verdicts on the same runs were 7 PASS, 7 INCONCLUSIVE, 0 BLOCK; that is
+printed and not claimed as mistakes avoided. Page: `study/RESULT-same-0.md`.
+
+**What the three results show together, and no more.**
+
+- Board-0: one sentence added to a tool result took three local models from 0 to 13% to 84 to
+  100% of trials passed, and took a fourth from 30/32 to 11/32. The same change helped some
+  models and hurt another.
+- Size-0: under a prompt that says "Retry an empty lookup once", the repeat lookup was counted
+  in 1/144 and 0/160 trials for one build, 56/160 and 58/160 for another, and 160/160 for the
+  reference model. The size reading is withheld; these are counts per build.
+- Same-0: with nothing changed at all, three runs a side put two copies ten points or more
+  apart in 3 of 14 comparisons.
+
+**The decision.**
+
+- No code, package or command changes. The pivot is in what the project says it is for: **a
+  test bench for harness changes.** Someone changes a prompt, a tool's reply, a skill or a
+  setting of an agent, runs the old and the new version on the same tasks, and gets PASS, BLOCK
+  or INCONCLUSIVE with the assumptions printed. Local-model studies and the Board-0 table become
+  evidence for that purpose and are not a product line.
+- This is a hypothesis about what people want. Nothing above shows demand: nobody outside the
+  project has used the tool.
+- **Fail rule.** D-38's hand test decides. If the one outside person declines, the idea ends at
+  once. If there is no usable reply within 14 days of the maintainer posting the question, it
+  ends then (12 December 2026 if posted on 28 November). It counts as support only if they
+  supply two versions and a test command and use the answer, INCONCLUSIVE included, in a real
+  decision. Board-0's own 30-day check (28 December) is separate and unchanged.
+- Until that test is read: nothing new is built, no leaderboard, no skill, no automatic
+  saving. Wording on the README changes only through a pull request the maintainer merges.
+- No thread post was made on 28 Nov before the maintainer's return; `launch/devto-reply-7.md`
+  waits for him.
+
+**Not claimed.** That the three results are new findings in the field (each has published
+relatives; see the result pages). Anything about hosted models, larger models or real agents.
+That a harness test bench is wanted.
