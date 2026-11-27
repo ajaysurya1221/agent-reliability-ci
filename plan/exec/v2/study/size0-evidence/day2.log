@@ -1,0 +1,27 @@
+Board-0 chain ended: CHAIN DONE (all); now 28 Nov 00:18:36
+server 0.32.14 answers, Board-0 lock free
+PREFLIGHT q9 28 Nov 00:19:37
+START size0-d2-q9-clean 28 Nov 00:19:50
+size0-d2-q9-clean  160 trials
+END size0-d2-q9-clean seconds 605 28 Nov 00:29:55
+PREFLIGHT q9 28 Nov 00:29:55
+START size0-d2-q9-null 28 Nov 00:30:08
+size0-d2-q9-null  160 trials
+END size0-d2-q9-null seconds 562 28 Nov 00:39:30
+PREFLIGHT q4 28 Nov 00:39:30
+START size0-d2-q4-clean 28 Nov 00:39:39
+size0-d2-q4-clean  160 trials
+END size0-d2-q4-clean seconds 490 28 Nov 00:47:49
+PREFLIGHT q4 28 Nov 00:47:49
+START size0-d2-q4-null 28 Nov 00:47:58
+size0-d2-q4-null  160 trials
+END size0-d2-q4-null seconds 296 28 Nov 00:52:54
+PREFLIGHT q2 28 Nov 00:52:54
+START size0-d2-q2-clean 28 Nov 00:53:02
+size0-d2-q2-clean  160 trials
+END size0-d2-q2-clean seconds 360 28 Nov 00:59:02
+PREFLIGHT q2 28 Nov 00:59:02
+START size0-d2-q2-null 28 Nov 00:59:07
+size0-d2-q2-null  160 trials
+END size0-d2-q2-null seconds 293 28 Nov 01:04:00
+CHAIN DONE (all)

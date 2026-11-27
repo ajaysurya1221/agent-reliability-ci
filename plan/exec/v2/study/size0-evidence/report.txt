@@ -1,0 +1,36 @@
+real
+complete
+starts accounted for: 14/14
+verified rows: 14/14
+size0-d1-q2-clean	finished
+size0-d1-q2-null	finished
+size0-d1-q4-clean	finished
+size0-d1-q4-null	finished
+size0-d1-q9-clean	finished
+size0-d1-q9-null	finished
+size0-d1-g12-clean	finished
+size0-d1-g12-null	finished
+size0-d2-q9-clean	finished
+size0-d2-q9-null	finished
+size0-d2-q4-clean	finished
+size0-d2-q4-null	finished
+size0-d2-q2-clean	finished
+size0-d2-q2-null	finished
+Day 1
+slot	tag	condition	round	reached 10	verdict (check only, not a result)	trials	final-state passes	clean qualifying IDs/8	rated	delivered	exposed	unexposed	read again/exposed	percent	exact 95% interval (%)	exposed >=80	right ID	by order (passes/trials, delivered, exposed, read again, right ID)	passes read again/no read again/unexposed	unexposed trial IDs (wire reason, termination)	date verification
+q2	qwen3.5:2b-nvfp4-ctx32k	clean	10	1	INCONCLUSIVE	160	23	0/8	0	0	0	0	0/0	NA	NA	NA	0	ORD-103 3/20,0,0,0,0  ORD-106 2/20,0,0,0,0  ORD-109 3/20,0,0,0,0  ORD-112 3/20,0,0,0,0  ORD-115 3/20,0,0,0,0  ORD-118 7/20,0,0,0,0  ORD-121 1/20,0,0,0,0  ORD-124 1/20,0,0,0,0	0/0/0		verified
+q2	qwen3.5:2b-nvfp4-ctx32k	null	10	1	INCONCLUSIVE	160	7	0/8	0	160	160	0	33/160	20.6	14.6429,27.7276	1	33	ORD-103 1/20,20,20,5,5  ORD-106 0/20,20,20,2,2  ORD-109 0/20,20,20,4,4  ORD-112 0/20,20,20,0,0  ORD-115 3/20,20,20,5,5  ORD-118 2/20,20,20,8,8  ORD-121 1/20,20,20,2,2  ORD-124 0/20,20,20,7,7	7/0/0		verified
+q4	qwen3.5:4b-mlx-ctx32k	clean	6	0	PASS	96	86	8/8	1	0	0	0	0/0	NA	NA	NA	0	ORD-103 10/12,0,0,0,0  ORD-106 11/12,0,0,0,0  ORD-109 11/12,0,0,0,0  ORD-112 9/12,0,0,0,0  ORD-115 11/12,0,0,0,0  ORD-118 10/12,0,0,0,0  ORD-121 12/12,0,0,0,0  ORD-124 12/12,0,0,0,0	0/0/0		verified
+q4	qwen3.5:4b-mlx-ctx32k	null	9	0	PASS	144	1	8/8	1	144	144	0	1/144	0.7	0.0176,3.8083	1	1	ORD-103 0/18,18,18,0,0  ORD-106 0/18,18,18,0,0  ORD-109 0/18,18,18,0,0  ORD-112 0/18,18,18,0,0  ORD-115 0/18,18,18,0,0  ORD-118 0/18,18,18,0,0  ORD-121 0/18,18,18,0,0  ORD-124 1/18,18,18,1,1	1/0/0		verified
+q9	qwen3.5:9b-nvfp4-ctx32k	clean	10	1	INCONCLUSIVE	160	112	8/8	1	0	0	0	0/0	NA	NA	NA	0	ORD-103 16/20,0,0,0,0  ORD-106 18/20,0,0,0,0  ORD-109 10/20,0,0,0,0  ORD-112 15/20,0,0,0,0  ORD-115 13/20,0,0,0,0  ORD-118 14/20,0,0,0,0  ORD-121 13/20,0,0,0,0  ORD-124 13/20,0,0,0,0	0/0/0		verified
+q9	qwen3.5:9b-nvfp4-ctx32k	null	10	1	INCONCLUSIVE	160	49	8/8	1	160	160	0	56/160	35.0	27.6388,42.9283	1	56	ORD-103 9/20,20,20,10,10  ORD-106 8/20,20,20,9,9  ORD-109 4/20,20,20,4,4  ORD-112 5/20,20,20,7,7  ORD-115 7/20,20,20,8,8  ORD-118 7/20,20,20,8,8  ORD-121 4/20,20,20,5,5  ORD-124 5/20,20,20,5,5	49/0/0		verified
+g12	gemma4:12b-mlx-ctx32k	clean	10	1	PASS	160	160	8/8	1	0	0	0	0/0	NA	NA	NA	0	ORD-103 20/20,0,0,0,0  ORD-106 20/20,0,0,0,0  ORD-109 20/20,0,0,0,0  ORD-112 20/20,0,0,0,0  ORD-115 20/20,0,0,0,0  ORD-118 20/20,0,0,0,0  ORD-121 20/20,0,0,0,0  ORD-124 20/20,0,0,0,0	0/0/0		verified
+g12	gemma4:12b-mlx-ctx32k	null	10	1	PASS	160	160	8/8	1	160	160	0	160/160	100.0	97.7208,100.0000	1	160	ORD-103 20/20,20,20,20,20  ORD-106 20/20,20,20,20,20  ORD-109 20/20,20,20,20,20  ORD-112 20/20,20,20,20,20  ORD-115 20/20,20,20,20,20  ORD-118 20/20,20,20,20,20  ORD-121 20/20,20,20,20,20  ORD-124 20/20,20,20,20,20	160/0/0		verified
+Day 2
+slot	tag	condition	round	reached 10	verdict (check only, not a result)	trials	final-state passes	clean qualifying IDs/8	rated	delivered	exposed	unexposed	read again/exposed	percent	exact 95% interval (%)	exposed >=80	right ID	by order (passes/trials, delivered, exposed, read again, right ID)	passes read again/no read again/unexposed	unexposed trial IDs (wire reason, termination)	date verification
+q9	qwen3.5:9b-nvfp4-ctx32k	clean	10	1	PASS	160	112	8/8	1	0	0	0	0/0	NA	NA	NA	0	ORD-103 17/20,0,0,0,0  ORD-106 18/20,0,0,0,0  ORD-109 11/20,0,0,0,0  ORD-112 10/20,0,0,0,0  ORD-115 16/20,0,0,0,0  ORD-118 13/20,0,0,0,0  ORD-121 15/20,0,0,0,0  ORD-124 12/20,0,0,0,0	0/0/0		verified
+q9	qwen3.5:9b-nvfp4-ctx32k	null	10	1	INCONCLUSIVE	160	54	8/8	1	160	160	0	58/160	36.2	28.8078,44.2118	1	58	ORD-103 8/20,20,20,8,8  ORD-106 8/20,20,20,8,8  ORD-109 5/20,20,20,6,6  ORD-112 4/20,20,20,4,4  ORD-115 6/20,20,20,6,6  ORD-118 9/20,20,20,11,11  ORD-121 5/20,20,20,6,6  ORD-124 9/20,20,20,9,9	54/0/0		verified
+q4	qwen3.5:4b-mlx-ctx32k	clean	10	1	PASS	160	141	8/8	1	0	0	0	0/0	NA	NA	NA	0	ORD-103 19/20,0,0,0,0  ORD-106 18/20,0,0,0,0  ORD-109 19/20,0,0,0,0  ORD-112 15/20,0,0,0,0  ORD-115 18/20,0,0,0,0  ORD-118 19/20,0,0,0,0  ORD-121 17/20,0,0,0,0  ORD-124 16/20,0,0,0,0	0/0/0		verified
+q4	qwen3.5:4b-mlx-ctx32k	null	10	1	PASS	160	0	8/8	1	160	160	0	0/160	0.0	0.0000,2.2792	1	0	ORD-103 0/20,20,20,0,0  ORD-106 0/20,20,20,0,0  ORD-109 0/20,20,20,0,0  ORD-112 0/20,20,20,0,0  ORD-115 0/20,20,20,0,0  ORD-118 0/20,20,20,0,0  ORD-121 0/20,20,20,0,0  ORD-124 0/20,20,20,0,0	0/0/0		verified
+q2	qwen3.5:2b-nvfp4-ctx32k	clean	10	1	INCONCLUSIVE	160	16	0/8	0	0	0	0	0/0	NA	NA	NA	0	ORD-103 4/20,0,0,0,0  ORD-106 1/20,0,0,0,0  ORD-109 0/20,0,0,0,0  ORD-112 3/20,0,0,0,0  ORD-115 0/20,0,0,0,0  ORD-118 4/20,0,0,0,0  ORD-121 2/20,0,0,0,0  ORD-124 2/20,0,0,0,0	0/0/0		verified
+q2	qwen3.5:2b-nvfp4-ctx32k	null	10	1	INCONCLUSIVE	160	3	0/8	0	160	160	0	32/160	20.0	14.1004,27.0447	1	31	ORD-103 0/20,20,20,4,4  ORD-106 0/20,20,20,2,2  ORD-109 1/20,20,20,2,2  ORD-112 0/20,20,20,3,3  ORD-115 0/20,20,20,5,5  ORD-118 2/20,20,20,6,5  ORD-121 0/20,20,20,5,5  ORD-124 0/20,20,20,5,5	3/0/0		verified

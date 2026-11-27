@@ -983,3 +983,81 @@ count as the table having mattered; otherwise it stays a dated record.
 **Not claimed.** As in D-35 and the registration: nothing about hosted models, larger models or
 real agents; no claim that reply wording changing recovery, a local-model recovery benchmark or
 an empty-result test is new; no claim that anyone asked for this table.
+
+## D-37: Size-0: the size reading is withheld; the rows are published as they are (2026-11-28)
+
+**What led to it.** A reader of the order-desk write-up asked whether the 4B model's 0 of 24 in
+Run 6 was about model size and proposed one family at more than one size. The maintainer
+approved the study and two model downloads on 27 Nov, and on the same day moved its first day
+into the idle hours between Board-0's two days. Registered and pushed before any probe or trial
+(`b381114`, then `3d4ee3d`, which corrected one test that assumed a placeholder registration;
+the 14 run descriptions are byte-identical in both). Day 1 ran 27 Nov 17:09 to 18:08 local time,
+day 2 on 28 Nov 00:19 to 01:04, after Board-0's last run. All 14 runs started once and finished.
+Result page: `study/RESULT-size-0.md`. Evidence: `study/size0-evidence/claims.zip`, SHA-256
+`fcb0bb543a83392927558f850e6e70f976dcced81d80347a847841a66a7516be`.
+
+**The outcome.** The registered rule needs all three Qwen 3.5 builds rated and complete on both
+days. The 2B build is not rated on either day: with the order supplied it passed 23 of 160 and
+16 of 160 trials, and 0 of 8 order ids qualified. So the size reading is withheld and no sentence
+about size is written. The rows, "looked the order up again / exposed":
+
+- 2B (not rated): 33/160 and 32/160.
+- 4B: 1/144 and 0/160. Run 6 recorded 0/24.
+- 9B: 56/160 and 58/160.
+- Gemma 4 12B (reference, day 1): 160/160. The 24 of 24 reported on the public thread on 22 Nov
+  had no stored trial records; this count has them.
+
+An agent that read no write-up recounted all 14 runs with the same counts. The study's checker
+verified the unpacked evidence. The consultant (Astra) reviewed the page; its eight corrections
+were made.
+
+**Stated plainly.**
+
+- A link to the registration had been promised on the public thread before the first trial. It
+  was not posted there before the first trial. The pushed commit is the public time stamp.
+- The first registration commit was pushed while one test failed; the orchestrator had chained
+  the test run and the push without stopping on failure. Corrected before any probe or trial.
+- Predictions: the consultant's 9B estimate (about 35%) was close; the orchestrator's (about
+  50%) was not. Both expected the 4B build near zero. The 2B build's clean failure had been
+  given about a 40% chance by the orchestrator.
+- These are three separately released builds of one family, one prompt, one scripted mistake,
+  one laptop. Nothing here speaks for parameter count as a cause, for hosted models or for real
+  agents.
+
+**What follows.** A reply to the reader with these rows, for the maintainer to post. No further
+size run is planned; a new run would need a new outside question and its own registration.
+
+## D-38: before anything new is built, one outside person tries the idea by hand (2026-11-28)
+
+**What led to it.** On 27 Nov the maintainer asked whether the project is moving in the right
+direction and pointed to six widely used agent-skill repositories as models. A web review (23
+sources, 25 checked claims; private notes) found that recovery after tool failures is covered by
+several larger published benchmarks, that a leaderboard near Board-0's has almost no visible use
+(one case), that Show HN is restricted for new accounts, and nothing for or against demand for
+the log tool. The consultant (Astra) then challenged the orchestrator's reading of both.
+
+**The decision** (the maintainer, 27 Nov: "Yes, test first").
+
+- Board-0 and Size-0 are published as registered. No leaderboard is built as a destination.
+- Nothing taken from the six repositories is built yet. The leading idea is a skill that lets a
+  coding agent run the user's own tests on an old and a new version of an agent, prompt or
+  skill, and has `arci verdict` decide. An existing test folder in someone's project shows that
+  they test changes; it does not show that this decision is their bottleneck.
+- The test, by hand, with released code only: one person outside the project supplies two
+  versions and their test command; the orchestrator runs the existing command line; nothing new
+  is written.
+- **Counts as demand:** they supply both versions and the command, and use the answer
+  (INCONCLUSIVE included) in their real decision. Any set-up they wished were automatic is noted.
+- **Counts as a miss:** they decline, or no usable reply within 14 days of the maintainer posting
+  the question. A miss ends this idea; another idea needs its own evidence.
+- The question goes to the one reader who has asked this project questions, in the reply that
+  carries the Size-0 rows, and may be repeated in the project's own discussion thread. Nothing is
+  asked on anyone else's tracker.
+
+**A correction.** On 27 Nov the orchestrator told the maintainer, and wrote into the research
+brief, that "no new feature before 14 Dec" and the 14 Dec stop rule were in force. D-32 had
+lifted both on 25 Nov. The maintainer was told the same evening. The research's remark that the
+stop rule is sound rested on that wrong premise and is not relied on.
+
+**Not decided here.** Any change to the README, any support for further coding agents, any
+automatic saving of daily counts. Each waits for the test and for the maintainer.

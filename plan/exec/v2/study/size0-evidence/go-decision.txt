@@ -1,0 +1,2 @@
+Go decision, 27 Nov 2026 17:09:24 IST. Owner answered 'Start without it' (no thread post before the first trial).
+Judged from first-preflight probe times only (warm seconds q2 0.6, q4 1.1, q9 1.75, g12 1.2): about 5 model calls per trial, at most 160 trials per run, so about 8 to 27 minutes per run and about 2 h 20 min for all eight runs. Start 17:10, so the last run should start near 19:15, before the 21:00 no-start time. Margin: the estimate can be wrong by a factor of about 1.9 before the last run misses 21:00.
