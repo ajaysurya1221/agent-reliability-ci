@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":166067947209950,"variant":"clean"},"at_ms":0.040209000871982425}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.65033400140237}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 350, \"duration_minutes\": 36, \"organiser\": \"Farah Malik\", \"room\": \"Juniper Theatre\", \"start_minute\": 774, \"title\": \"Market Seminar\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.51954200083856}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":166067947209950,"variant":"clean"},"at_ms":0.03929199738195166}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.0582920006127}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 350, \"duration_minutes\": 36, \"organiser\": \"Farah Malik\", \"room\": \"Juniper Theatre\", \"start_minute\": 774, \"title\": \"Market Seminar\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.78337499743793}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

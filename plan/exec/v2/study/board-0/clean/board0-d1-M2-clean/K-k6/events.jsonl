@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":26524860738996,"variant":"clean"},"at_ms":0.03804199513979256}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-8514"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.24866699543782}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 250, \"duration_minutes\": 45, \"organiser\": \"Amir Malik\", \"room\": \"Hazel Loft\", \"start_minute\": 511, \"title\": \"Budget Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.62616699782666}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":26524860738996,"variant":"clean"},"at_ms":0.04370800161268562}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-8514"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.64445800392423}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 250, \"duration_minutes\": 45, \"organiser\": \"Amir Malik\", \"room\": \"Hazel Loft\", \"start_minute\": 511, \"title\": \"Budget Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.96154200151796}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

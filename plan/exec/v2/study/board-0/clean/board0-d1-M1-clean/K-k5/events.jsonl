@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":268071947577892,"variant":"clean"},"at_ms":0.03679200017359108}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.7801249998738}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 450, \"duration_minutes\": 238, \"organiser\": \"Sam Bell\", \"room\": \"Birch Lounge\", \"start_minute\": 935, \"title\": \"Market Forum\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.7148750035558}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":268071947577892,"variant":"clean"},"at_ms":0.0374590017599985}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.83974999934435}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 450, \"duration_minutes\": 238, \"organiser\": \"Sam Bell\", \"room\": \"Birch Lounge\", \"start_minute\": 935, \"title\": \"Market Forum\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":213.92550000018673}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -1,0 +1,95 @@
+{
+  "record_sha256": "e12a9d3268064e273b5ebbbb5377af9ed8f90f2b634403df750ef8d2d1845d3f",
+  "schema_version": "arci/0.5",
+  "experiment_id": "board0-d2-M4-clean-K-k6",
+  "manifest_sha256": "2ff4f62456cc6ad430c84c6a971208cf30bbdd0e2d937568d7c3ddea18a0108d",
+  "trials_sha256": "1201cd7a91c7f5b4b8397f81f4b2bf17fbf3ac0d3f4aa29a6038dffdd82834cd",
+  "alpha": 0.05,
+  "delta": 0.1,
+  "interval_method": "clopper_pearson",
+  "k_conditions": 1,
+  "per_arm_confidence": 0.975,
+  "n_per_arm": 1,
+  "looks": [
+    1
+  ],
+  "history": [
+    {
+      "look": 1,
+      "pairs": 1,
+      "trials_sha256": "1201cd7a91c7f5b4b8397f81f4b2bf17fbf3ac0d3f4aa29a6038dffdd82834cd",
+      "conditions": [
+        {
+          "condition_id": "E",
+          "baseline": {
+            "n": 1,
+            "successes": 0,
+            "errors": 0,
+            "rate": 0.0,
+            "cp_low": 0.0,
+            "cp_high": 0.9875,
+            "wilson_low": 0.0,
+            "wilson_high": 0.7934506856227626
+          },
+          "candidate": {
+            "n": 1,
+            "successes": 0,
+            "errors": 0,
+            "rate": 0.0,
+            "cp_low": 0.0,
+            "cp_high": 0.9875,
+            "wilson_low": 0.0,
+            "wilson_high": 0.7934506856227626
+          },
+          "delta_low": -0.9875,
+          "delta_high": 0.9875,
+          "candidate_hard_violations": 0,
+          "is_gating": true,
+          "verdict": "INCONCLUSIVE",
+          "reasons": [
+            "bounds cross the margin"
+          ]
+        }
+      ],
+      "verdict": "INCONCLUSIVE"
+    }
+  ],
+  "stopped_at_look": 1,
+  "conditions": [
+    {
+      "condition_id": "E",
+      "baseline": {
+        "n": 1,
+        "successes": 0,
+        "errors": 0,
+        "rate": 0.0,
+        "cp_low": 0.0,
+        "cp_high": 0.9875,
+        "wilson_low": 0.0,
+        "wilson_high": 0.7934506856227626
+      },
+      "candidate": {
+        "n": 1,
+        "successes": 0,
+        "errors": 0,
+        "rate": 0.0,
+        "cp_low": 0.0,
+        "cp_high": 0.9875,
+        "wilson_low": 0.0,
+        "wilson_high": 0.7934506856227626
+      },
+      "delta_low": -0.9875,
+      "delta_high": 0.9875,
+      "candidate_hard_violations": 0,
+      "is_gating": true,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "bounds cross the margin"
+      ]
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "exit_code": 2,
+  "reasons": [],
+  "prior_runs": []
+}

@@ -1,0 +1,29 @@
+{"run": "board0-d2-M3-E", "date": "2026-11-28", "claim_ns": 117840206740041, "part_ns": 117840208000708, "ollama": "0.32.14", "model_digest": "d3d6951729aeb9bbb6a4e89e5b401a3880c215bbf2dd8b22e5ac5809b0e03da5"}
+run store: /private/var/tmp/arci-board0-claims/board0-d2-M3-E/stores/board0-d2-M3-E@5d61537bc50748f4a69af900f02f958c91214a74e7964482b74bf3019b0d9a30
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 1
+pairs: 16 (32 trials)
+baseline 15/16 passed, candidate 1/16 passed
+counts: minus=14, zero=2, plus=0, errored=0
+PASS wealth: 9.44479e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 6.18898e+01; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+VERDICT: BLOCK (exit 1)
+reason: regression established
+stopping round: 1
+pairs: 16 (32 trials)
+baseline 15/16 passed, candidate 1/16 passed
+counts: minus=14, zero=2, plus=0, errored=0
+PASS wealth: 9.44479e-03; threshold: 40/1; crossed: False
+BLOCK wealth: 6.18898e+01; threshold: 40/1; crossed: True
+errored pairs: 0; tolerance: 4
+candidate hard violations: 0
+scenario_seeds: per_round. Assuming joint independence across cells within rounds and across rounds (or the conditional form), each directional statistical error is at most alpha/2 (alpha=1/20); Its error guarantee requires that in every round the suite mean over that round's scenario instances obey the relevant null, with the independence conditions above (or their conditional form).
+ARCI does not check or enforce this premise; there is no guarantee averaged over seeds.
+The bound covers statistical BLOCK only; hard-invariant BLOCK is a separate rule.
+stored decision: MATCH

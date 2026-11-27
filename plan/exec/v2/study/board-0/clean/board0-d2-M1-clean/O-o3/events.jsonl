@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":210893571074359,"variant":"clean"},"at_ms":0.03999999898951501}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"order_id":"ORD-109"},"call_id":"c-0000","occurrence":0,"tool":"lookup_order"},"at_ms":148.36462499806657}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_order","value":{"content":[{"text":"{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-5186\", \"total_cents\": 7265}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.65954100433737}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":210893571074359,"variant":"clean"},"at_ms":0.0380830024369061}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"order_id":"ORD-109"},"call_id":"c-0000","occurrence":0,"tool":"lookup_order"},"at_ms":143.64875000319444}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_order","value":{"content":[{"text":"{\"notes\": [], \"refunded_cents\": 0, \"sku\": \"SKU-5186\", \"total_cents\": 7265}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.3349580023205}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":20223887093746,"variant":"clean"},"at_ms":0.03891601227223873}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.92066601128317}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 175, \"duration_minutes\": 197, \"organiser\": \"Anika Wong\", \"room\": \"Birch Atrium\", \"start_minute\": 480, \"title\": \"Service Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.02608300861903}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":20223887093746,"variant":"clean"},"at_ms":0.037165998946875334}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.63212500454392}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 175, \"duration_minutes\": 197, \"organiser\": \"Anika Wong\", \"room\": \"Birch Atrium\", \"start_minute\": 480, \"title\": \"Service Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.83366600214504}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -1,0 +1,14 @@
+{
+  "claim_ns": 34159195191625,
+  "counts_agree": true,
+  "export_ns": 34256275475666,
+  "model_digest": "a5c533115db870b8db2e39657686a8742a5e7182bd00403b851dd1af28e4efbc",
+  "ollama": "0.32.14",
+  "run": "board0-d1-M2-E",
+  "seconds": 97.080284041,
+  "started_local_date": "2026-11-27",
+  "stopping_round": 2,
+  "transport": "native Ollama",
+  "verdict": "BLOCK",
+  "verified_trials": 64
+}

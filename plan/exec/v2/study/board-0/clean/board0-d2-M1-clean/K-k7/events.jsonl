@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":264900979371771,"variant":"clean"},"at_ms":0.03729200398083776}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":144.50066699646413}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 146, \"duration_minutes\": 51, \"organiser\": \"Ada Bell\", \"room\": \"Juniper Lounge\", \"start_minute\": 717, \"title\": \"Library Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.8498339978978}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":264900979371771,"variant":"clean"},"at_ms":0.03920799645129591}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.91087499866262}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 146, \"duration_minutes\": 51, \"organiser\": \"Ada Bell\", \"room\": \"Juniper Lounge\", \"start_minute\": 717, \"title\": \"Library Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.84179200604558}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

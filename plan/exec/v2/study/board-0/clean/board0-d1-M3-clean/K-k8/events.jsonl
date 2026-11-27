@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":31599237047991,"variant":"clean"},"at_ms":0.03962500341003761}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.84687499923166}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 444, \"duration_minutes\": 75, \"organiser\": \"Ada Das\", \"room\": \"Linden Loft\", \"start_minute\": 563, \"title\": \"Library Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":213.5281250011758}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":31599237047991,"variant":"clean"},"at_ms":0.04233299841871485}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.19479200337082}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 444, \"duration_minutes\": 75, \"organiser\": \"Ada Das\", \"room\": \"Linden Loft\", \"start_minute\": 563, \"title\": \"Library Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.05362500000047}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

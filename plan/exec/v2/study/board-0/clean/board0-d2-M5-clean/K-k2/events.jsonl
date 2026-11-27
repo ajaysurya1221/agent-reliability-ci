@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":73404492683497,"variant":"clean"},"at_ms":0.04116600030101836}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":271.686916006729}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 419, \"duration_minutes\": 203, \"organiser\": \"Hugo Lee\", \"room\": \"Linden Atrium\", \"start_minute\": 804, \"title\": \"Travel Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":381.73883300623856}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":73404492683497,"variant":"clean"},"at_ms":0.0439160066889599}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":191.63741600641515}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 419, \"duration_minutes\": 203, \"organiser\": \"Hugo Lee\", \"room\": \"Linden Atrium\", \"start_minute\": 804, \"title\": \"Travel Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":275.7161659974372}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

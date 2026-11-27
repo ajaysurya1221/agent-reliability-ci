@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":21887657539390,"variant":"clean"},"at_ms":0.045334003516472876}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":227.56474999187049}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 49, \"duration_minutes\": 67, \"organiser\": \"Anika Chen\", \"room\": \"Ash Atrium\", \"start_minute\": 474, \"title\": \"Finance Talk\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":322.90504200500436}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":21887657539390,"variant":"clean"},"at_ms":0.08116599929053336}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":217.9594160115812}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 49, \"duration_minutes\": 67, \"organiser\": \"Anika Chen\", \"room\": \"Ash Atrium\", \"start_minute\": 474, \"title\": \"Finance Talk\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":313.10566600586753}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":224409239904543,"variant":"clean"},"at_ms":0.035083998227491975}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.87304199812934}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 301, \"duration_minutes\": 80, \"organiser\": \"Jonah Bell\", \"room\": \"Juniper Gallery\", \"start_minute\": 951, \"title\": \"Library Session\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.72529199207202}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":224409239904543,"variant":"clean"},"at_ms":0.03733400080818683}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.3832919980632}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 301, \"duration_minutes\": 80, \"organiser\": \"Jonah Bell\", \"room\": \"Juniper Gallery\", \"start_minute\": 951, \"title\": \"Library Session\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.279624996474}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

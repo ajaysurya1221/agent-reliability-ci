@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":241489566823369,"variant":"clean"},"at_ms":0.037500001781154424}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.99583399831317}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 99, \"duration_minutes\": 170, \"organiser\": \"Leila Silva\", \"room\": \"Alder Lounge\", \"start_minute\": 624, \"title\": \"Community Seminar\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.47616700141225}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":241489566823369,"variant":"clean"},"at_ms":0.039874998037703335}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.3180419994169}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 99, \"duration_minutes\": 170, \"organiser\": \"Leila Silva\", \"room\": \"Alder Lounge\", \"start_minute\": 624, \"title\": \"Community Seminar\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.84441700036405}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

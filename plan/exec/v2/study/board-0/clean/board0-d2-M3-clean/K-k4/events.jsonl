@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":214943752410873,"variant":"clean"},"at_ms":0.035958000808022916}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":144.69358300266322}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 243, \"duration_minutes\": 78, \"organiser\": \"Elena Park\", \"room\": \"Rowan Theatre\", \"start_minute\": 913, \"title\": \"Library Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.37437499722}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":214943752410873,"variant":"clean"},"at_ms":0.03633399319369346}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.03208399401046}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 243, \"duration_minutes\": 78, \"organiser\": \"Elena Park\", \"room\": \"Rowan Theatre\", \"start_minute\": 913, \"title\": \"Library Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.7314999953378}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

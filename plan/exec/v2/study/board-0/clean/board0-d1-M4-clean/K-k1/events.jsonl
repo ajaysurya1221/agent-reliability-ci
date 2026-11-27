@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":153764644227234,"variant":"clean"},"at_ms":0.035875003959517926}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.56766700156732}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 398, \"duration_minutes\": 209, \"organiser\": \"Nora Park\", \"room\": \"Elm Pavilion\", \"start_minute\": 512, \"title\": \"Outreach Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.42012500058627}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":153764644227234,"variant":"clean"},"at_ms":0.03920900053344667}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.17662499949802}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 398, \"duration_minutes\": 209, \"organiser\": \"Nora Park\", \"room\": \"Elm Pavilion\", \"start_minute\": 512, \"title\": \"Outreach Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.51891699951375}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

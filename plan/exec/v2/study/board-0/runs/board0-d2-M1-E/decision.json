@@ -1,0 +1,273 @@
+{
+  "record_sha256": "438bc7a702ca004fe121a0c71cedd76be343c6f71318cd4bcfa199109a6e516d",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "board0-d2-M1-E@0489a4aa62714c44bb33672b0ff6e9e4bb2465b1fd10542db77cb687ae6ea594",
+  "manifest_sha256": "a37cc8e475c07c46bfa685f1dc0c92875e825722cef15a942a2f0beb15f9b4cd",
+  "trials_sha256": "e591458e4104fd883afdea64b8121157a68c92b1e905db00178fd7131a3955a2",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 16,
+  "max_rounds": 26,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 16,
+      "trials_sha256": "e591458e4104fd883afdea64b8121157a68c92b1e905db00178fd7131a3955a2",
+      "counts": {
+        "minus": 14,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "9.44479e-03",
+      "block_wealth": "6.18898e+01",
+      "pass_crossed": false,
+      "block_crossed": true,
+      "verdict": "BLOCK",
+      "reasons": [
+        "regression established"
+      ]
+    }
+  ],
+  "stopped_at_round": 1,
+  "cells": [
+    {
+      "task_id": "K-k1",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k2",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k3",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k4",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k5",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k6",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k7",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k8",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o1",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o2",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o3",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o4",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o5",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o6",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o7",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o8",
+      "condition_id": "E",
+      "pairs": 1,
+      "baseline_successes": 1,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 1,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "BLOCK",
+  "exit_code": 1,
+  "reasons": [
+    "regression established"
+  ],
+  "prior_runs": []
+}

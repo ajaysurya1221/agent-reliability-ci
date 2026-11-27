@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":211397839354312,"variant":"clean"},"at_ms":0.038499994843732566}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.82524999423185}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 230, \"duration_minutes\": 15, \"organiser\": \"Hugo Park\", \"room\": \"Willow Suite\", \"start_minute\": 742, \"title\": \"Outreach Review\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.58654199785087}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":211397839354312,"variant":"clean"},"at_ms":0.03804099833359942}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-2436"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.56020800227998}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 230, \"duration_minutes\": 15, \"organiser\": \"Hugo Park\", \"room\": \"Willow Suite\", \"start_minute\": 742, \"title\": \"Outreach Review\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.95437499711988}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

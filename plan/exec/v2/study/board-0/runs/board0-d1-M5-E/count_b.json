@@ -1,0 +1,56 @@
+{
+  "arms": {
+    "baseline": {
+      "all": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 11,
+        "retrieved": 11,
+        "trials": 32
+      },
+      "calendar": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 9,
+        "retrieved": 9,
+        "trials": 16
+      },
+      "orders": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 2,
+        "retrieved": 2,
+        "trials": 16
+      }
+    },
+    "candidate": {
+      "all": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 30,
+        "retrieved": 30,
+        "trials": 32
+      },
+      "calendar": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 14,
+        "retrieved": 14,
+        "trials": 16
+      },
+      "orders": {
+        "errored": 0,
+        "exact": 0,
+        "passed": 16,
+        "retrieved": 16,
+        "trials": 16
+      }
+    }
+  },
+  "signs": {
+    "errored": 0,
+    "minus": 2,
+    "plus": 21,
+    "zero": 9
+  }
+}

@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":171022031484759,"variant":"clean"},"at_ms":0.040958002500701696}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":144.20520800194936}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 308, \"duration_minutes\": 35, \"organiser\": \"Ravi Reed\", \"room\": \"Alder Studio\", \"start_minute\": 1089, \"title\": \"Finance Workshop\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.20812500076136}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":171022031484759,"variant":"clean"},"at_ms":0.03695900522870943}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":144.1069590000552}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 308, \"duration_minutes\": 35, \"organiser\": \"Ravi Reed\", \"room\": \"Alder Studio\", \"start_minute\": 1089, \"title\": \"Finance Workshop\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.70487499976298}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

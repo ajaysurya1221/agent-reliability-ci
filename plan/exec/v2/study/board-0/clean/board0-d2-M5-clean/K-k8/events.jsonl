@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":64042181705903,"variant":"clean"},"at_ms":0.038416997995227575}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.17429199663457}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 304, \"duration_minutes\": 164, \"organiser\": \"Zoe Bell\", \"room\": \"Spruce Wing\", \"start_minute\": 1071, \"title\": \"Outreach Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.74233299784828}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":64042181705903,"variant":"clean"},"at_ms":0.033958000130951405}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.40291599405464}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 304, \"duration_minutes\": 164, \"organiser\": \"Zoe Bell\", \"room\": \"Spruce Wing\", \"start_minute\": 1071, \"title\": \"Outreach Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.9819999926258}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

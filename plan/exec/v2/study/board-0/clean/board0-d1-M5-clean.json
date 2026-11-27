@@ -1,0 +1,12 @@
+{
+  "claim_ns": 34673940852375,
+  "export_ns": 34716016533916,
+  "families": {
+    "calendar": 8,
+    "orders": 8
+  },
+  "rated": true,
+  "run": "board0-d1-M5-clean",
+  "seconds": 42.075681541,
+  "started_local_date": "2026-11-27"
+}

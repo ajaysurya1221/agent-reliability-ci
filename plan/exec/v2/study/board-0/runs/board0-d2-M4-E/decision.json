@@ -1,0 +1,353 @@
+{
+  "record_sha256": "f73b11cad7b9260032b7134ff57d2659f456e9e7c864ab317f578ce93922815e",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "board0-d2-M4-E@e759c71158f025964edbe42a2aa89624b6740c334a4a9fd5d17fc29fbbf68794",
+  "manifest_sha256": "24a3c517ecda31af384879b78419cca5b4ca3da7a48e40d6a6a48a4bf9f79583",
+  "trials_sha256": "6f8ff56b5f98bbcc23311d76ae6ed9269b4adb595ba8df097a0beae18fd1a250",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 16,
+  "max_rounds": 26,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 16,
+      "trials_sha256": "02ccf285769a6baa575900b43880d53e8db3f15d4b0a74047d9bad0cdacf83c1",
+      "counts": {
+        "minus": 0,
+        "zero": 16,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.96269e+00",
+      "block_wealth": "5.83645e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 32,
+      "trials_sha256": "7ee2b9e359e692dcf893bf52b9947dedba98a6e559ebc3e7cbea664c09245d5b",
+      "counts": {
+        "minus": 0,
+        "zero": 32,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.02231e+00",
+      "block_wealth": "3.52433e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 3,
+      "pairs": 48,
+      "trials_sha256": "e0932189434feefbadbaa8f7b9b0bec0a8010e5d281b309941ee2da823784c22",
+      "counts": {
+        "minus": 0,
+        "zero": 48,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "8.56246e+00",
+      "block_wealth": "2.19459e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 4,
+      "pairs": 64,
+      "trials_sha256": "caf5cb41a75ec19cc9e3b6ec68fc2ca781893f19deda8cbe403fcb8a8d2adc3a",
+      "counts": {
+        "minus": 0,
+        "zero": 64,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "1.88007e+01",
+      "block_wealth": "1.40275e-01",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 5,
+      "pairs": 80,
+      "trials_sha256": "889b0096749e9a3e9425fd71db6e74300f5e8ca5c08ccd5376ea89d0144caec6",
+      "counts": {
+        "minus": 0,
+        "zero": 80,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "4.22732e+01",
+      "block_wealth": "9.15729e-02",
+      "pass_crossed": true,
+      "block_crossed": false,
+      "verdict": "PASS",
+      "reasons": [
+        "non-inferiority established"
+      ]
+    }
+  ],
+  "stopped_at_round": 5,
+  "cells": [
+    {
+      "task_id": "K-k1",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k2",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k3",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k4",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k5",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k6",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k7",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k8",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o1",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o2",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o3",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o4",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o5",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o6",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o7",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o8",
+      "condition_id": "E",
+      "pairs": 5,
+      "baseline_successes": 0,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 0,
+        "zero": 5,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "PASS",
+  "exit_code": 0,
+  "reasons": [
+    "non-inferiority established"
+  ],
+  "prior_runs": []
+}

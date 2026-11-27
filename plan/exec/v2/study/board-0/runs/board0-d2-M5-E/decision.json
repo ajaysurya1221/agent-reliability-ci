@@ -1,0 +1,293 @@
+{
+  "record_sha256": "f7083fe58d6f89678eb9b25e9df5212aeb62255188ecd6492186d4e38074492e",
+  "schema_version": "arci-suite/1",
+  "experiment_id": "board0-d2-M5-E@63f561b655e32328b730bdeb2e7cc48a212130f2ff0f51458aeb9258f21c93c1",
+  "manifest_sha256": "66dcb490440df9434d10ff77954ee7cef12b20739686cb61c6341b20d3e1dfc9",
+  "trials_sha256": "282b56ffd0c3d8e89af1aa4b54bd25f09ad9ae0db8663d6bf4b7e6ad06bda4d8",
+  "alpha": "1/20",
+  "delta": "1/10",
+  "stakes": [
+    "1/4",
+    "1/2"
+  ],
+  "threshold": "40/1",
+  "n_cells": 16,
+  "max_rounds": 26,
+  "scenario_seeds": "per_round",
+  "max_errored_pairs": 4,
+  "history": [
+    {
+      "round": 1,
+      "pairs": 16,
+      "trials_sha256": "41e1141d1a6d39c9cf517c5c7d1581e7560004cddf19ae4ffb0675bc9337e23f",
+      "counts": {
+        "minus": 2,
+        "zero": 3,
+        "plus": 11,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "3.36433e+01",
+      "block_wealth": "2.90197e-02",
+      "pass_crossed": false,
+      "block_crossed": false,
+      "verdict": "INCONCLUSIVE",
+      "reasons": [
+        "no test crossed"
+      ]
+    },
+    {
+      "round": 2,
+      "pairs": 32,
+      "trials_sha256": "0eb014dd83b962427a061671c7066be81827220867b58f33027dfc3d089d8288",
+      "counts": {
+        "minus": 3,
+        "zero": 8,
+        "plus": 21,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0,
+      "pass_wealth": "2.22555e+03",
+      "block_wealth": "1.72968e-03",
+      "pass_crossed": true,
+      "block_crossed": false,
+      "verdict": "PASS",
+      "reasons": [
+        "non-inferiority established"
+      ]
+    }
+  ],
+  "stopped_at_round": 2,
+  "cells": [
+    {
+      "task_id": "K-k1",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 1,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k2",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 0,
+      "counts": {
+        "minus": 2,
+        "zero": 0,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k3",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k4",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k5",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 2,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k6",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k7",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 2,
+      "candidate_successes": 1,
+      "counts": {
+        "minus": 1,
+        "zero": 1,
+        "plus": 0,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "K-k8",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 1,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o1",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o2",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o3",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o4",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o5",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o6",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 1,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 1,
+        "plus": 1,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o7",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    },
+    {
+      "task_id": "O-o8",
+      "condition_id": "E",
+      "pairs": 2,
+      "baseline_successes": 0,
+      "candidate_successes": 2,
+      "counts": {
+        "minus": 0,
+        "zero": 0,
+        "plus": 2,
+        "errored": 0
+      },
+      "candidate_hard_violations": 0
+    }
+  ],
+  "verdict": "PASS",
+  "exit_code": 0,
+  "reasons": [
+    "non-inferiority established"
+  ],
+  "prior_runs": []
+}

@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":107911683314782,"variant":"clean"},"at_ms":0.03820800338871777}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.56520800397266}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 205, \"duration_minutes\": 168, \"organiser\": \"Elena Reed\", \"room\": \"Alder Terrace\", \"start_minute\": 697, \"title\": \"Library Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.2126659990754}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":107911683314782,"variant":"clean"},"at_ms":0.04083299427293241}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.03787499456666}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 205, \"duration_minutes\": 168, \"organiser\": \"Elena Reed\", \"room\": \"Alder Terrace\", \"start_minute\": 697, \"title\": \"Library Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.36187500087544}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

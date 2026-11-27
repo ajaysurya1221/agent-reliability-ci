@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":235041782400100,"variant":"clean"},"at_ms":0.03766699956031516}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.60437499696855}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 19, \"duration_minutes\": 179, \"organiser\": \"Elena Chen\", \"room\": \"Ash Annex\", \"start_minute\": 836, \"title\": \"Safety Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.05116699961945}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":235041782400100,"variant":"clean"},"at_ms":0.0351249982486479}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-7359"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.3650830007973}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 19, \"duration_minutes\": 179, \"organiser\": \"Elena Chen\", \"room\": \"Ash Annex\", \"start_minute\": 836, \"title\": \"Safety Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.7297909965855}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":56295120212891,"variant":"clean"},"at_ms":0.03679200017359108}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":148.0510829933337}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 392, \"duration_minutes\": 169, \"organiser\": \"Maya Lee\", \"room\": \"Willow Annex\", \"start_minute\": 572, \"title\": \"Travel Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.5547499997774}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":56295120212891,"variant":"clean"},"at_ms":0.03795800148509443}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.9164160041837}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 392, \"duration_minutes\": 169, \"organiser\": \"Maya Lee\", \"room\": \"Willow Annex\", \"start_minute\": 572, \"title\": \"Travel Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":209.16612500150222}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

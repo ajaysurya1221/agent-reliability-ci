@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":79748876476167,"variant":"clean"},"at_ms":0.036958997952751815}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.67920900299214}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 201, \"duration_minutes\": 198, \"organiser\": \"Amir Green\", \"room\": \"Hazel Terrace\", \"start_minute\": 1170, \"title\": \"Service Handover\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.5856249977951}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":79748876476167,"variant":"clean"},"at_ms":0.04012499994132668}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-5821"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":148.6903330005589}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 201, \"duration_minutes\": 198, \"organiser\": \"Amir Green\", \"room\": \"Hazel Terrace\", \"start_minute\": 1170, \"title\": \"Service Handover\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":212.05787499638973}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

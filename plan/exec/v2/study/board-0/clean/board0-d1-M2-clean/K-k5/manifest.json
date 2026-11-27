@@ -1,0 +1,122 @@
+{
+  "record_sha256": "b9e88cb0fb7129abf7e10ccf2b778aef9fa6b51f86f903cbf72ce2fac27d0614",
+  "schema_version": "arci/0.5",
+  "experiment_id": "board0-d1-M2-clean-K-k5",
+  "created_at": "",
+  "task_id": "K-k5",
+  "task": {
+    "ask": "How many people are attending event EVT-2436?",
+    "family": "calendar",
+    "key_id": "K-k5",
+    "opening": {
+      "arguments": {
+        "event_id": "EVT-2436"
+      },
+      "name": "lookup_event"
+    },
+    "task": {
+      "event_id": "EVT-2436"
+    }
+  },
+  "toolset": null,
+  "mcp_server": {
+    "name": "env",
+    "argv": [
+      "python",
+      "-P",
+      "-m",
+      "board_relay"
+    ],
+    "env": {},
+    "snapshot": "board_oracle:snapshot"
+  },
+  "decisions": null,
+  "contract": {
+    "oracle": "board_oracle:passed",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "python",
+        "-P",
+        "-m",
+        "agent",
+        "--task-file",
+        "{task_file}",
+        "--mcp-config",
+        "{mcp_config}",
+        "--arm",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--run-id",
+        "board0-d1-M2-clean"
+      ],
+      "env": {
+        "BOARD0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "candidate": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "python",
+        "-P",
+        "-m",
+        "agent",
+        "--task-file",
+        "{task_file}",
+        "--mcp-config",
+        "{mcp_config}",
+        "--arm",
+        "clean",
+        "--model",
+        "gemma4:12b-mlx-ctx32k",
+        "--run-id",
+        "board0-d1-M2-clean"
+      ],
+      "env": {
+        "BOARD0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "conditions": [
+    {
+      "condition_id": "E",
+      "faults": []
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 1,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 279407589852431,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 50,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

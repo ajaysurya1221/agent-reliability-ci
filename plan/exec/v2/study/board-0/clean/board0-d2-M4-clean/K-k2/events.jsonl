@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":224849433620276,"variant":"clean"},"at_ms":0.04312499368097633}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.50999999139458}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 416, \"duration_minutes\": 226, \"organiser\": \"Zoe Green\", \"room\": \"Aspen Hall\", \"start_minute\": 1007, \"title\": \"Community Handover\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.38799999223556}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":224849433620276,"variant":"clean"},"at_ms":0.037707999581471086}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-4173"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.70920799835585}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 416, \"duration_minutes\": 226, \"organiser\": \"Zoe Green\", \"room\": \"Aspen Hall\", \"start_minute\": 1007, \"title\": \"Community Handover\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":212.06258299935143}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

@@ -924,3 +924,62 @@ consultant (Astra) ten design questions. The maintainer then answered two questi
 2609.35381, 2611.11581, 2610.10062); that a recovery benchmark on local models is new
 (tool-eval-bench has error-recovery scenarios and one on an empty search); that five small local
 models speak for hosted models or for real agents; that anyone asked for this table.
+
+## D-36: Board-0: all five registered criteria hold; the numbers are published and nothing is built (2026-11-28)
+
+**What led to it.** Board-0 (D-35) ran as registered: day 1 on 27 Nov 2026 (00:56 to 01:10 local
+time), day 2 on 28 Nov (00:05 to 00:18), 20 runs, each started once and finished, 992 trials on
+five local models. The registered report was read, an agent that saw only raw files counted and
+graded everything again, the consultant (Astra) reviewed the result page and its eight
+corrections were made, and a fresh offline agent checked the evidence file.
+Result page: `study/RESULT-board-0.md`. Evidence: `study/board0-evidence.zip`, SHA-256
+`35f70d9b3a787a1e429fd623dd550b80d77b99da60ea7ce2291d74d9204e5340`.
+
+**The outcome, criterion by criterion.**
+
+- **K1 holds.** Day 1: Gemma 4 12B and Llama 3.1 8B give BLOCK. On Gemma the empty arm is 100
+  points below the sentence arm in orders (0/16 against 16/16) and 62.5 points below in calendar
+  (1/16 against 11/16).
+- **K2 holds as written.** Day 1: three models give BLOCK and Qwen 2.5 7B gives PASS with its
+  empty arm at 16/16 in orders and 14/16 in calendar. Both written predictions expected K2 to
+  miss. It held because that model passed more trials with the empty result than with the
+  sentence (30/32 against 11/32 on day 1, 29/32 against 11/32 on day 2). That is a count; no
+  cause is known.
+- **K3 holds.** No model changes between PASS and BLOCK. Four of the five day-1 decisions are the
+  same decision on day 2. Mistral NeMo 12B's day 2 is not rated (4 of 8 calendar tasks in the
+  clean row) and so is not a decision.
+- **K4 holds.** 9 of 10 model-days are decisions; the median model-day took 127.76 seconds.
+- **K5 holds.** The verifier accepted the evidence file offline (10 of 10 stored verdicts
+  reproduced, every trial regraded) and rejected three altered copies (one grade, one rule, one
+  verdict), each with its own matching digest.
+
+**What this allows, and what is decided.** By the registered rule a pass of all five allows an
+`arci board` command to be built as additive modules. It does not require it. Nothing is built.
+A web review of 27 Nov found recovery after tool failures to be a field with several larger
+published benchmarks, and one published leaderboard near this one with almost no visible use
+(one case, not a rate). The consultant advised against a leaderboard as a destination. The
+maintainer chose on 27 Nov that nothing new is built before one outside person has tried an idea
+by hand; that choice gets its own entry. The registered 30-day check stands: by 28 Dec 2026, one
+row run and sent in by someone outside the project, or three outside questions about recovery,
+count as the table having mattered; otherwise it stays a dated record.
+
+**Stated plainly.**
+
+- Mistral NeMo 12B passed 0 of 80 trials in both arms on both days. Its PASS is a tie at zero and
+  K2 does not rest on it.
+- The pin was corrected by amendment 1 after its first results were known, and Granite 3.3 8B
+  was replaced by the spare Qwen 2.5 7B under amendment 2. So the table has four makers, with two
+  models from one maker.
+- Between the two days the model server was stopped and started again (same version and
+  settings) and another study's first day (Size-0) ran on the same laptop. A check before day 2
+  confirmed the server version, the five model digests and the context size.
+- The K5 agent's first attempt failed because the verifier calls the released `arci` command by
+  name; with the command's folder on the search path it ran. The blind recount used `jq`; its
+  Python version could not run in its sandbox and was run by the orchestrator afterwards with
+  the same totals.
+- The scheduled task that was to finish Board-0 at 01:30 was switched off and the work done in
+  the main session, so that the write-up could carry the facts above.
+
+**Not claimed.** As in D-35 and the registration: nothing about hosted models, larger models or
+real agents; no claim that reply wording changing recovery, a local-model recovery benchmark or
+an empty-result test is new; no claim that anyone asked for this table.

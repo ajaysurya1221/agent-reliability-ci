@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":60435721585973,"variant":"clean"},"at_ms":0.03795800148509443}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.29416599927936}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 92, \"duration_minutes\": 179, \"organiser\": \"Nora Stone\", \"room\": \"Hazel Atrium\", \"start_minute\": 558, \"title\": \"Travel Forum\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.59049999166746}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":60435721585973,"variant":"clean"},"at_ms":0.035707998904399574}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.6674580005929}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 92, \"duration_minutes\": 179, \"organiser\": \"Nora Stone\", \"room\": \"Hazel Atrium\", \"start_minute\": 558, \"title\": \"Travel Forum\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.47458300017752}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

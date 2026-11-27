@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":169152181533886,"variant":"clean"},"at_ms":0.039040998672135174}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-9062"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.38995800103294}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 103, \"duration_minutes\": 163, \"organiser\": \"Iris Park\", \"room\": \"Maple Wing\", \"start_minute\": 427, \"title\": \"Travel Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.64645799883874}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":169152181533886,"variant":"clean"},"at_ms":0.03995800216216594}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-9062"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":143.56075000250712}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 103, \"duration_minutes\": 163, \"organiser\": \"Iris Park\", \"room\": \"Maple Wing\", \"start_minute\": 427, \"title\": \"Travel Orientation\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":206.54066600400256}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

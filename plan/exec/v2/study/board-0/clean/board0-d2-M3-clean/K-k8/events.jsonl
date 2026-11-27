@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":91949484028219,"variant":"clean"},"at_ms":0.039417005609720945}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":144.35820799553767}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 472, \"duration_minutes\": 97, \"organiser\": \"Nora Chen\", \"room\": \"Maple Studio\", \"start_minute\": 1109, \"title\": \"Library Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":207.81787499436177}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":91949484028219,"variant":"clean"},"at_ms":0.03633300366345793}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.88874999794643}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 472, \"duration_minutes\": 97, \"organiser\": \"Nora Chen\", \"room\": \"Maple Studio\", \"start_minute\": 1109, \"title\": \"Library Panel\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":211.730124996393}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

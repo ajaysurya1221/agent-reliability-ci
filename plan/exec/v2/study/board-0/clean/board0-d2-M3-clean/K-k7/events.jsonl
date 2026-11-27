@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":39186747258602,"variant":"clean"},"at_ms":0.037667006836272776}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.27312500285916}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 17, \"duration_minutes\": 144, \"organiser\": \"Ada Evans\", \"room\": \"Hazel Lounge\", \"start_minute\": 460, \"title\": \"Travel Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.59462500084192}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":39186747258602,"variant":"clean"},"at_ms":0.03529200330376625}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-3647"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":145.6770829972811}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 17, \"duration_minutes\": 144, \"organiser\": \"Ada Evans\", \"room\": \"Hazel Lounge\", \"start_minute\": 460, \"title\": \"Travel Briefing\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":208.9479999995092}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}

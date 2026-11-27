@@ -1,0 +1,122 @@
+{
+  "record_sha256": "20fe51ecac82f567090e6d5fa453481e87607b4eb2622d3f9ebd80dfcb6fdabb",
+  "schema_version": "arci/0.5",
+  "experiment_id": "board0-d1-M1-clean-O-o4",
+  "created_at": "",
+  "task_id": "O-o4",
+  "task": {
+    "ask": "How many cents were paid in total for order ORD-112?",
+    "family": "orders",
+    "key_id": "O-o4",
+    "opening": {
+      "arguments": {
+        "order_id": "ORD-112"
+      },
+      "name": "lookup_order"
+    },
+    "task": {
+      "order_id": "ORD-112"
+    }
+  },
+  "toolset": null,
+  "mcp_server": {
+    "name": "env",
+    "argv": [
+      "python",
+      "-P",
+      "-m",
+      "board_relay"
+    ],
+    "env": {},
+    "snapshot": "board_oracle:snapshot"
+  },
+  "decisions": null,
+  "contract": {
+    "oracle": "board_oracle:passed",
+    "max_tool_calls": null,
+    "forbidden_tools": [],
+    "required_tools": [],
+    "max_calls_per_tool": {},
+    "unobservable": []
+  },
+  "baseline": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "python",
+        "-P",
+        "-m",
+        "agent",
+        "--task-file",
+        "{task_file}",
+        "--mcp-config",
+        "{mcp_config}",
+        "--arm",
+        "clean",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--run-id",
+        "board0-d1-M1-clean"
+      ],
+      "env": {
+        "BOARD0_ARCI_ARM": "baseline"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "candidate": {
+    "label": "clean",
+    "agent": null,
+    "command": {
+      "argv": [
+        "python",
+        "-P",
+        "-m",
+        "agent",
+        "--task-file",
+        "{task_file}",
+        "--mcp-config",
+        "{mcp_config}",
+        "--arm",
+        "clean",
+        "--model",
+        "qwen3.5:4b-mlx-ctx32k",
+        "--run-id",
+        "board0-d1-M1-clean"
+      ],
+      "env": {
+        "BOARD0_ARCI_ARM": "candidate"
+      },
+      "infra_exit_codes": [
+        70,
+        75
+      ]
+    },
+    "candidate_id": ""
+  },
+  "conditions": [
+    {
+      "condition_id": "E",
+      "faults": []
+    }
+  ],
+  "alpha": 0.05,
+  "delta": 0.1,
+  "n_per_arm": 1,
+  "interval_method": "clopper_pearson",
+  "looks": [],
+  "base_seed": 205987503472950,
+  "budgets": {
+    "max_tool_calls": 12,
+    "max_model_steps": 50,
+    "max_seconds": 120.0,
+    "grader_seconds": 20.0
+  },
+  "fixtures_sha256": "",
+  "prior_runs": []
+}

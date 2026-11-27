@@ -1,0 +1,8 @@
+{"trial_id":"E:00000:baseline","seq":0,"kind":"trial_start","payload":{"arm":"baseline","seed":268913621230622,"variant":"clean"},"at_ms":0.03779200778808445}
+{"trial_id":"E:00000:baseline","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":146.18716700351797}
+{"trial_id":"E:00000:baseline","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 160, \"duration_minutes\": 224, \"organiser\": \"Zoe Evans\", \"room\": \"Oak Gallery\", \"start_minute\": 942, \"title\": \"Market Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":210.19820899527986}
+{"trial_id":"E:00000:baseline","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
+{"trial_id":"E:00000:candidate","seq":0,"kind":"trial_start","payload":{"arm":"candidate","seed":268913621230622,"variant":"clean"},"at_ms":0.037874997360631824}
+{"trial_id":"E:00000:candidate","seq":1,"kind":"tool_start","payload":{"arguments":{"event_id":"EVT-6295"},"call_id":"c-0000","occurrence":0,"tool":"lookup_event"},"at_ms":147.45816700451542}
+{"trial_id":"E:00000:candidate","seq":2,"kind":"tool_finish","payload":{"call_id":"c-0000","error_kind":null,"injected_by":null,"ok":true,"tool":"lookup_event","value":{"content":[{"text":"{\"attendee_count\": 160, \"duration_minutes\": 224, \"organiser\": \"Zoe Evans\", \"room\": \"Oak Gallery\", \"start_minute\": 942, \"title\": \"Market Clinic\"}","type":"text"}],"isError":false,"resultType":"complete"}},"at_ms":212.17337501002476}
+{"trial_id":"E:00000:candidate","seq":3,"kind":"trial_end","payload":{},"at_ms":0.0}
