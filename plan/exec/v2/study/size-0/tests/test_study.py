@@ -456,6 +456,8 @@ def git(argv,**kwargs):
     if "merge-base" in argv: return ref.encode()
     assert argv[-1].startswith(ref+":")
     return (root/argv[-1].split(":",1)[1]).read_bytes()
+registration=(root/REG).read_bytes()
+(root/REG).write_text("PLACEHOLDER, not a registration")
 with patch("freeze.subprocess.check_output",git):
     for receipt,error in [("","invalid push"),(ref+" refs/heads/main","invalid push"),
                            (ref+" refs/heads/v2/phase0","placeholder")]:
@@ -463,6 +465,8 @@ with patch("freeze.subprocess.check_output",git):
         try: published(root)
         except ValueError as e: assert error in str(e)
         else: raise AssertionError("bad registration accepted")
+    (root/REG).write_bytes(registration)
+    assert published(root)==ref
     (root/"agent/__pycache__").mkdir()
     try: published(root)
     except ValueError as e: assert "bytecode" in str(e)

@@ -39,6 +39,6 @@
   "tests/receipt_probe.py": "6c9a21c8a75d358cb96a9844a76ca4704ef40cb754d1eea43bcf4c6a79325a0d",
   "tests/rehearsal.py": "f314b670dfccb7bf14df78cd3dbee6b863d4a0d9a8478d4b68eddb012e39d1e2",
   "tests/request_probe.py": "d2b4a9ef7368c8d39b6f2a6b0b09f464194a1a6ab6c73bd6cd9eeaacad4f1936",
-  "tests/test_study.py": "6776b43ff15c356594867401fbd7ff3110f7d570e820f55d7df25b1c28d0753a",
+  "tests/test_study.py": "c0670a61af554707d672ec9bea26c768c3d70136a95b7eb26c1185a36b1418fe",
   "verify_registration.py": "76c30e25fa0826b44b5de8315d4abf1476ccbad5a47e5f58fa5aead51a7ba480"
 }
