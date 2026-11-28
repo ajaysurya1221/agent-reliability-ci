@@ -330,6 +330,19 @@ def _neutral(
     return ParsedInput(tuple(rows), tuple(sorted(rounds)), not bool(labelled))
 
 
+def read_outcome_rows(
+    source: str,
+    *,
+    fmt: Literal["csv", "jsonl"],
+    path: str,
+    arm: Arm,
+    position: int,
+    tasks: frozenset[str] | None,
+) -> ParsedInput:
+    """Read a single captured CSV or JSONL file with the released row checks."""
+    return _neutral(source, fmt=fmt, path=path, arm=arm, position=position, tasks=tasks, seen=set())
+
+
 @dataclass
 class _InputFile:
     path: str

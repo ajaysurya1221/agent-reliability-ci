@@ -1076,6 +1076,20 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
         "--force", action="store_true", help="replace an existing regular file at --out"
     )
     # --- end init ---
+    change = commands.add_parser(
+        "check-change", help="test a harness change on fresh paired runs", allow_abbrev=False
+    )
+    change.add_argument("--baseline", required=True, help="baseline command containing {out}")
+    change.add_argument("--candidate", required=True, help="candidate command containing {out}")
+    change.add_argument("--format", choices=("junit", "csv", "jsonl"), default="junit")
+    change.add_argument("--margin", default="1/10", help="allowed mean loss as a rational")
+    change.add_argument("--max-rounds", type=int, help="cap on evaluated rounds")
+    change.add_argument("--timeout-seconds", type=float, default=600, help="per launch")
+    change.add_argument("--out-dir", help="create this new campaign directory")
+    change.add_argument(
+        "--plan-only", action="store_true", help="stop after discovery and registration"
+    )
+
     verdict = commands.add_parser(
         "verdict",
         help="decide from imported outcomes",
@@ -1166,6 +1180,19 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
 
 def _dispatch(values: dict[str, object]) -> int:
     command = cast(str, values["command"])
+    if command == "check-change":
+        from arci.change import check_change
+
+        return check_change(
+            baseline=cast(str, values["baseline"]),
+            candidate=cast(str, values["candidate"]),
+            fmt=cast(Literal["junit", "csv", "jsonl"], values["format"]),
+            margin=cast(str, values["margin"]),
+            max_rounds=cast(int | None, values["max_rounds"]),
+            timeout_seconds=cast(float, values["timeout_seconds"]),
+            out_dir=cast(str | None, values["out_dir"]),
+            plan_only=cast(bool, values["plan_only"]),
+        )
     if command == "run":
         return _cmd_run(
             cast(str, values["manifest_json"]),

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `arci check-change` registers a rule before running two test commands on fresh paired rounds.
+  Sealed decisions name the snapshots used for replay. ARCI checks earlier originals and
+  snapshots before each launch and before reporting the verdict. Cancelling a launch stops
+  its process group and records the cancellation in `verdict.txt`. The report explains the verdict
+  against the registered margin and gives the number of task runs each version passed.
+  See the [check-change recipe](docs/recipes/check-change.md).
+
 - **Docs:** the readers are checked against Claude Code 2.1.326 and 2.1.330 and Codex CLI
   0.171.0. For 2.1.330 and 0.171.0 the check was one short session each; for 2.1.326 it
   was this project's own sessions of that client. `docs/LOG_FORMATS.md` names the three
