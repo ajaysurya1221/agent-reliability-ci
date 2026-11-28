@@ -35,7 +35,19 @@ def neutral_jsonl(result: PromptfooResult, source_sha256: str) -> bytes:
     return b"".join(lines)
 
 
-def _write_new(out: Path, content: bytes) -> None:
+def _remove_temporary(path: str) -> str | None:
+    for _ in range(3):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            return None
+        except OSError:
+            continue
+        return None
+    return path
+
+
+def _write_new(out: Path, content: bytes) -> str | None:
     try:
         fd, temporary = tempfile.mkstemp(dir=out.parent)
     except OSError as exc:
@@ -50,7 +62,8 @@ def _write_new(out: Path, content: bytes) -> None:
     except OSError as exc:
         raise PromptfooError("cannot write output file") from exc
     finally:
-        os.unlink(temporary)
+        leftover = _remove_temporary(temporary)
+    return leftover
 
 
 def stream_text(text: str, stream: TextIO) -> str:
@@ -75,7 +88,7 @@ def convert(
             raise PromptfooError("cannot read source file") from exc
         result = read(raw, prompt=prompt, provider=provider)
         digest = hash_bytes(raw)
-        _write_new(out, neutral_jsonl(result, digest))
+        leftover = _write_new(out, neutral_jsonl(result, digest))
     except (PromptfooError, OSError) as exc:
         print(stream_text(f"convert: {escape_terminal(str(exc))}", sys.stderr), file=sys.stderr)
         return 3
@@ -98,6 +111,8 @@ def convert(
             "that the file cannot show."
         )
     lines.append(_EXISTING_RESULTS)
+    if leftover is not None:
+        lines.append(f"Notice: could not remove temporary file {escape_terminal(leftover)}")
     try:
         print(stream_text("\n".join(lines), sys.stdout), flush=True)
     except Exception:

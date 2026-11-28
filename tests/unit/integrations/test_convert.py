@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import io
 import json
@@ -270,6 +271,64 @@ def test_midwrite_never_publishes_partial_output(
         else:
             assert run_convert(REAL / "words-single.json", out) == 3
     assert visible == [False]
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("failure", ["missing", "transient", "persistent"])
+def test_cleanup_after_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: str,
+) -> None:
+    source = REAL / "words-single.json"
+    expected = tmp_path / "expected.jsonl"
+    assert run_convert(source, expected) == 0
+    summary = capsys.readouterr()
+    out = tmp_path / "out.jsonl"
+    unlink = os.unlink
+    attempts: list[Path] = []
+
+    def busy_or_missing(name: str) -> None:
+        temporary = Path(name)
+        attempts.append(temporary)
+        assert temporary.parent == out.parent and temporary.samefile(out)
+        if failure == "missing":
+            unlink(name)
+        elif failure == "persistent" or len(attempts) == 1:
+            raise OSError(errno.EBUSY, "file busy")
+        unlink(name)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "unlink", busy_or_missing)
+        assert run_convert(source, out) == 0
+    assert out.read_bytes() == expected.read_bytes()
+    report = capsys.readouterr()
+    assert report.err == ""
+    if failure == "persistent":
+        assert 1 < len(attempts) < 10 and len(set(attempts)) == 1
+        assert attempts[0].samefile(out)
+        assert report.out.splitlines() == [
+            *summary.out.splitlines(),
+            f"Notice: could not remove temporary file {attempts[0]}",
+        ]
+    else:
+        assert len(attempts) == (1 if failure == "missing" else 2)
+        assert not attempts[0].exists() and report.out == summary.out
+
+
+def test_link_failure_refuses_without_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "out.jsonl"
+
+    def refuse_link(temporary: str, destination: Path) -> None:
+        assert Path(temporary).parent == destination.parent
+        assert Path(temporary).stat().st_size > 0 and not destination.exists()
+        raise OSError(errno.EACCES, "link refused")
+
+    monkeypatch.setattr(os, "link", refuse_link)
+    assert run_convert(REAL / "words-single.json", out) == 3
     assert list(tmp_path.iterdir()) == []
 
 

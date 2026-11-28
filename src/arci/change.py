@@ -18,7 +18,7 @@ import tempfile
 import time
 from collections.abc import Callable, Generator, Sequence
 from contextlib import ExitStack, closing, contextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from fractions import Fraction
@@ -37,8 +37,10 @@ from arci.outcome_report import TERMINAL_TASK_OVERFLOW, escape_terminal, render_
 from arci.outcome_schema import OutcomeDecision, OutcomeRule
 from arci.outcomes import (
     decide_outcomes,
+    input_format,
     load_rule,
     read_outcome_rows,
+    rule_from_inventory,
     rule_of,
     rule_sha256,
 )
@@ -47,6 +49,7 @@ from arci.suite_schedule import Arm, arm_order
 from arci.suite_schema import SUITE_MAX_PAIRS, parse_rational
 from arci.suite_stats import (
     check_rule_plan,
+    default_max_rounds,
     earliest_block_round,
     earliest_pass_round,
     never_differs_pass_round,
@@ -513,48 +516,31 @@ def discover_rule(
     *,
     tasks: Sequence[str],
     digest: str,
+    fmt: ScoredFormat,
     margin: str,
-    max_rounds: int | None,
+    max_rounds: int,
 ) -> OutcomeRule:
     """Register the inventory already parsed from the single discovery snapshot."""
     (snapshot,) = snapshots
+    input_format(str(snapshot), fmt)
     _verify_digest(snapshot, digest)
-    fields: dict[str, object] = {
-        "schema_version": "arci-outcomes/1",
-        "suite_id": "imported-outcomes",
-        "tasks": tasks,
-        "margin": margin,
-        "fixed_before_runs": True,
-    }
-    if max_rounds is not None:
-        fields["max_rounds"] = max_rounds
-    rule = OutcomeRule.model_validate(fields)
-    stats = rule_of(rule)
-    if max_rounds is None and never_differs_pass_round(stats) is None:
-        # At a tight margin the default 400-pair budget may be below the all-ties floor.
-        floor = never_differs_pass_round(
-            replace(stats, max_rounds=SUITE_MAX_PAIRS // stats.n_cells)
-        )
-        if floor is None:
-            raise ValueError("budget cannot establish PASS within 100000 registered pairs")
-        rule = OutcomeRule.model_validate({**fields, "max_rounds": floor})
-    check_rule_plan(rule_of(rule))
-    return rule
+    return rule_from_inventory(tasks, margin=margin, max_rounds=max_rounds)
 
 
-def _register(discovery: LaunchResult, margin: str, cap: int | None) -> OutcomeRule:
+def _register(discovery: LaunchResult, fmt: ScoredFormat, margin: str, cap: int) -> OutcomeRule:
     capture, outcomes = discovery
     discovered = discover_rule(
         [capture.snapshot],
         tasks=tuple(outcomes),
         digest=capture.digest,
+        fmt=fmt,
         margin=margin,
         max_rounds=cap,
     )
     capture.verify()
     if discovered.tasks != tuple(sorted(outcomes)):
         raise ValueError("registered tasks differ from captured discovery ids")
-    return discovered
+    return discovered.model_copy(update={"fixed_before_runs": True})
 
 
 def _assess_prefix(
@@ -647,13 +633,18 @@ def _run(
             "fixed_before_runs": False,
         }
     )
-    if never_differs_pass_round(rule_of(ceiling)) is None:
+    min_pairs = never_differs_pass_round(rule_of(ceiling))
+    if min_pairs is None:
         raise ValueError(
             "--margin cannot establish PASS with all ties within 100000 registered pairs"
         )
     _require_exit_observer()
     discovery = campaign.launch("baseline", 0)
-    registered = _register(discovery, margin, cap)
+    if cap is None:
+        # Each round contributes one pair per task to the all-ties floor.
+        n = len(discovery[1])
+        cap = max(default_max_rounds(n), (min_pairs + n - 1) // n)
+    registered = _register(discovery, campaign.scored_format, margin, cap)
     rule_path = campaign.root / "rule.yaml"
     campaign.register(
         rule_path.name,
