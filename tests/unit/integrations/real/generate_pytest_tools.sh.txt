@@ -1,0 +1,24 @@
+#!/bin/sh
+# DeepEval 4.3.6 and Opik 2.3.7 fixtures, offline. Usage: sh generate_pytest_tools.sh OUTROOT
+set -u
+E=/tools; O=$1
+export DEEPEVAL_TELEMETRY_OPT_OUT=1 OPIK_TRACK_DISABLE=false PYTHONDONTWRITEBYTECODE=1
+mkdir -p $O/deepeval $O/opik
+cd $E/gen/deepeval
+for spec in "e2e-discovery pass" "e2e-r1-baseline pass" "e2e-r1-candidate fail" "named-run2 pass"; do
+  set -- $spec
+  echo "--- deepeval $1 (AGENT_MODE=$2): deepeval test run test_agent.py --junitxml=$O/deepeval/$1.xml"
+  AGENT_MODE=$2 sandbox-exec -f $E/offline.sb $E/deepeval/.venv/bin/deepeval test run test_agent.py --junitxml=$O/deepeval/$1.xml > $O/deepeval/$1.log 2>&1; echo "exit $?"
+done
+echo "--- deepeval shapes: deepeval test run test_shapes.py --junitxml=$O/deepeval/shapes.xml"
+sandbox-exec -f $E/offline.sb $E/deepeval/.venv/bin/deepeval test run test_shapes.py --junitxml=$O/deepeval/shapes.xml > $O/deepeval/shapes.log 2>&1; echo "exit $?"
+cd $E/gen/opik
+for spec in "e2e-discovery pass" "e2e-r1-baseline pass" "e2e-r1-candidate fail" "named-run2 pass"; do
+  set -- $spec
+  echo "--- opik $1 (AGENT_MODE=$2): OPIK_PYTEST_EXPERIMENT_ENABLED=false pytest test_agent.py --junitxml=$O/opik/$1.xml"
+  AGENT_MODE=$2 OPIK_PYTEST_EXPERIMENT_ENABLED=false OPIK_TRACK_DISABLE=true sandbox-exec -f $E/offline.sb $E/opik/.venv/bin/pytest -q -p no:cacheprovider test_agent.py --junitxml=$O/opik/$1.xml > $O/opik/$1.log 2>&1; echo "exit $?"
+done
+echo "--- opik shapes"
+OPIK_PYTEST_EXPERIMENT_ENABLED=false OPIK_TRACK_DISABLE=true sandbox-exec -f $E/offline.sb $E/opik/.venv/bin/pytest -q -p no:cacheprovider test_shapes.py --junitxml=$O/opik/shapes.xml > $O/opik/shapes.log 2>&1; echo "exit $?"
+echo "--- opik with server logging left on (no server reachable): does the outcome change?"
+AGENT_MODE=pass sandbox-exec -f $E/offline.sb $E/opik/.venv/bin/pytest -q -p no:cacheprovider test_agent.py --junitxml=$O/opik/logging-on.xml > $O/opik/logging-on.log 2>&1; echo "exit $?"

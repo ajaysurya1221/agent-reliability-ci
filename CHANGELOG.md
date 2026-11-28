@@ -9,6 +9,13 @@
   against the registered margin and gives the number of task runs each version passed.
   See the [check-change recipe](docs/recipes/check-change.md).
 
+- `arci convert --from promptfoo` converts saved JSON for a descriptive verdict.
+  `arci check-change --format promptfoo` compares fresh runs. The
+  [recipes for promptfoo, DeepEval, Opik, MLflow and Langfuse](docs/recipes/eval-tools.md)
+  describe how each route was tested and include two example JSONL exporters,
+  [mlflow_rows.py](examples/integrations/mlflow_rows.py) and
+  [langfuse_rows.py](examples/integrations/langfuse_rows.py).
+
 - **Docs:** the readers are checked against Claude Code 2.1.326 and 2.1.330 and Codex CLI
   0.171.0. For 2.1.330 and 0.171.0 the check was one short session each; for 2.1.326 it
   was this project's own sessions of that client. `docs/LOG_FORMATS.md` names the three

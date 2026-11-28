@@ -1,0 +1,2300 @@
+{
+  "evalId": "eval-NT8-2026-11-28T08:31:32",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-11-28T08:31:32.434Z",
+    "prompts": [
+      {
+        "id": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "raw": "Say the word {{word}}",
+        "label": "Say the word {{word}}",
+        "provider": "pass",
+        "metrics": {
+          "score": 20,
+          "testPassCount": 20,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 20,
+          "assertFailCount": 0,
+          "totalLatencyMs": 21,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 20,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w01"
+              }
+            }
+          ]
+        },
+        "id": "48c9682b-8342-4961-bdde-38ca30d016d2",
+        "latencyMs": 2,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w01",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w01"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w01",
+          "vars": {
+            "word": "w01"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w01"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w01"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w02"
+              }
+            }
+          ]
+        },
+        "id": "ca9b771b-1f8d-497c-af9b-c3548c93b477",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w02",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w02"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w02",
+          "vars": {
+            "word": "w02"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w02"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w02"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w03"
+              }
+            }
+          ]
+        },
+        "id": "397b4b7e-faa2-4cf9-93c1-353c3ea9b593",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w03",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w03"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w03",
+          "vars": {
+            "word": "w03"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w03"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w03"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w04"
+              }
+            }
+          ]
+        },
+        "id": "5ddeadf6-813a-439d-93dc-f759774fe246",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w04",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w04"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w04",
+          "vars": {
+            "word": "w04"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w04"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w04"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w05"
+              }
+            }
+          ]
+        },
+        "id": "e9a5e22f-c13c-451b-89eb-be4363dbce39",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w05",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w05"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w05",
+          "vars": {
+            "word": "w05"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w05"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w05"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w06"
+              }
+            }
+          ]
+        },
+        "id": "7ad3da14-c9ce-4eb1-993a-7d02b8843255",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w06",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w06"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w06",
+          "vars": {
+            "word": "w06"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w06"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w06"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w07"
+              }
+            }
+          ]
+        },
+        "id": "6b59b672-f7a4-4a41-b48f-79af2564d40f",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w07",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w07"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w07",
+          "vars": {
+            "word": "w07"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w07"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 6,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w07"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w08"
+              }
+            }
+          ]
+        },
+        "id": "34975ec4-937a-49a1-aaaf-4bbd6e35d66b",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w08",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w08"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w08",
+          "vars": {
+            "word": "w08"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w08"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 7,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w08"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w09"
+              }
+            }
+          ]
+        },
+        "id": "8ca5f3c3-9554-4766-ad8e-d4efbf674cae",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w09",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w09"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w09",
+          "vars": {
+            "word": "w09"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w09"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 8,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w09"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w10"
+              }
+            }
+          ]
+        },
+        "id": "e9778ccb-0c36-44ca-bc6c-81b40b02e315",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w10",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w10"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w10",
+          "vars": {
+            "word": "w10"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w10"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 9,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w10"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w11"
+              }
+            }
+          ]
+        },
+        "id": "6265c65f-40ce-431a-9492-fdacb49667a1",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w11",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w11"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w11",
+          "vars": {
+            "word": "w11"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w11"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 10,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w11"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w12"
+              }
+            }
+          ]
+        },
+        "id": "91957696-3f05-44f2-910e-effb6b1408a9",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w12",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w12"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w12",
+          "vars": {
+            "word": "w12"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w12"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 11,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w12"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w13"
+              }
+            }
+          ]
+        },
+        "id": "336e3fd4-b1f6-4c27-a90d-8f0d88c684d2",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w13",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w13"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w13",
+          "vars": {
+            "word": "w13"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w13"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 12,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w13"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w14"
+              }
+            }
+          ]
+        },
+        "id": "eed7c9f0-9a81-490e-8d03-2760a87c06e2",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w14",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w14"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w14",
+          "vars": {
+            "word": "w14"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w14"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 13,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w14"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w15"
+              }
+            }
+          ]
+        },
+        "id": "edcd4c7b-6c6d-4c6f-b4cf-b69e8fcd1c96",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w15",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w15"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w15",
+          "vars": {
+            "word": "w15"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w15"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 14,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w15"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w16"
+              }
+            }
+          ]
+        },
+        "id": "d7dd30e3-ffbd-4dd1-ab8d-87a4db7f8c96",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w16",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w16"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w16",
+          "vars": {
+            "word": "w16"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w16"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 15,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w16"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w17"
+              }
+            }
+          ]
+        },
+        "id": "b382291f-92bd-450a-8bd7-5c79d1c02cd2",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w17",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w17"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w17",
+          "vars": {
+            "word": "w17"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w17"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 16,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w17"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w18"
+              }
+            }
+          ]
+        },
+        "id": "a89caa0f-85e8-4b52-ac53-632719cf433a",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w18",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w18"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w18",
+          "vars": {
+            "word": "w18"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w18"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 17,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w18"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w19"
+              }
+            }
+          ]
+        },
+        "id": "58d3aa3b-d107-4bbf-936d-3655a8d30a83",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w19",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w19"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w19",
+          "vars": {
+            "word": "w19"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w19"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 18,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w19"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "w20"
+              }
+            }
+          ]
+        },
+        "id": "93917a22-9b5f-451d-9835-e2718aac354b",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word w20",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "fixed",
+          "label": "pass"
+        },
+        "response": {
+          "output": "the word is w20"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "task-w20",
+          "vars": {
+            "word": "w20"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "w20"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 19,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "w20"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      }
+    ],
+    "stats": {
+      "successes": 20,
+      "failures": 0,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 20,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 32,
+      "evaluationDurationMs": 32
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "twenty tasks (pass)",
+    "prompts": [
+      "Say the word {{word}}"
+    ],
+    "providers": [
+      {
+        "id": "file://fixed.js",
+        "label": "pass",
+        "config": {
+          "mode": "pass"
+        }
+      }
+    ],
+    "tests": [
+      {
+        "description": "task-w01",
+        "vars": {
+          "word": "w01"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w01"
+          }
+        ]
+      },
+      {
+        "description": "task-w02",
+        "vars": {
+          "word": "w02"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w02"
+          }
+        ]
+      },
+      {
+        "description": "task-w03",
+        "vars": {
+          "word": "w03"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w03"
+          }
+        ]
+      },
+      {
+        "description": "task-w04",
+        "vars": {
+          "word": "w04"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w04"
+          }
+        ]
+      },
+      {
+        "description": "task-w05",
+        "vars": {
+          "word": "w05"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w05"
+          }
+        ]
+      },
+      {
+        "description": "task-w06",
+        "vars": {
+          "word": "w06"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w06"
+          }
+        ]
+      },
+      {
+        "description": "task-w07",
+        "vars": {
+          "word": "w07"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w07"
+          }
+        ]
+      },
+      {
+        "description": "task-w08",
+        "vars": {
+          "word": "w08"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w08"
+          }
+        ]
+      },
+      {
+        "description": "task-w09",
+        "vars": {
+          "word": "w09"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w09"
+          }
+        ]
+      },
+      {
+        "description": "task-w10",
+        "vars": {
+          "word": "w10"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w10"
+          }
+        ]
+      },
+      {
+        "description": "task-w11",
+        "vars": {
+          "word": "w11"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w11"
+          }
+        ]
+      },
+      {
+        "description": "task-w12",
+        "vars": {
+          "word": "w12"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w12"
+          }
+        ]
+      },
+      {
+        "description": "task-w13",
+        "vars": {
+          "word": "w13"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w13"
+          }
+        ]
+      },
+      {
+        "description": "task-w14",
+        "vars": {
+          "word": "w14"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w14"
+          }
+        ]
+      },
+      {
+        "description": "task-w15",
+        "vars": {
+          "word": "w15"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w15"
+          }
+        ]
+      },
+      {
+        "description": "task-w16",
+        "vars": {
+          "word": "w16"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w16"
+          }
+        ]
+      },
+      {
+        "description": "task-w17",
+        "vars": {
+          "word": "w17"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w17"
+          }
+        ]
+      },
+      {
+        "description": "task-w18",
+        "vars": {
+          "word": "w18"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w18"
+          }
+        ]
+      },
+      {
+        "description": "task-w19",
+        "vars": {
+          "word": "w19"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w19"
+          }
+        ]
+      },
+      {
+        "description": "task-w20",
+        "vars": {
+          "word": "w20"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "w20"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "sharing": false,
+    "outputPath": [
+      "/tools/runs/promptfoo/e2e-discovery.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {},
+    "basePath": "/work"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.126.0",
+    "nodeVersion": "v24.18.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-11-28T08:31:32.474Z",
+    "evaluationCreatedAt": "2026-11-28T08:31:32.434Z"
+  },
+  "vars": [
+    "word"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 1,
+    "maxConcurrency": 4,
+    "cache": false
+  }
+}

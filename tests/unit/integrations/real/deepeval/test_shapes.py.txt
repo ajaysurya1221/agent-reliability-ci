@@ -1,0 +1,30 @@
+"""Shapes: a pass, a failed metric, a skip, an exception in the test body, and positional ids."""
+import pytest
+from deepeval import assert_test
+from deepeval.test_case import LLMTestCase
+from test_agent import ContainsWord
+
+
+def test_passes():
+    assert_test(LLMTestCase(input="a", actual_output="the word is a", expected_output="a"), [ContainsWord()], run_async=False)
+
+
+def test_metric_fails():
+    assert_test(LLMTestCase(input="b", actual_output="nope", expected_output="b"), [ContainsWord()], run_async=False)
+
+
+def test_skipped_setup():
+    pytest.skip("judge model not reachable")
+
+
+def test_body_raises():
+    raise RuntimeError("agent crashed before the metric ran")
+
+
+GOLDENS = [{"word": "alpha"}, {"word": "beta"}, {"word": "gamma"}]
+
+
+@pytest.mark.parametrize("golden", GOLDENS)
+def test_positional(golden):
+    w = golden["word"]
+    assert_test(LLMTestCase(input=w, actual_output=f"the word is {w}", expected_output=w), [ContainsWord()], run_async=False)

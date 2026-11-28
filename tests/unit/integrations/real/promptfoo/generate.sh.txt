@@ -1,0 +1,33 @@
+#!/bin/sh
+# Generates the promptfoo 0.126.0 fixtures offline. Usage: sh generate.sh OUTDIR
+set -u
+E=/tools; G=$E/gen/promptfoo; O=$1
+PF=$E/promptfoo/node_modules/.bin/promptfoo
+export PROMPTFOO_CONFIG_DIR=$E/home/promptfoo PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 \
+  PROMPTFOO_DISABLE_SHARING=1 PROMPTFOO_PASS_RATE_THRESHOLD=0
+run() { name=$1; shift; echo "--- $name: promptfoo eval $*"; sandbox-exec -f $E/offline.sb $PF eval "$@" --no-table --no-progress-bar --no-share -o $O/$name.json > $O/$name.log 2>&1; echo "exit $?"; }
+cd $G
+run words-baseline -c words-baseline.yaml --repeat 3 --no-cache
+run words-candidate -c words-candidate.yaml --repeat 3 --no-cache
+run words-single -c words-baseline.yaml --no-cache
+run e2e-discovery -c e2e-pass.yaml --no-cache
+run e2e-r1-baseline -c e2e-pass.yaml --no-cache
+run e2e-r1-candidate -c e2e-fail.yaml --no-cache
+run two-prompts -c two-prompts.yaml --repeat 3 --no-cache
+run two-providers -c two-providers.yaml --repeat 3 --no-cache
+run shapes -c shapes.yaml --no-cache
+# Cache: a fresh cache directory, the stub counts requests.
+export PROMPTFOO_CACHE_PATH=$O/cache-dir
+: > $O/stub-count.txt
+sandbox-exec -f $E/offline.sb python3 -I -B $G/stub_server.py 18765 $O/stub-count.txt & STUB=$!
+sleep 1
+run cache-cold -c cache.yaml
+echo "stub requests after cold: $(wc -l < $O/stub-count.txt)"
+run cache-warm -c cache.yaml
+echo "stub requests after warm: $(wc -l < $O/stub-count.txt)"
+PROMPTFOO_CACHE_ENABLED=false run cache-env-off -c cache.yaml
+echo "stub requests after env-off: $(wc -l < $O/stub-count.txt)"
+run cache-repeat-cold -c cache.yaml --repeat 2
+run cache-repeat-warm -c cache.yaml --repeat 2
+echo "stub requests after repeat runs: $(wc -l < $O/stub-count.txt)"
+kill $STUB

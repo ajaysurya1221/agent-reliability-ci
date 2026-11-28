@@ -245,7 +245,12 @@ def round_outcomes_sha256(
     )
 
 
-def _format(path: str, fmt: str) -> Format:
+def input_format(path: str, fmt: str) -> Format:
+    """Validate a scored input path and select its reader."""
+    try:
+        path.encode("utf-8")
+    except UnicodeEncodeError:
+        raise OutcomeError(text("E6", path=path)) from None
     # .eval is always refused, including an explicit format override.
     extension = Path(path).suffix
     if extension == ".eval":
@@ -384,8 +389,7 @@ def _read_inputs(
         for position, input_path in enumerate(paths, 1):
             path = str(input_path)
             try:
-                path.encode("utf-8")
-                parser = _format(path, fmt)
+                parser = input_format(path, fmt)
                 if parser == "inspect":
                     inspect_count += 1
                     if inspect_count > 1 and not discovery:
@@ -834,11 +838,16 @@ def discover_rule(
         paths, (), fmt=fmt, tasks=None, score=score, pass_at_least=threshold, discovery=True
     )
     tasks = sorted({task for values in data.baseline.values() for task in values})
+    return rule_from_inventory(tasks, **options)
+
+
+def rule_from_inventory(tasks: Sequence[str], /, **options: object) -> OutcomeRule:
+    """Apply discovery's rule checks to an already parsed inventory."""
     values: dict[str, object] = {
         "schema_version": OUTCOMES_SCHEMA_VERSION,
         "suite_id": "imported-outcomes",
         **options,
-        "tasks": tasks,
+        "tasks": list(tasks),
         "fixed_before_runs": False,
     }
     try:

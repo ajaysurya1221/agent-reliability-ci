@@ -1,0 +1,9 @@
+// Offline provider with a fixed answer: config.mode "pass" answers the word, "fail" answers "nope".
+class FixedProvider {
+  constructor(options) { this.mode = (options.config || {}).mode || 'pass'; this.label = options.label; }
+  id() { return 'fixed'; }
+  async callApi(prompt, context) {
+    return { output: this.mode === 'fail' ? 'nope' : `the word is ${context.vars.word}` };
+  }
+}
+module.exports = FixedProvider;

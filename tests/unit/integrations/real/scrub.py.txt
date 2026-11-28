@@ -1,0 +1,55 @@
+"""Copy the generated fixtures into the repository, replacing local paths, the host name and the
+user name. Only these byte substitutions are made. Usage: python3 scrub.py RUNS GEN DEST"""
+import re
+import shutil
+import sys
+from pathlib import Path
+
+SUBS = [
+    (re.compile(rb"/tools/gen/[a-z]+"), b"/work"),
+    (re.compile(rb"/tools"), b"/tools"),
+    (re.compile(rb"/home/\"\\ ]+"), b"/home"),
+    (re.compile(rb'hostname="host"]*"'), b'hostname="host"'),
+    (re.compile(rb"[A-Za-z0-9-]*host[A-Za-z0-9.-]*"), b"host"),
+    (re.compile(rb'"(mlflow\.user|source_id)":"[^"]*"'), rb'"\1":"user"'),
+]
+
+
+def scrub(data: bytes) -> bytes:
+    for pattern, repl in SUBS:
+        data = pattern.sub(repl, data)
+    return data
+
+
+runs, gen, dest = (Path(a) for a in sys.argv[1:4])
+copies = {
+    "promptfoo": [(runs / "promptfoo" / f"{n}.json", f"{n}.json") for n in (
+        "words-baseline", "words-candidate", "words-single", "e2e-discovery", "e2e-r1-baseline",
+        "e2e-r1-candidate", "two-prompts", "two-providers", "shapes", "cache-cold", "cache-warm",
+        "cache-env-off", "cache-repeat-cold", "cache-repeat-warm")],
+    "deepeval": [(runs / "deepeval" / f"{n}.xml", f"{n}.xml") for n in (
+        "e2e-discovery", "e2e-r1-baseline", "e2e-r1-candidate", "named-run2", "shapes")],
+    "opik": [(runs / "opik" / f"{n}.xml", f"{n}.xml") for n in (
+        "e2e-discovery", "e2e-r1-baseline", "e2e-r1-candidate", "named-run2", "shapes", "logging-on")],
+    "mlflow": [(runs / "mlflow" / m / "result_df.json", f"result_df-{m}.json") for m in ("pass", "fail")],
+    "langfuse": [(runs / "langfuse" / m / "item_results.json", f"item_results-{m}.json") for m in ("pass", "fail")],
+}
+inputs = {
+    "promptfoo": ["words-baseline.yaml", "words-candidate.yaml", "e2e-pass.yaml", "e2e-fail.yaml",
+                  "two-prompts.yaml", "two-providers.yaml", "shapes.yaml", "cache.yaml", "provider.js",
+                  "fixed.js", "stub_server.py", "generate.sh", "vars/more.csv", "vars/word.txt"],
+    "deepeval": ["test_agent.py", "test_shapes.py"],
+    "opik": ["test_agent.py", "test_shapes.py"],
+    "mlflow": ["evaluate_agent.py"],
+    "langfuse": ["run_experiment.py"],
+}
+for tool, pairs in copies.items():
+    (dest / tool).mkdir(parents=True, exist_ok=True)
+    for src, name in pairs:
+        (dest / tool / name).write_bytes(scrub(src.read_bytes()))
+    for rel in inputs[tool]:
+        name = rel.replace("/", "-") + ("" if rel.endswith(".txt") else ".txt")
+        (dest / tool / name).write_bytes(scrub((gen / tool / rel).read_bytes()))
+for extra in ("generate_pytest_tools.sh", "scrub.py"):
+    (dest / f"{extra}.txt").write_bytes(scrub((gen / extra).read_bytes()))
+print("copied")

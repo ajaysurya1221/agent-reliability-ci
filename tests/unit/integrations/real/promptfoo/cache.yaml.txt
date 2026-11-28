@@ -1,0 +1,18 @@
+description: http provider against a local stub, for the cache fixtures
+prompts:
+  - "Say the word {{word}}"
+providers:
+  - id: http://127.0.0.1:18765/answer
+    label: stub
+    config:
+      method: POST
+      headers: { Content-Type: application/json }
+      body: { word: "{{word}}" }
+      transformResponse: json.output
+tests:
+  - description: word-alpha
+    vars: { word: alpha }
+    assert: [{ type: contains, value: alpha }]
+  - description: word-beta
+    vars: { word: beta }
+    assert: [{ type: contains, value: beta }]

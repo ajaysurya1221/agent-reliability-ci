@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="1" tests="4" time="0.039" timestamp="2026-11-28T14:03:06.265356+05:30" hostname="host"><testcase classname="test_shapes" name="test_passes" time="0.000" /><testcase classname="test_shapes" name="test_check_fails" time="0.000"><failure message="AssertionError: assert 'b' in 'nope'">@opik.llm_unit()
+    def test_check_fails():
+&gt;       assert "b" in "nope"
+E       AssertionError: assert 'b' in 'nope'
+
+test_shapes.py:13: AssertionError</failure></testcase><testcase classname="test_shapes" name="test_skipped_setup" time="0.000"><skipped type="pytest.skip" message="judge model not reachable">/work/test_shapes.py:18: judge model not reachable</skipped></testcase><testcase classname="test_shapes" name="test_body_raises" time="0.000"><failure message="RuntimeError: agent crashed before the check ran">@opik.llm_unit()
+    def test_body_raises():
+&gt;       raise RuntimeError("agent crashed before the check ran")
+E       RuntimeError: agent crashed before the check ran
+
+test_shapes.py:23: RuntimeError</failure></testcase></testsuite></testsuites>

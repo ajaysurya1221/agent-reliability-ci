@@ -1,0 +1,36 @@
+description: shapes the reader must handle
+prompts:
+  - "Say the word {{word}}"
+providers:
+  - id: file://fixed.js
+    label: shapes
+    config:
+      mode: pass
+defaultTest:
+  vars:
+    tone: plain
+tests:
+  - description: array-var
+    vars: { word: alpha, extra: [1, 2, 3] }
+    assert: [{ type: contains, value: alpha }]
+  - description: nested-var
+    vars: { word: beta, meta: { b: 2, a: 1 } }
+    assert: [{ type: contains, value: beta }]
+  - description: non-ascii-var
+    vars: { word: "café" }
+    assert: [{ type: contains, value: "café" }]
+  - description: file-var
+    vars: { word: file://vars/word.txt }
+    assert: [{ type: contains, value: kappa }]
+  - description: same-twice
+    vars: { word: gamma }
+    assert: [{ type: contains, value: gamma }]
+  - description: same-twice
+    vars: { word: gamma }
+    assert: [{ type: icontains, value: GAMMA }]
+  - description: throwing-assert
+    vars: { word: delta }
+    assert: [{ type: javascript, value: "throw new Error('assert exploded')" }]
+  - vars: { word: epsilon }
+    assert: [{ type: contains, value: epsilon }]
+  - file://vars/more.csv

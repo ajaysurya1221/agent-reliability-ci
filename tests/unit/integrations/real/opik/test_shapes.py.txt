@@ -1,0 +1,23 @@
+"""Shapes under Opik: a pass, a failed check, a skip and an exception in the test body."""
+import opik
+import pytest
+
+
+@opik.llm_unit()
+def test_passes():
+    assert "a" in "the word is a"
+
+
+@opik.llm_unit()
+def test_check_fails():
+    assert "b" in "nope"
+
+
+@opik.llm_unit()
+def test_skipped_setup():
+    pytest.skip("judge model not reachable")
+
+
+@opik.llm_unit()
+def test_body_raises():
+    raise RuntimeError("agent crashed before the check ran")

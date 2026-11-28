@@ -1,0 +1,69 @@
+description: twenty tasks (fail)
+prompts:
+  - "Say the word {{word}}"
+providers:
+  - id: file://fixed.js
+    label: fail
+    config:
+      mode: fail
+tests:
+  - description: task-w01
+    vars: { word: w01 }
+    assert: [{ type: contains, value: w01 }]
+  - description: task-w02
+    vars: { word: w02 }
+    assert: [{ type: contains, value: w02 }]
+  - description: task-w03
+    vars: { word: w03 }
+    assert: [{ type: contains, value: w03 }]
+  - description: task-w04
+    vars: { word: w04 }
+    assert: [{ type: contains, value: w04 }]
+  - description: task-w05
+    vars: { word: w05 }
+    assert: [{ type: contains, value: w05 }]
+  - description: task-w06
+    vars: { word: w06 }
+    assert: [{ type: contains, value: w06 }]
+  - description: task-w07
+    vars: { word: w07 }
+    assert: [{ type: contains, value: w07 }]
+  - description: task-w08
+    vars: { word: w08 }
+    assert: [{ type: contains, value: w08 }]
+  - description: task-w09
+    vars: { word: w09 }
+    assert: [{ type: contains, value: w09 }]
+  - description: task-w10
+    vars: { word: w10 }
+    assert: [{ type: contains, value: w10 }]
+  - description: task-w11
+    vars: { word: w11 }
+    assert: [{ type: contains, value: w11 }]
+  - description: task-w12
+    vars: { word: w12 }
+    assert: [{ type: contains, value: w12 }]
+  - description: task-w13
+    vars: { word: w13 }
+    assert: [{ type: contains, value: w13 }]
+  - description: task-w14
+    vars: { word: w14 }
+    assert: [{ type: contains, value: w14 }]
+  - description: task-w15
+    vars: { word: w15 }
+    assert: [{ type: contains, value: w15 }]
+  - description: task-w16
+    vars: { word: w16 }
+    assert: [{ type: contains, value: w16 }]
+  - description: task-w17
+    vars: { word: w17 }
+    assert: [{ type: contains, value: w17 }]
+  - description: task-w18
+    vars: { word: w18 }
+    assert: [{ type: contains, value: w18 }]
+  - description: task-w19
+    vars: { word: w19 }
+    assert: [{ type: contains, value: w19 }]
+  - description: task-w20
+    vars: { word: w20 }
+    assert: [{ type: contains, value: w20 }]

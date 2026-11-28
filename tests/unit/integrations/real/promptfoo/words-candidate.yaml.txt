@@ -1,0 +1,20 @@
+description: order words (candidate)
+prompts:
+  - "Say the word {{word}}"
+providers:
+  - id: file://provider.js
+    label: candidate
+    config:
+      failRate: 0.4
+tests:
+  - description: word-alpha
+    vars: { word: alpha }
+    assert: [{ type: contains, value: alpha }]
+  - description: word-beta
+    vars: { word: beta }
+    assert: [{ type: contains, value: beta }]
+  - vars: { word: gamma }
+    assert: [{ type: contains, value: gamma }]
+  - description: word-boom
+    vars: { word: boom }
+    assert: [{ type: contains, value: boom }]

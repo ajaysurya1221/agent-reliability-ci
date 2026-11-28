@@ -100,17 +100,30 @@ count as failures. Skipped tests and setup errors count as errors. Use `--format
 `--format jsonl` for rows with `task_id` and `outcome` (`pass`, `fail` or `error`). An optional
 `round` field must agree with the assigned round, including round 0.
 
-A command may exit 0 or 1 with a valid file. Use a wrapper to translate another runner's
-test-failure status. Failure to start, timeout, signal or another exit status stops the
-campaign with ERROR. So does a missing, empty, unreadable or malformed file, a file already
-at the output path before launch, a repeated JUnit timestamp on the same side, a duplicate
-or unknown task, or a conflicting round label. Evidence already written stays in place.
+For JUnit, CSV and JSONL, ARCI accepts exit 0 or 1 with a valid file. For promptfoo,
+ARCI sets `PROMPTFOO_FAILED_TEST_EXIT_CODE=100` and accepts 0 or 100 with a valid export.
+A suite override that returns 1 ends the campaign with `ERROR`.
+
+A command that fails to start, times out, dies from a signal or returns an unaccepted
+status stops the campaign with ERROR. ARCI also reports ERROR for a missing, empty,
+unreadable or malformed file, a file already at the output path before launch, a repeated
+JUnit timestamp on the same side, a duplicate or unknown task, or a conflicting round
+label. Evidence already written stays in place.
 ARCI compares timestamps as instants when it can parse them and as text otherwise.
 There is no retry, skipped round, replacement or fallback to an earlier verdict.
 
 Within valid files, a missing task or an error on either side counts as one errored pair.
-Each such pair counts against both decisions. The cumulative allowance is one percent of
-registered pairs, rounded up. One more gives ERROR at that round end.
+Each such pair counts against both PASS and BLOCK. The rule allows one percent of
+registered pairs to have errors, rounded up to a whole pair. If the total exceeds
+that allowance, ARCI reports ERROR at the end of the round.
+
+## Using promptfoo
+
+With `--format promptfoo`, have each command run one prompt with one provider, use
+`--no-cache` and write its JSON export to `{out}`. Let ARCI schedule the repeats.
+ARCI keeps each original `.json` and scores its `.snapshot.jsonl` conversion.
+For manual replay, list each side's snapshots in numeric
+round order, leaving discovery out. See the [promptfoo recipe](promptfoo.md).
 
 ## Read the verdict
 
@@ -138,8 +151,9 @@ most 2.5%. These bounds require all of the following.
 - Fix the rule, task list, pairing and round order before either evaluated side runs.
 - Really rerun the agent for every task. Use fresh pairs, jointly independent across tasks
   and rounds. Disable response caches and replay. Dependence within a pair is allowed.
-- Keep each task's outcome law stable across rounds. Hold inputs, versions, settings, grading
-  and retry policy fixed. Use the same grading criterion on both sides.
+- For each task, the probability of each outcome must stay the same across rounds.
+  Hold inputs, versions, settings, grading and retry policy fixed. Use the same grading
+  criterion on both sides.
 - Running one side before the other must have no effect. Reset any state that could carry over.
 - Label infrastructure failures as errors.
 - Keep the registered order intact. Never omit or replace rounds, extend the cap after seeing

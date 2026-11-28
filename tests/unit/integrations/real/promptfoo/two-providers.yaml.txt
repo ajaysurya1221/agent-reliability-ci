@@ -1,0 +1,24 @@
+description: two providers in one run
+prompts:
+  - "Say the word {{word}}"
+providers:
+  - id: file://provider.js
+    label: old
+    config:
+      failRate: 0.1
+  - id: file://provider.js
+    label: new
+    config:
+      failRate: 0.5
+tests:
+  - description: word-alpha
+    vars: { word: alpha }
+    assert: [{ type: contains, value: alpha }]
+  - description: word-beta
+    vars: { word: beta }
+    assert: [{ type: contains, value: beta }]
+  - vars: { word: gamma }
+    assert: [{ type: contains, value: gamma }]
+  - description: word-delta
+    vars: { word: delta }
+    assert: [{ type: contains, value: delta }]
