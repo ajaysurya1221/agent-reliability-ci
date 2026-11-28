@@ -1178,3 +1178,14 @@ of the five tools) and one design check, and he approved it the same day.
   him before the plan.
 - Left out on purpose: a reader for Opik's own report, live Opik or Langfuse servers, scores
   between 0 and 1, the size of a change with a range, a skill, a pull-request comment.
+
+**Outcome, 28 Nov 2026.** Both pieces are on `main`; the maintainer merged each pull request.
+
+- Pull request 44 (`arci check-change`, D-40): merged at 10:21 UTC, merge commit `cc793fe`.
+- Pull request 45 (the five tools, this decision): merged at 12:15 UTC, merge commit `a16c20a`,
+  after all 19 checks passed on `b0e721a` (Linux tests on Python 3.11 and 3.14, install tests on
+  Linux and macOS, the Windows install check, CodeQL, zizmor). The first run had failed at the
+  formatting step on a Python example inside `docs/recipes/langfuse.md`; the local check before
+  the push had not covered Python code inside Markdown pages. Fixed in `b0e721a`.
+- No release. Both changes sit under "Unreleased" in `CHANGELOG.md` until the maintainer decides
+  on 2.5.0. No README change.
