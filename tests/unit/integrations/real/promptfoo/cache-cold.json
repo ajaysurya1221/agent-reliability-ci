@@ -1,0 +1,469 @@
+{
+  "evalId": "eval-jJ1-2026-11-28T08:31:36",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-11-28T08:31:36.870Z",
+    "prompts": [
+      {
+        "id": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "raw": "Say the word {{word}}",
+        "label": "Say the word {{word}}",
+        "provider": "stub",
+        "metrics": {
+          "score": 2,
+          "testPassCount": 2,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 2,
+          "assertFailCount": 0,
+          "totalLatencyMs": 15,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 2,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "alpha"
+              }
+            }
+          ]
+        },
+        "id": "fa834103-ef84-4321-927c-6ba5046e66f4",
+        "latencyMs": 7,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word alpha",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "http://127.0.0.1:18765/answer",
+          "label": "stub"
+        },
+        "response": {
+          "raw": "{\"output\": \"the word is alpha\"}",
+          "latencyMs": 7,
+          "cached": false,
+          "metadata": {
+            "http": {
+              "status": 200,
+              "statusText": "OK",
+              "headers": {
+                "content-length": "31",
+                "content-type": "application/json",
+                "date": "Sat, 28 Nov 2026 08:31:36 GMT",
+                "server": "BaseHTTP/0.6 Python/3.14.6"
+              }
+            }
+          },
+          "output": "the word is alpha",
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          }
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "word-alpha",
+          "vars": {
+            "word": "alpha"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "alpha"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "alpha"
+        },
+        "metadata": {
+          "http": {
+            "status": 200,
+            "statusText": "OK",
+            "headers": {
+              "content-length": "31",
+              "content-type": "application/json",
+              "date": "Sat, 28 Nov 2026 08:31:36 GMT",
+              "server": "BaseHTTP/0.6 Python/3.14.6"
+            }
+          },
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "beta"
+              }
+            }
+          ]
+        },
+        "id": "e7784f92-4a7a-49a8-9eee-35568767bd0e",
+        "latencyMs": 8,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word beta",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "http://127.0.0.1:18765/answer",
+          "label": "stub"
+        },
+        "response": {
+          "raw": "{\"output\": \"the word is beta\"}",
+          "latencyMs": 8,
+          "cached": false,
+          "metadata": {
+            "http": {
+              "status": 200,
+              "statusText": "OK",
+              "headers": {
+                "content-length": "30",
+                "content-type": "application/json",
+                "date": "Sat, 28 Nov 2026 08:31:36 GMT",
+                "server": "BaseHTTP/0.6 Python/3.14.6"
+              }
+            }
+          },
+          "output": "the word is beta",
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          }
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "word-beta",
+          "vars": {
+            "word": "beta"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "beta"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "beta"
+        },
+        "metadata": {
+          "http": {
+            "status": 200,
+            "statusText": "OK",
+            "headers": {
+              "content-length": "30",
+              "content-type": "application/json",
+              "date": "Sat, 28 Nov 2026 08:31:36 GMT",
+              "server": "BaseHTTP/0.6 Python/3.14.6"
+            }
+          },
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      }
+    ],
+    "stats": {
+      "successes": 2,
+      "failures": 0,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 2,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 132,
+      "evaluationDurationMs": 132
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "http provider against a local stub, for the cache fixtures",
+    "prompts": [
+      "Say the word {{word}}"
+    ],
+    "providers": [
+      {
+        "id": "http://127.0.0.1:18765/answer",
+        "label": "stub",
+        "config": {
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "word": "{{word}}"
+          },
+          "transformResponse": "json.output"
+        }
+      }
+    ],
+    "tests": [
+      {
+        "description": "word-alpha",
+        "vars": {
+          "word": "alpha"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "alpha"
+          }
+        ]
+      },
+      {
+        "description": "word-beta",
+        "vars": {
+          "word": "beta"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "beta"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "sharing": false,
+    "outputPath": [
+      "/tools/runs/promptfoo/cache-cold.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {},
+    "basePath": "/work"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.126.0",
+    "nodeVersion": "v24.18.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-11-28T08:31:37.011Z",
+    "evaluationCreatedAt": "2026-11-28T08:31:36.870Z"
+  },
+  "vars": [
+    "word"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 1,
+    "maxConcurrency": 4,
+    "cache": true
+  }
+}

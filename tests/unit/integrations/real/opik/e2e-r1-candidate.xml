@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="20" skipped="0" tests="20" time="0.053" timestamp="2026-11-28T14:03:03.385886+05:30" hostname="host"><testcase classname="test_agent" name="test_agent[task-w01]" time="0.001"><failure message="AssertionError: assert 'w01' in 'nope'&#10; +  where 'nope' = agent('w01')">word = 'w01'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w01' in 'nope'
+E        +  where 'nope' = agent('w01')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w02]" time="0.000"><failure message="AssertionError: assert 'w02' in 'nope'&#10; +  where 'nope' = agent('w02')">word = 'w02'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w02' in 'nope'
+E        +  where 'nope' = agent('w02')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w03]" time="0.000"><failure message="AssertionError: assert 'w03' in 'nope'&#10; +  where 'nope' = agent('w03')">word = 'w03'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w03' in 'nope'
+E        +  where 'nope' = agent('w03')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w04]" time="0.000"><failure message="AssertionError: assert 'w04' in 'nope'&#10; +  where 'nope' = agent('w04')">word = 'w04'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w04' in 'nope'
+E        +  where 'nope' = agent('w04')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w05]" time="0.000"><failure message="AssertionError: assert 'w05' in 'nope'&#10; +  where 'nope' = agent('w05')">word = 'w05'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w05' in 'nope'
+E        +  where 'nope' = agent('w05')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w06]" time="0.000"><failure message="AssertionError: assert 'w06' in 'nope'&#10; +  where 'nope' = agent('w06')">word = 'w06'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w06' in 'nope'
+E        +  where 'nope' = agent('w06')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w07]" time="0.000"><failure message="AssertionError: assert 'w07' in 'nope'&#10; +  where 'nope' = agent('w07')">word = 'w07'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w07' in 'nope'
+E        +  where 'nope' = agent('w07')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w08]" time="0.000"><failure message="AssertionError: assert 'w08' in 'nope'&#10; +  where 'nope' = agent('w08')">word = 'w08'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w08' in 'nope'
+E        +  where 'nope' = agent('w08')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w09]" time="0.000"><failure message="AssertionError: assert 'w09' in 'nope'&#10; +  where 'nope' = agent('w09')">word = 'w09'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w09' in 'nope'
+E        +  where 'nope' = agent('w09')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w10]" time="0.000"><failure message="AssertionError: assert 'w10' in 'nope'&#10; +  where 'nope' = agent('w10')">word = 'w10'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w10' in 'nope'
+E        +  where 'nope' = agent('w10')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w11]" time="0.000"><failure message="AssertionError: assert 'w11' in 'nope'&#10; +  where 'nope' = agent('w11')">word = 'w11'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w11' in 'nope'
+E        +  where 'nope' = agent('w11')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w12]" time="0.000"><failure message="AssertionError: assert 'w12' in 'nope'&#10; +  where 'nope' = agent('w12')">word = 'w12'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w12' in 'nope'
+E        +  where 'nope' = agent('w12')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w13]" time="0.000"><failure message="AssertionError: assert 'w13' in 'nope'&#10; +  where 'nope' = agent('w13')">word = 'w13'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w13' in 'nope'
+E        +  where 'nope' = agent('w13')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w14]" time="0.000"><failure message="AssertionError: assert 'w14' in 'nope'&#10; +  where 'nope' = agent('w14')">word = 'w14'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w14' in 'nope'
+E        +  where 'nope' = agent('w14')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w15]" time="0.000"><failure message="AssertionError: assert 'w15' in 'nope'&#10; +  where 'nope' = agent('w15')">word = 'w15'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w15' in 'nope'
+E        +  where 'nope' = agent('w15')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w16]" time="0.000"><failure message="AssertionError: assert 'w16' in 'nope'&#10; +  where 'nope' = agent('w16')">word = 'w16'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w16' in 'nope'
+E        +  where 'nope' = agent('w16')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w17]" time="0.000"><failure message="AssertionError: assert 'w17' in 'nope'&#10; +  where 'nope' = agent('w17')">word = 'w17'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w17' in 'nope'
+E        +  where 'nope' = agent('w17')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w18]" time="0.000"><failure message="AssertionError: assert 'w18' in 'nope'&#10; +  where 'nope' = agent('w18')">word = 'w18'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w18' in 'nope'
+E        +  where 'nope' = agent('w18')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w19]" time="0.000"><failure message="AssertionError: assert 'w19' in 'nope'&#10; +  where 'nope' = agent('w19')">word = 'w19'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w19' in 'nope'
+E        +  where 'nope' = agent('w19')
+
+test_agent.py:19: AssertionError</failure></testcase><testcase classname="test_agent" name="test_agent[task-w20]" time="0.000"><failure message="AssertionError: assert 'w20' in 'nope'&#10; +  where 'nope' = agent('w20')">word = 'w20'
+
+    @opik.llm_unit()
+    @pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+    def test_agent(word):
+&gt;       assert word in agent(word)
+E       AssertionError: assert 'w20' in 'nope'
+E        +  where 'nope' = agent('w20')
+
+test_agent.py:19: AssertionError</failure></testcase></testsuite></testsuites>

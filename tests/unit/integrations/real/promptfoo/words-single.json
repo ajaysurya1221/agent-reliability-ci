@@ -1,0 +1,549 @@
+{
+  "evalId": "eval-AlY-2026-11-28T08:31:31",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-11-28T08:31:31.886Z",
+    "prompts": [
+      {
+        "id": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "raw": "Say the word {{word}}",
+        "label": "Say the word {{word}}",
+        "provider": "baseline",
+        "metrics": {
+          "score": 2,
+          "testPassCount": 2,
+          "testFailCount": 1,
+          "testErrorCount": 1,
+          "testCacheHitCount": 0,
+          "assertPassCount": 2,
+          "assertFailCount": 1,
+          "totalLatencyMs": 4,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 3,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "alpha"
+              }
+            }
+          ]
+        },
+        "id": "eefb0bed-363c-4fe4-8f65-2678c8779400",
+        "latencyMs": 2,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word alpha",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "scripted",
+          "label": "baseline"
+        },
+        "response": {
+          "output": "the word is alpha"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "word-alpha",
+          "vars": {
+            "word": "alpha"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "alpha"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "alpha"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "beta"
+              }
+            }
+          ]
+        },
+        "id": "cd45f1df-3422-4546-b3e5-b84a0f33c768",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word beta",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "scripted",
+          "label": "baseline"
+        },
+        "response": {
+          "output": "the word is beta"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "word-beta",
+          "vars": {
+            "word": "beta"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "beta"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "beta"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"gamma\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"gamma\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"gamma\"",
+              "assertion": {
+                "type": "contains",
+                "value": "gamma"
+              }
+            }
+          ]
+        },
+        "id": "635eb678-4480-4c09-ba87-85c17fdbbc07",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word gamma",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "scripted",
+          "label": "baseline"
+        },
+        "response": {
+          "output": "nope"
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "word": "gamma"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "gamma"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "gamma"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Error: simulated infrastructure failure\n    at ScriptedProvider.callApi (/work/provider.js:7:35)\n    at file:///tools/promptfoo/node_modules/promptfoo/dist/src/evaluator-5tUcjTs8.js:7557:114\n    at file:///tools/promptfoo/node_modules/promptfoo/dist/src/providerRegistry-D21ukb8q.js:82:18\n    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)\n    at ProviderRegistry.withProvider (file:///tools/promptfoo/node_modules/promptfoo/dist/src/providerRegistry-D21ukb8q.js:69:31)\n    at invoke (file:///tools/promptfoo/node_modules/promptfoo/dist/src/evaluator-5tUcjTs8.js:7549:41)\n    at file:///tools/promptfoo/node_modules/promptfoo/dist/src/evaluator-5tUcjTs8.js:7571:93\n    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)\n    at withProviderCallExecutionContext (file:///tools/promptfoo/node_modules/promptfoo/dist/src/shared-CQLVvecG.js:27:38)\n    at callApi (file:///tools/promptfoo/node_modules/promptfoo/dist/src/evaluator-5tUcjTs8.js:7561:10)",
+        "gradingResult": null,
+        "id": "4e88b765-6148-41fc-bff0-122f1960c152",
+        "latencyMs": 0,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Say the word boom",
+          "label": "Say the word {{word}}",
+          "config": {}
+        },
+        "promptId": "92efdf9deaab3d57934fed37416aee2eda4f3526c18097cc26452f1f084e1608",
+        "promptIdx": 0,
+        "provider": {
+          "id": "scripted",
+          "label": "baseline"
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "word-boom",
+          "vars": {
+            "word": "boom"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "boom"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "word": "boom"
+        },
+        "metadata": {
+          "errorContext": {
+            "providerId": "scripted",
+            "providerLabel": "baseline"
+          }
+        },
+        "failureReason": 2
+      }
+    ],
+    "stats": {
+      "successes": 2,
+      "failures": 1,
+      "errors": 1,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 3,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 14,
+      "evaluationDurationMs": 14
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "order words (baseline)",
+    "prompts": [
+      "Say the word {{word}}"
+    ],
+    "providers": [
+      {
+        "id": "file://provider.js",
+        "label": "baseline",
+        "config": {
+          "failRate": 0.1
+        }
+      }
+    ],
+    "tests": [
+      {
+        "description": "word-alpha",
+        "vars": {
+          "word": "alpha"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "alpha"
+          }
+        ]
+      },
+      {
+        "description": "word-beta",
+        "vars": {
+          "word": "beta"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "beta"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "word": "gamma"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "gamma"
+          }
+        ]
+      },
+      {
+        "description": "word-boom",
+        "vars": {
+          "word": "boom"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "boom"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "sharing": false,
+    "outputPath": [
+      "/tools/runs/promptfoo/words-single.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {},
+    "basePath": "/work"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.126.0",
+    "nodeVersion": "v24.18.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-11-28T08:31:31.908Z",
+    "evaluationCreatedAt": "2026-11-28T08:31:31.886Z"
+  },
+  "vars": [
+    "word"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 1,
+    "maxConcurrency": 4,
+    "cache": false
+  }
+}

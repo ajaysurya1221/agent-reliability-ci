@@ -1,0 +1,25 @@
+description: two prompts in one run
+prompts:
+  - id: old
+    label: old prompt
+    raw: "Say the word {{word}}"
+  - id: new
+    label: new prompt
+    raw: "Please say {{word}}"
+providers:
+  - id: file://provider.js
+    label: scripted
+    config:
+      failRate: 0.3
+tests:
+  - description: word-alpha
+    vars: { word: alpha }
+    assert: [{ type: contains, value: alpha }]
+  - description: word-beta
+    vars: { word: beta }
+    assert: [{ type: contains, value: beta }]
+  - vars: { word: gamma }
+    assert: [{ type: contains, value: gamma }]
+  - description: word-delta
+    vars: { word: delta }
+    assert: [{ type: contains, value: delta }]

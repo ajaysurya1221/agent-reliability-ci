@@ -1,0 +1,37 @@
+"""Langfuse 5.2.0 fixture generator, without a Langfuse server.
+
+Usage: python run_experiment.py MODE OUTDIR  (MODE pass|fail). The client points at a local
+address where nothing listens and tracing is off, so no data leaves the machine. One item's task
+raises (w07) and one item's evaluator raises (w13). Writes what run_experiment returned.
+"""
+import json
+import sys
+from pathlib import Path
+
+from langfuse import Langfuse
+from langfuse.experiment import Evaluation
+
+MODE, OUT = sys.argv[1], Path(sys.argv[2])
+OUT.mkdir(parents=True, exist_ok=True)
+WORDS = [f"w{n:02d}" for n in range(1, 21)]
+client = Langfuse(public_key="pk-lf-local-none", secret_key="sk-lf-local-none", host="http://127.0.0.1:9", tracing_enabled=False)
+
+
+def task(*, item, **kwargs):
+    word = item["input"]["word"]
+    if word == "w07":
+        raise RuntimeError("agent crashed")
+    return "nope" if MODE == "fail" else f"the word is {word}"
+
+
+def contains_word(*, input, output, expected_output, **kwargs):
+    if input["word"] == "w13":
+        raise ValueError("evaluator crashed")
+    return Evaluation(name="contains_word", value=expected_output in str(output))
+
+
+cases = [{"input": {"word": w}, "expected_output": w, "metadata": {"task_id": f"task-{w}"}} for w in WORDS]
+res = client.run_experiment(name="arci-fixture", run_name=f"arci-fixture-{MODE}", data=cases, task=task, evaluators=[contains_word])
+dump = [{"item": r.item, "output": r.output, "evaluations": [{"name": e.name, "value": e.value} for e in r.evaluations], "trace_id": r.trace_id} for r in res.item_results]
+(OUT / "item_results.json").write_text(json.dumps({"run_name": res.run_name, "items": dump}, indent=1, default=str))
+print("items returned", len(res.item_results), "of", len(cases))

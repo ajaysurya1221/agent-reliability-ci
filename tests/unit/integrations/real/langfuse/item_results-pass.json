@@ -1,0 +1,361 @@
+{
+ "run_name": "arci-fixture-pass",
+ "items": [
+  {
+   "item": {
+    "input": {
+     "word": "w01"
+    },
+    "expected_output": "w01",
+    "metadata": {
+     "task_id": "task-w01"
+    }
+   },
+   "output": "the word is w01",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w02"
+    },
+    "expected_output": "w02",
+    "metadata": {
+     "task_id": "task-w02"
+    }
+   },
+   "output": "the word is w02",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w03"
+    },
+    "expected_output": "w03",
+    "metadata": {
+     "task_id": "task-w03"
+    }
+   },
+   "output": "the word is w03",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w04"
+    },
+    "expected_output": "w04",
+    "metadata": {
+     "task_id": "task-w04"
+    }
+   },
+   "output": "the word is w04",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w05"
+    },
+    "expected_output": "w05",
+    "metadata": {
+     "task_id": "task-w05"
+    }
+   },
+   "output": "the word is w05",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w06"
+    },
+    "expected_output": "w06",
+    "metadata": {
+     "task_id": "task-w06"
+    }
+   },
+   "output": "the word is w06",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w08"
+    },
+    "expected_output": "w08",
+    "metadata": {
+     "task_id": "task-w08"
+    }
+   },
+   "output": "the word is w08",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w09"
+    },
+    "expected_output": "w09",
+    "metadata": {
+     "task_id": "task-w09"
+    }
+   },
+   "output": "the word is w09",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w10"
+    },
+    "expected_output": "w10",
+    "metadata": {
+     "task_id": "task-w10"
+    }
+   },
+   "output": "the word is w10",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w11"
+    },
+    "expected_output": "w11",
+    "metadata": {
+     "task_id": "task-w11"
+    }
+   },
+   "output": "the word is w11",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w12"
+    },
+    "expected_output": "w12",
+    "metadata": {
+     "task_id": "task-w12"
+    }
+   },
+   "output": "the word is w12",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w13"
+    },
+    "expected_output": "w13",
+    "metadata": {
+     "task_id": "task-w13"
+    }
+   },
+   "output": "the word is w13",
+   "evaluations": [],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w14"
+    },
+    "expected_output": "w14",
+    "metadata": {
+     "task_id": "task-w14"
+    }
+   },
+   "output": "the word is w14",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w15"
+    },
+    "expected_output": "w15",
+    "metadata": {
+     "task_id": "task-w15"
+    }
+   },
+   "output": "the word is w15",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w16"
+    },
+    "expected_output": "w16",
+    "metadata": {
+     "task_id": "task-w16"
+    }
+   },
+   "output": "the word is w16",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w17"
+    },
+    "expected_output": "w17",
+    "metadata": {
+     "task_id": "task-w17"
+    }
+   },
+   "output": "the word is w17",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w18"
+    },
+    "expected_output": "w18",
+    "metadata": {
+     "task_id": "task-w18"
+    }
+   },
+   "output": "the word is w18",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w19"
+    },
+    "expected_output": "w19",
+    "metadata": {
+     "task_id": "task-w19"
+    }
+   },
+   "output": "the word is w19",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  },
+  {
+   "item": {
+    "input": {
+     "word": "w20"
+    },
+    "expected_output": "w20",
+    "metadata": {
+     "task_id": "task-w20"
+    }
+   },
+   "output": "the word is w20",
+   "evaluations": [
+    {
+     "name": "contains_word",
+     "value": true
+    }
+   ],
+   "trace_id": "00000000000000000000000000000000"
+  }
+ ]
+}
