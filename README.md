@@ -598,15 +598,15 @@ schema); re-run the experiment rather than trust an unreadable store.
 
 ### GitHub Actions
 
-This example pins `v2.4.1`, the current release (the Action installs that tag's source; the
-same code is on PyPI as `agent-reliability-ci==2.4.1`). See
+This example pins `v2.5.0`, the current release (the Action installs that tag's source; the
+same code is on PyPI as `agent-reliability-ci==2.5.0`). See
 [CHANGELOG.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/CHANGELOG.md).
 
 ```yaml
 - uses: actions/setup-python@v7
   with: { python-version: "3.12" }
 - run: pip install -e .            # your agent, importable
-- uses: ajaysurya1221/agent-reliability-ci@v2.4.1
+- uses: ajaysurya1221/agent-reliability-ci@v2.5.0
   id: gate
   with:
     manifest: reliability/manifest.json
@@ -761,9 +761,9 @@ records live in [docs/design](https://github.com/ajaysurya1221/agent-reliability
 
 ### Availability and project status
 
-**Availability:** v2.4.1 is the current release. Install `agent-reliability-ci==2.4.1` from PyPI
-(`agent-reliability-ci[langchain]==2.4.1` for the LangChain adapter), use `uvx realornoise`,
-or use Action tag `v2.4.1`. The `realornoise` distribution pins the same main-package version.
+**Availability:** v2.5.0 is the current release. Install `agent-reliability-ci==2.5.0` from PyPI
+(`agent-reliability-ci[langchain]==2.5.0` for the LangChain adapter), use `uvx realornoise`,
+or use Action tag `v2.5.0`. The `realornoise` distribution pins the same main-package version.
 The [release page](https://github.com/ajaysurya1221/agent-reliability-ci/releases/latest)
 links the wheel, sdist, checksums and verification receipt. The release workflow
 builds both distributions, tests their wheels on Ubuntu/macOS, and publishes the main

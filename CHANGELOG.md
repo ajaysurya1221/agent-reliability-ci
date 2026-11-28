@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.5.0 (2026-11-28)
 
 - `arci check-change` registers a rule before running two test commands on fresh paired rounds.
   Sealed decisions name the snapshots used for replay. ARCI checks earlier originals and

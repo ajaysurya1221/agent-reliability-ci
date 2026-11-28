@@ -80,7 +80,7 @@ its `SHA256SUMS` from the matching release workflow artifact, and run
 on PyPI too. See [Releasing](RELEASING.md#4-verify). Hashes check bytes, not behavior.
 
 The Claude Code plugin and Codex skill each tell the assistant to run one pinned command,
-once and with nothing added: `uvx --python 3.14 realornoise==2.4.1`. They tell it not to
+once and with nothing added: `uvx --python 3.14 realornoise==2.5.0`. They tell it not to
 add `--keep`. In Claude Code, Claude does not start the plugin's skill on its own: it
 starts when the user types its command, or names it in a message and Claude judges that
 they asked for it. The skill approves no tool ahead of time and has no shell line of its

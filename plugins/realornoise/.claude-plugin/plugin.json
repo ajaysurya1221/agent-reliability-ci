@@ -2,7 +2,7 @@
   "name": "realornoise",
   "displayName": "realornoise",
   "description": "Did your coding agent get worse? Tells Claude to run realornoise on your local session logs and to show its output unchanged.",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "author": { "name": "Ajay Surya Senthilrajan" },
   "homepage": "https://github.com/ajaysurya1221/agent-reliability-ci",
   "repository": "https://github.com/ajaysurya1221/agent-reliability-ci",
