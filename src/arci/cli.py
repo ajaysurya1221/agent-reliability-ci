@@ -1076,6 +1076,15 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
         "--force", action="store_true", help="replace an existing regular file at --out"
     )
     # --- end init ---
+    convert = commands.add_parser(
+        "convert", help="convert an evaluation export into neutral JSONL", allow_abbrev=False
+    )
+    convert.add_argument("--from", required=True, choices=("promptfoo",))
+    convert.add_argument("source", metavar="SOURCE", type=Path)
+    convert.add_argument("--out", required=True, type=Path, metavar="OUT.jsonl")
+    convert.add_argument("--prompt", type=int, metavar="N")
+    convert.add_argument("--provider", metavar="LABEL")
+
     change = commands.add_parser(
         "check-change", help="test a harness change on fresh paired runs", allow_abbrev=False
     )
@@ -1180,6 +1189,15 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
 
 def _dispatch(values: dict[str, object]) -> int:
     command = cast(str, values["command"])
+    if command == "convert":
+        from arci.convert import convert
+
+        return convert(
+            cast(Path, values["source"]),
+            cast(Path, values["out"]),
+            prompt=cast(int | None, values["prompt"]),
+            provider=cast(str | None, values["provider"]),
+        )
     if command == "check-change":
         from arci.change import check_change
 
