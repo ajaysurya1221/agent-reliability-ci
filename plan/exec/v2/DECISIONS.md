@@ -1113,3 +1113,27 @@ printed and not claimed as mistakes avoided. Page: `study/RESULT-same-0.md`.
 **Not claimed.** That the three results are new findings in the field (each has published
 relatives; see the result pages). Anything about hosted models, larger models or real agents.
 That a harness test bench is wanted.
+
+## D-40: one improvement is built before the hand test: `arci check-change` (2026-11-28)
+
+**What led to it.** On the morning of 28 Nov the maintainer read the night's report and wrote:
+"no. That's for tomorrow. Today is for ARCI improvements!!!!" Asked which improvement, with the
+note that choosing one sets aside D-38's "nothing new is built before one outside person has
+tried the idea by hand" for today, he chose "One-command test".
+
+**The decision.**
+
+- One command is built, `arci check-change`: the user gives the test command for the old version
+  and for the new version of an agent, prompt, skill or setting; the tool runs both in paired
+  rounds with the released rule and answers PASS, BLOCK or INCONCLUSIVE. Design record:
+  `docs/design/0019-check-change.md` on the branch `v2/change-check` (from `main` at `c1c88f3`),
+  with 18 acceptance items. The consultant (Astra) designed the interface against the released
+  code. No new statistic; additive code; no frozen file edited.
+- D-38 is set aside for this command only. Its hand test with one outside person stays the test
+  of demand, and D-39's fail rule stays as written. Nothing else from D-38's list is built (no
+  skill, no leaderboard, no automatic saving, no README change).
+- The maintainer opens and merges the pull request and decides on any release. The thread posts
+  wait for another day, as he said.
+
+**Stated plainly.** Nobody outside the project asked for this command. It is built on the
+maintainer's decision and the orchestrator's recommendation, before any evidence of demand.
