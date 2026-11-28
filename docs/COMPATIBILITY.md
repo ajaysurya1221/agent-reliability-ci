@@ -128,3 +128,16 @@ closed, and in a narrow case the changelog names a trial can end in timeout inst
 completed. Nothing about the stop is recorded. Stored 2.4.0 records stay valid and are
 not re-graded. `arci-logs/2` records and the kept table format `realornoise-days/1` are
 unchanged. See [record 0018](design/0018-v2.4.1-release.md).
+
+## 2.5.0
+
+2.5.0 adds `arci check-change` and `arci convert`. Existing commands, exit codes, fixed
+text and records keep their meaning. The log format `arci-logs/2` and the kept table format
+`realornoise-days/1` are unchanged. `arci verdict` and `arci verdict-rule` keep their
+behaviour. The `junit`, `csv`, `jsonl` and `inspect` readers handle existing input as before.
+
+The input format in a sealed imported-outcome decision is still `csv`, `jsonl`, `junit`
+or `inspect`. With `check-change --format promptfoo`, ARCI converts the results to JSONL.
+The sealed decision names the converted snapshot. The `check-change` file `plan.json` is
+new in 2.5.0. With `--format promptfoo`, it also records `reader`, `scored_format` and
+`tool_version`. See [record 0021](design/0021-v2.5.0-release.md).

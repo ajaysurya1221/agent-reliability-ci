@@ -68,7 +68,7 @@ command. In one that does not ask (auto mode, an allow rule, a hook), it can run
 a prompt, and the transcript shows what ran. A mode, a classifier or a deny rule can also
 refuse it; then nothing runs. These are instructions to an assistant, not locks. A copy
 of plugin version 2.4.0 installed before the skill became an instruction keeps the
-earlier skill until the plugin is updated. Plugin version 2.4.1 holds the instruction. The
+earlier skill until the plugin is updated. Plugin versions from 2.4.1 on hold the instruction. The
 earlier skill ran the command itself when you typed it, with the command approved ahead of
 time.
 Everything that command prints enters your conversation with the assistant. That includes any message from `uvx` itself, such as a

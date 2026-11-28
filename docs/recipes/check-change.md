@@ -85,7 +85,14 @@ The timeout defaults to 600 seconds per launch. Use `--timeout-seconds` to chang
 Each launch has its own process group. When the command exits or times out, ARCI stops any
 remaining processes in that group before it reads the result or starts another launch.
 If you press Ctrl-C during a launch, ARCI stops its process group, records the cancellation
-in `verdict.txt` and exits with status 130.
+in `verdict.txt` and exits with status 130. If you press it while a finished verdict is being
+printed, the lines already printed stay above the cancellation line. The exit status and the
+last line that starts with `ERROR:` or `VERDICT:` are the result.
+
+A helper that starts its own session leaves the process group, so ARCI cannot stop it
+during clean-up. Process-group clean-up is tested in CI on Linux and by hand on macOS.
+On Windows, the package installs and `arci --help` works. Running
+`arci check-change` on Windows is unsupported.
 
 Write one regular result file per launch. ARCI refuses symbolic links at the result path or
 in place of the round directory. ARCI saves a snapshot alongside the original, for example
@@ -167,7 +174,6 @@ cannot tell you whether the model ran again. Disable caches and have the command
 
 Use test commands you trust. A command runs with your permissions and can deliberately
 rewrite ARCI's own files while it reads them. ARCI checks for changes at specific times.
-A helper that starts a separate session leaves the launch's process group and can keep running.
 
 A deterministic command can reach PASS on ties even when both sides fail every task. Read
 the identical-outcomes warning and the absolute passes. A mean can also hide one failing

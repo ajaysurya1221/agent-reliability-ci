@@ -55,9 +55,9 @@ publisher is a maintainer action, not something this repository's tests establis
    versions must not change, `uv lock --check` must pass, and the design record says what moved.
 3. Move the CHANGELOG `Unreleased` entries under `vX.Y.Z (YYYY-MM-DD)`.
 4. Recompute `FROZEN.sha256` for the files the bump touched (`pyproject.toml`, `uv.lock`, the new
-   design record) and check that every other hash is unchanged. For 2.4.1,
-   record 0018 re-freezes exactly `pyproject.toml` and `uv.lock`, and newly pins
-   `docs/design/0018-v2.4.1-release.md`. Records 0016 and 0017 stay pinned and unchanged;
+   design record) and check that every other hash is unchanged. For 2.5.0,
+   record 0021 re-freezes exactly `pyproject.toml` and `uv.lock`, and newly pins
+   `docs/design/0021-v2.5.0-release.md`. Records 0019 and 0020 stay pinned and unchanged;
    every other hash stays as it is.
    Only the release orchestrator may change these frozen files or their hashes:
    `shasum -a 256 -c FROZEN.sha256`.

@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
+## v2.5.0 (2026-11-28)
 
-- `arci check-change` registers a rule before running two test commands on fresh paired rounds.
+- `arci check-change` runs one unscored discovery launch, then registers the rule before either
+  evaluated test command runs, and runs both on fresh paired rounds.
   Sealed decisions name the snapshots used for replay. ARCI checks earlier originals and
   snapshots before each launch and before reporting the verdict. Cancelling a launch stops
-  its process group and records the cancellation in `verdict.txt`. The report explains the verdict
-  against the registered margin and gives the number of task runs each version passed.
+  its process group and records the cancellation in `verdict.txt`. The report explains the
+  verdict against the registered margin and, once a round has been evaluated, gives the number
+  of task runs each version passed. Windows supports install and `--help` only.
   See the [check-change recipe](docs/recipes/check-change.md).
 
 - `arci convert --from promptfoo` converts saved JSON for a descriptive verdict.
@@ -14,14 +16,19 @@
   [recipes for promptfoo, DeepEval, Opik, MLflow and Langfuse](docs/recipes/eval-tools.md)
   describe how each route was tested and include two example JSONL exporters,
   [mlflow_rows.py](examples/integrations/mlflow_rows.py) and
-  [langfuse_rows.py](examples/integrations/langfuse_rows.py).
+  [langfuse_rows.py](examples/integrations/langfuse_rows.py). When `convert` refuses and
+  cannot remove its temporary file, the error names that file.
 
 - **Docs:** the readers are checked against Claude Code 2.1.326 and 2.1.330 and Codex CLI
   0.171.0. For 2.1.330 and 0.171.0 the check was one short session each; for 2.1.326 it
   was this project's own sessions of that client. `docs/LOG_FORMATS.md` names the three
   versions and says what each check was. No code change.
-- **CI:** the build tool uv that every workflow installs is 0.13.4, up from 0.12.5, with the
-  hashes of all 19 files PyPI lists for that version. Why: an advisory says uv below 0.13.4
+- **Docs:** a descriptive study of how a reasoning measure and an attribution share line up in
+  public Codex sessions (`docs/results/log-signals-study/`). It does not validate these
+  measures against any outcome. No code change.
+- **CI:** the workflows that install uv use 0.13.4, up from 0.12.5. The repository pin
+  (`.github/requirements/uv.txt`) lists the hashes of all 19 files PyPI lists for that
+  version; the timing workflow installs that version without them. Why: an advisory says uv below 0.13.4
   bundles a certificate store that trusts a root whose intermediate keys are compromised.
   The installed package is not affected: uv is used to build and test, not at run time.
 

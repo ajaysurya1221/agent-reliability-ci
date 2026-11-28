@@ -159,3 +159,5 @@ Shell globs sort by name, so number the files with leading zeros if there are te
 
 Reading `.eval` directly; more than one Inspect log per arm; promptfoo; a verdict mode in the
 GitHub Action; HTML output; score columns in CSV and JSONL.
+
+Since 2.5.0, promptfoo JSON can be converted to JSONL with `arci convert --from promptfoo` (see the [promptfoo recipe](promptfoo.md)) before `arci verdict-rule` and `arci verdict`.

@@ -52,17 +52,25 @@ def _write_new(out: Path, content: bytes) -> str | None:
         fd, temporary = tempfile.mkstemp(dir=out.parent)
     except OSError as exc:
         raise PromptfooError("cannot create output file") from exc
+    error: OSError | None = None
     try:
         with os.fdopen(fd, "wb") as stream:
             if stream.write(content) != len(content):
                 raise OSError("short write")
         os.link(temporary, out)
-    except FileExistsError as exc:
-        raise PromptfooError("output already exists") from exc
     except OSError as exc:
-        raise PromptfooError("cannot write output file") from exc
+        error = exc
     finally:
         leftover = _remove_temporary(temporary)
+    if error is not None:
+        reason = (
+            "output already exists"
+            if isinstance(error, FileExistsError)
+            else "cannot write output file"
+        )
+        if leftover is not None:
+            reason += f" (could not remove temporary file {leftover})"
+        raise PromptfooError(reason) from error
     return leftover
 
 
