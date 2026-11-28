@@ -33,8 +33,11 @@ def task_id(item):
 
 
 write_jsonl(
-    Path(sys.argv[2]), [task_id(case) for case in cases], res.item_results,
-    "contains_word", task_id,
+    Path(sys.argv[2]),
+    [task_id(case) for case in cases],
+    res.item_results,
+    "contains_word",
+    task_id,
 )
 ```
 
