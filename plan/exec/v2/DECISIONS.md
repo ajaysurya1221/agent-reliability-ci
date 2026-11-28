@@ -1137,3 +1137,44 @@ tried the idea by hand" for today, he chose "One-command test".
 
 **Stated plainly.** Nobody outside the project asked for this command. It is built on the
 maintainer's decision and the orchestrator's recommendation, before any evidence of demand.
+
+## D-41: ARCI works on top of five evaluation tools; plan approved; the release is held (2026-11-28)
+
+**What led to it.** With `arci check-change` in pull request 44, the maintainer asked whether
+ARCI can be focused on harness engineering and made strong by combining the best of the popular
+tools, named the five he meant (Langfuse, MLflow, promptfoo, Opik, DeepEval), and wrote: "Hold
+the release. Plan the best to engineer on works on top of the five." The plan was made in plan
+mode from three read-only explorations (ARCI's importer code; the current source and documents
+of the five tools) and one design check, and he approved it the same day.
+
+**The decision.**
+
+- The five run the tests; ARCI gives the verdict. ARCI does not rebuild their dashboards,
+  storage or judges.
+- Depth (the maintainer's choice): a tested recipe for each tool, plus a reader for the tool's
+  own result file where it has one. In practice: a reader and a converter for promptfoo's JSON
+  (`arci check-change --format promptfoo`, `arci convert --from promptfoo`); recipes on the
+  existing JUnit reader for DeepEval, Opik and MLflow; recipes with a short script for MLflow's
+  result table and for Langfuse.
+- Downloads approved by the maintainer for all five tools, in isolated folders, pinned
+  versions, install scripts off, source looked at first, no account, no API key, local models
+  only.
+- No servers (the maintainer's choice): Opik through its pytest route; Langfuse checked against
+  its library and not against a live Langfuse. Each page states how it was tested.
+- No frozen file is edited: a foreign result file is converted to ARCI's plain rows and the
+  sealed decision names that converted copy; the original is kept beside it with its digest.
+- The release is held. No README change, no public result claim. Branch `v2/eval-tools`,
+  stacked on `v2/change-check`; design record 0020; the maintainer merges.
+
+**Stated plainly.**
+
+- Nobody outside the project asked for these connections. D-38's test with one outside person
+  and D-39's fail rule are unchanged.
+- Two of the five already have statistics of their own, and no page may suggest otherwise:
+  MLflow 3.18 has an experimental paired comparison of two runs
+  (`mlflow.genai.compare_evaluations`), and promptfoo prints pass-rate ranges per test with
+  `--repeat`. The orchestrator had told the maintainer earlier the same day that no popular
+  tool leads with this; that was a scan of front pages and was wrong about MLflow. Corrected to
+  him before the plan.
+- Left out on purpose: a reader for Opik's own report, live Opik or Langfuse servers, scores
+  between 0 and 1, the size of a change with a range, a skill, a pull-request comment.
