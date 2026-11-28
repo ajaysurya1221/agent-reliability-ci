@@ -127,10 +127,18 @@ kept table again when another run put it in place during the read. The Claude Co
 plugin's skill is an instruction to Claude, in plugin version 2.4.1. See
 [CHANGELOG.md](../CHANGELOG.md) and [record 0018](design/0018-v2.4.1-release.md).
 
+## Done in v2.5.0
+
+`arci check-change` registers a rule before running two test commands in fresh paired rounds.
+Use `--format promptfoo` for fresh promptfoo runs or `arci convert --from promptfoo` for saved JSON.
+The [recipes](recipes/eval-tools.md) cover promptfoo, DeepEval, Opik, MLflow and Langfuse.
+See [CHANGELOG.md](../CHANGELOG.md) and [record 0021](design/0021-v2.5.0-release.md).
+
 ## Next
 
-Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need.
+Nothing is scheduled. Since v2.1.0, the maintainer takes up an item when someone who would use
+it asks for it or a recorded run shows the need. In 2.5.0, the maintainer made an exception
+and chose `check-change` and the five evaluation-tool routes before any outside request.
 
 Design record 0014 lists what is not in 2.1.0: interrupts and human-in-the-loop steps (one
 reader asked; the adapter still rejects them), async agents, compound fault conditions,
@@ -138,8 +146,9 @@ stronger bets near the margin, and every item design record 0013 lists as not bu
 suites (`minimize`, `bundle`, `replay` and `trace-check` for suite stores, JUnit for suites,
 tools with injected arguments, MCP clients other than ARCI's own revision, and command-agent
 suites beyond what the schema already allows, which are untested end to end). There is one
-framework adapter, for LangChain. Design record 0015 defers, for imported outcomes: reading an
+framework adapter, for LangChain. For imported outcomes, design record 0015 deferred reading an
 Inspect `.eval` file directly, promptfoo, the GitHub Action's verdict mode, and HTML output.
+Conversion of promptfoo JSON to JSONL shipped in 2.5.0.
 
 Record 0017 leaves open one pre-stated streak check in place of the three variants reported
 by the self-check, an unknown split date and repeated daily looks with a stated error rate.

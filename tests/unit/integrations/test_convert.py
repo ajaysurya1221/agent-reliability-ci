@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from arci.cli import main
+from arci.outcome_report import escape_terminal
 from tests.unit.integrations.test_promptfoo_reader import (
     REAL,
     REFUSALS,
@@ -330,6 +331,33 @@ def test_link_failure_refuses_without_publication(
     monkeypatch.setattr(os, "link", refuse_link)
     assert run_convert(REAL / "words-single.json", out) == 3
     assert list(tmp_path.iterdir()) == []
+
+
+def test_link_refusal_reports_unremoved_temporary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / "back\\slash\nline"
+    directory.mkdir()
+    out = directory / "out.jsonl"
+
+    def refuse_link(temporary: str, destination: Path) -> None:
+        raise PermissionError("link refused")
+
+    def refuse_unlink(temporary: str) -> None:
+        raise PermissionError("unlink refused")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "link", refuse_link)
+        patch.setattr(os, "unlink", refuse_unlink)
+        assert run_convert(REAL / "words-single.json", out) == 3
+    assert not out.exists()
+    (leftover,) = directory.iterdir()
+    escaped = escape_terminal(str(leftover))
+    report = capsys.readouterr()
+    assert report.out == ""
+    assert report.err == (
+        f"convert: cannot write output file (could not remove temporary file {escaped})\n"
+    )
 
 
 def test_ascii_streams_escape_imported_cell_names(

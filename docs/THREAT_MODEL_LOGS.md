@@ -89,7 +89,7 @@ before the command runs depends on the user's permission mode and settings. An i
 is not a control: the prompt, when there is one, and the transcript show the command. A
 copy of plugin version 2.4.0 installed before the skill became an instruction keeps the
 earlier skill, which ran the command itself with the command approved ahead of time,
-until the plugin is updated. Plugin version 2.4.1 holds the instruction. Everything the
+until the plugin is updated. Plugin versions from 2.4.1 on hold the instruction. Everything the
 command prints, including any message from uvx, which can show a path, enters the
 assistant's conversation and goes wherever that conversation goes.
 realornoise itself opens no connection and sends nothing. uvx downloads the package,

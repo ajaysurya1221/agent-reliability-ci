@@ -116,7 +116,7 @@ Threat model: https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/do
   classifier refused the command.
 - The command runs by itself, with nothing shown first: a copy of plugin version 2.4.0
   installed before the skill became an instruction to Claude keeps the earlier skill
-  until the plugin is updated. Plugin version 2.4.1 holds the instruction. The earlier skill ran
+  until the plugin is updated. Plugin versions from 2.4.1 on hold the instruction. The earlier skill ran
   the command itself when you typed it, with the command approved ahead of time.
 - ERROR for a tool: the tool found no logs, no readable file or no usable response for it on
   this computer. Results for the other tool can still appear.

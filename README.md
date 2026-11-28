@@ -719,9 +719,11 @@ here claims adoption, performance or superiority.
 
 ## Roadmap
 
-Nothing is scheduled. From v2.1.0 on, an item is taken up only when someone who would use it
-asks for it, or when a recorded run shows the need. What is not in 2.4.1
-(a scan over split dates, reading an Inspect `.eval` log directly, promptfoo, the Action's verdict mode, interrupts, async agents, a suite
+Nothing is scheduled. Since v2.1.0, the maintainer takes up an item when someone who would use
+it asks for it or a recorded run shows the need. In 2.5.0, the maintainer made an exception
+and chose `check-change` and the five evaluation-tool routes before any outside request.
+What is not in 2.5.0
+(a scan over split dates, reading an Inspect `.eval` log directly, the Action's verdict mode, interrupts, async agents, a suite
 example with several faults in one condition, a second framework adapter, the v1 commands that
 do not yet accept suites) and the earlier candidate list (last revised for v0.8.0) are in
 [docs/ROADMAP.md](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/ROADMAP.md).
@@ -770,7 +772,9 @@ builds both distributions, tests their wheels on Ubuntu/macOS, and publishes the
 package before `realornoise` through trusted publishing with attestations. The timing
 workflow is manually triggered and can time either packaged log example or `arci demo`.
 The single-task gate, `triage`, `trace-check`, the packaged demo, descriptors, initialization, planner and opt-in pass^k reporting from earlier releases remain
-available.
+available. Version 2.5.0 adds [`arci check-change`](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/check-change.md)
+for fresh paired runs and [`arci convert --from promptfoo`](https://github.com/ajaysurya1221/agent-reliability-ci/blob/main/docs/recipes/eval-tools.md)
+for saved promptfoo JSON.
 **Boundary:** PASS means relative non-inferiority, not absolute reliability. This is not a sandbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ajaysurya1221/agent-reliability-ci/ci.yml?branch=main&style=flat-square&label=CI&labelColor=57606A)](https://github.com/ajaysurya1221/agent-reliability-ci/actions/workflows/ci.yml)

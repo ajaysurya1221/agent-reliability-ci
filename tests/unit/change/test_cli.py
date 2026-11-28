@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import select
@@ -14,7 +15,7 @@ from collections.abc import Sequence
 from contextlib import ExitStack
 from pathlib import Path
 from types import FrameType
-from typing import Any
+from typing import Any, TextIO
 
 import pytest
 
@@ -929,6 +930,246 @@ def test_item_32_cancel_reaps_leader_and_restores_handlers(
     (leader,) = leaders
     with pytest.raises(ChildProcessError):
         os.waitpid(leader, os.WNOHANG)
+
+
+@pytest.mark.parametrize("plan_only", [False, True], ids=["verdict", "plan-only"])
+def test_final_verification_commits_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    plan_only: bool,
+) -> None:
+    options = ["--plan-only"] if plan_only else []
+    early = tmp_path / "early"
+    final_evidence = early / ("plan.json" if plan_only else "round-001/decision.json")
+    verify = change.CapturedResult.verify
+
+    def interrupt_verification(capture: change.CapturedResult) -> None:
+        verify(capture)
+        if final_evidence.exists():
+            signal.raise_signal(signal.SIGINT)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(change.CapturedResult, "verify", interrupt_verification)
+        assert run(early, "pass", "fail", *options) == 128 + signal.SIGINT
+    cancelled = capsys.readouterr().out
+    assert cancelled == (early / "verdict.txt").read_text()
+    assert "the campaign was cancelled, so there is no verdict." in cancelled
+    assert "VERDICT:" not in cancelled
+
+    stream_text = change.stream_text
+    trigger = "Launch record" if plan_only else "Absolute passes:"
+
+    def interrupt_report(line: str, stream: TextIO) -> str:
+        if line.startswith(trigger):
+            signal.raise_signal(signal.SIGINT)
+        return stream_text(line, stream)
+
+    monkeypatch.setattr(change, "stream_text", interrupt_report)
+    late = tmp_path / "late"
+    code = run(late, "pass", "fail", *options)
+    report = capsys.readouterr().out
+    assert "cancelled" not in report
+    assert report == (late / "verdict.txt").read_text()
+    assert trigger in report and "  verdict.txt\n" in report
+    if plan_only:
+        assert code == 0 and "VERDICT:" not in report
+    else:
+        assert code == look(late, 1).exit_code == 1
+        assert report.splitlines().count("VERDICT: BLOCK (exit 1)") == 1
+
+
+def test_committed_report_handles_signal_during_file_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stream_text = change.stream_text
+
+    def interrupt_index(line: str, stream: TextIO) -> str:
+        if line.startswith("Files in "):
+            signal.raise_signal(signal.SIGTERM)
+        return stream_text(line, stream)
+
+    def caller_handler(sig: int, frame: FrameType | None) -> None:
+        pytest.fail("caller received SIGTERM before the file index was printed")
+
+    monkeypatch.setattr(change, "stream_text", interrupt_index)
+    root = tmp_path / "run"
+    previous = signal.signal(signal.SIGTERM, caller_handler)
+    try:
+        assert run(root, "pass", "fail") == 1
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+    report = capsys.readouterr().out
+    assert report == (root / "verdict.txt").read_text()
+    assert "  verdict.txt\n" in report
+
+
+@pytest.mark.parametrize("fail_write", [False, True], ids=["return", "raise"])
+def test_error_report_restores_handlers_after_last_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_write: bool
+) -> None:
+    signals = (signal.SIGINT, signal.SIGTERM)
+    before = tuple(signal.getsignal(sig) for sig in signals)
+    last_write = False
+    stream_text = change.stream_text
+
+    def observe_last_write(line: str, stream: TextIO) -> str:
+        nonlocal last_write
+        if line == "  verdict.txt":
+            last_write = True
+            assert all(
+                signal.getsignal(sig) != old for sig, old in zip(signals, before, strict=True)
+            )
+            signal.raise_signal(signal.SIGINT)
+            if fail_write:
+                raise RuntimeError("last write failed")
+        return stream_text(line, stream)
+
+    monkeypatch.setattr(change, "stream_text", observe_last_write)
+
+    def check() -> int:
+        return change.check_change(
+            baseline="{out}",
+            candidate="{out}",
+            fmt="csv",
+            margin="0.1",
+            max_rounds=0,
+            timeout_seconds=1,
+            out_dir=str(tmp_path / "run"),
+            plan_only=False,
+        )
+
+    if fail_write:
+        with pytest.raises(RuntimeError, match="last write failed"):
+            check()
+    else:
+        assert check() == 3
+    assert tuple(signal.getsignal(sig) for sig in signals) == before
+    assert last_write
+
+
+@pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM])
+def test_cancel_during_handler_installation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    sig: signal.Signals,
+) -> None:
+    signals = (signal.SIGINT, signal.SIGTERM)
+    install = signal.signal
+    interrupted = False
+
+    def caller_handler(s: int, frame: FrameType | None) -> None:
+        pytest.fail("signal reached caller during installation")
+
+    def interrupt_install(s: signal.Signals, handler: Any) -> Any:
+        nonlocal interrupted
+        previous = install(s, handler)
+        if s == signal.SIGINT and not interrupted:
+            interrupted = True
+            signal.raise_signal(sig)
+        return previous
+
+    root = tmp_path / "run"
+    with ExitStack() as restore:
+        for s in signals:
+            previous = install(s, caller_handler)
+            restore.callback(install, s, previous)
+        monkeypatch.setattr(signal, "signal", interrupt_install)
+        code = run(root)
+        assert all(signal.getsignal(s) is caller_handler for s in signals)
+    assert code == 128 + sig
+    report = capsys.readouterr().out
+    assert report == (root / "verdict.txt").read_text()
+    assert "the campaign was cancelled" in report and "VERDICT:" not in report
+    assert "  verdict.txt\n" in report and not (root / "discovery").exists()
+
+
+def test_cancel_between_transcript_and_stdout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stream_text = change.stream_text
+
+    def interrupt_plan(line: str, stream: TextIO) -> str:
+        if line.startswith("Earliest PASS:"):
+            signal.raise_signal(signal.SIGINT)
+        return stream_text(line, stream)
+
+    monkeypatch.setattr(change, "stream_text", interrupt_plan)
+    root = tmp_path / "run"
+    assert run(root) == 128 + signal.SIGINT
+    report = capsys.readouterr().out
+    assert report == (root / "verdict.txt").read_text()
+    assert "Earliest PASS:" in report and "Earliest BLOCK:" not in report
+    assert "the campaign was cancelled" in report and "VERDICT:" not in report
+
+
+@pytest.mark.parametrize("failure", [OSError, BrokenPipeError, ValueError])
+def test_committed_block_survives_stdout_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: type[Exception]
+) -> None:
+    class FailingStdout(io.StringIO):
+        failed = False
+
+        def write(self, text: str) -> int:
+            assert not self.failed, "retried failed stdout"
+            if text.startswith("Absolute passes:"):
+                self.failed = True
+                raise failure("stdout unavailable")
+            return super().write(text)
+
+    stream = FailingStdout()
+    monkeypatch.setattr(sys, "stdout", stream)
+    root = tmp_path / "run"
+    assert run(root, "pass", "fail") == look(root, 1).exit_code == 1
+    assert stream.failed
+    report = (root / "verdict.txt").read_text()
+    assert report.startswith(stream.getvalue() + "Absolute passes:")
+    assert [line for line in report.splitlines() if line.startswith("VERDICT:")] == [
+        "VERDICT: BLOCK (exit 1)"
+    ]
+    assert "ERROR:" not in report and report.endswith("  verdict.txt\n")
+
+
+def test_committed_block_exit_with_closed_stdout_pipe(tmp_path: Path) -> None:
+    root = tmp_path / "run"
+    script = """
+import os
+import sys
+from arci import change
+from arci.cli import main
+
+stream_text = change.stream_text
+def disconnect(line, stream):
+    if line.startswith("Absolute passes:"):
+        reader, writer = os.pipe()
+        os.close(reader)
+        os.dup2(writer, stream.fileno())
+        os.close(writer)
+    return stream_text(line, stream)
+
+change.stream_text = disconnect
+sys.exit(main())
+"""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            "check-change",
+            "--baseline",
+            command("pass"),
+            "--candidate",
+            command("fail"),
+            "--format",
+            "csv",
+            "--out-dir",
+            str(root),
+        ],
+        capture_output=True,
+    )
+    assert result.returncode == look(root, 1).exit_code == 1, result.stderr
+    assert (root / "verdict.txt").read_text().endswith("  verdict.txt\n")
 
 
 def test_item_33_replay_sealed_snapshots_after_original_changes(tmp_path: Path) -> None:

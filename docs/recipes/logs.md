@@ -32,7 +32,7 @@ arci logs --example
 ```
 
 Example data, generated, not anyone's logs. This is the complete output captured in the
-2.4.1 checkout on 2026-11-18.
+2.5.0 checkout on 2026-11-28.
 
 ```text
 realornoise 2.5.0 · reads local session logs · sends nothing · writes nothing unless asked
