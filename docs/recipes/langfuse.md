@@ -1,24 +1,25 @@
 # Compare two versions with Langfuse
 
-Langfuse Python SDK 5.2.0 on Python 3.13.12 was
-tested with the SDK's `run_experiment` with tracing off and no server; not tested against a live Langfuse.
-The client pointed at a local address where no server listened. The fixture ran
-20 word checks and saved the returned item results. It used no model.
+The fixture used Langfuse Python SDK 5.2.0 on Python 3.13.12. It ran 20 word
+checks with `run_experiment` and saved the returned items. Tracing was off,
+and the client pointed at a local address where no server was listening. The
+checks used no model. This recipe was not tested against a live Langfuse server.
 
-Keep the task list you pass to the experiment. When the task raised on
+Keep the task list you pass to the experiment. When the task crashed on
 `task-w07`, Langfuse left that item out of the results. When the evaluator
-raised on `task-w13`, the item came back with no evaluation. The helper writes
+crashed on `task-w13`, the item came back with no evaluation. The helper writes
 an error for each. A named score of true or 1 passes. False or 0 fails.
 Any other value gives an error. An unexpected or duplicate task id stops the
 export, as do two scores with the requested name on one item.
 
-Let `run_experiment.py` take a version and an output file. Here `pass` and
-`fail` select the two fixture versions. If you adapt the fixture script,
-replace its output-directory setup and JSON dump. ARCI needs one JSONL file at
-the supplied path. Copy the helper below into
-`langfuse_rows.py` beside your script. After `res = client.run_experiment(...)`,
-pass the ids of the input cases and the items the SDK returned. Use the same
-key on both sides.
+In `run_experiment.py`, use `sys.argv[1]` to select the version (`pass`
+or `fail` in the fixture). ARCI supplies the output filename in `sys.argv[2]`.
+If you adapt the fixture script, replace the code that creates an output
+directory and writes results into it. The helper writes one JSON line for
+each input in `cases`, including inputs missing from `res.item_results`.
+Use the same task id for each input on both sides.
+
+Add this to `run_experiment.py` after `res = client.run_experiment(...)` returns.
 
 ```python
 import sys
@@ -37,17 +38,7 @@ write_jsonl(
 )
 ```
 
-Run this in the script's directory. Each launch should run the experiment afresh.
-
-```sh
-arci check-change --format jsonl \
-  --baseline 'python run_experiment.py pass {out}' \
-  --candidate 'python run_experiment.py fail {out}' \
-  --out-dir langfuse-comparison
-```
-
-MLflow also compares paired runs, and promptfoo reports per-test pass-rate
-ranges for repeats. See [check-change](check-change.md) for ARCI's verdicts.
+Save this complete block as `langfuse_rows.py` beside `run_experiment.py`.
 
 ```python
 """Export one Langfuse experiment as ARCI task outcomes."""
@@ -118,5 +109,18 @@ def write_jsonl(
         for row in rows:
             stream.write(json.dumps(row) + "\n")
 ```
+
+Run this command in the directory containing `run_experiment.py`. Each launch
+should run the experiment afresh.
+
+```sh
+arci check-change --format jsonl \
+  --baseline 'python run_experiment.py pass {out}' \
+  --candidate 'python run_experiment.py fail {out}' \
+  --out-dir langfuse-comparison
+```
+
+MLflow also compares paired runs, and promptfoo reports per-test pass-rate
+ranges for repeats. See [check-change](check-change.md) for ARCI's verdicts.
 
 [Fixture script](../../tests/unit/integrations/real/langfuse/run_experiment.py.txt) · [Fixture notes](../../tests/unit/integrations/real/README.md)

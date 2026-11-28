@@ -5,8 +5,7 @@ The test ran 20 word checks with a Python metric called `ContainsWord`.
 DeepEval passed the JUnit option to pytest. The saved XML also covers a failed
 metric, a skipped test and an exception. The checks used no model or account.
 
-Give each task a name that travels with its input. For example, use
-`@pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])`.
+Give each task an id based on its input, as in the `ids=` example below.
 DeepEval's saved report names one such case `test_agent::test_agent[task-w01]`.
 A positional id such as `golden0` can pair different tasks if you reorder the inputs.
 
@@ -23,11 +22,17 @@ arci check-change --format junit \
 
 An exception in the test body counts as a failure, just like a wrong answer.
 If the judge is down, the error bound cannot distinguish that fault from a worse
-answer. Mark the broken setup as skipped so ARCI counts the pair as an error.
+answer. Put this guard inside each affected test, before calling the judge.
+Pytest will emit a skipped row with that task’s ID. ARCI counts the pair as an
+error. Here you supply the `judge_available` and `judge` fixtures. The judge
+returns true when the answer passes.
 
 ```python
-if not judge_available:
-    pytest.skip("judge model not reachable")
+@pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+def test_agent(word, judge_available, judge):
+    if not judge_available:
+        pytest.skip("judge model not reachable")
+    assert judge(agent(word))
 ```
 
 Other tools also report statistics. MLflow compares paired runs and promptfoo

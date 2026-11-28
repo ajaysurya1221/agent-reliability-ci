@@ -54,6 +54,10 @@ def task_id(item: Item) -> str:
 @pytest.mark.parametrize("mode", ["pass", "fail"])
 def test_c02_real_results_and_missing_items(mode: str, tmp_path: Path) -> None:
     raw = raw_items(mode)
+    raw_by_id = {record["item"]["metadata"]["task_id"]: record for record in raw}
+    assert "task-w07" not in raw_by_id
+    assert raw_by_id["task-w13"]["evaluations"] == []
+
     outcomes = dict.fromkeys(EXPECTED_IDS, "error")
     for record in raw:
         item = record["item"]

@@ -208,7 +208,7 @@ REFUSALS = [
     *(
         Refusal(
             f"group hits {v}",
-            "groups[].cached",
+            "cache use reported by results.repeatStability.groups[].cached",
             "words-baseline",
             "results.repeatStability.groups.0.cached",
             v,
@@ -289,3 +289,27 @@ def test_a03_golden_id() -> None:
     case = doc["results"]["results"][0]["testCase"]
     case.update(description="Row #1", vars={"x": [1, 1.0, True, None, ["é"]]})
     assert read(canonical(doc)).rows[0].task_id == "Row #1 #25722901d99dfa75"
+
+
+@pytest.mark.parametrize("value", ["2", -1, None, 1.5, False])
+def test_malformed_group_cache_count(value: object) -> None:
+    doc = json.loads((REAL / "words-baseline.json").read_bytes())
+    doc["results"]["repeatStability"]["groups"][0]["cached"] = value
+    with pytest.raises(PromptfooError, match=r"groups\[\]\.cached must be a non-negative integer"):
+        read(canonical(doc))
+
+
+def test_absent_and_zero_group_cache_counts() -> None:
+    doc = json.loads((REAL / "words-baseline.json").read_bytes())
+    group = doc["results"]["repeatStability"]["groups"][0]
+    group["cached"] = 0
+    expected = read(canonical(doc))
+    del group["cached"]
+    assert read(canonical(doc)) == expected
+
+
+def test_non_object_http_metadata_is_ignored() -> None:
+    doc = json.loads((REAL / "e2e-discovery.json").read_bytes())
+    expected = read(canonical(doc))
+    doc["results"]["results"][0]["response"].setdefault("metadata", {})["http"] = "HTTP/2"
+    assert read(canonical(doc)) == expected

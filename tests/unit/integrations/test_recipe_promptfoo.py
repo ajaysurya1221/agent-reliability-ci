@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from arci.suite_stats import default_max_rounds
+
 REAL = Path(__file__).with_name("real")
 OLDER = REAL.parents[1] / "outcomes" / "real"
 RECIPES = REAL.parents[3] / "docs" / "recipes"
@@ -98,11 +100,46 @@ def test_d02_page_convert_commands_and_descriptive_verdict(
     assert rule[:2] == ["arci", "verdict-rule"]
     result = run_arci(rule, tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert compare[:2] == ["arci", "verdict"]
+    assert compare == [
+        "arci",
+        "verdict",
+        "rule.yaml",
+        "--baseline",
+        "old.jsonl",
+        "--candidate",
+        "new.jsonl",
+    ]
     result = run_arci(compare, tmp_path)
     assert result.returncode == 2, result.stdout + result.stderr
     assert "Descriptive verdict" in result.stdout
     assert "INCONCLUSIVE" in result.stdout
+
+
+def test_d02_round_cap_covers_the_repeated_export(tmp_path: Path) -> None:
+    _, _, providers, (rule, compare), _ = shell_blocks()
+    shutil.copyfile(REAL / "promptfoo" / "two-providers.json", tmp_path / "providers.json")
+    for command in providers:
+        result = run_arci(command, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    # Apply the 200-task example's caps to the unmodified four-task export.
+    # A wider margin makes both plans valid for this small fixture.
+    assert default_max_rounds(200) == 2
+    cap = re.search(r"`(--max-rounds \d+)`", PROMPTFOO.read_text())
+    assert cap and shlex.split(cap[1]) == ["--max-rounds", "3"]
+    for option, expected_status, message in (
+        (["--max-rounds", "2"], 3, "round 3 is outside 1 to 2"),
+        (shlex.split(cap[1]), 0, "both arms cover rounds 1 to 3"),
+    ):
+        work = tmp_path / option[1]
+        work.mkdir()
+        for name in ("old.jsonl", "new.jsonl"):
+            shutil.copyfile(tmp_path / name, work / name)
+        result = run_arci([*rule, "--margin", "3/4", *option], work)
+        assert result.returncode == 0, result.stdout + result.stderr
+        result = run_arci(compare, work)
+        assert result.returncode == expected_status, result.stdout + result.stderr
+        assert message in result.stdout + result.stderr
 
 
 def test_d02_page_check_change_runs_with_saved_exports(tmp_path: Path) -> None:
@@ -137,8 +174,8 @@ def test_d03_how_tested_and_caveats() -> None:
     recipe = " ".join(PROMPTFOO.read_text().split())
     for fact in (
         "tested with JSON exports",
-        "scripted provider",
-        "local HTTP stub",
+        "the scripted provider tested exports containing two prompts or two providers",
+        "Separate runs used a local HTTP server to check cache behavior",
         "descriptive verdict",
         "defaultTest.vars",
         "file://",

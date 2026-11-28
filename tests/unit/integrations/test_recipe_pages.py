@@ -184,7 +184,9 @@ def test_d02_documented_command_runs(
         (
             "langfuse",
             [
-                "sdk's `run_experiment` with tracing off and no server",
+                "`run_experiment`",
+                "tracing was off",
+                "no server was listening",
                 "not tested against a live langfuse",
                 "20 word checks",
             ],
@@ -202,4 +204,8 @@ def test_d03_test_scope_and_caveats(tool: str, facts: list[str]) -> None:
 @pytest.mark.parametrize("tool", SCRIPTS)
 def test_d03_helper_bytes(tool: str) -> None:
     helper = ROOT / "examples" / "integrations" / f"{tool}_rows.py"
-    assert blocks(tool, "python").count(helper.read_bytes()) == 1
+    heading = f"Save this complete block as `{helper.name}`".encode()
+    _, after_heading = page(tool).read_bytes().split(heading)
+    paragraph, helper_block = after_heading.split(b"\n\n", 1)
+    assert b"```" not in paragraph
+    assert helper_block.startswith(b"```python\n" + helper.read_bytes() + b"```\n")

@@ -11,13 +11,14 @@ both versions, and reads the evidence after each round. At the round cap it can
 say “cannot tell” (`INCONCLUSIVE`). Another tool, promptfoo, reports per-test
 pass-rate ranges for repeats.
 
-Let `evaluate_agent.py` take a version and an output file. In this example
-`pass` and `fail` select the two fixture versions. If you adapt the fixture script,
-replace its output-directory setup and JSON dump. Keep SQLite in a separate
-directory. ARCI needs one JSONL file at the supplied path.
+In `evaluate_agent.py`, use `sys.argv[1]` to select the version (`pass`
+or `fail` in the fixture). ARCI supplies the output filename in `sys.argv[2]`.
+If you adapt the fixture script, remove the code that creates a directory at
+that path and writes results into it. Keep the SQLite database in a separate
+directory. The helper writes one JSON line per task to the supplied file.
 
-Copy the helper below into `mlflow_rows.py` beside your script. After `res = mlflow.genai.evaluate(...)`, add this code.
-Use a stable key from the request and the same scorer for both versions.
+Use the same scorer and the same task id for each input on both sides.
+Add this to `evaluate_agent.py` after `res = mlflow.genai.evaluate(...)` returns.
 
 ```python
 import sys
@@ -35,21 +36,14 @@ def word_id(request: object) -> str:
 write_jsonl(Path(sys.argv[2]), res.result_df.to_dict("records"), "contains_word", word_id)
 ```
 
-Run this in the script's directory. ARCI supplies a fresh path for each launch.
-
-```sh
-arci check-change --format jsonl \
-  --baseline 'python evaluate_agent.py pass {out}' \
-  --candidate 'python evaluate_agent.py fail {out}' \
-  --out-dir mlflow-comparison
-```
-
 When prediction crashed on `w07`, the scorer still returned false for the
 empty answer. The helper checks `state` before the score. On `w13` the scorer
 raised and set its error message. Both rows become errors. A missing, null or
 NaN message means there was no scorer error. Boolean scores and the strings
 `"yes"` and `"no"` give pass or fail. Other values, including the numbers
 1 and 0, give an error. Duplicate task ids stop the export.
+
+Save this complete block as `mlflow_rows.py` beside `evaluate_agent.py`.
 
 ```python
 """Export one MLflow evaluation as ARCI task outcomes."""
@@ -95,6 +89,15 @@ def write_jsonl(
     with path.open("w", encoding="utf-8") as stream:
         for row in rows:
             stream.write(json.dumps(row) + "\n")
+```
+
+Run this command in the directory containing `evaluate_agent.py`.
+
+```sh
+arci check-change --format jsonl \
+  --baseline 'python evaluate_agent.py pass {out}' \
+  --candidate 'python evaluate_agent.py fail {out}' \
+  --out-dir mlflow-comparison
 ```
 
 [Fixture script](../../tests/unit/integrations/real/mlflow/evaluate_agent.py.txt) · [Fixture notes](../../tests/unit/integrations/real/README.md)

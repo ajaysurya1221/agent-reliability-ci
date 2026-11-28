@@ -30,14 +30,13 @@ from xml.etree import ElementTree
 
 import yaml
 
-from arci.convert import neutral_jsonl
+from arci.convert import neutral_jsonl, stream_text
 from arci.hashing import hash_bytes
 from arci.importers import OutcomeValue, junit, promptfoo
 from arci.outcome_report import TERMINAL_TASK_OVERFLOW, escape_terminal, render_terminal
 from arci.outcome_schema import OutcomeDecision, OutcomeRule
 from arci.outcomes import (
     decide_outcomes,
-    discover_rule,
     load_rule,
     read_outcome_rows,
     rule_of,
@@ -262,13 +261,14 @@ class CapturedResult:
     original_digest: str | None = None
 
     def verify(self) -> None:
-        for path, digest in (
-            (self.path, self.original_digest or self.digest),
-            (self.snapshot, self.digest),
-        ):
-            with _directory(path.parent) as fd, _regular(fd, path.name) as stream:
-                if hashlib.file_digest(stream, "sha256").hexdigest() != digest:
-                    raise ValueError(f"results changed: {path}")
+        _verify_digest(self.path, self.original_digest or self.digest)
+        _verify_digest(self.snapshot, self.digest)
+
+
+def _verify_digest(path: Path, digest: str) -> None:
+    with _directory(path.parent) as fd, _regular(fd, path.name) as stream:
+        if hashlib.file_digest(stream, "sha256").hexdigest() != digest:
+            raise ValueError(f"results changed: {path}")
 
 
 LaunchResult = tuple[CapturedResult, dict[str, OutcomeValue | None]]
@@ -463,33 +463,26 @@ class _Campaign:
 
             try:
                 with _regular(fd, path.name) as source_file:
-                    if self.fmt == "promptfoo":
-                        raw = source_file.read()
-                        original_digest = hash_bytes(raw)
-                        try:
-                            content = self.promptfoo_snapshot(raw, arm, original_digest)
-                        except ValueError as exc:
-                            raise ValueError(f"{label}: {exc}") from exc
-                        with open(snapshot.name, "xb", opener=new_snapshot) as target:
-                            target.write(content)
-                        capture = CapturedResult(
-                            path, snapshot, hash_bytes(content), original_digest
-                        )
-                    else:
-                        digest = hashlib.sha256()
-                        with open(snapshot.name, "xb", opener=new_snapshot) as target:
-                            while chunk := source_file.read(256 * 1024):
-                                target.write(chunk)
-                                digest.update(chunk)
-                        capture = CapturedResult(path, snapshot, digest.hexdigest())
+                    raw = source_file.read()
+                original_digest = hash_bytes(raw)
+                content = raw
+                snapshot_digest = original_digest
+                if self.fmt == "promptfoo":
+                    try:
+                        content = self.promptfoo_snapshot(raw, arm, original_digest)
+                    except ValueError as exc:
+                        raise ValueError(f"{label}: {exc}") from exc
+                    snapshot_digest = hash_bytes(content)
+                with open(snapshot.name, "xb", opener=new_snapshot) as target:
+                    target.write(content)
+                capture = CapturedResult(path, snapshot, snapshot_digest, original_digest)
             except FileNotFoundError as exc:
                 raise ValueError(f"missing results file: {exc.filename}") from exc
 
         self.captures.append(capture)
         capture.verify()
         try:
-            with snapshot.open(encoding="utf-8-sig", newline="") as reader:
-                source = reader.read()
+            source = content.decode("utf-8-sig")
             fmt = self.scored_format
             if fmt == "junit":
                 parsed = junit.read(
@@ -515,36 +508,53 @@ class _Campaign:
         return capture, {row.task_id: row.outcome for row in parsed.rows}
 
 
-def _register(
-    discovery: LaunchResult, fmt: ScoredFormat, margin: str, cap: int | None
+def discover_rule(
+    snapshots: Sequence[Path],
+    *,
+    tasks: Sequence[str],
+    digest: str,
+    margin: str,
+    max_rounds: int | None,
 ) -> OutcomeRule:
-    capture, outcomes = discovery
-    if cap is None:
+    """Register the inventory already parsed from the single discovery snapshot."""
+    (snapshot,) = snapshots
+    _verify_digest(snapshot, digest)
+    fields: dict[str, object] = {
+        "schema_version": "arci-outcomes/1",
+        "suite_id": "imported-outcomes",
+        "tasks": tasks,
+        "margin": margin,
+        "fixed_before_runs": True,
+    }
+    if max_rounds is not None:
+        fields["max_rounds"] = max_rounds
+    rule = OutcomeRule.model_validate(fields)
+    stats = rule_of(rule)
+    if max_rounds is None and never_differs_pass_round(stats) is None:
         # At a tight margin the default 400-pair budget may be below the all-ties floor.
-        draft = OutcomeRule.model_validate(
-            {
-                "schema_version": "arci-outcomes/1",
-                "suite_id": "imported-outcomes",
-                "tasks": list(outcomes),
-                "margin": margin,
-                "fixed_before_runs": False,
-            }
+        floor = never_differs_pass_round(
+            replace(stats, max_rounds=SUITE_MAX_PAIRS // stats.n_cells)
         )
-        stats = rule_of(draft)
-        cap = stats.max_rounds
-        if never_differs_pass_round(stats) is None:
-            floor = never_differs_pass_round(
-                replace(stats, max_rounds=SUITE_MAX_PAIRS // stats.n_cells)
-            )
-            if floor is None:
-                raise ValueError("budget cannot establish PASS within 100000 registered pairs")
-            cap = floor
-    capture.verify()
-    discovered = discover_rule([capture.snapshot], fmt=fmt, margin=margin, max_rounds=cap)
+        if floor is None:
+            raise ValueError("budget cannot establish PASS within 100000 registered pairs")
+        rule = OutcomeRule.model_validate({**fields, "max_rounds": floor})
+    check_rule_plan(rule_of(rule))
+    return rule
+
+
+def _register(discovery: LaunchResult, margin: str, cap: int | None) -> OutcomeRule:
+    capture, outcomes = discovery
+    discovered = discover_rule(
+        [capture.snapshot],
+        tasks=tuple(outcomes),
+        digest=capture.digest,
+        margin=margin,
+        max_rounds=cap,
+    )
     capture.verify()
     if discovered.tasks != tuple(sorted(outcomes)):
         raise ValueError("registered tasks differ from captured discovery ids")
-    return discovered.model_copy(update={"fixed_before_runs": True})
+    return discovered
 
 
 def _assess_prefix(
@@ -643,7 +653,7 @@ def _run(
         )
     _require_exit_observer()
     discovery = campaign.launch("baseline", 0)
-    registered = _register(discovery, campaign.scored_format, margin, cap)
+    registered = _register(discovery, margin, cap)
     rule_path = campaign.root / "rule.yaml"
     campaign.register(
         rule_path.name,
@@ -815,7 +825,7 @@ def check_change(
 
         def emit(line: str) -> None:
             print(line, file=transcript, flush=True)
-            print(line, flush=True)
+            print(stream_text(line, sys.stdout), flush=True)
 
         try:
             with campaign.cancellation.listen():

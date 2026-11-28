@@ -5,14 +5,13 @@ Opik 2.3.7 was tested with pytest 9.2.0 on Python 3.13.12. The test used
 XML. The assertion determined the result. The checks used no model or account.
 
 By default the pytest integration tries to send results to Opik's cloud address.
-The fixture run with experiment logging left on retried when the sandbox
-refused the connection. The command below turns off experiment logging and
+In the run with experiment logging on, Opik retried the connection after the
+sandbox blocked it. The command below turns off experiment logging and
 disables traces from `@opik.track`. ARCI reads the local pytest file.
 
-Give each input an explicit id with
-`@pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])`.
-Use the same names on both sides. Positional ids can pair different inputs
-when their order changes.
+Give each input the same id on both sides, as in the `ids=` example below.
+If the ids depend on the order of the inputs, reordering them can pair two
+different tasks.
 
 Run this beside `test_agent.py`. Here `AGENT_MODE` selects the version.
 Use your two settings and rerun the same tasks and assertions on each launch.
@@ -25,12 +24,18 @@ arci check-change --format junit \
 ```
 
 An exception in the test body counts as a failure. The error bound treats a
-broken judge that raises there as a worse answer. Mark a broken setup as
-skipped so it counts as an error in ARCI.
+broken judge that raises there as a worse answer. Put this guard inside each
+affected test, before calling the judge. Pytest will emit a skipped row with
+that task’s ID. ARCI counts the pair as an error. Here you supply the
+`judge_available` and `judge` fixtures. The judge returns true when the answer passes.
 
 ```python
-if not judge_available:
-    pytest.skip("judge model not reachable")
+@opik.llm_unit()
+@pytest.mark.parametrize("word", WORDS, ids=[f"task-{w}" for w in WORDS])
+def test_agent(word, judge_available, judge):
+    if not judge_available:
+        pytest.skip("judge model not reachable")
+    assert judge(agent(word))
 ```
 
 MLflow also compares paired runs, and promptfoo reports per-test pass-rate

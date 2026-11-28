@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from collections import Counter
+from contextlib import suppress
 from pathlib import Path
+from typing import TextIO
 
 from arci.hashing import canonical_json, hash_bytes
 from arci.importers.promptfoo import READER, TESTED_VERSIONS, PromptfooError, PromptfooResult, read
+from arci.outcome_report import escape_terminal
 
 _EXISTING_RESULTS = (
     "These are existing results: use arci verdict-rule and arci verdict for a descriptive verdict; "
@@ -32,17 +37,26 @@ def neutral_jsonl(result: PromptfooResult, source_sha256: str) -> bytes:
 
 def _write_new(out: Path, content: bytes) -> None:
     try:
-        stream = out.open("xb")
-    except FileExistsError as exc:
-        raise PromptfooError("output already exists") from exc
+        fd, temporary = tempfile.mkstemp(dir=out.parent)
     except OSError as exc:
         raise PromptfooError("cannot create output file") from exc
     try:
-        with stream:
-            stream.write(content)
+        with os.fdopen(fd, "wb") as stream:
+            if stream.write(content) != len(content):
+                raise OSError("short write")
+        os.link(temporary, out)
+    except FileExistsError as exc:
+        raise PromptfooError("output already exists") from exc
     except OSError as exc:
-        out.unlink(missing_ok=True)
         raise PromptfooError("cannot write output file") from exc
+    finally:
+        os.unlink(temporary)
+
+
+def stream_text(text: str, stream: TextIO) -> str:
+    """Preserve printable Unicode when the destination encoding supports it."""
+    encoding = getattr(stream, "encoding", None) or "utf-8"
+    return text.encode(encoding, errors="backslashreplace").decode(encoding)
 
 
 def convert(
@@ -63,23 +77,33 @@ def convert(
         digest = hash_bytes(raw)
         _write_new(out, neutral_jsonl(result, digest))
     except (PromptfooError, OSError) as exc:
-        print(f"convert: {exc}", file=sys.stderr)
+        print(stream_text(f"convert: {escape_terminal(str(exc))}", sys.stderr), file=sys.stderr)
         return 3
 
-    version = result.tool_version or "unknown"
+    version = escape_terminal(result.tool_version or "unknown")
     counts = Counter(row.outcome for row in result.rows)
-    print(f"reader: {READER}")
-    print(f"tool version: {version}")
-    print(f"source_sha256: {digest}")
-    print(f"selected cell: {result.selected_cell}")
-    print(f"rows: {len(result.rows)}, rounds: {len({row.round for row in result.rows})}")
-    print(f"pass: {counts['pass']}, fail: {counts['fail']}, error: {counts['error']}")
+    lines = [
+        f"reader: {READER}",
+        f"tool version: {version}",
+        f"source_sha256: {digest}",
+        f"selected cell: {escape_terminal(str(result.selected_cell))}",
+        f"rows: {len(result.rows)}, rounds: {len({row.round for row in result.rows})}",
+        f"pass: {counts['pass']}, fail: {counts['fail']}, error: {counts['error']}",
+    ]
     if result.tool_version not in TESTED_VERSIONS:
-        print(f"Notice: {READER} was not tested with promptfoo version {version}.")
+        lines.append(f"Notice: {READER} was not tested with promptfoo version {version}.")
     if result.cache is True:
-        print(
+        lines.append(
             "Notice: the cache was on, so answers may come from earlier runs "
             "that the file cannot show."
         )
-    print(_EXISTING_RESULTS)
+    lines.append(_EXISTING_RESULTS)
+    try:
+        print(stream_text("\n".join(lines), sys.stdout), flush=True)
+    except Exception:
+        # Publication succeeded. Keep the interpreter's shutdown flush from
+        # retrying a failed write to the process's stdout (which would exit 120).
+        if sys.stdout is sys.__stdout__:
+            with suppress(OSError, ValueError):
+                sys.stdout.close()
     return 0

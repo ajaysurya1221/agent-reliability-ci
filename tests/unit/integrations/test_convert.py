@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
+import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -82,12 +87,14 @@ def test_a04_exact_bytes_and_summary(
 
 def test_a04_untested_version_notice(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     doc = json.loads((REAL / "words-single.json").read_bytes())
-    doc["metadata"]["promptfooVersion"] = "other"
+    doc["metadata"]["promptfooVersion"] = "other\nextra"
     source = tmp_path / "other.json"
     source.write_bytes(canonical(doc))
     assert run_convert(source, tmp_path / "out.jsonl") == 0
-    notices = [s for s in capsys.readouterr().out.splitlines() if "not tested" in s]
-    assert notices == ["Notice: promptfoo/1 was not tested with promptfoo version other."]
+    lines = capsys.readouterr().out.splitlines()
+    assert r"tool version: other\x0aextra" in lines
+    notices = [s for s in lines if "not tested" in s]
+    assert notices == [r"Notice: promptfoo/1 was not tested with promptfoo version other\x0aextra."]
 
 
 @pytest.mark.parametrize("case", REFUSALS, ids=lambda c: c.name)
@@ -231,3 +238,87 @@ def test_a06_selector_refusal_lists_cells(
     message = capsys.readouterr().err
     for r in json.loads(source.read_bytes())["results"]["results"]:
         assert f'prompt={r["promptIdx"]} provider="{r["provider"]["label"]}"' in message
+
+
+@pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
+def test_midwrite_never_publishes_partial_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: type[BaseException]
+) -> None:
+    out = tmp_path / "out.jsonl"
+    open_file = io.open
+    visible: list[bool] = []
+
+    def interrupted_open(file: Any, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        stream = open_file(file, mode, *args, **kwargs)
+        if "b" in mode and stream.writable():
+            write = stream.write
+
+            def interrupt(data: bytes) -> int:
+                write(data[:4])
+                stream.flush()
+                visible.append(out.exists())
+                raise failure()
+
+            monkeypatch.setattr(stream, "write", interrupt)
+        return stream
+
+    with monkeypatch.context() as patch:
+        patch.setattr(io, "open", interrupted_open)
+        if failure is KeyboardInterrupt:
+            with pytest.raises(KeyboardInterrupt):
+                run_convert(REAL / "words-single.json", out)
+        else:
+            assert run_convert(REAL / "words-single.json", out) == 3
+    assert visible == [False]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_ascii_streams_escape_imported_cell_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = json.loads((REAL / "words-single.json").read_bytes())
+    for row in doc["results"]["results"]:
+        row["provider"]["label"] = "café\u2028end"
+    source = tmp_path / "source.json"
+    source.write_bytes(canonical(doc))
+    out = tmp_path / "out.jsonl"
+    with (
+        io.TextIOWrapper(io.BytesIO(), encoding="ascii") as stdout,
+        io.TextIOWrapper(io.BytesIO(), encoding="ascii") as stderr,
+        monkeypatch.context() as patch,
+    ):
+        patch.setattr(sys, "stdout", stdout)
+        patch.setattr(sys, "stderr", stderr)
+        assert run_convert(source, out) == 0
+        assert run_convert(source, tmp_path / "missing.jsonl", "--provider", "absent") == 3
+        for stream in (stdout, stderr):
+            stream.seek(0)
+            assert r'provider="caf\xe9\u2028end"' in stream.read()
+    assert out.is_file()
+
+
+@pytest.mark.parametrize("unbuffered", [False, True])
+def test_closed_pipe_preserves_published_exit_status(tmp_path: Path, unbuffered: bool) -> None:
+    out = tmp_path / "out.jsonl"
+    reader, writer = os.pipe()
+    os.close(reader)
+    with os.fdopen(writer, "wb") as pipe:
+        result = subprocess.run(
+            [
+                sys.executable,
+                *(["-u"] if unbuffered else []),
+                "-m",
+                "arci",
+                "convert",
+                "--from",
+                "promptfoo",
+                str(REAL / "words-single.json"),
+                "--out",
+                str(out),
+            ],
+            stdout=pipe,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    assert out.read_bytes().endswith(b"\n")
+    assert result.returncode == 0, result.stderr

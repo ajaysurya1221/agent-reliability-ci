@@ -145,9 +145,11 @@ def _check_result_cache(results: dict[str, Any], stats: dict[str, Any]) -> None:
     stability = _optional_object(results.get("repeatStability"), "results.repeatStability")
     _cache_count(stability.get("cachedResults"), "results.repeatStability.cachedResults")
     for group in _array(stability.get("groups", []), "repeatStability.groups"):
-        _cache_count(
-            _object(group, "group").get("cached"), "results.repeatStability.groups[].cached"
-        )
+        cached = _object(group, "group").get("cached", 0)
+        field = "results.repeatStability.groups[].cached"
+        if cached is not True and (type(cached) is not int or cached < 0):
+            raise PromptfooError(f"{field} must be a non-negative integer or true")
+        _cache_count(cached, field)
 
 
 def _check_grading_cache(value: object) -> None:
@@ -166,8 +168,8 @@ def _read_row(row: dict[str, Any]) -> PromptfooRow:
     if response.get("cached") is True:
         raise PromptfooError("cache use reported by response.cached")
     metadata = _optional_object(response.get("metadata"), "response.metadata")
-    http = _optional_object(metadata.get("http"), "response.metadata.http")
-    status = http.get("status")
+    http = metadata.get("http")
+    status = http.get("status") if isinstance(http, dict) else None
     if isinstance(status, (int, float)) and 400 <= status <= 599 and status == int(status):
         raise PromptfooError("response.metadata.http.status is in the HTTP error range 400 to 599")
     _check_grading_cache(row.get("gradingResult"))

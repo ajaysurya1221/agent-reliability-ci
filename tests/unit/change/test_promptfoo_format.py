@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import shlex
 import sys
@@ -11,9 +12,12 @@ from typing import Any
 
 import pytest
 
+from arci import change
 from arci.cli import main
+from arci.hashing import hash_bytes
 from arci.outcome_schema import OutcomeDecision
 from tests.unit.change.test_cli import run as run_legacy
+from tests.unit.integrations.test_promptfoo_reader import raw_rows
 
 REAL = Path(__file__).resolve().parents[1] / "integrations/real/promptfoo"
 
@@ -287,14 +291,19 @@ def test_a11_same_export_twice(tmp_path: Path) -> None:
     assert "repeated promptfoo evalId" in (tmp_path / "run/verdict.txt").read_text()
 
 
-def test_a11_untested_version_notice_once(tmp_path: Path) -> None:
+def test_a11_untested_version_notice_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("discovery", "r1-baseline", "r1-candidate"):
         doc = document("e2e-" + name)
-        doc["metadata"]["promptfooVersion"] = "other"
+        doc["metadata"]["promptfooVersion"] = "other\né"
         write_export(tmp_path, name, doc)
-    assert campaign(tmp_path) == 1
+    notice = r"Notice: promptfoo/1 was not tested with promptfoo version other\x0a"
+    with io.TextIOWrapper(io.BytesIO(), encoding="ascii") as stdout, monkeypatch.context() as patch:
+        patch.setattr(sys, "stdout", stdout)
+        assert campaign(tmp_path) == 1
+        stdout.seek(0)
+        assert stdout.read().splitlines().count(notice + r"\xe9.") == 1
     lines = (tmp_path / "run/verdict.txt").read_text().splitlines()
-    assert lines.count("Notice: promptfoo/1 was not tested with promptfoo version other.") == 1
+    assert lines.count(notice + "é.") == 1
 
 
 @pytest.mark.parametrize("fmt", ["junit", "csv", "jsonl"])
@@ -324,3 +333,61 @@ def test_a12_legacy_launch_environment_and_exit_100(
     assert (root / "discovery/baseline.stdout").read_text() == "17\n"
     assert (root / "discovery/baseline.exit").read_text() == "100\n"
     assert "unexpected exit 100" in (root / "verdict.txt").read_text()
+
+
+def test_discovery_and_counts_use_verified_snapshot_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    open_path = Path.open
+
+    def reopen(path: Path, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        # Capture verification uses its own file descriptor. Give path-based
+        # parser rereads different rows without changing the evidence on disk.
+        if path.name.endswith(".snapshot.jsonl") and mode in {"r", "rb"}:
+            with open_path(path, "rb") as stream:
+                raw = stream.read()
+            if path.parent.name == "discovery":
+                raw += b'{"task_id":"unexpected","outcome":"pass"}\n'
+            elif mode == "r":
+                raw = raw.replace(b'"outcome":"pass"', b'"outcome":"fail"')
+            return io.BytesIO(raw) if mode == "rb" else io.StringIO(raw.decode())
+        return open_path(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reopen)
+    assert campaign(tmp_path) == 1
+    root = tmp_path / "run"
+    expected = sorted(task for _, task, _ in raw_rows(document("e2e-discovery")))
+    assert json.loads((root / "plan.json").read_bytes())["tasks"] == expected
+    assert (
+        "Old version passed 20 of 20 task runs. New version passed 0 of 20."
+        in (root / "verdict.txt").read_text()
+    )
+
+
+def test_wrong_returned_promptfoo_digest_with_intact_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decide = change.decide_outcomes
+    root = tmp_path / "run"
+    folder = root / "round-001"
+    scored: dict[str, str] = {}
+
+    def wrong_digest(*args: Any, **kwargs: Any) -> OutcomeDecision:
+        actual = decide(*args, **kwargs)
+        first, *rest = actual.inputs
+        scored.update((item.path, item.sha256) for item in actual.inputs)
+        incorrect = first.model_copy(update={"sha256": "0" * 64})
+        altered = OutcomeDecision.create(
+            **actual.model_dump(exclude={"inputs", "record_sha256"}), inputs=(incorrect, *rest)
+        )
+        assert altered.validate_seal()
+        return altered
+
+    monkeypatch.setattr(change, "decide_outcomes", wrong_digest)
+    assert campaign(tmp_path) == 3
+    for arm in ("baseline", "candidate"):
+        assert (folder / f"{arm}.json").read_bytes() == (REAL / f"e2e-r1-{arm}.json").read_bytes()
+        path = folder / f"{arm}.snapshot.jsonl"
+        assert hash_bytes(path.read_bytes()) == scored[str(path)]
+    assert "scored bytes differ" in (root / "verdict.txt").read_text()
+    assert not (folder / "decision.json").exists()

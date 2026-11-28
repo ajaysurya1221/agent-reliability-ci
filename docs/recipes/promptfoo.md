@@ -2,8 +2,9 @@
 
 The reader was tested with JSON exports from promptfoo 0.125.1 and 0.126.0.
 Both versions ran word checks with a scripted provider, with and without repeats.
-The 0.126.0 runs also tested two prompts, two providers and cache hits against
-a local HTTP stub. See the [0.125.1 fixture notes](../../tests/unit/outcomes/real/README.md)
+In 0.126.0, the scripted provider tested exports containing two prompts or two
+providers. Separate runs used a local HTTP server to check cache behavior.
+See the [0.125.1 fixture notes](../../tests/unit/outcomes/real/README.md)
 and [0.126.0 fixture notes](../../tests/unit/integrations/real/README.md).
 
 ## Use a run you already have
@@ -33,8 +34,11 @@ arci convert --from promptfoo providers.json --provider old --out old.jsonl
 arci convert --from promptfoo providers.json --provider new --out new.jsonl
 ```
 
-With each version in its own JSONL file, use the baseline to name the tasks,
-then compare the two files.
+Use the old version's file to build the task list in `rule.yaml`, then compare
+the two versions. Each repeat in a saved export counts as one round. If your
+export contains more rounds than the default cap, set `--max-rounds` to cover
+them. For 200 tasks repeated three times, the default cap is two. Add
+`--max-rounds 3` to the `arci verdict-rule` command below.
 
 ```sh
 arci verdict-rule --tasks old.jsonl --out rule.yaml
@@ -42,9 +46,9 @@ arci verdict rule.yaml --baseline old.jsonl --candidate new.jsonl
 ```
 
 This is a descriptive verdict. The rule was written after the results existed,
-so the statistical error bound does not apply. Repeats in a saved export become
-numbered rounds. ARCI refuses exports that report cache hits. If the cache was
-on and the file shows no hits, conversion succeeds with a notice.
+so the statistical error bound does not apply. ARCI refuses exports that report
+cache hits. If the cache was on and the file shows no hits, conversion succeeds
+with a notice.
 
 ARCI pairs tasks by id. The id starts with up to 80 characters of the
 description (or `test` for a missing or empty description). After a space and
