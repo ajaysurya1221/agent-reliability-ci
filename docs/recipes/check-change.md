@@ -85,7 +85,9 @@ The timeout defaults to 600 seconds per launch. Use `--timeout-seconds` to chang
 Each launch has its own process group. When the command exits or times out, ARCI stops any
 remaining processes in that group before it reads the result or starts another launch.
 If you press Ctrl-C during a launch, ARCI stops its process group, records the cancellation
-in `verdict.txt` and exits with status 130.
+in `verdict.txt` and exits with status 130. If you press it while a finished verdict is being
+printed, the lines already printed stay above the cancellation line. The exit status and the
+last line that starts with `ERROR:` or `VERDICT:` are the result.
 
 A helper that starts its own session leaves the process group, so ARCI cannot stop it
 during clean-up. Process-group clean-up is tested in CI on Linux and by hand on macOS.

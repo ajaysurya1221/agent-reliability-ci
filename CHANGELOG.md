@@ -6,9 +6,7 @@
   evaluated test command runs, and runs both on fresh paired rounds.
   Sealed decisions name the snapshots used for replay. ARCI checks earlier originals and
   snapshots before each launch and before reporting the verdict. Cancelling a launch stops
-  its process group and records the cancellation in `verdict.txt`; a signal that arrives after
-  the final check, or a failure writing to the terminal after it, leaves the verdict and its
-  exit code as they are, and `verdict.txt` is completed. The report explains the
+  its process group and records the cancellation in `verdict.txt`. The report explains the
   verdict against the registered margin and, once a round has been evaluated, gives the number
   of task runs each version passed. Windows supports install and `--help` only.
   See the [check-change recipe](docs/recipes/check-change.md).

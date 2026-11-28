@@ -17,7 +17,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Generator, Sequence
-from contextlib import ExitStack, closing, contextmanager, suppress
+from contextlib import ExitStack, closing, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -95,50 +95,21 @@ class _Cancelled(Exception):
 class _Cancellation:
     signum: int = 0
     launch_active: bool = False
-    committed: bool = False
-    deferred: bool = False
 
     def request(self, signum: int, frame: FrameType | None) -> None:
         if not self.signum:
             self.signum = signum
             # During spawn and cleanup, leave ownership of the group with _execute.
-            if not self.launch_active and not self.committed and not self.deferred:
+            if not self.launch_active:
                 raise _Cancelled
 
     @contextmanager
-    def defer(self) -> Generator[None, None, None]:
-        if self.signum or self.committed or self.deferred:
-            yield
-            return
-        self.deferred = True
-        try:
-            yield
-        finally:
-            self.deferred = False
-        if self.signum and not self.launch_active:
-            raise _Cancelled
-
-    @contextmanager
-    def listen(self) -> Generator[Callable[[], None], None, None]:
-        """Let the caller catch cancellation during setup and keep handlers through reporting."""
+    def listen(self) -> Generator[None, None, None]:
         with ExitStack() as restore:
-
-            def install() -> None:
-                signals = (signal.SIGINT, signal.SIGTERM)
-                mask = (
-                    signal.pthread_sigmask(signal.SIG_BLOCK, signals)
-                    if hasattr(signal, "pthread_sigmask")
-                    else None
-                )
-                try:
-                    for sig in signals:
-                        restore.callback(signal.signal, sig, signal.getsignal(sig))
-                        signal.signal(sig, self.request)
-                finally:
-                    if mask is not None:
-                        signal.pthread_sigmask(signal.SIG_SETMASK, mask)
-
-            yield install
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                restore.callback(signal.signal, sig, signal.getsignal(sig))
+                signal.signal(sig, self.request)
+            yield
 
 
 def _has_waitid() -> bool:
@@ -722,7 +693,6 @@ def _run(
     campaign.verify()
     if plan_only:
         campaign.verify_results()
-        campaign.cancellation.committed = True
         return 0
 
     campaign.tasks = frozenset(rule.tasks)
@@ -737,7 +707,6 @@ def _run(
     )
     campaign.verify()
     campaign.verify_results()
-    campaign.cancellation.committed = True
     emit("arci check-change verdict")
     n_tasks = len(rule.tasks)
     points = 100 * parse_rational(rule.margin)
@@ -844,60 +813,44 @@ def check_change(
         return 3
     campaign = _Campaign(root, commands, fmt, timeout_seconds)
     with (root / "verdict.txt").open("x", encoding="utf-8") as transcript:
-        stdout_available = True
 
         def emit(line: str) -> None:
-            nonlocal stdout_available
-            with campaign.cancellation.defer():
-                print(line, file=transcript, flush=True)
-                if stdout_available:
-                    try:
-                        print(stream_text(line, sys.stdout), flush=True)
-                    except (OSError, ValueError):
-                        if not campaign.cancellation.committed:
-                            raise
-                        stdout_available = False
-                        # A failed shutdown flush would replace the decision's status with 120.
-                        if sys.stdout is sys.__stdout__:
-                            with suppress(OSError, ValueError):
-                                sys.stdout.close()
+            print(line, file=transcript, flush=True)
+            print(stream_text(line, sys.stdout), flush=True)
 
-        with campaign.cancellation.listen() as install:
-            try:
+        try:
+            with campaign.cancellation.listen():
                 try:
-                    install()
                     code = _run(campaign, baseline, candidate, margin, max_rounds, plan_only, emit)
                     if plan_only:
                         _launch_record(campaign, emit)
                 except (_Cancelled, ValueError, OSError) as exc:
                     # A final evidence check may also fail as a cancelled launch unwinds.
-                    if campaign.cancellation.committed or not (sig := campaign.cancellation.signum):
+                    if not (sig := campaign.cancellation.signum):
                         raise
                     emit("ERROR: the campaign was cancelled, so there is no verdict.")
                     if not isinstance(exc, _Cancelled):
                         emit(escape_terminal(str(exc)))
                     _launch_record(campaign, emit)
                     code = 128 + sig
-            except (ValueError, OSError) as exc:
-                # The campaign already failed. Finish its error report with normal I/O semantics.
-                campaign.cancellation.deferred = True
-                emit("arci check-change verdict")
-                emit(ERROR_SENTENCE)
-                _pass_counts(campaign, emit)
-                emit("VERDICT: ERROR (exit 3)")
-                emit(escape_terminal(str(exc)))
-                _launch_record(campaign, emit)
-                code = 3
-            emit(ASSUMPTIONS)
-            emit(f"Files in {escape_terminal(str(root))}:")
+        except (ValueError, OSError) as exc:
+            emit("arci check-change verdict")
+            emit(ERROR_SENTENCE)
+            _pass_counts(campaign, emit)
+            emit("VERDICT: ERROR (exit 3)")
+            emit(escape_terminal(str(exc)))
+            _launch_record(campaign, emit)
+            code = 3
+        emit(ASSUMPTIONS)
+        emit(f"Files in {escape_terminal(str(root))}:")
 
-            def index_order(path: Path) -> tuple[str, int, Path]:
-                folder = path.relative_to(root).parts[0]
-                if match := re.fullmatch(r"round-([0-9]+)", folder):
-                    return "round-", int(match[1]), path
-                return folder, 0, path
+        def index_order(path: Path) -> tuple[str, int, Path]:
+            folder = path.relative_to(root).parts[0]
+            if match := re.fullmatch(r"round-([0-9]+)", folder):
+                return "round-", int(match[1]), path
+            return folder, 0, path
 
-            for path in sorted(root.rglob("*"), key=index_order if fmt == "promptfoo" else None):
-                if not path.is_dir():
-                    emit("  " + escape_terminal(str(path.relative_to(root))))
-            return code
+        for path in sorted(root.rglob("*"), key=index_order if fmt == "promptfoo" else None):
+            if not path.is_dir():
+                emit("  " + escape_terminal(str(path.relative_to(root))))
+        return code
