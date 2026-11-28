@@ -43,7 +43,8 @@ HTML and JUnit outputs are not read (its JUnit ids number the rows and cannot be
 - **Cell.** A file holds one or more cells; a cell is one `promptIdx` with one
   `provider.label` (the provider `id` when there is no label). The reader reads exactly one
   cell. A file with more than one cell is refused unless the caller selects one with
-  `prompt=N` (a `promptIdx`) and/or `provider=LABEL`; a selection that matches no cell or more
+  `prompt=N` (a `promptIdx`) and/or `provider=LABEL` (with both, a cell must match both); a
+  selection that matches no cell or more
   than one is refused, and the message lists the cells.
 - **Task id.** `D` is `testCase.description`: null when absent or null, otherwise the exact
   string (the empty string stays empty). `V` is `testCase.vars`: `{}` when absent or null,
@@ -59,9 +60,12 @@ HTML and JUnit outputs are not read (its JUnit ids number the rows and cannot be
   `runtimeOptions.repeat` 1 or absent) the rows carry no `round`. With repeats every row carries
   `round = repeatIndex + 1`, and the number of rounds must equal `runtimeOptions.repeat`. A cell
   where some rows have a `repeatIndex` and others do not is refused.
+- **Types.** `promptIdx`, `repeatIndex` and `failureReason` must be JSON integers (a boolean is
+  not an integer); `success` must be a boolean; an HTTP status counts when it is an integer, or a
+  number with an integral value (`500.0` counts as 500).
 - **Refused, with a fixed message naming the reason:** not a JSON object; results `version`
-  other than 3; a row without `testCase` or with a non-object `testCase.vars`; `success` not a
-  boolean; `failureReason` not 0, 1 or 2, or contradicting `success` (0 with false, 1 or 2 with
+  other than 3; a row without `testCase`; a `testCase.vars` that is neither absent, null nor an
+  object; `success` not a boolean; `failureReason` not 0, 1 or 2, or contradicting `success` (0 with false, 1 or 2 with
   true); a recount of the whole file (all cells) that differs from `results.stats.successes`,
   `failures` or `errors`; any cache use the file reports (`results.stats.cacheHits` above 0, any
   row with `response.cached` true, or any `results.prompts[].metrics.testCacheHitCount` above 0);
@@ -72,7 +76,7 @@ HTML and JUnit outputs are not read (its JUnit ids number the rows and cannot be
 - **Cache use the file reports**, each refused on its own: `results.stats.cacheHits` above 0;
   any row with `response.cached` true; any `results.prompts[].metrics.testCacheHitCount` above
   0; `results.repeatStability.cachedResults` above 0; any `results.repeatStability.groups[]`
-  with `cached` true; `metadata.cachedResponse` true on any `gradingResult` or nested
+  with `cached` above 0 (an integer count; `true` is treated as 1); `metadata.cachedResponse` true on any `gradingResult` or nested
   `componentResults` entry. Absent counters and an absent `response.cached` (a `file://`
   provider writes none) are accepted.
 - **Also returned:** the cache setting `runtimeOptions.cache` (true, false or absent), the tool version (`metadata.promptfooVersion`, or null), the run id
@@ -116,8 +120,9 @@ arci convert --from promptfoo SOURCE.json --out OUT.jsonl [--prompt N] [--provid
   round-002/baseline.snapshot.jsonl ... --candidate ...` reproduces the counts, the stopping
   round and the exit status. The file index the command prints is in that order.
 - `arci convert --from promptfoo` on a kept original reproduces its snapshot byte for byte.
-- The launch environment of a promptfoo command gets `PROMPTFOO_FAILED_TEST_EXIT_CODE=100`
-  (set by ARCI, overriding the caller's), so that a test failure cannot exit 1. Accepted exit
+- ARCI sets `PROMPTFOO_FAILED_TEST_EXIT_CODE=100` in the launch's process environment,
+  overriding the caller's value. A promptfoo suite file can still override it; exit status 1 is
+  refused even when a configured test failure produced it. Accepted exit
   statuses: 0 and 100; the raw status is recorded. Every other status, including 1 (promptfoo's
   status for any other error), ends the campaign with ERROR, as in 0019. Because promptfoo also
   exits 100 when the target failed, the file is always validated, and the HTTP-status refusal
@@ -127,10 +132,11 @@ arci convert --from promptfoo SOURCE.json --out OUT.jsonl [--prompt N] [--provid
   `cache: true`), so a file with `cache: true` ends the campaign with ERROR and the message names
   `--no-cache`.
 - In addition to 0019's checks, each of these ends the campaign with ERROR and starts no further
-  launch: a file with repeats; any cache use the file reports; `runtimeOptions.cache` true; more
-  than one cell; a run id
-  (`evalId`) seen before anywhere in the campaign; the same run time (`results.timestamp`) as an
-  earlier file of the same side; a tool version different from the one discovery saw; any
+  launch: a file with repeats; any cache use the file reports; `runtimeOptions.cache` that is
+  not the literal `false` (true, null or absent); an empty or missing `evalId`,
+  `results.timestamp` or tool version; more than one cell; a run id
+  (`evalId`) seen before anywhere in the campaign; a run time (`results.timestamp`) that denotes
+  the same instant as an earlier file of the same side (compared as in 0019); a tool version different from the one discovery saw; any
   reader refusal.
 - `plan.json` gains, for this format only, `reader` (`promptfoo/1`), `scored_format` (`jsonl`)
   and `tool_version` (from discovery). For `junit`, `csv` and `jsonl` it is unchanged.
@@ -145,9 +151,9 @@ arci convert --from promptfoo SOURCE.json --out OUT.jsonl [--prompt N] [--provid
   stable `ids=[...]`; a positional id (`golden0`) pairs by position, not by task.
 - **Opik** (`docs/recipes/opik.md`): `pytest TESTS --junitxml={out}` with `@opik.llm_unit()` and
   `OPIK_PYTEST_EXPERIMENT_ENABLED=false`. Without that variable Opik sends results to its cloud
-  address by default; the page says so, and shows both tested settings
-  (`OPIK_PYTEST_EXPERIMENT_ENABLED=false` alone, and with `OPIK_TRACK_DISABLE=true`, which also
-  stops `@opik.track` from trying to send traces). Opik's own report needs an Opik server and is
+  address by default; the page says so. The real files were made with both
+  `OPIK_PYTEST_EXPERIMENT_ENABLED=false` and `OPIK_TRACK_DISABLE=true` (the second stops
+  `@opik.track` from trying to send traces), and the page shows that combination only. Opik's own report needs an Opik server and is
   not used.
 - **MLflow** (`docs/recipes/mlflow.md`): the user's evaluation script calls
   `mlflow.genai.evaluate` and then writes ARCI's neutral JSONL to `{out}` with
@@ -182,7 +188,9 @@ arci convert --from promptfoo SOURCE.json --out OUT.jsonl [--prompt N] [--provid
 ## Acceptance items
 
 All offline. Real files only from `tests/unit/integrations/real/` (and, for promptfoo 0.125.1,
-`tests/unit/outcomes/real/promptfoo/`). "Recomputed" means computed in the test from the raw
+`tests/unit/outcomes/real/promptfoo/`). A test may derive a copy of a named real file by
+changing named fields only (`evalId`, `results.timestamp`, and a row's `success` with its
+`failureReason` and `results.stats` kept consistent); the derivation is code in the test. "Recomputed" means computed in the test from the raw
 file by code that does not call the code under test.
 
 **A. promptfoo**
@@ -194,21 +202,26 @@ file by code that does not call the code under test.
    changes no id.
 3. Each refusal listed for the reader, and each of the six cache signals, is tested one by one
    on a copy of a real file edited in that one place (including the real `shapes.json` for
-   duplicate ids and the real `cache-warm.json`); `cache-cold.json` and `cache-env-off.json` are
+   duplicate ids, the real `cache-warm.json`, a `repeatStability` group with `cached: 2` as the
+   only signal, `testCase.vars` null giving the same id as absent, and booleans in place of
+   integers); `cache-cold.json` and `cache-env-off.json` are
    accepted by `convert` with the cache notice. The golden vector gives its id.
 4. `convert` writes exactly one file, the same bytes on every run; each refusal (reader and
-   path rules) exits 3 and leaves no file.
+   path rules) exits 3 and leaves no new file, and a file that already existed at `OUT` keeps
+   its bytes.
 5. `verdict-rule` and `verdict` on `convert` outputs of `words-baseline` and `words-candidate`
    give the pair counts recomputed from the raw files, with the descriptive statement.
 6. `two-prompts.json` converted with `--prompt 0` and `--prompt 1`, and `two-providers.json`
    with `--provider old` and `--provider new`: every `(round, id, outcome)` of each output equals
    the source rows filtered independently by that cell; rounds are 1 to 3; id sets are equal
    between the two cells. Without a selector both files are refused and the message lists the
-   cells; a selector that matches no cell, and one that matches two, are refused.
+   cells; a selector that matches no cell, one that matches two, and `--prompt 0 --provider new`
+   on `two-providers.json` (each option matches a different cell) are refused.
 7. `check-change --format promptfoo` with a fake command that copies a real file to `{out}`:
    decisions name `*.snapshot.jsonl` with the format `jsonl`; `arci verdict` by hand on the
    snapshots, listed in numeric round order, reproduces counts, stopping round and exit status,
-   checked at round 2 and with its predecessor decision; the fake command sees
+   checked at round 2 and with its predecessor decision (derived copies: round 1 ties, round 2
+   losses, each launch a fresh `evalId` and run time); the fake command sees
    `PROMPTFOO_FAILED_TEST_EXIT_CODE=100` in its environment.
 8. `convert` on each kept original reproduces its snapshot byte for byte, and every row's
    `source_sha256` equals the original's digest.
@@ -217,8 +230,9 @@ file by code that does not call the code under test.
 10. Each of these gives exit 3, keeps the files written so far and starts no further launch: a
     changed original; a changed snapshot; a reused `evalId`; a reused run time on one side; a
     file with repeats; a file with cache use; a file with two cells; a changed tool version; a
-    reader refusal; a file with `runtimeOptions.cache` true; a row with HTTP status 500; a
-    launch exit status of 1.
+    reader refusal; a file with `runtimeOptions.cache` true, null or absent; an empty `evalId`,
+    run time or tool version; a row with HTTP status 500 and one with 500.0; a launch exit
+    status of 1.
 11. With `e2e-discovery.json`, `e2e-r1-baseline.json` and `e2e-r1-candidate.json` served by the
     fake command: BLOCK at round 1, exit 1. Serving the same file twice gives exit 3. A launch
     exiting with 100 and a valid file is accepted.
