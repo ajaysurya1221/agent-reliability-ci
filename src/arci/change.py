@@ -30,8 +30,9 @@ from xml.etree import ElementTree
 
 import yaml
 
+from arci.convert import neutral_jsonl
 from arci.hashing import hash_bytes
-from arci.importers import OutcomeValue, junit
+from arci.importers import OutcomeValue, junit, promptfoo
 from arci.outcome_report import TERMINAL_TASK_OVERFLOW, escape_terminal, render_terminal
 from arci.outcome_schema import OutcomeDecision, OutcomeRule
 from arci.outcomes import (
@@ -52,7 +53,8 @@ from arci.suite_stats import (
     never_differs_pass_round,
 )
 
-ChangeFormat = Literal["junit", "csv", "jsonl"]
+ScoredFormat = Literal["junit", "csv", "jsonl"]
+ChangeFormat = ScoredFormat | Literal["promptfoo"]
 ASSUMPTIONS = """Conditions for the campaign bound:
 Every round must rerun the agent with fresh answers. Matching outcomes alone cannot show a cache.
 Pairs must be jointly independent across tasks and rounds. Each task's law must stay fixed.
@@ -214,12 +216,16 @@ def _execute(
     directory: int,
     timeout: float,
     cancellation: _Cancellation,
+    fmt: ChangeFormat,
 ) -> tuple[int, bool, str | None]:
     def new_file(name: str, flags: int) -> int:
         return os.open(name, flags, 0o666, dir_fd=directory)
 
     if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
         raise ValueError("launch cleanup requires the default SIGCHLD disposition")
+    env = {**os.environ, "ARCI_CHANGE_ARM": arm, "ARCI_CHANGE_ROUND": str(number)}
+    if fmt == "promptfoo":
+        env["PROMPTFOO_FAILED_TEST_EXIT_CODE"] = "100"
     with (
         open(f"{arm}.stdout", "xb", opener=new_file) as stdout,
         open(f"{arm}.stderr", "xb", opener=new_file) as stderr,
@@ -227,7 +233,7 @@ def _execute(
             argv,
             stdout=stdout,
             stderr=stderr,
-            env={**os.environ, "ARCI_CHANGE_ARM": arm, "ARCI_CHANGE_ROUND": str(number)},
+            env=env,
             start_new_session=True,
         ) as child,
     ):
@@ -252,12 +258,16 @@ def _execute(
 class CapturedResult:
     path: Path
     snapshot: Path
-    digest: str
+    digest: str  # Scored snapshot, also the original's digest for byte-identical copies.
+    original_digest: str | None = None
 
     def verify(self) -> None:
-        for path in (self.path, self.snapshot):
+        for path, digest in (
+            (self.path, self.original_digest or self.digest),
+            (self.snapshot, self.digest),
+        ):
             with _directory(path.parent) as fd, _regular(fd, path.name) as stream:
-                if hashlib.file_digest(stream, "sha256").hexdigest() != self.digest:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != digest:
                     raise ValueError(f"results changed: {path}")
 
 
@@ -313,9 +323,39 @@ class _Campaign:
     earlier_decisions: dict[Path, str] = field(default_factory=dict)
     last_decision: tuple[Path, bytes] | None = None
     captures: list[CapturedResult] = field(default_factory=list)
+    run_ids: set[str] = field(default_factory=set)
+    tool_version: str | None = None
     completed_pairs: int = 0
     old_passes: int = 0
     new_passes: int = 0
+
+    @property
+    def scored_format(self) -> ScoredFormat:
+        return "jsonl" if self.fmt == "promptfoo" else self.fmt
+
+    def promptfoo_snapshot(self, raw: bytes, arm: Arm, digest: str) -> bytes:
+        result = promptfoo.read(raw)
+        if any(row.round is not None for row in result.rows):
+            raise ValueError("promptfoo repeats are not allowed")
+        if result.cache is not False:
+            raise ValueError("runtimeOptions.cache must be false: use --no-cache")
+        if not result.run_id:
+            raise ValueError("missing or empty evalId")
+        if not result.run_time:
+            raise ValueError("missing or empty results.timestamp")
+        if not result.tool_version:
+            raise ValueError("missing or empty promptfoo tool version")
+        if result.run_id in self.run_ids:
+            raise ValueError("repeated promptfoo evalId")
+        stamp = _timestamp(result.run_time)
+        if stamp in self.timestamps[arm]:
+            raise ValueError("repeated promptfoo timestamp")
+        if self.tool_version is not None and result.tool_version != self.tool_version:
+            raise ValueError("promptfoo tool version differs from discovery")
+        self.run_ids.add(result.run_id)
+        self.timestamps[arm].add(stamp)
+        self.tool_version = result.tool_version
+        return neutral_jsonl(result, digest)
 
     def register(self, name: str, content: str) -> None:
         path = self.root / name
@@ -362,7 +402,7 @@ class _Campaign:
     def launch(self, arm: Arm, number: int) -> LaunchResult:
         directory = self.root / (f"round-{number:03d}" if number else "discovery")
         directory.mkdir(exist_ok=True)
-        suffix = "xml" if self.fmt == "junit" else self.fmt
+        suffix = {"junit": "xml", "promptfoo": "json"}.get(self.fmt, self.fmt)
         path = directory / f"{arm}.{suffix}"
         argv = [arg.replace("{out}", str(path)) for arg in self.commands[arm]]
         label = f"{directory.name}/{arm}"
@@ -380,7 +420,7 @@ class _Campaign:
                 self.cancellation.launch_active = True
                 try:
                     code, timed_out, cleanup_error = _execute(
-                        argv, arm, number, fd, self.timeout, self.cancellation
+                        argv, arm, number, fd, self.timeout, self.cancellation, self.fmt
                     )
                     status = str(code)
                 finally:
@@ -392,16 +432,17 @@ class _Campaign:
                     status = f"timeout (exit {code})"
                     description = status
                     raise ValueError(f"{label}: {status}")
+                accepted = (0, 100) if self.fmt == "promptfoo" else (0, 1)
                 if code < 0:
                     description = f"terminated by signal {-code} (exit {code})"
-                elif code in (0, 1):
+                elif code in accepted:
                     description = f"{'success' if code == 0 else 'test failure'} (exit {code})"
                 else:
                     description = f"unexpected exit {code}"
                 if cleanup_error:
                     description += f" (cleanup failed: {cleanup_error})"
                     raise ValueError(f"{label}: {description}")
-                if code not in (0, 1):
+                if code not in accepted:
                     raise ValueError(f"{label}: exit {code}")
             finally:
                 self.record.append(f"{label}: {description}")
@@ -413,30 +454,44 @@ class _Campaign:
                 self.verify()
             if not os.path.samestat(os.fstat(fd), directory.lstat()):
                 raise ValueError(f"launch directory replaced: {directory}")
-            snapshot = path.with_suffix(f".snapshot{path.suffix}")
+            snapshot = path.with_suffix(
+                f".snapshot.{'jsonl' if self.fmt == 'promptfoo' else suffix}"
+            )
 
             def new_snapshot(name: str, flags: int) -> int:
                 return os.open(name, flags, 0o600, dir_fd=fd)
 
-            digest = hashlib.sha256()
             try:
-                with (
-                    _regular(fd, path.name) as source_file,
-                    open(snapshot.name, "xb", opener=new_snapshot) as target,
-                ):
-                    while chunk := source_file.read(256 * 1024):
-                        target.write(chunk)
-                        digest.update(chunk)
+                with _regular(fd, path.name) as source_file:
+                    if self.fmt == "promptfoo":
+                        raw = source_file.read()
+                        original_digest = hash_bytes(raw)
+                        try:
+                            content = self.promptfoo_snapshot(raw, arm, original_digest)
+                        except ValueError as exc:
+                            raise ValueError(f"{label}: {exc}") from exc
+                        with open(snapshot.name, "xb", opener=new_snapshot) as target:
+                            target.write(content)
+                        capture = CapturedResult(
+                            path, snapshot, hash_bytes(content), original_digest
+                        )
+                    else:
+                        digest = hashlib.sha256()
+                        with open(snapshot.name, "xb", opener=new_snapshot) as target:
+                            while chunk := source_file.read(256 * 1024):
+                                target.write(chunk)
+                                digest.update(chunk)
+                        capture = CapturedResult(path, snapshot, digest.hexdigest())
             except FileNotFoundError as exc:
                 raise ValueError(f"missing results file: {exc.filename}") from exc
 
-        capture = CapturedResult(path, snapshot, digest.hexdigest())
         self.captures.append(capture)
         capture.verify()
         try:
             with snapshot.open(encoding="utf-8-sig", newline="") as reader:
                 source = reader.read()
-            if self.fmt == "junit":
+            fmt = self.scored_format
+            if fmt == "junit":
                 parsed = junit.read(
                     source, path=str(path), arm=arm, position=number, tasks=self.tasks, seen=set()
                 )
@@ -451,7 +506,7 @@ class _Campaign:
                 self.timestamps[arm].update(stamps)
             else:
                 parsed = read_outcome_rows(
-                    source, fmt=self.fmt, path=str(path), arm=arm, position=number, tasks=self.tasks
+                    source, fmt=fmt, path=str(path), arm=arm, position=number, tasks=self.tasks
                 )
             if tuple(parsed.rounds) != (number,):
                 raise ValueError(f"file round contradicts assigned round {number}")
@@ -461,7 +516,7 @@ class _Campaign:
 
 
 def _register(
-    discovery: LaunchResult, fmt: ChangeFormat, margin: str, cap: int | None
+    discovery: LaunchResult, fmt: ScoredFormat, margin: str, cap: int | None
 ) -> OutcomeRule:
     capture, outcomes = discovery
     if cap is None:
@@ -495,7 +550,7 @@ def _register(
 def _assess_prefix(
     rule: OutcomeRule,
     rule_path: Path,
-    fmt: ChangeFormat,
+    fmt: ScoredFormat,
     prefix: list[dict[Arm, CapturedResult]],
     previous: OutcomeDecision | None,
     predecessor: Path | None,
@@ -532,7 +587,7 @@ def run_rounds(
     launch: Callable[[Arm, int], LaunchResult],
     rule: OutcomeRule,
     rule_path: Path,
-    fmt: ChangeFormat,
+    fmt: ScoredFormat,
     save: Callable[[int, bytes], None],
     count: Callable[[int, int, int], None],
 ) -> tuple[OutcomeDecision, bool]:
@@ -588,7 +643,7 @@ def _run(
         )
     _require_exit_observer()
     discovery = campaign.launch("baseline", 0)
-    registered = _register(discovery, campaign.fmt, margin, cap)
+    registered = _register(discovery, campaign.scored_format, margin, cap)
     rule_path = campaign.root / "rule.yaml"
     campaign.register(
         rule_path.name,
@@ -613,6 +668,12 @@ def _run(
         rule_sha256=digest,
         arm_order=order,
     )
+    if campaign.tool_version is not None:
+        plan.update(
+            reader=promptfoo.READER,
+            scored_format=campaign.scored_format,
+            tool_version=campaign.tool_version,
+        )
     campaign.register("plan.json", json.dumps(plan, indent=2) + "\n")
     emit(
         f"arci check-change plan: {len(rule.tasks)} tasks, {rule.max_rounds} rounds, "
@@ -639,7 +700,7 @@ def _run(
         campaign.launch,
         rule,
         rule_path,
-        campaign.fmt,
+        campaign.scored_format,
         campaign.save_decision,
         campaign.count_round,
     )
@@ -671,6 +732,12 @@ def _run(
     emit(block_text)
     if re.search(r"^\d+" + re.escape(TERMINAL_TASK_OVERFLOW.format(n="")) + "$", block_text, re.M):
         emit(f"Full task table: round-{decision.last_round_evaluated:03d}/decision.json")
+    if campaign.tool_version is not None:
+        version = escape_terminal(campaign.tool_version)
+        emit(
+            f"Results from promptfoo {version}, read by {promptfoo.READER}. "
+            "To check one: arci convert --from promptfoo round-001/baseline.json --out check.jsonl"
+        )
     _launch_record(campaign, emit)
     emit(
         f"Absolute passes: baseline {sum(t.baseline_successes for t in decision.tasks)}, "
@@ -702,6 +769,9 @@ def _pass_counts(campaign: _Campaign, emit: Callable[[str], None]) -> None:
 
 
 def _launch_record(campaign: _Campaign, emit: Callable[[str], None]) -> None:
+    if campaign.tool_version is not None and campaign.tool_version not in promptfoo.TESTED_VERSIONS:
+        version = escape_terminal(campaign.tool_version)
+        emit(f"Notice: {promptfoo.READER} was not tested with promptfoo version {version}.")
     emit("Launch record (discovery excluded from scoring):")
     for entry in campaign.record:
         emit("  " + entry)
@@ -772,7 +842,14 @@ def check_change(
             code = 3
         emit(ASSUMPTIONS)
         emit(f"Files in {escape_terminal(str(root))}:")
-        for path in sorted(root.rglob("*")):
+
+        def index_order(path: Path) -> tuple[str, int, Path]:
+            folder = path.relative_to(root).parts[0]
+            if match := re.fullmatch(r"round-([0-9]+)", folder):
+                return "round-", int(match[1]), path
+            return folder, 0, path
+
+        for path in sorted(root.rglob("*"), key=index_order if fmt == "promptfoo" else None):
             if not path.is_dir():
                 emit("  " + escape_terminal(str(path.relative_to(root))))
         return code

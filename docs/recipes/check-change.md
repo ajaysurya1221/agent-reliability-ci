@@ -112,6 +112,14 @@ Within valid files, a missing task or an error on either side counts as one erro
 Each such pair counts against both decisions. The cumulative allowance is one percent of
 registered pairs, rounded up. One more gives ERROR at that round end.
 
+## Using promptfoo
+
+With `--format promptfoo`, have each command run one prompt/provider cell with `--no-cache`
+and write its JSON export to `{out}`. Let ARCI schedule the repeats. For this format the
+accepted launch statuses are 0 and 100. ARCI keeps each original `.json` and scores its
+`.snapshot.jsonl` conversion. For manual replay, list each side's snapshots in numeric
+round order, leaving discovery out. See the [promptfoo recipe](promptfoo.md).
+
 ## Read the verdict
 
 - **PASS (0)** means the evidence puts the mean loss below the margin on these tasks.

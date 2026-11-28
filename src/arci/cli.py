@@ -1090,7 +1090,7 @@ def _parser(*, suite_probe: bool = False, v1_plan: bool = False) -> _Parser:
     )
     change.add_argument("--baseline", required=True, help="baseline command containing {out}")
     change.add_argument("--candidate", required=True, help="candidate command containing {out}")
-    change.add_argument("--format", choices=("junit", "csv", "jsonl"), default="junit")
+    change.add_argument("--format", choices=("junit", "csv", "jsonl", "promptfoo"), default="junit")
     change.add_argument("--margin", default="1/10", help="allowed mean loss as a rational")
     change.add_argument("--max-rounds", type=int, help="cap on evaluated rounds")
     change.add_argument("--timeout-seconds", type=float, default=600, help="per launch")
@@ -1199,12 +1199,12 @@ def _dispatch(values: dict[str, object]) -> int:
             provider=cast(str | None, values["provider"]),
         )
     if command == "check-change":
-        from arci.change import check_change
+        from arci.change import ChangeFormat, check_change
 
         return check_change(
             baseline=cast(str, values["baseline"]),
             candidate=cast(str, values["candidate"]),
-            fmt=cast(Literal["junit", "csv", "jsonl"], values["format"]),
+            fmt=cast(ChangeFormat, values["format"]),
             margin=cast(str, values["margin"]),
             max_rounds=cast(int | None, values["max_rounds"]),
             timeout_seconds=cast(float, values["timeout_seconds"]),
